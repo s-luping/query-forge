@@ -7,8 +7,9 @@ class TextToSqlRequest(BaseModel):
     """文本转SQL请求模型"""
     query: str
     table_names: Optional[List[str]] = None
-    max_results: Optional[int] = 100
     knowledge_id: Optional[int] = None
+    db_type: Optional[str] = "sqlite"
+    schema_name: Optional[str] = None
 
 
 class SqlValidationResponse(BaseModel):
@@ -40,6 +41,8 @@ class SqlHistoryItem(BaseModel):
     user_id: str
     created_at: Optional[datetime] = None
     rating: Optional[int] = None
+    schema_name: Optional[str] = None
+    knowledge_id: Optional[int] = None
 
 
 class SqlHistoryResponse(BaseModel):

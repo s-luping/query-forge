@@ -19,3 +19,5 @@ class SqlHistory(Base):
     user_id = Column(String(50), nullable=False)
     created_at = Column(DateTime, default=func.now())
     rating = Column(Integer)
+    schema_name = Column(String(100))
+    knowledge_id = Column(Integer)

@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Text to SQL</title>
+    <title>QueryForge</title>
     <link rel="stylesheet" href="/static/css/bootstrap.min.css">
     <link rel="stylesheet" href="/static/css/template_index.css">
 </head>
@@ -16,16 +16,23 @@
             <div class="tpl-index-sidebar-title">数据菜单</div>
             <div class="tpl-index-sidebar-content">
                 <div class="menu-group">
-                    <div class="menu-group-title" onclick="toggleMenu('schema')">Schema管理</div>
+                    <div class="menu-group-title" onclick="toggleMenu('schema')">Schema 管理</div>
                     <div id="menu-schema" class="menu-items" style="display:none;">
-                        <div class="menu-item" onclick="openWindow('Schema管理','/static/template/schema/schema_manage.html')">DDL解析管理</div>
+                        <div class="menu-item" onclick="openWindow('Schema 管理','/static/template/schema/schema_manage.html')">DDL 解析管理</div>
                     </div>
                 </div>
                 <div class="menu-group">
-                    <div class="menu-group-title" onclick="toggleMenu('chat')">智能分析</div>
+                    <div class="menu-group-title" onclick="toggleMenu('data')">表数据管理</div>
+                    <div id="menu-data" class="menu-items" style="display:none;">
+                        <div class="menu-item"
+                            onclick="openWindow('表数据管理','/static/template/table_data/table_data.html')">表数据管理与查询</div>
+                    </div>
+                </div>
+                <div class="menu-group">
+                    <div class="menu-group-title" onclick="toggleMenu('chat')">生成 SQL 与查询</div>
                     <div id="menu-chat" class="menu-items" style="display:none;">
                         <div class="menu-item"
-                            onclick="openWindow('智能数据分析','/static/template/chatSQL/chat_to_data.html')">智能数据分析助手</div>
+                            onclick="openWindow('生成 SQL 与查询','/static/template/chatSQL/chat_to_sql.html')">智能 SQL 生成</div>
                     </div>
                 </div>
             </div>
@@ -38,7 +45,7 @@
     </div>
     <!-- 顶部栏，右上角显示用户名 -->
     <div id="topbar" class="tpl-index-topbar">
-        <span class="tpl-index-topbar-title">Text to SQL 智能数据分析平台 <span class="tpl-index-topbar-version">v1.0</span></span>
+        <span class="tpl-index-topbar-title">QueryForge 智能数据查询平台 <span class="tpl-index-topbar-version">v1.0</span></span>
         <div class="dropdown tpl-index-user-dropdown">
             <span id="user-info" class="tpl-index-user-info"></span>
             <div id="user-dropdown" class="tpl-index-user-dropdown-menu">

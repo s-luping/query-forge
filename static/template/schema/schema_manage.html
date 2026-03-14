@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Schema管理</title>
+    <title>Schema 管理</title>
     <link href="/static/css/bootstrap.min.css" rel="stylesheet">
     <style>
         html, body {
@@ -118,29 +118,37 @@
             padding: 20px 0;
         }
         .table-cell-ellipsis {
-            max-width: 150px;
+            max-width: 120px;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
             cursor: pointer;
+            position: relative;
         }
         .table-cell-ellipsis:hover {
             white-space: normal;
             word-break: break-all;
+            position: absolute;
+            z-index: 1000;
+            background-color: white;
+            padding: 5px;
+            border: 1px solid #ddd;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+            max-width: 300px;
         }
         .table th {
             min-width: 80px;
         }
-        .table th:nth-child(1) { width: 40px; }
-        .table th:nth-child(2) { width: 80px; }
-        .table th:nth-child(3) { width: 100px; }
-        .table th:nth-child(4) { width: 120px; }
-        .table th:nth-child(5) { width: 100px; }
-        .table th:nth-child(6) { width: 100px; }
-        .table th:nth-child(7) { width: 150px; }
-        .table th:nth-child(8) { width: 60px; }
-        .table th:nth-child(9) { width: 140px; }
-        .table th:nth-child(10) { width: 60px; }
+        .table th:nth-child(1) { width: 30px; }
+        .table th:nth-child(2) { width: 70px; }
+        .table th:nth-child(3) { width: 90px; }
+        .table th:nth-child(4) { width: 100px; }
+        .table th:nth-child(5) { width: 90px; }
+        .table th:nth-child(6) { width: 90px; }
+        .table th:nth-child(7) { width: 120px; }
+        .table th:nth-child(8) { width: 50px; }
+        .table th:nth-child(9) { width: 130px; }
+        .table th:nth-child(10) { width: 70px; }
     </style>
 </head>
 
@@ -148,8 +156,8 @@
     <div class="container-fluid">
         <div class="row mb-4">
             <div class="col-12">
-                <h3 class="text-center">Schema管理 - DDL解析</h3>
-                <p class="text-center text-muted">上传或输入DDL语句，自动解析表结构信息</p>
+                <h3 class="text-center">Schema 管理 - DDL 解析</h3>
+                <p class="text-center text-muted">上传或输入 DDL 语句，自动解析表结构信息</p>
             </div>
         </div>
 
@@ -158,7 +166,7 @@
             <div class="col-md-4">
                 <div class="card stats-card">
                     <h3 id="schemaCount">0</h3>
-                    <p>Schema数量</p>
+                    <p>Schema 数量</p>
                 </div>
             </div>
             <div class="col-md-4">
@@ -175,7 +183,7 @@
             </div>
         </div>
 
-        <!-- DDL输入区域 -->
+        <!-- DDL 输入区域 -->
         <div class="card">
             <div class="card-header">
                 <ul class="nav nav-tabs card-header-tabs" id="inputTabs" role="tablist">
@@ -192,27 +200,27 @@
                     <!-- 文本输入 -->
                     <div class="tab-pane fade show active" id="textInput" role="tabpanel">
                         <div class="mb-3">
-                            <label for="schemaName" class="form-label">Schema名称:</label>
-                            <input type="text" class="form-control" id="schemaName" value="default" placeholder="输入Schema名称">
+                            <label for="schemaName" class="form-label">Schema 名称:</label>
+                            <input type="text" class="form-control" id="schemaName" value="default" placeholder="输入 Schema 名称">
                         </div>
                         <div class="mb-3">
-                            <label for="ddlText" class="form-label">DDL语句:</label>
-                            <textarea class="form-control ddl-textarea" id="ddlText" rows="10" placeholder="请输入CREATE TABLE语句..."></textarea>
+                            <label for="ddlText" class="form-label">DDL 语句:</label>
+                            <textarea class="form-control ddl-textarea" id="ddlText" rows="10" placeholder="请输入 CREATE TABLE 语句..."></textarea>
                         </div>
                         <button class="btn btn-primary" onclick="parseDDLText()">
-                            <i class="fas fa-play"></i> 解析DDL
+                            <i class="fas fa-play"></i> 解析 DDL
                         </button>
                     </div>
                     
                     <!-- 文件上传 -->
                     <div class="tab-pane fade" id="fileInput" role="tabpanel">
                         <div class="mb-3">
-                            <label for="schemaNameFile" class="form-label">Schema名称:</label>
-                            <input type="text" class="form-control" id="schemaNameFile" value="default" placeholder="输入Schema名称">
+                            <label for="schemaNameFile" class="form-label">Schema 名称:</label>
+                            <input type="text" class="form-control" id="schemaNameFile" value="default" placeholder="输入 Schema 名称">
                         </div>
                         <div id="fileDropZone">
                             <i class="fas fa-cloud-upload-alt fa-3x text-muted mb-3"></i>
-                            <p class="mb-0">拖拽DDL文件到此处，或点击选择文件</p>
+                            <p class="mb-0">拖拽 DDL 文件到此处，或点击选择文件</p>
                             <small class="text-muted">支持 .sql, .txt 文件</small>
                             <input type="file" id="ddlFile" accept=".sql,.txt" style="display: none;">
                         </div>
@@ -232,30 +240,28 @@
             <div class="row">
                 <div class="col-md-3">
                     <label class="form-label">Schema:</label>
-                    <select class="form-select" id="filterSchema" onchange="loadSchemaList()">
+                    <select class="form-select" id="filterSchema" onchange="onSchemaChange()">
                         <option value="">全部</option>
                     </select>
                 </div>
                 <div class="col-md-3">
                     <label class="form-label">表名:</label>
-                    <select class="form-select" id="filterTable" onchange="loadSchemaList()">
-                        <option value="">全部</option>
+                    <select class="form-select" id="filterTable" onchange="onTableChange()" disabled>
+                        <option value="">请先选择 Schema</option>
                     </select>
                 </div>
-                <div class="col-md-3">
-                    <label class="form-label">搜索:</label>
-                    <input type="text" class="form-control" id="searchKeyword" placeholder="搜索表名或字段名" onkeyup="filterTable()">
-                </div>
-                <div class="col-md-3 d-flex align-items-end">
-                    <button class="btn btn-outline-secondary me-2" onclick="resetFilters()">重置</button>
-                    <button class="btn btn-success" onclick="exportSchema()">
-                        <i class="fas fa-download"></i> 导出CSV
+                <div class="col-md-3 d-flex align-items-end gap-2">
+                    <button class="btn btn-sm btn-outline-danger flex-fill" onclick="deleteBySchema()" id="deleteSchemaBtn" disabled>
+                        <i class="fas fa-trash"></i> 删除 Schema
+                    </button>
+                    <button class="btn btn-sm btn-outline-danger flex-fill" onclick="deleteByTable()" id="deleteTableBtn" disabled>
+                        <i class="fas fa-trash"></i> 删除表
                     </button>
                 </div>
             </div>
         </div>
 
-        <!-- 解析结果列表 -->
+        <!-- 解析结果 -->
         <div class="card">
             <div class="card-header d-flex justify-content-between align-items-center">
                 <span>解析结果</span>
@@ -270,60 +276,38 @@
             </div>
             <div class="card-body p-0">
                 <div class="table-responsive">
-                    <table class="table table-hover mb-0" id="schemaTable">
+                    <table class="table table-hover table-sm mb-0" id="schemaTable">
                         <thead>
                             <tr>
-                                <th><input type="checkbox" id="selectAll" onchange="toggleSelectAll()"></th>
+                                <th><input type="checkbox" id="selectAll" onclick="toggleSelectAll()"></th>
                                 <th>Schema</th>
                                 <th>表名</th>
-                                <th>表描述</th>
                                 <th>字段名</th>
                                 <th>字段类型</th>
-                                <th>字段注释</th>
+                                <th>字段描述</th>
+                                <th>表描述</th>
                                 <th>主键</th>
                                 <th>创建时间</th>
                                 <th>操作</th>
                             </tr>
                         </thead>
                         <tbody id="schemaTableBody">
-                            <tr>
-                                <td colspan="10" class="text-center text-muted py-4">
-                                    暂无数据，请上传DDL进行解析
-                                </td>
-                            </tr>
                         </tbody>
                     </table>
                 </div>
-            </div>
-        </div>
-
-        <!-- 分页 -->
-        <div class="d-flex justify-content-between align-items-center mt-3">
-            <div>
-                <span id="pageInfo">共 0 条记录</span>
-            </div>
-            <div>
-                <button class="btn btn-outline-secondary btn-sm me-2" id="prevBtn" onclick="prevPage()" disabled>上一页</button>
-                <span id="currentPage">第 1 页</span>
-                <button class="btn btn-outline-secondary btn-sm ms-2" id="nextBtn" onclick="nextPage()" disabled>下一页</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- 确认删除模态框 -->
-    <div class="modal fade" id="deleteModal" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header bg-danger text-white">
-                    <h5 class="modal-title">确认删除</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <p id="deleteMessage">确定要删除选中的记录吗？</p>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-                    <button type="button" class="btn btn-danger" id="confirmDeleteBtn">确认删除</button>
+                <!-- 分页控件 -->
+                <div id="paginationContainer" class="card-footer d-flex justify-content-between align-items-center" style="display: none !important;">
+                    <div>
+                        <span id="paginationInfo">第 1 页，共 1 页，总计 0 条</span>
+                    </div>
+                    <div>
+                        <button class="btn btn-sm btn-outline-secondary me-2" id="prevPageBtn" onclick="prevPage()" disabled>
+                            <i class="fas fa-chevron-left"></i> 上一页
+                        </button>
+                        <button class="btn btn-sm btn-outline-secondary" id="nextPageBtn" onclick="nextPage()" disabled>
+                            下一页 <i class="fas fa-chevron-right"></i>
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -332,139 +316,80 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="/static/js/bootstrap.bundle.min.js"></script>
     <script>
+        const apiRequest = window.apiRequest || function(url, options = {}) {
+            const token = document.cookie.split('; ').find(row => row.startsWith('token='))?.split('=')[1];
+            const headers = { 'Content-Type': 'application/json' };
+            if (token) headers['Authorization'] = `Bearer ${token}`;
+            return fetch(url, { ...options, headers });
+        };
+
         let currentPage = 1;
-        let pageSize = 50;
-        let totalRecords = 0;
-        let selectedIds = [];
-        let deleteCallback = null;
+        let pageSize = 20;
+        let totalItems = 0;
+        let totalPages = 1;
 
-        // 获取token
-        function getToken() {
-            const value = `; ${document.cookie}`;
-            const parts = value.split(`; token=`);
-            if (parts.length === 2) return parts.pop().split(';').shift();
-            return '';
-        }
-
-        // API请求封装
-        async function apiRequest(url, options = {}) {
-            const token = getToken();
-            const headers = {
-                'Content-Type': 'application/json',
-                ...options.headers
-            };
-            if (token) {
-                headers['Authorization'] = `Bearer ${token}`;
-            }
-            
-            const response = await fetch(url, { ...options, headers });
-            if (response.status === 401) {
-                alert('登录已过期，请重新登录');
-                parent.window.location.href = '/login';
-                return null;
-            }
-            return response;
-        }
-
-        // 加载统计信息
         async function loadStats() {
-            const response = await apiRequest('/api/schema/check');
-            if (response && response.ok) {
-                const data = await response.json();
-                document.getElementById('schemaCount').textContent = data.schema_count;
-                document.getElementById('tableCount').textContent = data.table_count;
+            try {
+                const resp = await apiRequest('/api/schema/stats');
+                if (resp && resp.ok) {
+                    const data = await resp.json();
+                    document.getElementById('schemaCount').textContent = data.schema_count || 0;
+                    document.getElementById('tableCount').textContent = data.table_count || 0;
+                    document.getElementById('columnCount').textContent = data.column_count || 0;
+                }
+            } catch (e) {
+                console.error('加载统计数据失败:', e);
             }
         }
 
-        // 加载Schema列表
         async function loadSchemaList() {
-            const schemaFilter = document.getElementById('filterSchema').value;
-            const tableFilter = document.getElementById('filterTable').value;
-            
-            const params = new URLSearchParams({
-                limit: pageSize,
-                offset: (currentPage - 1) * pageSize
-            });
-            if (schemaFilter) params.append('schema_name', schemaFilter);
-            if (tableFilter) params.append('table_name', tableFilter);
-            
-            const response = await apiRequest(`/api/schema/list?${params}`);
-            if (response && response.ok) {
-                const data = await response.json();
-                totalRecords = data.total;
-                renderTable(data.items);
-                updatePagination();
-                
-                // 更新字段总数
-                document.getElementById('columnCount').textContent = totalRecords;
-            }
-        }
+            try {
+                const schema = document.getElementById('filterSchema').value;
+                const table = document.getElementById('filterTable').value;
+                const offset = (currentPage - 1) * pageSize;
+                let url = `/api/schema/list?limit=${pageSize}&offset=${offset}`;
+                if (schema) url += `&schema_name=${encodeURIComponent(schema)}`;
+                if (table) url += `&table_name=${encodeURIComponent(table)}`;
 
-        // 加载筛选选项
-        async function loadFilterOptions() {
-            // 加载Schema选项
-            const schemaResp = await apiRequest('/api/schema/schemas');
-            if (schemaResp && schemaResp.ok) {
-                const data = await schemaResp.json();
-                const select = document.getElementById('filterSchema');
-                select.innerHTML = '<option value="">全部</option>';
-                data.schemas.forEach(s => {
-                    select.innerHTML += `<option value="${s}">${s}</option>`;
-                });
+                const resp = await apiRequest(url);
+                if (resp && resp.ok) {
+                    const data = await resp.json();
+                    totalItems = data.total || 0;
+                    totalPages = Math.ceil(totalItems / pageSize) || 1;
+                    
+                    const tbody = document.getElementById('schemaTableBody');
+                    if (data.items && data.items.length > 0) {
+                        tbody.innerHTML = data.items.map(item => `
+                            <tr>
+                                <td><input type="checkbox" class="schema-checkbox" value="${item.id}"></td>
+                                <td><span class="schema-badge">${item.schema_name}</span></td>
+                                <td><span class="table-badge">${item.table_name}</span></td>
+                                <td class="table-cell-ellipsis">${item.column_name}</td>
+                                <td class="table-cell-ellipsis">${item.column_type || ''}</td>
+                                <td class="table-cell-ellipsis">${item.column_description || ''}</td>
+                                <td class="table-cell-ellipsis">${item.table_description || ''}</td>
+                                <td>${item.column_key ? '<span class="pk-badge">PK</span>' : ''}</td>
+                                <td>${new Date(item.created_at).toLocaleString()}</td>
+                                <td>
+                                    <button class="btn btn-sm btn-outline-danger" onclick="deleteSchema(${item.id})">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        `).join('');
+                        
+                        document.getElementById('paginationContainer').style.display = 'flex';
+                        document.getElementById('paginationInfo').textContent = `第 ${currentPage} 页，共 ${totalPages} 页，总计 ${totalItems} 条`;
+                        document.getElementById('prevPageBtn').disabled = currentPage === 1;
+                        document.getElementById('nextPageBtn').disabled = currentPage >= totalPages;
+                    } else {
+                        tbody.innerHTML = '<tr><td colspan="10" class="text-center text-muted py-4">暂无数据</td></tr>';
+                        document.getElementById('paginationContainer').style.display = 'none';
+                    }
+                }
+            } catch (e) {
+                console.error('加载 Schema 列表失败:', e);
             }
-            
-            // 加载表名选项
-            const tableResp = await apiRequest('/api/schema/tables');
-            if (tableResp && tableResp.ok) {
-                const data = await tableResp.json();
-                const select = document.getElementById('filterTable');
-                select.innerHTML = '<option value="">全部</option>';
-                data.tables.forEach(t => {
-                    select.innerHTML += `<option value="${t.table_name}">${t.table_name}</option>`;
-                });
-            }
-        }
-
-        // 渲染表格
-        function renderTable(items) {
-            const tbody = document.getElementById('schemaTableBody');
-            if (items.length === 0) {
-                tbody.innerHTML = `
-                    <tr>
-                        <td colspan="10" class="text-center text-muted py-4">
-                            暂无数据，请上传DDL进行解析
-                        </td>
-                    </tr>`;
-                return;
-            }
-            
-            tbody.innerHTML = items.map(item => `
-                <tr>
-                    <td><input type="checkbox" class="row-checkbox" value="${item.id}" onchange="updateSelected()"></td>
-                    <td><span class="schema-badge">${item.schema_name}</span></td>
-                    <td><span class="table-badge">${item.table_name}</span></td>
-                    <td class="table-cell-ellipsis" title="${item.table_description || ''}">${item.table_description || '-'}</td>
-                    <td><strong>${item.column_name}</strong></td>
-                    <td class="table-cell-ellipsis" title="${item.column_type || ''}">${item.column_type || '-'}</td>
-                    <td class="table-cell-ellipsis" title="${item.column_description || ''}">${item.column_description || '-'}</td>
-                    <td>${item.column_key === 'PRI' ? '<span class="pk-badge">主键</span>' : '-'}</td>
-                    <td>${new Date(item.created_at).toLocaleString()}</td>
-                    <td>
-                        <button class="btn btn-outline-danger action-btn" onclick="deleteItem(${item.id})">
-                            <i class="fas fa-trash"></i>
-                        </button>
-                    </td>
-                </tr>
-            `).join('');
-        }
-
-        // 更新分页
-        function updatePagination() {
-            const totalPages = Math.ceil(totalRecords / pageSize);
-            document.getElementById('pageInfo').textContent = `共 ${totalRecords} 条记录`;
-            document.getElementById('currentPage').textContent = `第 ${currentPage} / ${totalPages || 1} 页`;
-            document.getElementById('prevBtn').disabled = currentPage <= 1;
-            document.getElementById('nextBtn').disabled = currentPage >= totalPages;
         }
 
         function prevPage() {
@@ -475,226 +400,333 @@
         }
 
         function nextPage() {
-            const totalPages = Math.ceil(totalRecords / pageSize);
             if (currentPage < totalPages) {
                 currentPage++;
                 loadSchemaList();
             }
         }
 
-        // 解析DDL文本
-        async function parseDDLText() {
-            const schemaName = document.getElementById('schemaName').value.trim();
-            const ddlText = document.getElementById('ddlText').value.trim();
+        function onSchemaChange() {
+            const schema = document.getElementById('filterSchema').value;
+            const tableSelect = document.getElementById('filterTable');
+            const deleteSchemaBtn = document.getElementById('deleteSchemaBtn');
+            const deleteTableBtn = document.getElementById('deleteTableBtn');
             
-            if (!schemaName) {
-                alert('请输入Schema名称');
-                return;
-            }
-            if (!ddlText) {
-                alert('请输入DDL语句');
-                return;
-            }
-            
-            const response = await apiRequest('/api/schema/parse', {
-                method: 'POST',
-                body: JSON.stringify({
-                    ddl_text: ddlText,
-                    schema_name: schemaName
-                })
-            });
-            
-            if (response && response.ok) {
-                const data = await response.json();
-                alert(data.message || `解析成功！共解析出 ${data.total} 个字段`);
-                document.getElementById('ddlText').value = '';
-                loadSchemaList();
-                loadStats();
-                loadFilterOptions();
-            } else if (response) {
-                const error = await response.json();
-                alert('解析失败: ' + (error.detail || '未知错误'));
-            }
-        }
-
-        // 文件上传相关
-        const dropZone = document.getElementById('fileDropZone');
-        const fileInput = document.getElementById('ddlFile');
-        
-        dropZone.addEventListener('click', () => fileInput.click());
-        
-        dropZone.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            dropZone.classList.add('dragover');
-        });
-        
-        dropZone.addEventListener('dragleave', () => {
-            dropZone.classList.remove('dragover');
-        });
-        
-        dropZone.addEventListener('drop', (e) => {
-            e.preventDefault();
-            dropZone.classList.remove('dragover');
-            const files = e.dataTransfer.files;
-            if (files.length > 0) {
-                handleFileSelect(files[0]);
-            }
-        });
-        
-        fileInput.addEventListener('change', (e) => {
-            if (e.target.files.length > 0) {
-                handleFileSelect(e.target.files[0]);
-            }
-        });
-        
-        function handleFileSelect(file) {
-            if (!file.name.match(/\.(sql|txt)$/i)) {
-                alert('请选择 .sql 或 .txt 文件');
-                return;
-            }
-            document.getElementById('selectedFile').style.display = 'block';
-            document.getElementById('fileName').textContent = file.name;
-            document.getElementById('uploadBtn').disabled = false;
-        }
-        
-        async function uploadDDLFile() {
-            const file = fileInput.files[0];
-            if (!file) {
-                alert('请选择文件');
-                return;
-            }
-            
-            const schemaName = document.getElementById('schemaNameFile').value.trim() || 'default';
-            const formData = new FormData();
-            formData.append('file', file);
-            formData.append('schema_name', schemaName);
-            
-            const token = getToken();
-            const response = await fetch('/api/schema/upload', {
-                method: 'POST',
-                headers: token ? { 'Authorization': `Bearer ${token}` } : {},
-                body: formData
-            });
-            
-            if (response.ok) {
-                const data = await response.json();
-                alert(data.message || `上传解析成功！共解析出 ${data.total} 个字段`);
-                document.getElementById('selectedFile').style.display = 'none';
-                document.getElementById('uploadBtn').disabled = true;
-                fileInput.value = '';
-                loadSchemaList();
-                loadStats();
-                loadFilterOptions();
+            if (schema) {
+                tableSelect.disabled = false;
+                deleteSchemaBtn.disabled = false;
+                loadTableOptions(schema);
             } else {
-                const error = await response.json();
-                alert('上传失败: ' + (error.detail || '未知错误'));
-            }
-        }
-
-        // 删除操作
-        function deleteItem(id) {
-            selectedIds = [id];
-            showDeleteModal('确定要删除这条记录吗？', async () => {
-                const response = await apiRequest(`/api/schema/${id}`, { method: 'DELETE' });
-                if (response && response.ok) {
-                    alert('删除成功');
-                    loadSchemaList();
-                    loadStats();
-                } else if (response) {
-                    const error = await response.json();
-                    alert('删除失败: ' + (error.detail || '未知错误'));
-                }
-            });
-        }
-
-        function deleteSelected() {
-            const checkboxes = document.querySelectorAll('.row-checkbox:checked');
-            if (checkboxes.length === 0) {
-                alert('请先选择要删除的记录');
-                return;
+                tableSelect.disabled = true;
+                tableSelect.innerHTML = '<option value="">请先选择 Schema</option>';
+                deleteSchemaBtn.disabled = true;
+                deleteTableBtn.disabled = true;
             }
             
-            selectedIds = Array.from(checkboxes).map(cb => parseInt(cb.value));
-            showDeleteModal(`确定要删除选中的 ${selectedIds.length} 条记录吗？`, async () => {
-                let successCount = 0;
-                for (const id of selectedIds) {
-                    const response = await apiRequest(`/api/schema/${id}`, { method: 'DELETE' });
-                    if (response && response.ok) successCount++;
-                }
-                alert(`成功删除 ${successCount} 条记录`);
-                loadSchemaList();
-                loadStats();
-            });
-        }
-
-        function showDeleteModal(message, callback) {
-            document.getElementById('deleteMessage').textContent = message;
-            deleteCallback = callback;
-            const modal = new bootstrap.Modal(document.getElementById('deleteModal'));
-            modal.show();
-        }
-
-        document.getElementById('confirmDeleteBtn').addEventListener('click', async () => {
-            bootstrap.Modal.getInstance(document.getElementById('deleteModal')).hide();
-            if (deleteCallback) {
-                await deleteCallback();
-                deleteCallback = null;
-            }
-        });
-
-        // 全选
-        function toggleSelectAll() {
-            const selectAll = document.getElementById('selectAll').checked;
-            document.querySelectorAll('.row-checkbox').forEach(cb => cb.checked = selectAll);
-        }
-
-        function updateSelected() {
-            const all = document.querySelectorAll('.row-checkbox');
-            const checked = document.querySelectorAll('.row-checkbox:checked');
-            document.getElementById('selectAll').checked = all.length === checked.length;
-        }
-
-        // 筛选
-        function filterTable() {
-            const keyword = document.getElementById('searchKeyword').value.toLowerCase();
-            const rows = document.querySelectorAll('#schemaTableBody tr');
-            rows.forEach(row => {
-                const text = row.textContent.toLowerCase();
-                row.style.display = text.includes(keyword) ? '' : 'none';
-            });
-        }
-
-        function resetFilters() {
-            document.getElementById('filterSchema').value = '';
-            document.getElementById('filterTable').value = '';
-            document.getElementById('searchKeyword').value = '';
             currentPage = 1;
             loadSchemaList();
         }
 
-        // 导出
-        async function exportSchema() {
-            const schemaName = document.getElementById('filterSchema').value;
-            const params = schemaName ? `?schema_name=${schemaName}` : '';
-            const token = getToken();
-            const response = await fetch(`/api/schema/export${params}`, {
-                headers: token ? { 'Authorization': `Bearer ${token}` } : {}
-            });
+        function onTableChange() {
+            const table = document.getElementById('filterTable').value;
+            const deleteTableBtn = document.getElementById('deleteTableBtn');
             
-            if (response.ok) {
-                const blob = await response.blob();
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `schema_${schemaName || 'export'}.csv`;
-                a.click();
-                window.URL.revokeObjectURL(url);
-            } else {
-                alert('导出失败');
+            deleteTableBtn.disabled = !table;
+            currentPage = 1;
+            loadSchemaList();
+        }
+
+        async function loadTableOptions(schemaName) {
+            try {
+                const response = await apiRequest(`/api/schema/table-names?schema_name=${encodeURIComponent(schemaName)}`);
+                if (response && response.ok) {
+                    const data = await response.json();
+                    const tableSelect = document.getElementById('filterTable');
+                    tableSelect.innerHTML = '<option value="">全部</option>';
+                    data.tables.forEach(t => {
+                        tableSelect.innerHTML += `<option value="${t}">${t}</option>`;
+                    });
+                }
+            } catch (e) {
+                console.error('加载表名列表失败:', e);
             }
         }
 
-        // 初始化
+        async function deleteBySchema() {
+            const schema = document.getElementById('filterSchema').value;
+            if (!schema) {
+                alert('请先选择要删除的 Schema');
+                return;
+            }
+            
+            if (!confirm(`确定要删除 Schema "${schema}" 的所有数据吗？此操作不可恢复！`)) return;
+            
+            try {
+                const response = await apiRequest(`/api/schema/schema/${encodeURIComponent(schema)}`, {
+                    method: 'DELETE'
+                });
+                
+                if (response && response.ok) {
+                    const data = await response.json();
+                    alert(data.message);
+                    document.getElementById('filterSchema').value = '';
+                    document.getElementById('filterTable').innerHTML = '<option value="">请先选择 Schema</option>';
+                    document.getElementById('filterTable').disabled = true;
+                    document.getElementById('deleteSchemaBtn').disabled = true;
+                    document.getElementById('deleteTableBtn').disabled = true;
+                    currentPage = 1;
+                    loadStats();
+                    loadSchemaList();
+                    loadFilterOptions();
+                } else {
+                    const error = await response.json();
+                    alert('删除失败：' + (error.detail || '未知错误'));
+                }
+            } catch (e) {
+                alert('删除失败：' + e.message);
+            }
+        }
+
+        async function deleteByTable() {
+            const schema = document.getElementById('filterSchema').value;
+            const table = document.getElementById('filterTable').value;
+            
+            if (!schema) {
+                alert('请先选择 Schema');
+                return;
+            }
+            if (!table) {
+                alert('请先选择要删除的表');
+                return;
+            }
+            
+            if (!confirm(`确定要删除表 "${schema}.${table}" 的所有数据吗？此操作不可恢复！`)) return;
+            
+            try {
+                const response = await apiRequest(`/api/schema/table/${encodeURIComponent(schema)}/${encodeURIComponent(table)}`, {
+                    method: 'DELETE'
+                });
+                
+                if (response && response.ok) {
+                    const data = await response.json();
+                    alert(data.message);
+                    document.getElementById('filterTable').value = '';
+                    document.getElementById('deleteTableBtn').disabled = true;
+                    currentPage = 1;
+                    loadStats();
+                    loadSchemaList();
+                    loadTableOptions(schema);
+                } else {
+                    const error = await response.json();
+                    alert('删除失败：' + (error.detail || '未知错误'));
+                }
+            } catch (e) {
+                alert('删除失败：' + e.message);
+            }
+        }
+
+        async function loadFilterOptions() {
+            try {
+                const schemaResp = await apiRequest('/api/schema/schema-names');
+                if (schemaResp && schemaResp.ok) {
+                    const data = await schemaResp.json();
+                    const schemaSelect = document.getElementById('filterSchema');
+                    const currentValue = schemaSelect.value;
+                    schemaSelect.innerHTML = '<option value="">全部</option>';
+                    data.schemas.forEach(s => {
+                        schemaSelect.innerHTML += `<option value="${s}">${s}</option>`;
+                    });
+                    schemaSelect.value = currentValue;
+                }
+
+                const tableResp = await apiRequest('/api/schema/table-names');
+                if (tableResp && tableResp.ok) {
+                    const data = await tableResp.json();
+                    const tableSelect = document.getElementById('filterTable');
+                    const currentValue = tableSelect.value;
+                    tableSelect.innerHTML = '<option value="">全部</option>';
+                    data.tables.forEach(t => {
+                        tableSelect.innerHTML += `<option value="${t}">${t}</option>`;
+                    });
+                    tableSelect.value = currentValue;
+                }
+            } catch (e) {
+                console.error('加载筛选选项失败:', e);
+            }
+        }
+
+        async function parseDDLText() {
+            const schemaName = document.getElementById('schemaName').value.trim();
+            const ddlText = document.getElementById('ddlText').value.trim();
+
+            if (!schemaName) {
+                alert('请输入 Schema 名称');
+                return;
+            }
+            if (!ddlText) {
+                alert('请输入 DDL 语句');
+                return;
+            }
+
+            try {
+                const response = await apiRequest('/api/schema/parse', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        schema_name: schemaName,
+                        ddl_text: ddlText
+                    })
+                });
+
+                if (response && response.ok) {
+                    const data = await response.json();
+                    alert(`解析成功！共解析 ${data.total} 个字段${data.message ? '，' + data.message : ''}`);
+                    loadStats();
+                    loadSchemaList();
+                    loadFilterOptions();
+                    document.getElementById('ddlText').value = '';
+                } else {
+                    const error = await response.json();
+                    alert('解析失败：' + (error.detail || '未知错误'));
+                }
+            } catch (e) {
+                alert('解析失败：' + e.message);
+            }
+        }
+
+        async function uploadDDLFile() {
+            const schemaName = document.getElementById('schemaNameFile').value.trim();
+            const fileInput = document.getElementById('ddlFile');
+            const file = fileInput.files[0];
+
+            if (!schemaName) {
+                alert('请输入 Schema 名称');
+                return;
+            }
+            if (!file) {
+                alert('请选择文件');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('schema_name', schemaName);
+            formData.append('file', file);
+
+            try {
+                const token = document.cookie.split('; ').find(row => row.startsWith('token='))?.split('=')[1];
+                const response = await fetch('/api/schema/upload', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: formData
+                });
+
+                if (response && response.ok) {
+                    const data = await response.json();
+                    alert(`解析成功！共解析 ${data.total} 个字段${data.message ? '，' + data.message : ''}`);
+                    loadStats();
+                    loadSchemaList();
+                    loadFilterOptions();
+                    document.getElementById('ddlFile').value = '';
+                    document.getElementById('selectedFile').style.display = 'none';
+                    document.getElementById('uploadBtn').disabled = true;
+                } else {
+                    const error = await response.json();
+                    alert('解析失败：' + (error.detail || '未知错误'));
+                }
+            } catch (e) {
+                alert('解析失败：' + e.message);
+            }
+        }
+
+        async function deleteSchema(id) {
+            if (!confirm('确定要删除这条记录吗？')) return;
+
+            try {
+                const response = await apiRequest(`/api/schema/${id}`, {
+                    method: 'DELETE'
+                });
+
+                if (response && response.ok) {
+                    alert('删除成功');
+                    loadStats();
+                    loadSchemaList();
+                    loadFilterOptions();
+                } else {
+                    const error = await response.json();
+                    alert('删除失败：' + (error.detail || '未知错误'));
+                }
+            } catch (e) {
+                alert('删除失败：' + e.message);
+            }
+        }
+
+        async function deleteSelected() {
+            const checkboxes = document.querySelectorAll('.schema-checkbox:checked');
+            if (checkboxes.length === 0) {
+                alert('请至少选择一条记录');
+                return;
+            }
+
+            if (!confirm(`确定要删除选中的 ${checkboxes.length} 条记录吗？`)) return;
+
+            try {
+                const ids = Array.from(checkboxes).map(cb => parseInt(cb.value));
+                const response = await apiRequest('/api/schema/batch-delete', {
+                    method: 'POST',
+                    body: JSON.stringify({ ids })
+                });
+
+                if (response && response.ok) {
+                    alert('删除成功');
+                    loadStats();
+                    loadSchemaList();
+                    loadFilterOptions();
+                } else {
+                    const error = await response.json();
+                    alert('删除失败：' + (error.detail || '未知错误'));
+                }
+            } catch (e) {
+                alert('删除失败：' + e.message);
+            }
+        }
+
+        function toggleSelectAll() {
+            const selectAll = document.getElementById('selectAll');
+            const checkboxes = document.querySelectorAll('.schema-checkbox');
+            checkboxes.forEach(cb => cb.checked = selectAll.checked);
+        }
+
+        document.getElementById('ddlFile').addEventListener('change', function() {
+            const fileName = this.files[0]?.name;
+            if (fileName) {
+                document.getElementById('fileName').textContent = fileName;
+                document.getElementById('selectedFile').style.display = 'block';
+                document.getElementById('uploadBtn').disabled = false;
+            }
+        });
+
+        const fileDropZone = document.getElementById('fileDropZone');
+        fileDropZone.addEventListener('click', () => document.getElementById('ddlFile').click());
+        fileDropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            fileDropZone.classList.add('dragover');
+        });
+        fileDropZone.addEventListener('dragleave', () => {
+            fileDropZone.classList.remove('dragover');
+        });
+        fileDropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            fileDropZone.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                document.getElementById('ddlFile').files = files;
+                document.getElementById('fileName').textContent = files[0].name;
+                document.getElementById('selectedFile').style.display = 'block';
+                document.getElementById('uploadBtn').disabled = false;
+            }
+        });
+
         document.addEventListener('DOMContentLoaded', () => {
             loadStats();
             loadSchemaList();

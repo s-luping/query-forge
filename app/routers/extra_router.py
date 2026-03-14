@@ -4,7 +4,7 @@
 """
 from fastapi import APIRouter, HTTPException, Depends, Request, Query
 from fastapi.security import HTTPBearer
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from typing import Optional, List
 
 from app.logger import logger
@@ -24,6 +24,27 @@ class ExtraKnowledgeRequest(BaseModel):
     sample_values_section: Optional[str] = None
     table_relations_section: Optional[str] = None
     domain_knowledge_section: Optional[str] = None
+    
+    @field_validator('sample_values_section')
+    @classmethod
+    def validate_sample_values(cls, v):
+        if v and len(v) > 100:
+            raise ValueError('字段示例值不能超过100个字符')
+        return v
+    
+    @field_validator('table_relations_section')
+    @classmethod
+    def validate_table_relations(cls, v):
+        if v and len(v) > 100:
+            raise ValueError('表间关系不能超过100个字符')
+        return v
+    
+    @field_validator('domain_knowledge_section')
+    @classmethod
+    def validate_domain_knowledge(cls, v):
+        if v and len(v) > 500:
+            raise ValueError('领域知识不能超过500个字符')
+        return v
 
 
 class ExtraKnowledgeResponse(BaseModel):
@@ -94,9 +115,9 @@ def get_extra_knowledge_by_id(user_id: int, knowledge_id: int) -> Optional[dict]
                 'id': extra.id,
                 'user_id': extra.user_id,
                 'title': extra.title,
-                'sample_values_section': extra.sample_values_section,
-                'table_relations_section': extra.table_relations_section,
-                'domain_knowledge_section': extra.domain_knowledge_section,
+                'sample_values_section': extra.sample_values_section or '',
+                'table_relations_section': extra.table_relations_section or '',
+                'domain_knowledge_section': extra.domain_knowledge_section or '',
                 'is_active': extra.is_active,
                 'created_at': extra.created_at.strftime('%Y-%m-%d %H:%M:%S') if extra.created_at else None,
                 'updated_at': extra.updated_at.strftime('%Y-%m-%d %H:%M:%S') if extra.updated_at else None
@@ -143,9 +164,9 @@ def create_extra_knowledge(user_id: int, data: ExtraKnowledgeRequest) -> int:
         extra = ExtraKnowledge(
             user_id=user_id,
             title=data.title,
-            sample_values_section=data.sample_values_section,
-            table_relations_section=data.table_relations_section,
-            domain_knowledge_section=data.domain_knowledge_section,
+            sample_values=data.sample_values,
+            table_relations=data.table_relations,
+            domain_knowledge=data.domain_knowledge,
             is_active=1
         )
         db.add(extra)

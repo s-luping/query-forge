@@ -1,6 +1,6 @@
 # -*- coding: UTF-8 -*-
 """
-Text to SQL 路由 - 智能数据分析
+QueryForge SQL生成路由
 """
 import time
 import os
@@ -17,9 +17,10 @@ from app.logger import logger
 from app.auth import get_current_user
 from app.config import TEMP_DB_PATH
 from app.routers.history_router import add_history, get_successful_queries
-from app.routers.extra_router import get_extra_knowledge_for_llm, get_extra_knowledge_by_id
-from models import SessionLocal, SqlSessionLocal
+from app.routers.extra_router import get_extra_knowledge_by_id
+from models import SessionLocal, SqlSessionLocal, ExtraSessionLocal, HistorySessionLocal
 from models.schema_parse import SchemaParse
+from models.sql_history import SqlHistory
 
 
 router = APIRouter()
@@ -38,35 +39,23 @@ def get_user_temp_db_path(user_id: int) -> str:
 security = HTTPBearer(auto_error=False)
 
 
-def check_user_schema(user_id: int) -> tuple:
-    """检查用户是否有schema，返回 (has_schema, schema_info)"""
-    db = SqlSessionLocal()
-    try:
-        schema_count = db.query(SchemaParse).filter(SchemaParse.user_id == user_id).count()
-        table_count = db.query(SchemaParse.table_name).filter(
-            SchemaParse.user_id == user_id
-        ).distinct().count()
-        return schema_count > 0, {"schema_count": schema_count, "table_count": table_count}
-    finally:
-        db.close()
 
-
-def get_user_schema_csv(user_id: int) -> str:
+def get_user_schema_csv(user_id: int, schema_name: str = None) -> str:
     """获取用户的schema并生成CSV格式的内容"""
     db = SqlSessionLocal()
     try:
-        items = db.query(SchemaParse).filter(
-            SchemaParse.user_id == user_id
-        ).order_by(SchemaParse.table_name, SchemaParse.column_name).all()
+        query = db.query(SchemaParse)\
+        .filter(SchemaParse.user_id == user_id, SchemaParse.schema_name == schema_name)
+        
+        items = query.order_by(SchemaParse.table_name, SchemaParse.column_name).all()
         
         if not items:
             return ""
         
-        lines = ['db_id,db_type,table_name,column_name,column_types,column_descriptions,table_comment,primary_key,foreign_key,is_nullable,default_value']
+        lines = ['schema_name,table_name,column_name,column_type,column_description,table_comment,primary_key,foreign_key,is_nullable,default_value']
         for item in items:
             lines.append(','.join([
                 item.schema_name,
-                'mysql',
                 item.table_name,
                 item.column_name,
                 item.column_type or '',
@@ -83,127 +72,44 @@ def get_user_schema_csv(user_id: int) -> str:
         db.close()
 
 
-def get_sample_values(user_id: int) -> Dict[str, List[str]]:
-    """获取用户的字段示例值"""
-    db = SqlSessionLocal()
-    try:
-        items = db.query(SchemaParse).filter(
-            SchemaParse.user_id == user_id,
-            SchemaParse.sample_values.isnot(None)
-        ).all()
-        
-        sample_values = {}
-        for item in items:
-            if item.sample_values:
-                key = f"{item.table_name}.{item.column_name}"
-                values = [v.strip() for v in item.sample_values.split(',') if v.strip()]
-                if values:
-                    sample_values[key] = values
-        
-        return sample_values
-    finally:
-        db.close()
 
-
-def get_table_relations(user_id: int) -> List[Dict[str, str]]:
-    """获取表间关系（基于外键信息）"""
-    db = SqlSessionLocal()
-    try:
-        items = db.query(SchemaParse).filter(
-            SchemaParse.user_id == user_id,
-            SchemaParse.column_key == 'MUL'
-        ).all()
-        
-        relations = []
-        tables = db.query(SchemaParse.table_name).filter(
-            SchemaParse.user_id == user_id
-        ).distinct().all()
-        table_names = [t[0] for t in tables]
-        
-        for item in items:
-            col_name_lower = item.column_name.lower()
-            for table_name in table_names:
-                if table_name != item.table_name:
-                    if col_name_lower.endswith('_id') or col_name_lower.endswith('_code'):
-                        relations.append({
-                            'from_table': item.table_name,
-                            'from_column': item.column_name,
-                            'to_table': table_name,
-                            'to_column': item.column_name
-                        })
-        
-        return relations[:20]
-    finally:
-        db.close()
-
-
-@router.get("/check-schema")
-async def check_schema_status(user = Depends(get_current_user)):
-    """检查用户是否有schema"""
-    user_id = user['user_id']
-    has_schema, schema_info = check_user_schema(user_id)
-    return {
-        "has_schema": has_schema,
-        "schema_count": schema_info["schema_count"],
-        "table_count": schema_info["table_count"]
-    }
-
-
-@router.post("/validate")
-async def validate_text_to_sql(
+@router.post("/generate_sql")
+async def generate_sql(
     request: TextToSqlRequest,
     user = Depends(get_current_user)
 ):
-    """验证文本转SQL的功能"""
+    """生成SQL"""
     try:
         user_id = user['user_id']
         
-        has_schema, schema_info = check_user_schema(user_id)
-        if not has_schema:
-            raise HTTPException(
-                status_code=400, 
-                detail="您还没有维护Schema，请先在【Schema管理】中上传DDL解析表结构"
-            )
-
         cache_key = hashlib.md5(
-            f"{user_id}_{request.query}_{request.max_results}_{request.knowledge_id}".encode()).hexdigest()
+            f"{user_id}_{request.query}_{request.knowledge_id}_{request.schema_name}".encode()).hexdigest()
 
         if cache_key in validation_cache:
-            cached_result, timestamp = validation_cache[cache_key]
+            cached_sql, timestamp = validation_cache[cache_key]
             if time.time() - timestamp < 300:
-                logger.info(f"使用缓存的验证结果: {request.query[:50]}...")
-                return cached_result
+                logger.info(f"使用缓存的生成结果: {request.query[:50]}...")
+                return cached_sql
 
-        schema_csv = get_user_schema_csv(user_id)
+        schema_csv = get_user_schema_csv(user_id, request.schema_name)
         if not schema_csv:
             raise HTTPException(
                 status_code=400,
                 detail="获取Schema失败，请检查您的Schema配置"
             )
         
-        sample_values = get_sample_values(user_id)
-        table_relations = get_table_relations(user_id)
-        history_queries = get_successful_queries(user_id)
-        
+        sample_values = ""
+        table_relations = ""
         domain_knowledge = ""
+        
         if request.knowledge_id:
-            extra = get_extra_knowledge_by_id(user_id, request.knowledge_id)
-            if extra:
-                if extra.get('domain_knowledge_section'):
-                    domain_knowledge = extra['domain_knowledge_section']
-                if extra.get('sample_values_section'):
-                    domain_knowledge += "\n【补充字段示例值】\n" + extra['sample_values_section']
-                if extra.get('table_relations_section'):
-                    domain_knowledge += "\n【补充表间关系】\n" + extra['table_relations_section']
-        else:
-            extra = get_extra_knowledge_for_llm(user_id)
-            if extra:
-                if extra.get('domain_knowledge_section'):
-                    domain_knowledge = extra['domain_knowledge_section']
-                if extra.get('sample_values_section'):
-                    domain_knowledge += "\n【补充字段示例值】\n" + extra['sample_values_section']
-                if extra.get('table_relations_section'):
-                    domain_knowledge += "\n【补充表间关系】\n" + extra['table_relations_section']
+            knowledge = get_extra_knowledge_by_id(user_id, request.knowledge_id)
+            if knowledge:
+                sample_values = knowledge.get("sample_values_section", "")
+                table_relations = knowledge.get("table_relations_section", "")
+                domain_knowledge = knowledge.get("domain_knowledge_section", "")
+        
+        history_queries = get_successful_queries(user_id)
         
         prompt = sql_generator.generate_sql_prompt(
             query=request.query,
@@ -211,7 +117,8 @@ async def validate_text_to_sql(
             sample_values=sample_values,
             table_relations=table_relations,
             history_queries=history_queries,
-            domain_knowledge=domain_knowledge
+            domain_knowledge=domain_knowledge,
+            db_type=request.db_type
         )
         
         logger.info(f"生成SQL提示: {prompt[:200]}...")
@@ -235,7 +142,9 @@ async def validate_text_to_sql(
             sql_query=generated_sql,
             is_valid=is_valid,
             error_message=error_msg if not is_valid else None,
-            user_id=user_id
+            user_id=user_id,
+            schema_name=request.schema_name,
+            knowledge_id=request.knowledge_id
         )
 
         return response
@@ -247,51 +156,43 @@ async def validate_text_to_sql(
         raise HTTPException(status_code=500, detail=f"处理失败: {str(e)}")
 
 
-@router.post("/execute", response_model=ChartDataResponse)
-async def execute_text_to_sql(
-    request: TextToSqlRequest,
+@router.post("/execute_sql", response_model=ChartDataResponse)
+async def execute_sql_with_sqlite(
+    request: Request,
     user = Depends(get_current_user)
 ):
-    """执行文本转SQL并返回图表数据"""
+    """执行历史SQL查询并返回结果"""
     try:
-        user_id = user['user_id']
+        data = await request.json()
+        history_id = data.get('history_id')
         
-        has_schema, schema_info = check_user_schema(user_id)
-        if not has_schema:
-            raise HTTPException(
-                status_code=400,
-                detail="您还没有维护Schema，请先在【Schema管理】中上传DDL解析表结构"
-            )
+        if not history_id:
+            raise HTTPException(status_code=400, detail="history_id 不能为空")
+        
+        user_id = user['user_id']
 
-        cache_key = hashlib.md5(
-            f"{user_id}_{request.query}_{request.max_results}_{request.knowledge_id}".encode()).hexdigest()
-        validation_response = None
+        db = HistorySessionLocal()
+        try:
+            sql_history = db.query(SqlHistory).filter(
+                SqlHistory.id == history_id,
+                SqlHistory.user_id == str(user_id)
+            ).first()
+            if not sql_history:
+                raise HTTPException(status_code=404, detail="历史记录不存在或不属于该用户")
 
-        if cache_key in validation_cache:
-            cached_result, timestamp = validation_cache[cache_key]
-            if time.time() - timestamp < 120:
-                logger.info(f"使用缓存的验证结果进行执行: {request.query[:50]}...")
-                validation_response = cached_result
-
-        if not validation_response:
-            validation_response = await validate_text_to_sql(request, user)
-
-        if not validation_response.is_valid:
-            raise HTTPException(
-                status_code=400, detail=validation_response.error_message)
-
-        generated_sql = validation_response.sql_query
+            generated_sql = sql_history.sql_query
+        finally:
+            db.close()
 
         temp_db_path = get_user_temp_db_path(user_id)
         if not os.path.exists(temp_db_path):
             raise HTTPException(
                 status_code=400,
-                detail="临时数据库不存在，请重新上传DDL解析表结构"
+                detail="临时数据库不存在，请先在Schema管理中建表"
             )
         
         db_manager = DatabaseManager(temp_db_path)
-        max_results = min(request.max_results or 100, 1000)
-        query_results = db_manager.execute_query(generated_sql, max_results)
+        query_results = db_manager.execute_query(generated_sql, 100)
 
         return ChartDataResponse(
             sql_query=generated_sql,
@@ -305,5 +206,5 @@ async def execute_text_to_sql(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"文本转SQL执行失败: {e}")
+        logger.error(f"SQL执行失败: {e}")
         raise HTTPException(status_code=500, detail=f"执行失败: {str(e)}")
