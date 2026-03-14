@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>表数据管理</title>
+    <link href="/static/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        html, body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            background-color: #f5f5f5;
+            font-family: 'Microsoft YaHei', sans-serif;
+        }
+        body {
+            overflow-y: auto;
+        }
+        .container-fluid {
+            padding: 20px;
+        }
+        .card {
+            border: none;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .card-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            font-weight: bold;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+        }
+        .btn-success {
+            background: linear-gradient(135deg, #56ab2f 0%, #a8e063 100%);
+            border: none;
+        }
+        .table th {
+            background-color: #f8f9fa;
+            font-weight: 600;
+        }
+        .table-hover tbody tr:hover {
+            background-color: #f0f4ff;
+        }
+        .data-cell.new-row {
+            background-color: #e8f5e9;
+        }
+        .alert-inline {
+            display: inline-block;
+            padding: 0.5rem 1rem;
+            border-radius: 0.25rem;
+            margin-left: 1rem;
+        }
+        .alert-warning-inline {
+            background-color: #fff3cd;
+            border: 1px solid #ffc107;
+            color: #856404;
+        }
+        .alert-danger-inline {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .alert-success-inline {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .alert-info-inline {
+            background-color: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container-fluid">
+        <div class="row mb-4">
+            <div class="col-12">
+                <h3 class="text-center">表数据管理</h3>
+                <p class="text-center text-muted">查看和编辑表数据，支持增删改查操作</p>
+            </div>
+        </div>
+
+        <!-- 表选择区域 -->
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-table me-2"></i>选择数据表
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-3 mb-3">
+                        <label class="form-label">Schema:</label>
+                        <select class="form-select" id="dataSchemaFilter" onchange="onSchemaChange()">
+                            <option value="">全部</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label class="form-label">表名:</label>
+                        <select class="form-select" id="dataTableSelect" onchange="onTableChange()" disabled>
+                            <option value="">请先选择 Schema</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6 mb-3 d-flex align-items-end gap-2">
+                        <button class="btn btn-primary" onclick="loadTablePreview()" id="viewDataBtn" disabled>
+                            <i class="fas fa-eye"></i> 查看数据
+                        </button>
+                        <button class="btn btn-success" onclick="createTableFromSchema()" id="createTableBtn" disabled>
+                            <i class="fas fa-table"></i> 建表
+                        </button>
+                    </div>
+                </div>
+                <div id="tableStatusAlert" style="display: none;"></div>
+            </div>
+        </div>
+
+        <!-- 数据预览区域 -->
+        <div class="card" id="dataPreviewCard" style="display: none;">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="fas fa-table me-2"></i>数据预览 - <span id="previewTableName"></span>
+                    <span class="alert-info-inline alert-inline ms-3"><i class="fas fa-info-circle"></i> 最多录入 10 行数据</span>
+                </span>
+                <div>
+                    <button class="btn btn-sm btn-outline-primary me-2" onclick="addNewRow()" id="addRowBtn">
+                        <i class="fas fa-plus"></i> 新增行
+                    </button>
+                    <button class="btn btn-sm btn-outline-light me-2" onclick="toggleEditMode()">
+                        <i class="fas fa-edit"></i> 编辑模式
+                    </button>
+                    <button class="btn btn-sm btn-outline-success me-2" onclick="saveDataChanges()" id="saveDataBtn" style="display: none;">
+                        <i class="fas fa-save"></i> 保存更改
+                    </button>
+                    <button class="btn btn-sm btn-outline-light" onclick="loadTablePreview()">
+                        <i class="fas fa-sync"></i> 刷新
+                    </button>
+                </div>
+            </div>
+            <div class="card-body p-0">
+                <div id="dataPreviewAlert" style="display: none; padding: 0.5rem 1rem;"></div>
+                <div class="table-responsive">
+                    <table class="table table-hover table-sm mb-0" id="dataTable">
+                        <thead>
+                            <tr id="dataTableHeader"></tr>
+                        </thead>
+                        <tbody id="dataTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- SQL 查询面板 -->
+        <div class="card mt-4" id="sqlQueryPanel">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="fas fa-search me-2"></i>执行查询</span>
+                <button class="btn btn-sm btn-outline-primary" onclick="openHistoryModal()">
+                    <i class="fas fa-history me-1"></i>历史
+                </button>
+            </div>
+            <div class="card-body">
+                <div id="sqlQueryAlert" style="display: none; margin-bottom: 1rem;"></div>
+                
+                <div id="selectedHistoryInfo" class="alert alert-info py-2 mb-3" style="display: none;">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <strong>问题：</strong><span id="selectedHistoryQuery"></span>
+                        </div>
+                        <div class="col-md-6">
+                            <strong>Schema：</strong><span id="selectedHistorySchema"></span>
+                        </div>
+                    </div>
+                    <div class="row mt-2">
+                        <div class="col-md-12">
+                            <strong>SQL：</strong>
+                            <code id="selectedHistorySql" class="d-block bg-light p-2"></code>
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="noSelectionHint" class="text-center text-muted py-4">
+                    <i class="fas fa-hand-pointer fa-2x mb-2"></i>
+                    <p>点击右上角"历史"按钮选择要执行的SQL</p>
+                </div>
+                
+                <div class="d-flex justify-content-end">
+                    <button class="btn btn-success" id="executeQueryBtn" onclick="executeSelectedSql()" disabled>
+                        <i class="fas fa-play me-1"></i>执行查询
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 历史选择模态框 -->
+        <div class="modal fade" id="historyModal" tabindex="-1">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title"><i class="fas fa-history me-2"></i>选择历史SQL</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body" style="max-height: 60vh; overflow-y: auto;">
+                        <div id="historyModalAlert" style="display: none; margin-bottom: 1rem;"></div>
+                        <div id="historyModalList">
+                            <div class="text-center py-4">
+                                <div class="spinner-border text-primary" role="status"></div>
+                                <p class="mt-2">加载中...</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SQL 查询结果 -->
+        <div class="card mt-4" id="queryResultCard" style="display: none;">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="fas fa-chart-table me-2"></i>查询结果</span>
+                <span id="queryResultInfo"></span>
+                <button class="btn btn-sm btn-outline-light" onclick="exportQueryResult()">
+                    <i class="fas fa-download"></i> 导出 CSV
+                </button>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover table-sm mb-0" id="queryResultTable">
+                        <thead id="queryResultHeader"></thead>
+                        <tbody id="queryResultBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="/static/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const apiRequest = window.apiRequest || function(url, options = {}) {
+            const token = document.cookie.split('; ').find(row => row.startsWith('token='))?.split('=')[1];
+            const headers = { 'Content-Type': 'application/json' };
+            if (token) headers['Authorization'] = `Bearer ${token}`;
+            return fetch(url, { ...options, headers });
+        };
+
+        const MAX_ROWS = 10;
+        let currentTableExists = false;
+        let hasNewRows = false;
+
+        function showAlert(elementId, message, type = 'warning') {
+            const el = document.getElementById(elementId);
+            el.innerHTML = `<div class="alert-inline alert-${type}-inline"><i class="fas fa-exclamation-triangle"></i> ${message}</div>`;
+            el.style.display = 'block';
+        }
+
+        function hideAlert(elementId) {
+            document.getElementById(elementId).style.display = 'none';
+        }
+
+        async function loadDataSchemaOptions() {
+            const schemaResp = await apiRequest('/api/schema/schema-names');
+            if (schemaResp && schemaResp.ok) {
+                const data = await schemaResp.json();
+                const select = document.getElementById('dataSchemaFilter');
+                select.innerHTML = '<option value="">全部</option>';
+                data.schemas.forEach(s => {
+                    select.innerHTML += `<option value="${s}">${s}</option>`;
+                });
+            }
+        }
+
+        function onSchemaChange() {
+            const schema = document.getElementById('dataSchemaFilter').value;
+            const tableSelect = document.getElementById('dataTableSelect');
+            const createTableBtn = document.getElementById('createTableBtn');
+            const sqlQueryBtn = document.getElementById('sqlQueryBtn');
+            const viewDataBtn = document.getElementById('viewDataBtn');
+            
+            if (schema) {
+                tableSelect.disabled = false;
+                createTableBtn.disabled = false;
+                loadDataTables(schema);
+            } else {
+                tableSelect.disabled = true;
+                tableSelect.innerHTML = '<option value="">请先选择 Schema</option>';
+                createTableBtn.disabled = true;
+                sqlQueryBtn.disabled = true;
+                viewDataBtn.disabled = true;
+            }
+            
+            hideAlert('tableStatusAlert');
+            document.getElementById('dataPreviewCard').style.display = 'none';
+            currentTableExists = false;
+        }
+
+        async function loadDataTables(schemaName) {
+            const url = `/api/schema/table-names?schema_name=${encodeURIComponent(schemaName)}`;
+            const resp = await apiRequest(url);
+            if (resp && resp.ok) {
+                const data = await resp.json();
+                const select = document.getElementById('dataTableSelect');
+                select.innerHTML = '<option value="">请选择表</option>';
+                data.tables.forEach(t => {
+                    select.innerHTML += `<option value="${t}">${t}</option>`;
+                });
+            }
+        }
+
+        async function onTableChange() {
+            const tableName = document.getElementById('dataTableSelect').value;
+            const viewDataBtn = document.getElementById('viewDataBtn');
+            const createTableBtn = document.getElementById('createTableBtn');
+            
+            if (tableName) {
+                viewDataBtn.disabled = false;
+                createTableBtn.disabled = false;
+                await checkTableExists();
+            } else {
+                viewDataBtn.disabled = true;
+                createTableBtn.disabled = true;
+                hideAlert('tableStatusAlert');
+                document.getElementById('dataPreviewCard').style.display = 'none';
+            }
+        }
+
+        async function checkTableExists() {
+            const tableName = document.getElementById('dataTableSelect').value;
+            if (!tableName) return false;
+            
+            try {
+                const response = await apiRequest(`/api/table-data/${tableName}/exists`);
+                if (response && response.ok) {
+                    const data = await response.json();
+                    currentTableExists = data.exists;
+                    
+                    if (data.exists) {
+                        showAlert('tableStatusAlert', `表 ${tableName} 已创建，可以进行数据操作`, 'success');
+                        return true;
+                    } else {
+                        showAlert('tableStatusAlert', `表 ${tableName} 未创建，请先点击"建表"按钮创建表`, 'warning');
+                        return false;
+                    }
+                }
+            } catch (e) {
+                console.error('检查表存在失败:', e);
+            }
+            return false;
+        }
+
+        async function createTableFromSchema() {
+            const schema = document.getElementById('dataSchemaFilter').value;
+            const tableName = document.getElementById('dataTableSelect').value;
+            
+            if (!schema) {
+                showAlert('tableStatusAlert', '请先选择 Schema', 'warning');
+                return;
+            }
+            
+            if (!tableName) {
+                showAlert('tableStatusAlert', '请选择要创建的表', 'warning');
+                return;
+            }
+            
+            if (!confirm(`确定要创建表 "${tableName}" 吗？\n注意：如果表已存在，将先删除再创建。`)) return;
+            
+            try {
+                const response = await apiRequest('/api/table-data/create-table', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        schema_name: schema,
+                        table_name: tableName
+                    })
+                });
+                
+                if (response && response.ok) {
+                    const data = await response.json();
+                    showAlert('tableStatusAlert', data.message, 'success');
+                    await checkTableExists();
+                } else {
+                    const error = await response.json();
+                    showAlert('tableStatusAlert', '建表失败：' + (error.detail || '未知错误'), 'danger');
+                }
+            } catch (e) {
+                showAlert('tableStatusAlert', '建表失败：' + e.message, 'danger');
+            }
+        }
+
+        async function loadTablePreview() {
+            const tableName = document.getElementById('dataTableSelect').value;
+            if (!tableName) {
+                showAlert('tableStatusAlert', '请选择要查看的表', 'warning');
+                return;
+            }
+            
+            if (!currentTableExists) {
+                showAlert('tableStatusAlert', '表未创建，请先点击"建表"按钮创建表', 'warning');
+                return;
+            }
+
+            document.getElementById('previewTableName').textContent = tableName;
+            document.getElementById('dataPreviewCard').style.display = 'block';
+            hideAlert('dataPreviewAlert');
+            
+            try {
+                const response = await apiRequest(`/api/table-data/${tableName}/preview?limit=${MAX_ROWS}`);
+                if (response && response.ok) {
+                    const data = await response.json();
+                    renderDataTable(data.columns, data.data);
+                } else {
+                    const error = await response.json();
+                    showAlert('dataPreviewAlert', '加载数据失败：' + (error.detail || '未知错误'), 'danger');
+                }
+            } catch (e) {
+                showAlert('dataPreviewAlert', '加载数据失败：' + e.message, 'danger');
+            }
+        }
+
+        function renderDataTable(columns, data) {
+            const thead = document.getElementById('dataTableHeader');
+            const tbody = document.getElementById('dataTableBody');
+            
+            thead.innerHTML = '<th>#</th>' + columns.map(col => `<th>${col}</th>`).join('');
+            
+            if (data.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="${columns.length + 1}" class="text-center text-muted py-4">暂无数据</td></tr>`;
+                return;
+            }
+            
+            tbody.innerHTML = data.slice(0, MAX_ROWS).map((row, idx) => `
+                <tr data-index="${idx}">
+                    <td>${idx + 1}</td>
+                    ${row.map((cell, colIdx) => `<td class="data-cell" data-column="${colIdx}" contenteditable="false">${cell !== null ? cell : '<span class="text-muted">NULL</span>'}</td>`).join('')}
+                </tr>
+            `).join('');
+            
+            hasNewRows = false;
+            document.getElementById('saveDataBtn').style.display = 'none';
+        }
+
+        function addNewRow() {
+            const tbody = document.getElementById('dataTableBody');
+            const existingRows = tbody.querySelectorAll('tr:not([colspan])').length;
+            
+            if (existingRows >= MAX_ROWS) {
+                showAlert('dataPreviewAlert', `最多只能录入 ${MAX_ROWS} 行数据`, 'warning');
+                return;
+            }
+            
+            const columns = Array.from(document.querySelectorAll('#dataTableHeader th')).slice(1).map(th => th.textContent);
+            
+            if (tbody.querySelector('td[colspan]')) {
+                tbody.innerHTML = '';
+            }
+            
+            const newRow = document.createElement('tr');
+            newRow.dataset.index = existingRows;
+            newRow.dataset.isNew = 'true';
+            
+            let html = `<td>${existingRows + 1}</td>`;
+            columns.forEach((col, idx) => {
+                html += `<td class="data-cell new-row" data-column="${idx}" contenteditable="true"></td>`;
+            });
+            
+            newRow.innerHTML = html;
+            tbody.appendChild(newRow);
+            newRow.scrollIntoView({ behavior: 'smooth' });
+            
+            hasNewRows = true;
+            document.getElementById('saveDataBtn').style.display = 'inline-block';
+        }
+
+        let isEditMode = false;
+        function toggleEditMode() {
+            isEditMode = !isEditMode;
+            const cells = document.querySelectorAll('.data-cell:not(.new-row)');
+            const saveBtn = document.getElementById('saveDataBtn');
+            
+            cells.forEach(cell => {
+                cell.contentEditable = isEditMode;
+                if (isEditMode) {
+                    cell.classList.add('table-active');
+                } else {
+                    cell.classList.remove('table-active');
+                }
+            });
+            
+            if (isEditMode || hasNewRows) {
+                saveBtn.style.display = 'inline-block';
+            } else {
+                saveBtn.style.display = 'none';
+            }
+        }
+
+        async function saveDataChanges() {
+            const tableName = document.getElementById('dataTableSelect').value;
+            if (!tableName) return;
+            
+            const rows = document.querySelectorAll('#dataTableBody tr');
+            const columns = Array.from(document.querySelectorAll('#dataTableHeader th')).slice(1).map(th => th.textContent);
+            
+            const changes = [];
+            rows.forEach((row, idx) => {
+                const cells = row.querySelectorAll('td');
+                const rowData = {};
+                
+                if (row.dataset.isNew === 'true') {
+                    rowData['__is_new__'] = true;
+                } else {
+                    rowData['__index'] = idx;
+                }
+                
+                cells.forEach((cell, i) => {
+                    if (i > 0) {
+                        const colName = columns[i - 1];
+                        let value = cell.textContent.trim();
+                        if (value === 'NULL' || value === '') {
+                            value = null;
+                        }
+                        rowData[colName] = value;
+                    }
+                });
+                
+                changes.push(rowData);
+            });
+            
+            try {
+                const response = await apiRequest(`/api/table-data/${tableName}/update`, {
+                    method: 'POST',
+                    body: JSON.stringify({ rows: changes })
+                });
+                
+                if (response && response.ok) {
+                    const result = await response.json();
+                    showAlert('dataPreviewAlert', '保存成功：' + result.message, 'success');
+                    isEditMode = false;
+                    hasNewRows = false;
+                    document.getElementById('saveDataBtn').style.display = 'none';
+                    loadTablePreview();
+                } else {
+                    const error = await response.json();
+                    showAlert('dataPreviewAlert', '保存失败：' + (error.detail || '未知错误'), 'danger');
+                }
+            } catch (e) {
+                showAlert('dataPreviewAlert', '保存失败：' + e.message, 'danger');
+            }
+        }
+
+        let currentHistorySql = null;
+        let currentHistoryItem = null;
+        let historyModalInstance = null;
+
+        async function openHistoryModal() {
+            const modalEl = document.getElementById('historyModal');
+            if (!historyModalInstance) {
+                historyModalInstance = new bootstrap.Modal(modalEl);
+            }
+            historyModalInstance.show();
+            await loadHistorySql();
+        }
+
+        async function loadHistorySql() {
+            const container = document.getElementById('historyModalList');
+            container.innerHTML = '<div class="text-center py-4"><div class="spinner-border text-primary" role="status"></div><p class="mt-2">加载中...</p></div>';
+            
+            try {
+                const response = await apiRequest('/api/chat-to-sql/history?limit=20&offset=0');
+                if (response && response.ok) {
+                    const data = await response.json();
+                    
+                    if (data.items && data.items.length > 0) {
+                        container.innerHTML = data.items.map((item, index) => `
+                            <div class="card mb-2">
+                                <div class="card-body py-2">
+                                    <div class="mb-2">
+                                        <strong class="text-primary">${escapeHtml(item.query)}</strong>
+                                        <small class="text-muted ms-2">Schema: ${item.schema_name || '全部'}</small>
+                                    </div>
+                                    <code class="d-block bg-light p-2 mb-2" style="max-height: 60px; overflow-y: auto;">${escapeHtml(item.sql_query)}</code>
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <small class="text-muted">${new Date(item.created_at).toLocaleString()}</small>
+                                        <button class="btn btn-sm btn-primary select-history-btn" data-index="${index}">
+                                            <i class="fas fa-check"></i> 选择
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        `).join('');
+                        
+                        window.historyData = data.items;
+                        
+                        container.querySelectorAll('.select-history-btn').forEach(btn => {
+                            btn.addEventListener('click', function() {
+                                const index = parseInt(this.getAttribute('data-index'));
+                                selectHistoryItem(window.historyData[index]);
+                            });
+                        });
+                    } else {
+                        container.innerHTML = '<div class="text-center text-muted py-4">暂无历史记录</div>';
+                    }
+                }
+            } catch (e) {
+                console.error('加载历史 SQL 失败:', e);
+                container.innerHTML = '<div class="text-center text-danger py-4">加载失败，请重试</div>';
+            }
+        }
+
+        let currentHistoryId = null;
+
+        async function selectHistoryItem(item) {
+            currentHistoryItem = item;
+            currentHistorySql = item.sql_query;
+            currentHistoryId = item.id;
+            
+            document.getElementById('selectedHistoryQuery').textContent = item.query;
+            document.getElementById('selectedHistorySql').textContent = item.sql_query;
+            document.getElementById('selectedHistorySchema').textContent = item.schema_name || '全部';
+            document.getElementById('selectedHistoryInfo').style.display = 'block';
+            document.getElementById('noSelectionHint').style.display = 'none';
+            document.getElementById('executeQueryBtn').disabled = false;
+            
+            if (historyModalInstance) {
+                historyModalInstance.hide();
+            }
+            
+            const tableCheck = await checkTablesInSql(item.sql_query);
+            if (!tableCheck.allExist) {
+                showAlert('sqlQueryAlert', `SQL 中的表未创建：${tableCheck.missingTables.join(', ')}，请先建表`, 'warning');
+            } else {
+                hideAlert('sqlQueryAlert');
+            }
+        }
+
+        async function executeSelectedSql() {
+            if (!currentHistoryId) {
+                showAlert('sqlQueryAlert', '请先选择一条历史 SQL', 'warning');
+                return;
+            }
+            
+            const executeBtn = document.getElementById('executeQueryBtn');
+            executeBtn.disabled = true;
+            executeBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> 执行中...';
+            
+            try {
+                const response = await apiRequest('/api/chat-to-sql/execute_sql', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        history_id: currentHistoryId
+                    })
+                });
+                
+                if (response && response.ok) {
+                    const result = await response.json();
+                    displayQueryResult(result);
+                } else {
+                    const error = await response.json();
+                    showAlert('sqlQueryAlert', '执行失败：' + (error.detail || '未知错误'), 'danger');
+                }
+            } catch (e) {
+                showAlert('sqlQueryAlert', '执行失败：' + e.message, 'danger');
+            } finally {
+                executeBtn.disabled = false;
+                executeBtn.innerHTML = '<i class="fas fa-play me-1"></i>执行查询';
+            }
+        }
+
+        async function checkTablesInSql(sql) {
+            const tablePattern = /(?:FROM|JOIN|INTO|UPDATE)\s+`?(\w+)`?/gi;
+            const tables = new Set();
+            let match;
+            
+            while ((match = tablePattern.exec(sql)) !== null) {
+                tables.add(match[1].toLowerCase());
+            }
+            
+            const missingTables = [];
+            
+            for (const table of tables) {
+                try {
+                    const response = await apiRequest(`/api/table-data/${table}/exists`);
+                    if (response && response.ok) {
+                        const data = await response.json();
+                        if (!data.exists) {
+                            missingTables.push(table);
+                        }
+                    }
+                } catch (e) {
+                    missingTables.push(table);
+                }
+            }
+            
+            return {
+                allExist: missingTables.length === 0,
+                missingTables: missingTables
+            };
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function displayQueryResult(result) {
+            const queryResultCard = document.getElementById('queryResultCard');
+            const queryResultInfo = document.getElementById('queryResultInfo');
+            const thead = document.getElementById('queryResultHeader');
+            const tbody = document.getElementById('queryResultBody');
+            
+            queryResultCard.style.display = 'block';
+            
+            if (result.columns && result.data) {
+                queryResultInfo.textContent = `共 ${result.data.length} 条结果`;
+                
+                thead.innerHTML = result.columns.map(col => `<th>${col}</th>`).join('');
+                
+                if (result.data.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="${result.columns.length}" class="text-center text-muted py-4">查询结果为空</td></tr>`;
+                } else {
+                    tbody.innerHTML = result.data.map(row => 
+                        `<tr>${row.map(cell => `<td>${cell !== null ? cell : 'NULL'}</td>`).join('')}</tr>`
+                    ).join('');
+                }
+            }
+        }
+
+        function exportQueryResult() {
+            const table = document.getElementById('queryResultTable');
+            let csv = '';
+            
+            const headers = Array.from(table.querySelectorAll('#queryResultHeader th')).map(th => th.textContent);
+            csv += headers.join(',') + '\n';
+            
+            const rows = table.querySelectorAll('#queryResultBody tr');
+            rows.forEach(row => {
+                const cells = row.querySelectorAll('td');
+                const rowData = Array.from(cells).map(td => {
+                    const text = td.textContent.replace(/"/g, '""');
+                    return `"${text}"`;
+                });
+                csv += rowData.join(',') + '\n';
+            });
+            
+            const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `query_result_${new Date().getTime()}.csv`;
+            link.click();
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadDataSchemaOptions();
+        });
+    </script>
+</body>
+
+</html>

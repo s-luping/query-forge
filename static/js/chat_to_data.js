@@ -1,6 +1,5 @@
 // 获取DOM元素
 const userQueryEl = document.getElementById('userQuery');
-const maxResultsEl = document.getElementById('maxResults');
 const executeBtn = document.getElementById('executeBtn');
 const executeBtnText = document.getElementById('executeBtnText');
 const executeSpinner = document.getElementById('executeSpinner');
@@ -94,7 +93,7 @@ async function checkSchemaStatus() {
 function showSchemaWarning() {
     const warningHtml = `
         <div class="alert alert-warning alert-dismissible fade show" role="alert">
-            <strong>提示：</strong>您还没有维护Schema，请先在【Schema管理】中上传DDL解析表结构，才能使用智能数据分析功能。
+            <strong>提示：</strong>您还没有维护Schema，请先在【Schema管理】中上传DDL解析表结构，才能使用数据查询功能。
             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         </div>
     `;
@@ -140,10 +139,8 @@ executeBtn.addEventListener('click', async function () {
     toggleLoadingState(true);
 
     try {
-        const maxResults = parseInt(maxResultsEl.value) || 100;
         const requestBody = {
-            query: query,
-            max_results: maxResults
+            query: query
         };
         
         if (selectedKnowledgeId) {

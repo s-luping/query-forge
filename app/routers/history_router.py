@@ -18,7 +18,7 @@ router = APIRouter()
 security = HTTPBearer(auto_error=False)
 
 
-def add_history(query: str, sql_query: str, is_valid: bool, error_message: str, user_id: int) -> int:
+def add_history(query: str, sql_query: str, is_valid: bool, error_message: str, user_id: int, schema_name: str = None, knowledge_id: int = None) -> int:
     """添加历史记录"""
     db = HistorySessionLocal()
     try:
@@ -27,7 +27,9 @@ def add_history(query: str, sql_query: str, is_valid: bool, error_message: str, 
             sql_query=sql_query,
             is_valid=is_valid,
             error_message=error_message,
-            user_id=str(user_id)
+            user_id=str(user_id),
+            schema_name=schema_name,
+            knowledge_id=knowledge_id
         )
         db.add(history)
         db.commit()
@@ -57,7 +59,9 @@ def get_history(user_id: int, limit: int = 20, offset: int = 0) -> tuple:
                 'error_message': item.error_message,
                 'user_id': item.user_id,
                 'created_at': item.created_at.strftime('%Y-%m-%d %H:%M:%S') if item.created_at else None,
-                'rating': item.rating
+                'rating': item.rating,
+                'schema_name': item.schema_name,
+                'knowledge_id': item.knowledge_id
             })
         
         return result, total
@@ -157,3 +161,35 @@ async def rate_sql_history(
     except Exception as e:
         logger.error(f"评分失败: {e}")
         raise HTTPException(status_code=500, detail=f"评分失败: {str(e)}")
+
+
+@router.delete("/history/{history_id}")
+async def delete_sql_history(
+    history_id: int,
+    user = Depends(get_current_user)
+):
+    """删除SQL历史记录"""
+    db = HistorySessionLocal()
+    try:
+        user_id_str = str(user['user_id'])
+        history = db.query(SqlHistory).filter(
+            SqlHistory.id == history_id,
+            SqlHistory.user_id == user_id_str
+        ).first()
+        
+        if not history:
+            raise HTTPException(status_code=404, detail="历史记录不存在或不属于该用户")
+        
+        db.delete(history)
+        db.commit()
+        
+        return {"success": True, "message": "删除成功"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"删除历史记录失败: {e}")
+        raise HTTPException(status_code=500, detail=f"删除失败: {str(e)}")
+    finally:
+        db.close()

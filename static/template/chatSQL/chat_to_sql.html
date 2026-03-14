@@ -1,0 +1,1044 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>生成 SQL 与查询</title>
+    <link href="/static/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        html, body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            background-color: #f5f5f5;
+            font-family: 'Microsoft YaHei', sans-serif;
+        }
+        body {
+            overflow-y: auto;
+        }
+        .container-fluid {
+            padding: 20px;
+        }
+        .card {
+            border: none;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .card-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            font-weight: bold;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+        }
+        .btn-success {
+            background: linear-gradient(135deg, #56ab2f 0%, #a8e063 100%);
+            border: none;
+        }
+        .table th {
+            background-color: #f8f9fa;
+            font-weight: 600;
+        }
+        .table-hover tbody tr:hover {
+            background-color: #f0f4ff;
+        }
+        code {
+            background-color: #f8f9fa;
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+        .knowledge-card {
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .knowledge-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .knowledge-card.selected {
+            border-color: #0d6efd;
+            background-color: #f0f7ff;
+        }
+        .nav-tabs .nav-link {
+            color: #495057;
+        }
+        .nav-tabs .nav-link.active {
+            font-weight: 600;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container-fluid">
+        <div class="row mb-4">
+            <div class="col-12">
+                <h3 class="text-center">生成 SQL 与查询</h3>
+                <p class="text-center text-muted">使用自然语言描述，AI 自动生成 SQL 并执行查询</p>
+            </div>
+        </div>
+
+        <!-- 智能 SQL 生成 -->
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="fas fa-robot me-2"></i>智能 SQL 生成</span>
+                <div>
+                    <button id="knowledgeBtn" class="btn btn-outline-light btn-sm me-2">
+                        <i class="fas fa-book me-1"></i>补充知识
+                    </button>
+                    <button id="historyBtn" class="btn btn-outline-light btn-sm">
+                        <i class="fas fa-history me-1"></i>历史记录
+                    </button>
+                </div>
+            </div>
+            <div class="card-body">
+                <div id="selectedKnowledgeInfo" class="alert alert-info d-none py-2 mb-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <i class="fas fa-check-circle me-2"></i>
+                            <strong>当前使用知识：</strong>
+                            <span id="selectedKnowledgeTitle"></span>
+                        </div>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="clearSelectedKnowledge()">
+                            <i class="fas fa-times"></i> 清除
+                        </button>
+                    </div>
+                    <div id="selectedKnowledgeDetails" class="mt-2 small">
+                        <div class="row">
+                            <div class="col-md-4">
+                                <strong>字段示例值：</strong>
+                                <pre id="selectedSampleValues" class="bg-light p-1 mb-0" style="font-size: 11px; max-height: 80px; overflow-y: auto;"></pre>
+                            </div>
+                            <div class="col-md-4">
+                                <strong>表间关系：</strong>
+                                <pre id="selectedTableRelations" class="bg-light p-1 mb-0" style="font-size: 11px; max-height: 80px; overflow-y: auto;"></pre>
+                            </div>
+                            <div class="col-md-4">
+                                <strong>领域知识：</strong>
+                                <pre id="selectedDomainKnowledge" class="bg-light p-1 mb-0" style="font-size: 11px; max-height: 80px; overflow-y: auto;"></pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">您的问题:</label>
+                    <textarea class="form-control" id="userQuery" rows="3" placeholder="例如：查询所有用户的姓名和邮箱"></textarea>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <label class="form-label">Schema: <span class="text-danger">*</span></label>
+                        <select class="form-select" id="schemaFilter" onchange="onSchemaFilterChange()">
+                            <option value="">请选择</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">数据库类型:</label>
+                        <select class="form-select" id="sqlDbType">
+                            <option value="sqlite" selected>SQLite</option>
+                            <option value="mysql">MySQL</option>
+                            <option value="postgresql">PostgreSQL</option>
+                            <option value="oracle">Oracle</option>
+                            <option value="sqlserver">SQL Server</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4 d-flex align-items-end">
+                        <button class="btn btn-primary w-100" id="generateBtn" onclick="generateSQL()">
+                            <span id="generateBtnText">生成 SQL</span>
+                            <span id="generateSpinner" class="spinner-border spinner-border-sm d-none ms-2" role="status"></span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">生成的 SQL:</label>
+                    <textarea class="form-control" id="generatedSql" rows="5" readonly></textarea>
+                </div>
+                <div class="mb-3" id="sqlValidationResult"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 历史记录模态框 -->
+    <div class="modal fade" id="historyModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-info text-white">
+                    <h5 class="modal-title">历史记录</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h6>历史查询记录</h6>
+                            <button id="refreshHistoryBtn" class="btn btn-sm btn-outline-info">
+                                <i class="fas fa-sync-alt me-1"></i>刷新
+                            </button>
+                        </div>
+                        <div id="historyLoading" class="text-center py-4">
+                            <div class="spinner-border" role="status">
+                                <span class="visually-hidden">加载中...</span>
+                            </div>
+                            <p class="mt-2">加载历史记录中...</p>
+                        </div>
+                        <div id="historyContent" class="d-none">
+                            <div class="list-group" id="historyList"></div>
+                            <div id="historyPagination" class="mt-3 d-flex justify-content-between align-items-center">
+                                <button id="prevHistoryBtn" class="btn btn-sm btn-outline-secondary" disabled>上一页</button>
+                                <span id="historyPageInfo">第 1 页，共 1 页</span>
+                                <button id="nextHistoryBtn" class="btn btn-sm btn-outline-secondary" disabled>下一页</button>
+                            </div>
+                        </div>
+                        <div id="historyEmpty" class="d-none text-center py-4">
+                            <i class="fas fa-history fa-3x mb-3 text-muted"></i>
+                            <p class="text-muted">暂无历史记录</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 补充知识模态框 -->
+    <div class="modal fade" id="knowledgeModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header bg-warning">
+                    <h5 class="modal-title"><i class="fas fa-book me-2"></i>补充知识管理</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <ul class="nav nav-tabs mb-3" id="knowledgeTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="list-tab" data-bs-toggle="tab" data-bs-target="#list-tab-pane" type="button" role="tab">知识列表</button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="add-tab" data-bs-toggle="tab" data-bs-target="#add-tab-pane" type="button" role="tab">添加知识</button>
+                        </li>
+                    </ul>
+                    <div class="tab-content" id="knowledgeTabsContent">
+                        <!-- 知识列表 -->
+                        <div class="tab-pane fade show active" id="list-tab-pane" role="tabpanel">
+                            <div id="knowledgeLoading" class="text-center py-4">
+                                <div class="spinner-border" role="status">
+                                    <span class="visually-hidden">加载中...</span>
+                                </div>
+                                <p class="mt-2">加载补充知识中...</p>
+                            </div>
+                            <div id="knowledgeContent" class="d-none">
+                                <div class="row" id="knowledgeList"></div>
+                                <div id="knowledgePagination" class="mt-3 d-flex justify-content-between align-items-center">
+                                    <button id="prevKnowledgeBtn" class="btn btn-sm btn-outline-secondary" disabled>上一页</button>
+                                    <span id="knowledgePageInfo">第 1 页，共 1 页</span>
+                                    <button id="nextKnowledgeBtn" class="btn btn-sm btn-outline-secondary" disabled>下一页</button>
+                                </div>
+                            </div>
+                            <div id="knowledgeEmpty" class="d-none text-center py-4">
+                                <i class="fas fa-book fa-3x mb-3 text-muted"></i>
+                                <p class="text-muted">暂无补充知识，请添加</p>
+                            </div>
+                        </div>
+                        <!-- 添加/编辑知识 -->
+                        <div class="tab-pane fade" id="add-tab-pane" role="tabpanel">
+                            <form id="knowledgeForm">
+                                <input type="hidden" id="knowledgeId">
+                                <div class="mb-3">
+                                    <label for="knowledgeTitle" class="form-label">标题</label>
+                                    <input type="text" class="form-control" id="knowledgeTitle" placeholder="例如：订单状态说明">
+                                </div>
+                                <div class="mb-3">
+                                    <label for="sampleValuesSection" class="form-label">字段示例值</label>
+                                    <textarea class="form-control" id="sampleValuesSection" rows="3" placeholder="例如：&#10;users.status: active, inactive, pending&#10;orders.status: pending, paid, shipped, completed"></textarea>
+                                    <div class="form-text">列出字段的常见值，格式：表名。字段名：值 1, 值 2, 值 3</div>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="tableRelationsSection" class="form-label">表间关系说明</label>
+                                    <textarea class="form-control" id="tableRelationsSection" rows="3" placeholder="例如：&#10;orders.user_id 关联 users.id&#10;order_items.order_id 关联 orders.id"></textarea>
+                                    <div class="form-text">描述表之间的关联关系，帮助大模型理解 JOIN 操作</div>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="domainKnowledgeSection" class="form-label">领域知识</label>
+                                    <textarea class="form-control" id="domainKnowledgeSection" rows="5" placeholder="例如：&#10;1. 查询用户订单时，通常需要关联 users 表和 orders 表&#10;2. 状态为'completed'的订单才算完成"></textarea>
+                                    <div class="form-text">添加业务领域相关的知识，帮助大模型理解业务逻辑</div>
+                                </div>
+                                <div class="d-flex justify-content-end">
+                                    <button type="button" class="btn btn-secondary me-2" onclick="resetKnowledgeForm()">重置</button>
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-save me-1"></i>保存
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 查看知识详情模态框 -->
+    <div class="modal fade" id="viewKnowledgeModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-info text-white">
+                    <h5 class="modal-title" id="viewKnowledgeTitle">知识详情</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <h6>字段示例值</h6>
+                        <pre id="viewSampleValues" class="bg-light p-2" style="white-space: pre-wrap;"></pre>
+                    </div>
+                    <div class="mb-3">
+                        <h6>表间关系说明</h6>
+                        <pre id="viewTableRelations" class="bg-light p-2" style="white-space: pre-wrap;"></pre>
+                    </div>
+                    <div class="mb-3">
+                        <h6>领域知识</h6>
+                        <pre id="viewDomainKnowledge" class="bg-light p-2" style="white-space: pre-wrap;"></pre>
+                    </div>
+                    <div class="text-muted small">
+                        <span id="viewKnowledgeTime"></span>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 错误提示模态框 -->
+    <div class="modal fade" id="errorModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title">错误</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p id="errorMessage"></p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 评分模态框 -->
+    <div class="modal fade" id="ratingModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-sm">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title">评分</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-3">请为这次 SQL 生成体验评分：</p>
+                    <div class="rating-stars d-flex justify-content-center">
+                        <button type="button" class="star-btn btn btn-outline-warning m-1" data-rating="1">
+                            <i class="fas fa-star"></i>
+                        </button>
+                        <button type="button" class="star-btn btn btn-outline-warning m-1" data-rating="2">
+                            <i class="fas fa-star"></i>
+                        </button>
+                        <button type="button" class="star-btn btn btn-outline-warning m-1" data-rating="3">
+                            <i class="fas fa-star"></i>
+                        </button>
+                        <button type="button" class="star-btn btn btn-outline-warning m-1" data-rating="4">
+                            <i class="fas fa-star"></i>
+                        </button>
+                        <button type="button" class="star-btn btn btn-outline-warning m-1" data-rating="5">
+                            <i class="fas fa-star"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" id="submitRatingBtn" class="btn btn-primary" disabled>提交评分</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="/static/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const apiRequest = window.apiRequest || function(url, options = {}) {
+            const token = document.cookie.split('; ').find(row => row.startsWith('token='))?.split('=')[1];
+            const headers = { 'Content-Type': 'application/json' };
+            if (token) headers['Authorization'] = `Bearer ${token}`;
+            return fetch(url, { ...options, headers });
+        };
+
+        function getCookie(name) {
+            const value = `; ${document.cookie}`;
+            const parts = value.split(`; ${name}=`);
+            if (parts.length === 2) return parts.pop().split(';').shift();
+        }
+
+        function getToken() {
+            return getCookie('token') || '';
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function showError(message) {
+            document.getElementById('errorMessage').textContent = message;
+            const errorModal = new bootstrap.Modal(document.getElementById('errorModal'));
+            errorModal.show();
+        }
+
+        let knowledgeCurrentPage = 1;
+        let knowledgeTotalPages = 1;
+        let editingKnowledgeId = null;
+        let selectedKnowledgeId = null;
+        let historyCurrentPage = 1;
+        let historyTotalPages = 1;
+        let selectedRating = 0;
+        let currentHistoryId = null;
+
+        const knowledgeBtn = document.getElementById('knowledgeBtn');
+        const historyBtn = document.getElementById('historyBtn');
+        const knowledgeModal = new bootstrap.Modal(document.getElementById('knowledgeModal'));
+        const historyModal = new bootstrap.Modal(document.getElementById('historyModal'));
+        const viewKnowledgeModal = new bootstrap.Modal(document.getElementById('viewKnowledgeModal'));
+        const ratingModal = new bootstrap.Modal(document.getElementById('ratingModal'));
+
+        // 评分星星按钮事件
+        const starBtns = document.querySelectorAll('.star-btn');
+        const submitRatingBtn = document.getElementById('submitRatingBtn');
+
+        starBtns.forEach(btn => {
+            btn.addEventListener('click', function() {
+                const rating = parseInt(this.getAttribute('data-rating'));
+                selectedRating = rating;
+
+                starBtns.forEach((star, index) => {
+                    if (index < rating) {
+                        star.classList.remove('btn-outline-warning');
+                        star.classList.add('btn-warning');
+                    } else {
+                        star.classList.remove('btn-warning');
+                        star.classList.add('btn-outline-warning');
+                    }
+                });
+
+                submitRatingBtn.disabled = false;
+            });
+        });
+
+        submitRatingBtn.addEventListener('click', async function() {
+            if (selectedRating === 0 || currentHistoryId === null) {
+                showError('请选择评分');
+                return;
+            }
+
+            try {
+                const response = await apiRequest('/api/chat-to-sql/history/rate', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        history_id: currentHistoryId,
+                        rating: selectedRating
+                    })
+                });
+
+                if (!response || !response.ok) {
+                    const err = await response.json();
+                    throw new Error(err.detail || '评分失败');
+                }
+
+                ratingModal.hide();
+                loadHistory();
+
+                selectedRating = 0;
+                currentHistoryId = null;
+                starBtns.forEach(star => {
+                    star.classList.remove('btn-warning');
+                    star.classList.add('btn-outline-warning');
+                });
+                submitRatingBtn.disabled = true;
+
+            } catch (error) {
+                console.error('评分失败:', error);
+                showError(`评分失败：${error.message}`);
+            }
+        });
+
+        knowledgeBtn.addEventListener('click', function() {
+            knowledgeCurrentPage = 1;
+            loadKnowledge();
+            knowledgeModal.show();
+        });
+
+        historyBtn.addEventListener('click', function() {
+            historyCurrentPage = 1;
+            loadHistory();
+            historyModal.show();
+        });
+
+        async function loadSchemaOptions() {
+            try {
+                const response = await apiRequest('/api/schema/schema-names');
+                if (response && response.ok) {
+                    const data = await response.json();
+                    const select = document.getElementById('schemaFilter');
+                    select.innerHTML = '<option value="">全部</option>';
+                    data.schemas.forEach(s => {
+                        select.innerHTML += `<option value="${s}">${s}</option>`;
+                    });
+                }
+            } catch (e) {
+                console.error('加载 Schema 列表失败:', e);
+            }
+        }
+
+        function onSchemaFilterChange() {
+            // Schema 过滤会在后端生成SQL时使用
+        }
+
+        async function generateSQL() {
+            const query = document.getElementById('userQuery').value.trim();
+            if (!query) {
+                alert('请输入您的问题');
+                return;
+            }
+
+            const schemaFilter = document.getElementById('schemaFilter').value;
+            if (!schemaFilter) {
+                alert('请选择 Schema');
+                return;
+            }
+
+            const dbType = document.getElementById('sqlDbType').value;
+
+            const generateBtn = document.getElementById('generateBtn');
+            const generateBtnText = document.getElementById('generateBtnText');
+            const generateSpinner = document.getElementById('generateSpinner');
+
+            generateBtn.disabled = true;
+            generateBtnText.classList.add('d-none');
+            generateSpinner.classList.remove('d-none');
+
+            try {
+                const requestBody = {
+                    query: query,
+                    db_type: dbType,
+                    schema_name: schemaFilter
+                };
+                
+                if (selectedKnowledgeId) {
+                    requestBody.knowledge_id = selectedKnowledgeId;
+                }
+
+                const response = await apiRequest('/api/chat-to-sql/generate_sql', {
+                    method: 'POST',
+                    body: JSON.stringify(requestBody)
+                });
+
+                if (response && response.ok) {
+                    const data = await response.json();
+                    document.getElementById('generatedSql').value = data.sql_query || '';
+                    
+                    if (data.is_valid) {
+                        document.getElementById('sqlValidationResult').innerHTML = '<span class="text-success"><i class="fas fa-check-circle"></i> SQL 验证通过</span>';
+                    } else {
+                        document.getElementById('sqlValidationResult').innerHTML = '<span class="text-danger"><i class="fas fa-exclamation-circle"></i> SQL 验证失败：' + (data.error_message || '未知错误') + '</span>';
+                    }
+                } else {
+                    const error = await response.json();
+                    alert('生成失败：' + (error.detail || '未知错误'));
+                }
+            } catch (e) {
+                alert('生成失败：' + e.message);
+            } finally {
+                generateBtn.disabled = false;
+                generateBtnText.classList.remove('d-none');
+                generateSpinner.classList.add('d-none');
+            }
+        }
+
+        function useHistorySQL(query, sql) {
+            document.getElementById('userQuery').value = query;
+            document.getElementById('generatedSql').value = sql;
+        }
+
+        async function loadHistory() {
+            const historyLoading = document.getElementById('historyLoading');
+            const historyContent = document.getElementById('historyContent');
+            const historyEmpty = document.getElementById('historyEmpty');
+            const historyList = document.getElementById('historyList');
+            const historyPageInfo = document.getElementById('historyPageInfo');
+            const prevHistoryBtn = document.getElementById('prevHistoryBtn');
+            const nextHistoryBtn = document.getElementById('nextHistoryBtn');
+
+            historyLoading.classList.remove('d-none');
+            historyContent.classList.add('d-none');
+            historyEmpty.classList.add('d-none');
+
+            try {
+                const limit = 10;
+                const offset = (historyCurrentPage - 1) * limit;
+
+                const response = await apiRequest(`/api/chat-to-sql/history?limit=${limit}&offset=${offset}`);
+                if (!response || !response.ok) {
+                    throw new Error('加载历史记录失败');
+                }
+
+                const data = await response.json();
+
+                if (data.total === 0) {
+                    historyLoading.classList.add('d-none');
+                    historyEmpty.classList.remove('d-none');
+                    return;
+                }
+
+                historyTotalPages = Math.ceil(data.total / limit);
+                historyPageInfo.textContent = `第 ${historyCurrentPage} 页，共 ${historyTotalPages} 页`;
+                prevHistoryBtn.disabled = historyCurrentPage === 1;
+                nextHistoryBtn.disabled = historyCurrentPage === historyTotalPages;
+
+                historyList.innerHTML = data.items.map(item => `
+                    <div class="list-group-item list-group-item-action">
+                        <div class="d-flex justify-content-between">
+                            <div class="flex-grow-1">
+                                <h6 class="mb-1">${escapeHtml(item.query)}</h6>
+                                <p class="mb-1 text-muted small">${escapeHtml(item.sql_query.substring(0, 100))}${item.sql_query.length > 100 ? '...' : ''}</p>
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <span class="text-xs text-muted">${new Date(item.created_at).toLocaleString()}</span>
+                                        ${item.schema_name ? `<span class="badge bg-secondary ms-2">${escapeHtml(item.schema_name)}</span>` : ''}
+                                    </div>
+                                    <span class="badge ${item.is_valid ? 'bg-success' : 'bg-danger'}">${item.is_valid ? '有效' : '无效'}</span>
+                                </div>
+                            </div>
+                            <div class="d-flex flex-column align-items-end ms-3">
+                                ${item.rating ? `
+                                    <div class="rating mb-2">
+                                        ${Array.from({ length: 5 }, (_, i) => `
+                                            <i class="fas fa-star ${i < item.rating ? 'text-warning' : 'text-muted'}"></i>
+                                        `).join('')}
+                                    </div>
+                                ` : ''}
+                                <div class="btn-group">
+                                    <button class="btn btn-sm btn-outline-primary use-history-btn" 
+                                        data-query="${escapeHtml(item.query)}" 
+                                        data-sql="${escapeHtml(item.sql_query)}"
+                                        data-schema="${item.schema_name || ''}"
+                                        data-knowledge-id="${item.knowledge_id || ''}">
+                                        <i class="fas fa-reply me-1"></i>使用
+                                    </button>
+                                    ${!item.rating && item.is_valid ? `
+                                        <button class="btn btn-sm btn-outline-warning rate-history-btn" data-id="${item.id}">
+                                            <i class="fas fa-star me-1"></i>评分
+                                        </button>
+                                    ` : ''}
+                                    <button class="btn btn-sm btn-outline-danger delete-history-btn" data-id="${item.id}">
+                                        <i class="fas fa-trash me-1"></i>删除
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+
+                document.querySelectorAll('.use-history-btn').forEach(btn => {
+                    btn.addEventListener('click', async function() {
+                        const query = this.getAttribute('data-query');
+                        const sql = this.getAttribute('data-sql');
+                        const schemaName = this.getAttribute('data-schema');
+                        const knowledgeId = this.getAttribute('data-knowledge-id');
+                        
+                        document.getElementById('userQuery').value = query;
+                        document.getElementById('generatedSql').value = sql;
+                        
+                        if (schemaName) {
+                            document.getElementById('schemaFilter').value = schemaName;
+                        }
+                        
+                        if (knowledgeId && knowledgeId !== '') {
+                            try {
+                                const response = await apiRequest(`/api/extra-knowledge/${knowledgeId}`);
+                                if (response && response.ok) {
+                                    const knowledge = await response.json();
+                                    selectedKnowledgeId = parseInt(knowledgeId);
+                                    document.getElementById('selectedKnowledgeTitle').textContent = knowledge.title || '未命名知识';
+                                    document.getElementById('selectedKnowledgeInfo').classList.remove('d-none');
+                                }
+                            } catch (e) {
+                                console.error('加载知识失败:', e);
+                            }
+                        } else {
+                            selectedKnowledgeId = null;
+                            document.getElementById('selectedKnowledgeInfo').classList.add('d-none');
+                        }
+                        
+                        historyModal.hide();
+                    });
+                });
+
+                document.querySelectorAll('.rate-history-btn').forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        currentHistoryId = parseInt(this.getAttribute('data-id'));
+                        selectedRating = 0;
+                        starBtns.forEach(star => {
+                            star.classList.remove('btn-warning');
+                            star.classList.add('btn-outline-warning');
+                        });
+                        submitRatingBtn.disabled = true;
+                        ratingModal.show();
+                    });
+                });
+
+                document.querySelectorAll('.delete-history-btn').forEach(btn => {
+                    btn.addEventListener('click', async function() {
+                        const historyId = parseInt(this.getAttribute('data-id'));
+                        if (!confirm('确定要删除这条历史记录吗？')) {
+                            return;
+                        }
+                        
+                        try {
+                            const response = await apiRequest(`/api/chat-to-sql/history/${historyId}`, {
+                                method: 'DELETE'
+                            });
+                            
+                            if (!response || !response.ok) {
+                                const err = await response.json();
+                                throw new Error(err.detail || '删除失败');
+                            }
+                            
+                            loadHistory();
+                            
+                        } catch (error) {
+                            console.error('删除历史记录失败:', error);
+                            showError(`删除失败：${error.message}`);
+                        }
+                    });
+                });
+
+                historyLoading.classList.add('d-none');
+                historyContent.classList.remove('d-none');
+
+            } catch (error) {
+                console.error('加载历史记录失败:', error);
+                showError(`加载历史记录失败：${error.message}`);
+                historyLoading.classList.add('d-none');
+                historyEmpty.classList.remove('d-none');
+            }
+        }
+
+        document.getElementById('refreshHistoryBtn').addEventListener('click', loadHistory);
+        document.getElementById('prevHistoryBtn').addEventListener('click', function() {
+            if (historyCurrentPage > 1) {
+                historyCurrentPage--;
+                loadHistory();
+            }
+        });
+        document.getElementById('nextHistoryBtn').addEventListener('click', function() {
+            if (historyCurrentPage < historyTotalPages) {
+                historyCurrentPage++;
+                loadHistory();
+            }
+        });
+
+        async function loadKnowledge() {
+            const knowledgeLoading = document.getElementById('knowledgeLoading');
+            const knowledgeContent = document.getElementById('knowledgeContent');
+            const knowledgeEmpty = document.getElementById('knowledgeEmpty');
+            const knowledgeList = document.getElementById('knowledgeList');
+            const knowledgePageInfo = document.getElementById('knowledgePageInfo');
+            const prevKnowledgeBtn = document.getElementById('prevKnowledgeBtn');
+            const nextKnowledgeBtn = document.getElementById('nextKnowledgeBtn');
+
+            knowledgeLoading.classList.remove('d-none');
+            knowledgeContent.classList.add('d-none');
+            knowledgeEmpty.classList.add('d-none');
+
+            try {
+                const limit = 6;
+                const offset = (knowledgeCurrentPage - 1) * limit;
+
+                const response = await apiRequest(`/api/extra-knowledge?limit=${limit}&offset=${offset}`);
+                if (response.status === 401) {
+                    alert('登录已过期，请重新登录');
+                    parent.window.location.href = '/login';
+                    return;
+                }
+
+                if (!response.ok) {
+                    throw new Error('获取补充知识失败');
+                }
+
+                const data = await response.json();
+
+                if (data.total === 0) {
+                    knowledgeLoading.classList.add('d-none');
+                    knowledgeEmpty.classList.remove('d-none');
+                    return;
+                }
+
+                knowledgeTotalPages = Math.ceil(data.total / limit);
+                knowledgePageInfo.textContent = `第 ${knowledgeCurrentPage} 页，共 ${knowledgeTotalPages} 页`;
+                prevKnowledgeBtn.disabled = knowledgeCurrentPage === 1;
+                nextKnowledgeBtn.disabled = knowledgeCurrentPage === knowledgeTotalPages;
+
+                knowledgeList.innerHTML = data.items.map(item => {
+                    const title = item.title || '未命名知识';
+                    const preview = (item.domain_knowledge_section || item.sample_values_section || '').substring(0, 100);
+                    const isSelected = selectedKnowledgeId === item.id;
+
+                    return `
+                        <div class="col-md-6 col-lg-4 mb-3">
+                            <div class="card knowledge-card h-100 ${isSelected ? 'selected' : ''}" data-id="${item.id}" style="cursor: pointer; transition: all 0.2s;">
+                                <div class="card-body">
+                                    <h6 class="card-title">${escapeHtml(title)}</h6>
+                                    <p class="card-text text-muted small">${escapeHtml(preview)}...</p>
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <small class="text-muted">${item.updated_at || ''}</small>
+                                        <div class="btn-group">
+                                            <button class="btn btn-sm ${isSelected ? 'btn-success' : 'btn-outline-success'} use-knowledge-btn" data-id="${item.id}" data-title="${escapeHtml(title)}">
+                                                <i class="fas fa-check"></i>
+                                            </button>
+                                            <button class="btn btn-sm btn-outline-info view-knowledge-btn" data-id="${item.id}">
+                                                <i class="fas fa-eye"></i>
+                                            </button>
+                                            <button class="btn btn-sm btn-outline-primary edit-knowledge-btn" data-id="${item.id}">
+                                                <i class="fas fa-edit"></i>
+                                            </button>
+                                            <button class="btn btn-sm btn-outline-danger delete-knowledge-btn" data-id="${item.id}">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+
+                document.querySelectorAll('.use-knowledge-btn').forEach(btn => {
+                    btn.addEventListener('click', function(e) {
+                        e.stopPropagation();
+                        const id = parseInt(this.getAttribute('data-id'));
+                        const title = this.getAttribute('data-title');
+                        selectKnowledge(id, title);
+                    });
+                });
+
+                document.querySelectorAll('.view-knowledge-btn').forEach(btn => {
+                    btn.addEventListener('click', function(e) {
+                        e.stopPropagation();
+                        const id = parseInt(this.getAttribute('data-id'));
+                        viewKnowledge(id);
+                    });
+                });
+
+                document.querySelectorAll('.edit-knowledge-btn').forEach(btn => {
+                    btn.addEventListener('click', function(e) {
+                        e.stopPropagation();
+                        const id = parseInt(this.getAttribute('data-id'));
+                        editKnowledge(id);
+                    });
+                });
+
+                document.querySelectorAll('.delete-knowledge-btn').forEach(btn => {
+                    btn.addEventListener('click', async function(e) {
+                        e.stopPropagation();
+                        const id = parseInt(this.getAttribute('data-id'));
+                        if (confirm('确定要删除这条知识吗？')) {
+                            await deleteKnowledge(id);
+                        }
+                    });
+                });
+
+                knowledgeLoading.classList.add('d-none');
+                knowledgeContent.classList.remove('d-none');
+
+            } catch (error) {
+                console.error('加载补充知识失败:', error);
+                showError(`加载补充知识失败：${error.message}`);
+                knowledgeLoading.classList.add('d-none');
+                knowledgeEmpty.classList.remove('d-none');
+            }
+        }
+
+        async function viewKnowledge(id) {
+            try {
+                const response = await apiRequest(`/api/extra-knowledge/${id}`);
+                if (!response.ok) {
+                    throw new Error('获取知识详情失败');
+                }
+
+                const data = await response.json();
+
+                document.getElementById('viewKnowledgeTitle').textContent = data.title || '未命名知识';
+                document.getElementById('viewSampleValues').textContent = data.sample_values_section || '无';
+                document.getElementById('viewTableRelations').textContent = data.table_relations_section || '无';
+                document.getElementById('viewDomainKnowledge').textContent = data.domain_knowledge_section || '无';
+                document.getElementById('viewKnowledgeTime').textContent = `创建时间：${data.created_at || ''} | 更新时间：${data.updated_at || ''}`;
+
+                viewKnowledgeModal.show();
+
+            } catch (error) {
+                console.error('查看知识详情失败:', error);
+                showError(`查看知识详情失败：${error.message}`);
+            }
+        }
+
+        async function editKnowledge(id) {
+            try {
+                const response = await apiRequest(`/api/extra-knowledge/${id}`);
+                if (!response.ok) {
+                    throw new Error('获取知识详情失败');
+                }
+
+                const data = await response.json();
+
+                editingKnowledgeId = id;
+                document.getElementById('knowledgeId').value = id;
+                document.getElementById('knowledgeTitle').value = data.title || '';
+                document.getElementById('sampleValuesSection').value = data.sample_values_section || '';
+                document.getElementById('tableRelationsSection').value = data.table_relations_section || '';
+                document.getElementById('domainKnowledgeSection').value = data.domain_knowledge_section || '';
+
+                document.getElementById('add-tab').click();
+
+            } catch (error) {
+                console.error('编辑知识失败:', error);
+                showError(`编辑知识失败：${error.message}`);
+            }
+        }
+
+        async function deleteKnowledge(id) {
+            try {
+                const response = await apiRequest(`/api/extra-knowledge/${id}`, {
+                    method: 'DELETE'
+                });
+
+                if (!response.ok) {
+                    throw new Error('删除知识失败');
+                }
+
+                loadKnowledge();
+
+            } catch (error) {
+                console.error('删除知识失败:', error);
+                showError(`删除知识失败：${error.message}`);
+            }
+        }
+
+        function resetKnowledgeForm() {
+            editingKnowledgeId = null;
+            document.getElementById('knowledgeId').value = '';
+            document.getElementById('knowledgeTitle').value = '';
+            document.getElementById('sampleValuesSection').value = '';
+            document.getElementById('tableRelationsSection').value = '';
+            document.getElementById('domainKnowledgeSection').value = '';
+        }
+
+        async function selectKnowledge(id, title) {
+            selectedKnowledgeId = id;
+            document.getElementById('selectedKnowledgeTitle').textContent = title;
+            document.getElementById('selectedKnowledgeInfo').classList.remove('d-none');
+            
+            try {
+                const response = await apiRequest(`/api/extra-knowledge/${id}`);
+                if (response && response.ok) {
+                    const data = await response.json();
+                    
+                    document.getElementById('selectedSampleValues').textContent = data.sample_values_section || '无';
+                    document.getElementById('selectedTableRelations').textContent = data.table_relations_section || '无';
+                    document.getElementById('selectedDomainKnowledge').textContent = data.domain_knowledge_section || '无';
+                }
+            } catch (e) {
+                console.error('加载知识详情失败:', e);
+            }
+            
+            knowledgeModal.hide();
+            loadKnowledge();
+        }
+
+        function clearSelectedKnowledge() {
+            selectedKnowledgeId = null;
+            document.getElementById('selectedKnowledgeInfo').classList.add('d-none');
+            document.getElementById('selectedKnowledgeTitle').textContent = '';
+        }
+
+
+        document.getElementById('knowledgeForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            const data = {
+                title: document.getElementById('knowledgeTitle').value,
+                sample_values_section: document.getElementById('sampleValuesSection').value,
+                table_relations_section: document.getElementById('tableRelationsSection').value,
+                domain_knowledge_section: document.getElementById('domainKnowledgeSection').value
+            };
+
+            try {
+                let response;
+                if (editingKnowledgeId) {
+                    response = await apiRequest(`/api/extra-knowledge/${editingKnowledgeId}`, {
+                        method: 'PUT',
+                        body: JSON.stringify(data)
+                    });
+                } else {
+                    response = await apiRequest('/api/extra-knowledge', {
+                        method: 'POST',
+                        body: JSON.stringify(data)
+                    });
+                }
+
+                if (response.status === 401) {
+                    alert('登录已过期，请重新登录');
+                    parent.window.location.href = '/login';
+                    return;
+                }
+
+                const result = await response.json();
+
+                if (response.ok && result.success) {
+                    alert(editingKnowledgeId ? '更新成功！' : '创建成功！');
+                    resetKnowledgeForm();
+                    document.getElementById('list-tab').click();
+                    loadKnowledge();
+                } else {
+                    alert('操作失败：' + (result.detail || result.message || '未知错误'));
+                }
+            } catch (error) {
+                console.error('保存知识失败:', error);
+                showError(`保存知识失败：${error.message}`);
+            }
+        });
+
+        document.getElementById('prevKnowledgeBtn').addEventListener('click', function() {
+            if (knowledgeCurrentPage > 1) {
+                knowledgeCurrentPage--;
+                loadKnowledge();
+            }
+        });
+        document.getElementById('nextKnowledgeBtn').addEventListener('click', function() {
+            if (knowledgeCurrentPage < knowledgeTotalPages) {
+                knowledgeCurrentPage++;
+                loadKnowledge();
+            }
+        });
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadSchemaOptions();
+        });
+    </script>
+</body>
+
+</html>

@@ -16,6 +16,7 @@ from app.routers.chat_to_sql_router import router as chat_to_sql_router
 from app.routers.schema_router import router as schema_router
 from app.routers.history_router import router as history_router
 from app.routers.extra_router import router as extra_router
+from app.routers.table_data_router import router as table_data_router
 from app.config import SECRET_KEY, ALGORITHM
 from models import init_database, SessionLocal
 from models.user import User
@@ -94,9 +95,10 @@ async def check_token(request: Request):
 
 app.include_router(base_router, tags=["基础认证"])
 app.include_router(chat_to_sql_router, prefix="/api/chat-to-sql", tags=["chat_to_sql"])
-app.include_router(schema_router, prefix="/api", tags=["schema管理"])
+app.include_router(schema_router, prefix="/api", tags=["schema 管理"])
 app.include_router(history_router, prefix="/api/chat-to-sql", tags=["历史记录"])
 app.include_router(extra_router, prefix="/api", tags=["补充知识"])
+app.include_router(table_data_router, prefix="/api", tags=["表数据管理"])
 
 
 if __name__ == "__main__":
