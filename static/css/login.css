@@ -1,0 +1,101 @@
+.tpl-login-root {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Segoe UI', Arial, sans-serif;
+    background: linear-gradient(135deg, #2980b9 0%, #6dd5fa 100%)
+}
+
+.tpl-login-root .login-container {
+    background: #fff;
+    padding: 2.5rem 2.5rem 2rem;
+    border-radius: 16px;
+    box-shadow: 0 8px 32px rgba(44, 62, 80, .18);
+    width: 370px;
+    max-width: 92vw;
+    display: flex;
+    flex-direction: column;
+    align-items: center
+}
+
+.tpl-login-root .login-title {
+    text-align: center;
+    font-size: 2.1rem;
+    margin-bottom: 2rem;
+    color: #2980b9;
+    letter-spacing: 2px;
+    font-weight: 600
+}
+
+.tpl-login-root .form-group {
+    margin-bottom: 1.3rem;
+    width: 100%
+}
+
+.tpl-login-root label {
+    display: block;
+    margin-bottom: .4rem;
+    color: #34495e;
+    font-weight: 500;
+    font-size: 1.05rem
+}
+
+.tpl-login-root input[type="text"],
+.tpl-login-root input[type="password"] {
+    width: 100%;
+    box-sizing: border-box;
+    padding: .7rem .9rem;
+    border: 1px solid #b2bec3;
+    border-radius: 8px;
+    font-size: 1.08rem;
+    outline: none;
+    transition: border .2s, box-shadow .2s;
+    background: #f8fbfd
+}
+
+.tpl-login-root input[type="text"]:focus,
+.tpl-login-root input[type="password"]:focus {
+    border-color: #2980b9;
+    box-shadow: 0 0 0 2px #6dd5fa44
+}
+
+.tpl-login-root .login-btn {
+    width: 100%;
+    box-sizing: border-box;
+    padding: .85rem;
+    background: linear-gradient(90deg, #2980b9 60%, #6dd5fa 100%);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: 1.15rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background .2s, box-shadow .2s;
+    box-shadow: 0 2px 8px #2980b91a;
+    margin-top: .2rem
+}
+
+.tpl-login-root .login-btn:hover {
+    background: linear-gradient(90deg, #2573a6 60%, #4fc3f7 100%);
+    box-shadow: 0 4px 16px #2980b91a
+}
+
+.tpl-login-root .error-message {
+    color: #e74c3c;
+    text-align: center;
+    margin-bottom: 1.2rem;
+    display: none;
+    font-size: 1.05rem
+}
+
+@media (max-width:480px) {
+    .tpl-login-root .login-container {
+        padding: 1.2rem .5rem 1rem .5rem;
+        width: 98vw
+    }
+
+    .tpl-login-root .login-title {
+        font-size: 1.3rem
+    }
+}

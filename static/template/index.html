@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Text to SQL</title>
+    <link rel="stylesheet" href="/static/css/bootstrap.min.css">
+    <link rel="stylesheet" href="/static/css/template_index.css">
+</head>
+
+<body class="tpl-index-root" style="overflow:hidden;">
+    <div class="tpl-index-layout">
+        <!-- 左侧菜单栏 -->
+        <div id="sidebar" class="tpl-index-sidebar">
+            <div class="tpl-index-sidebar-title">数据菜单</div>
+            <div class="tpl-index-sidebar-content">
+                <div class="menu-group">
+                    <div class="menu-group-title" onclick="toggleMenu('schema')">Schema管理</div>
+                    <div id="menu-schema" class="menu-items" style="display:none;">
+                        <div class="menu-item" onclick="openWindow('Schema管理','/static/template/schema/schema_manage.html')">DDL解析管理</div>
+                    </div>
+                </div>
+                <div class="menu-group">
+                    <div class="menu-group-title" onclick="toggleMenu('chat')">智能分析</div>
+                    <div id="menu-chat" class="menu-items" style="display:none;">
+                        <div class="menu-item"
+                            onclick="openWindow('智能数据分析','/static/template/chatSQL/chat_to_data.html')">智能数据分析助手</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- 右侧内容区 -->
+        <div id="window-container" class="tpl-index-window-container">
+            <div id="tab-bar" class="tpl-index-tab-bar"></div>
+            <div id="tab-content" class="tpl-index-tab-content"></div>
+        </div>
+    </div>
+    <!-- 顶部栏，右上角显示用户名 -->
+    <div id="topbar" class="tpl-index-topbar">
+        <span class="tpl-index-topbar-title">Text to SQL 智能数据分析平台 <span class="tpl-index-topbar-version">v1.0</span></span>
+        <div class="dropdown tpl-index-user-dropdown">
+            <span id="user-info" class="tpl-index-user-info"></span>
+            <div id="user-dropdown" class="tpl-index-user-dropdown-menu">
+                <a href="/logout" class="tpl-index-logout-link">退出登录</a>
+            </div>
+        </div>
+    </div>
+    <script src="/static/js/bootstrap.bundle.min.js"></script>
+    <script>
+        window.addEventListener('load', function () {
+            const token = getCookie('token');
+
+            if (!token) {
+                window.location.href = '/login';
+                return;
+            }
+
+            fetch('/check-token', {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            })
+                .then(response => {
+                    if (response.status === 401) {
+                        document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+                        window.location.href = '/login';
+                    }
+                })
+                .catch(error => {
+                    console.error('Token verification error:', error);
+                });
+        });
+
+        function getCookie(name) {
+            const value = `; ${document.cookie}`;
+            const parts = value.split(`; ${name}=`);
+            if (parts.length === 2) return parts.pop().split(';').shift();
+        }
+
+        function getUserNameFromToken() {
+            const token = getCookie('token');
+            if (!token) return '';
+            try {
+                const payload = JSON.parse(atob(token.split('.')[1]));
+                return payload.username || payload.user || payload.sub || '';
+            } catch (e) { return ''; }
+        }
+        window.addEventListener('DOMContentLoaded', function () {
+            const user = getUserNameFromToken();
+            if (user) document.getElementById('user-info').textContent = user;
+        });
+
+        function toggleMenu(type) {
+            const el = document.getElementById('menu-' + type);
+            el.style.display = (el.style.display === 'none') ? '' : 'none';
+        }
+
+        const tabList = [];
+        function openWindow(title, url) {
+            let tabIdx = tabList.findIndex(t => t.url === url);
+            if (tabIdx === -1) {
+                const tabId = 'tab-' + Date.now();
+                tabList.push({ id: tabId, title, url });
+                renderTabs(tabId);
+            } else {
+                renderTabs(tabList[tabIdx].id);
+            }
+        }
+        function renderTabs(activeId) {
+            const tabBar = document.getElementById('tab-bar');
+            const tabContent = document.getElementById('tab-content');
+            tabBar.innerHTML = '';
+            tabContent.innerHTML = '';
+            tabList.forEach(tab => {
+                const tabDiv = document.createElement('div');
+                tabDiv.className = 'tab' + (tab.id === activeId ? ' active' : '');
+                tabDiv.innerHTML = `<span>${tab.title}</span><span class='tab-close' onclick='closeTab("${tab.id}",event)'>×</span>`;
+                tabDiv.onclick = function (e) {
+                    if (e.target.classList.contains('tab-close')) return;
+                    renderTabs(tab.id);
+                };
+                tabBar.appendChild(tabDiv);
+                const iframe = document.createElement('iframe');
+                iframe.className = 'tab-iframe' + (tab.id === activeId ? ' active' : '');
+                iframe.src = tab.url;
+                iframe.id = 'iframe-' + tab.id;
+                tabContent.appendChild(iframe);
+            });
+        }
+        function closeTab(tabId, evt) {
+            evt.stopPropagation();
+            const idx = tabList.findIndex(t => t.id === tabId);
+            if (idx !== -1) {
+                const wasActive = document.querySelector('.tab.active') && tabList[idx].id === tabList.find(t => document.querySelector('.tab.active').textContent.trim().startsWith(t.title)).id;
+                tabList.splice(idx, 1);
+                if (tabList.length > 0) {
+                    const newIdx = idx > 0 ? idx - 1 : 0;
+                    renderTabs(tabList[newIdx].id);
+                } else {
+                    renderTabs(null);
+                }
+            }
+        }
+
+        let dragData = null;
+        function dragWindow(e, id) {
+            const win = document.getElementById(id);
+            dragData = {
+                win: win,
+                offsetX: e.clientX - win.offsetLeft,
+                offsetY: e.clientY - win.offsetTop
+            };
+            document.onmousemove = moveWindow;
+            document.onmouseup = function () { dragData = null; document.onmousemove = null; };
+        }
+        function moveWindow(e) {
+            if (!dragData) return;
+            dragData.win.style.left = (e.clientX - dragData.offsetX) + 'px';
+            dragData.win.style.top = (e.clientY - dragData.offsetY) + 'px';
+        }
+
+        document.addEventListener('DOMContentLoaded', function () {
+            const userInfo = document.getElementById('user-info');
+            const dropdown = document.getElementById('user-dropdown');
+            userInfo.addEventListener('mouseenter', function () {
+                dropdown.style.display = 'block';
+            });
+            userInfo.addEventListener('mouseleave', function () {
+                setTimeout(() => { if (!dropdown.matches(':hover')) dropdown.style.display = 'none'; }, 200);
+            });
+            dropdown.addEventListener('mouseleave', function () {
+                dropdown.style.display = 'none';
+            });
+            const logoutLink = dropdown.querySelector('a[href="/logout"]');
+            if (logoutLink) {
+                logoutLink.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+                    localStorage.removeItem('token');
+                    sessionStorage.removeItem('token');
+                    window.location.href = '/logout';
+                });
+            }
+        });
+    </script>
+
+</html>
