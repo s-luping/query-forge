@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <title>登录</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="/static/css/login.css">
+    <style>
+        .tab-container {
+            display: flex;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #e0e0e0;
+        }
+        .tab-btn {
+            flex: 1;
+            padding: 12px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            color: #666;
+            transition: all 0.3s;
+        }
+        .tab-btn.active {
+            color: #4CAF50;
+            border-bottom: 2px solid #4CAF50;
+            margin-bottom: -2px;
+        }
+        .tab-btn:hover {
+            color: #4CAF50;
+        }
+        .form-container {
+            display: none;
+        }
+        .form-container.active {
+            display: block;
+        }
+        .success-message {
+            display: none;
+            color: #4CAF50;
+            text-align: center;
+            margin-bottom: 15px;
+            padding: 10px;
+            background: #e8f5e9;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+
+<body class="tpl-login-root">
+    <div class="login-container">
+        <div class="login-title">用户登录</div>
+
+        <!-- 标签切换 -->
+        <div class="tab-container">
+            <button class="tab-btn active" onclick="switchTab('login')">登录</button>
+            <button class="tab-btn" onclick="switchTab('register')">注册</button>
+        </div>
+
+        <div class="error-message" id="errorMsg"></div>
+        <div class="success-message" id="successMsg"></div>
+
+        <!-- 登录表单 -->
+        <div id="loginFormContainer" class="form-container active">
+            <form id="loginForm">
+                <div class="form-group">
+                    <label for="username">用户名</label>
+                    <input type="text" id="username" name="username" required autocomplete="username">
+                </div>
+                <div class="form-group">
+                    <label for="password">密码</label>
+                    <input type="password" id="password" name="password" required autocomplete="current-password">
+                </div>
+                <button type="submit" class="login-btn">登录</button>
+            </form>
+        </div>
+
+        <!-- 注册表单 -->
+        <div id="registerFormContainer" class="form-container">
+            <form id="registerForm">
+                <div class="form-group">
+                    <label for="regUsername">用户名</label>
+                    <input type="text" id="regUsername" name="username" required autocomplete="username" minlength="3">
+                </div>
+                <div class="form-group">
+                    <label for="regEmail">邮箱（可选）</label>
+                    <input type="email" id="regEmail" name="email" autocomplete="email">
+                </div>
+                <div class="form-group">
+                    <label for="regPassword">密码</label>
+                    <input type="password" id="regPassword" name="password" required autocomplete="new-password" minlength="6">
+                </div>
+                <div class="form-group">
+                    <label for="regConfirmPassword">确认密码</label>
+                    <input type="password" id="regConfirmPassword" name="confirmPassword" required autocomplete="new-password">
+                </div>
+                <button type="submit" class="login-btn">注册</button>
+            </form>
+        </div>
+    </div>
+    <script>
+        // 切换标签
+        function switchTab(tab) {
+            const loginContainer = document.getElementById('loginFormContainer');
+            const registerContainer = document.getElementById('registerFormContainer');
+            const tabBtns = document.querySelectorAll('.tab-btn');
+            const errorMsg = document.getElementById('errorMsg');
+            const successMsg = document.getElementById('successMsg');
+
+            // 清除消息
+            errorMsg.style.display = 'none';
+            successMsg.style.display = 'none';
+
+            if (tab === 'login') {
+                loginContainer.classList.add('active');
+                registerContainer.classList.remove('active');
+                tabBtns[0].classList.add('active');
+                tabBtns[1].classList.remove('active');
+            } else {
+                loginContainer.classList.remove('active');
+                registerContainer.classList.add('active');
+                tabBtns[0].classList.remove('active');
+                tabBtns[1].classList.add('active');
+            }
+        }
+
+        // 为用户名输入框添加Enter键监听
+        document.getElementById('username').addEventListener('keydown', function (event) {
+            if (event.key === 'Enter') {
+                const password = document.getElementById('password');
+                if (this.value.trim() !== '') {
+                    password.focus();
+                } else {
+                    submitLoginForm();
+                }
+            }
+        });
+
+        // 为密码输入框添加Enter键监听
+        document.getElementById('password').addEventListener('keydown', function (event) {
+            if (event.key === 'Enter' && this.value.trim() !== '') {
+                submitLoginForm();
+            }
+        });
+
+        function submitLoginForm() {
+            const username = document.getElementById('username').value.trim();
+            const password = document.getElementById('password').value;
+
+            if (username && password) {
+                document.getElementById('loginForm').dispatchEvent(new Event('submit'));
+            }
+        }
+
+        // 登录表单提交
+        document.getElementById('loginForm').addEventListener('submit', async function (e) {
+            e.preventDefault();
+            const username = document.getElementById('username').value.trim();
+            const password = document.getElementById('password').value;
+            const errorMsg = document.getElementById('errorMsg');
+            const successMsg = document.getElementById('successMsg');
+            errorMsg.style.display = 'none';
+            successMsg.style.display = 'none';
+
+            try {
+                const response = await fetch('/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        username: username,
+                        password: password
+                    })
+                });
+                const data = await response.json();
+                if (response.ok && data.access_token) {
+                    // 保存token到cookie
+                    document.cookie = `token=${data.access_token}; path=/;`;
+                    // 跳转到主界面
+                    window.location.href = '/';
+                } else {
+                    errorMsg.textContent = data.detail || '登录失败，请检查用户名和密码';
+                    errorMsg.style.display = 'block';
+                }
+            } catch (err) {
+                errorMsg.textContent = '网络错误，请稍后重试';
+                errorMsg.style.display = 'block';
+            }
+        });
+
+        // 注册表单提交
+        document.getElementById('registerForm').addEventListener('submit', async function (e) {
+            e.preventDefault();
+            const username = document.getElementById('regUsername').value.trim();
+            const email = document.getElementById('regEmail').value.trim();
+            const password = document.getElementById('regPassword').value;
+            const confirmPassword = document.getElementById('regConfirmPassword').value;
+            const errorMsg = document.getElementById('errorMsg');
+            const successMsg = document.getElementById('successMsg');
+            errorMsg.style.display = 'none';
+            successMsg.style.display = 'none';
+
+            // 前端验证
+            if (username.length < 3) {
+                errorMsg.textContent = '用户名至少需要3个字符';
+                errorMsg.style.display = 'block';
+                return;
+            }
+
+            if (password.length < 6) {
+                errorMsg.textContent = '密码至少需要6个字符';
+                errorMsg.style.display = 'block';
+                return;
+            }
+
+            if (password !== confirmPassword) {
+                errorMsg.textContent = '两次输入的密码不一致';
+                errorMsg.style.display = 'block';
+                return;
+            }
+
+            try {
+                const response = await fetch('/register', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        username: username,
+                        password: password,
+                        email: email || null
+                    })
+                });
+                const data = await response.json();
+                if (response.ok) {
+                    successMsg.textContent = '注册成功！请使用新账号登录';
+                    successMsg.style.display = 'block';
+                    // 清空表单
+                    document.getElementById('registerForm').reset();
+                    // 2秒后切换到登录标签
+                    setTimeout(() => {
+                        switchTab('login');
+                        document.getElementById('username').value = username;
+                    }, 1500);
+                } else {
+                    errorMsg.textContent = data.detail || '注册失败，请稍后重试';
+                    errorMsg.style.display = 'block';
+                }
+            } catch (err) {
+                errorMsg.textContent = '网络错误，请稍后重试';
+                errorMsg.style.display = 'block';
+            }
+        });
+
+        // 页面加载完成后检查是否已经登录
+        window.addEventListener('load', function () {
+            const token = getCookie('token');
+
+            // 如果已经有有效的token，则直接跳转到主页
+            if (token) {
+                fetch('/check-token', {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                })
+                    .then(response => {
+                        if (response.ok) {
+                            // Token有效，跳转到主页
+                            window.location.href = '/';
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Token verification error:', error);
+                    });
+            }
+        });
+
+        // 辅助函数：从cookie中获取指定名称的值
+        function getCookie(name) {
+            const value = `; ${document.cookie}`;
+            const parts = value.split(`; ${name}=`);
+            if (parts.length === 2) return parts.pop().split(';').shift();
+        }
+    </script>
+</body>
+
+</html>
