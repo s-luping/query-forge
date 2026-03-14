@@ -62,7 +62,7 @@ class SqlGenerator:
         prompt = (
             "你是一个专业的SQL生成助手。请根据用户的自然语言查询、表结构(csv)、领域知识和规则，生成正确的MySQL查询语句。\n"
             f"【用户问题】\n{query}"
-            f"【表结构(csv)】\n{schema_csv}"
+            f"【表结构(csv)】\n{schema_csv}\n"
             f"【字段示例值】\n{sample_values_section}"
             f"【表间关系】\n{table_relations_section}"
             f"【领域知识】\n{domain_section}"

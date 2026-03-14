@@ -117,6 +117,30 @@
         .tab-content {
             padding: 20px 0;
         }
+        .table-cell-ellipsis {
+            max-width: 150px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            cursor: pointer;
+        }
+        .table-cell-ellipsis:hover {
+            white-space: normal;
+            word-break: break-all;
+        }
+        .table th {
+            min-width: 80px;
+        }
+        .table th:nth-child(1) { width: 40px; }
+        .table th:nth-child(2) { width: 80px; }
+        .table th:nth-child(3) { width: 100px; }
+        .table th:nth-child(4) { width: 120px; }
+        .table th:nth-child(5) { width: 100px; }
+        .table th:nth-child(6) { width: 100px; }
+        .table th:nth-child(7) { width: 150px; }
+        .table th:nth-child(8) { width: 60px; }
+        .table th:nth-child(9) { width: 140px; }
+        .table th:nth-child(10) { width: 60px; }
     </style>
 </head>
 
@@ -419,10 +443,10 @@
                     <td><input type="checkbox" class="row-checkbox" value="${item.id}" onchange="updateSelected()"></td>
                     <td><span class="schema-badge">${item.schema_name}</span></td>
                     <td><span class="table-badge">${item.table_name}</span></td>
-                    <td>${item.table_description || '-'}</td>
+                    <td class="table-cell-ellipsis" title="${item.table_description || ''}">${item.table_description || '-'}</td>
                     <td><strong>${item.column_name}</strong></td>
-                    <td>${item.column_type || '-'}</td>
-                    <td>${item.column_description || '-'}</td>
+                    <td class="table-cell-ellipsis" title="${item.column_type || ''}">${item.column_type || '-'}</td>
+                    <td class="table-cell-ellipsis" title="${item.column_description || ''}">${item.column_description || '-'}</td>
                     <td>${item.column_key === 'PRI' ? '<span class="pk-badge">主键</span>' : '-'}</td>
                     <td>${new Date(item.created_at).toLocaleString()}</td>
                     <td>
