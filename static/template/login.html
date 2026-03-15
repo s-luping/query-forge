@@ -253,31 +253,6 @@
                 errorMsg.style.display = 'block';
             }
         });
-
-        // 页面加载完成后检查是否已经登录
-        window.addEventListener('load', function () {
-            const token = getCookie('token');
-
-            // 如果已经有有效的token，则直接跳转到主页
-            if (token) {
-                fetch('/check-token', {
-                    method: 'GET',
-                    headers: {
-                        'Authorization': `Bearer ${token}`
-                    }
-                })
-                    .then(response => {
-                        if (response.ok) {
-                            // Token有效，跳转到主页
-                            window.location.href = '/';
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Token verification error:', error);
-                    });
-            }
-        });
-
         // 辅助函数：从cookie中获取指定名称的值
         function getCookie(name) {
             const value = `; ${document.cookie}`;
