@@ -571,7 +571,7 @@
             container.innerHTML = '<div class="text-center py-4"><div class="spinner-border text-primary" role="status"></div><p class="mt-2">加载中...</p></div>';
             
             try {
-                const response = await apiRequest('/api/chat-to-sql/history?limit=20&offset=0');
+                const response = await apiRequest('/api/history?limit=20&offset=0');
                 if (response && response.ok) {
                     const data = await response.json();
                     
@@ -649,7 +649,7 @@
             executeBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> 执行中...';
             
             try {
-                const response = await apiRequest('/api/chat-to-sql/execute_sql', {
+                const response = await apiRequest('/api/table-data/execute_sql', {
                     method: 'POST',
                     body: JSON.stringify({
                         history_id: currentHistoryId

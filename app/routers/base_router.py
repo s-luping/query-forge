@@ -6,7 +6,7 @@ from app.auth import authenticate_user, create_access_token
 from app.logger import logger
 from pydantic import BaseModel
 from typing import Optional
-from models import SessionLocal
+from models import AppSessionLocal
 from models.user import User
 from app.limiter import limiter
 
@@ -37,7 +37,7 @@ async def login(request: LoginRequest):
         if not user.is_active:
             raise HTTPException(status_code=401, detail="用户未激活")
         
-        db = SessionLocal()
+        db = AppSessionLocal()
         try:
             db_user = db.query(User).filter(User.id == user.id).first()
             if db_user:
@@ -72,7 +72,7 @@ async def register(request: RegisterRequest):
         if len(password) < 6:
             raise HTTPException(status_code=400, detail="密码至少需要6个字符")
 
-        db = SessionLocal()
+        db = AppSessionLocal()
         try:
             existing_user = db.query(User).filter(User.username == username).first()
             if existing_user:

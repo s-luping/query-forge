@@ -14,8 +14,8 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from datetime import datetime
 
-from models import SessionLocal, SqlSessionLocal, get_db
-from models.schema_parse import SchemaParse
+from models import AppSessionLocal, SchemaSessionLocal
+from models.schema import Schema
 from models.user import User
 from app.logger import logger
 from app.auth import create_access_token, get_current_user
@@ -37,7 +37,7 @@ class DDLParseRequest(BaseModel):
     schema_name: str = "default"
 
 
-class SchemaParseItem(BaseModel):
+class SchemaItem(BaseModel):
     """Schema 解析项"""
     id: int
     schema_name: str
@@ -61,9 +61,9 @@ class UpdateSampleValuesRequest(BaseModel):
     sample_values: str
 
 
-class SchemaParseListResponse(BaseModel):
+class SchemaListResponse(BaseModel):
     """Schema 解析列表响应"""
-    items: List[SchemaParseItem]
+    items: List[SchemaItem]
     total: int
     message: Optional[str] = None
 
@@ -236,7 +236,7 @@ def parse_single_table(table_ddl: str, schema_name: str, user_id: int) -> List[d
     return results
 
 
-@router.post("/schema/parse", response_model=SchemaParseListResponse)
+@router.post("/parse", response_model=SchemaListResponse)
 async def parse_ddl_text(
     request: DDLParseRequest,
     user = Depends(get_current_user)
@@ -244,7 +244,7 @@ async def parse_ddl_text(
     """解析 DDL 文本"""
     try:
         user_id = user['user_id']
-        db = SqlSessionLocal()
+        db = SchemaSessionLocal()
         
         try:
             parsed_results = parse_ddl(request.ddl_text, request.schema_name, user_id, db)
@@ -255,18 +255,18 @@ async def parse_ddl_text(
             new_count = 0
             duplicate_count = 0
             for result in parsed_results:
-                existing = db.query(SchemaParse).filter(
-                    SchemaParse.user_id == user_id,
-                    SchemaParse.schema_name == result['schema_name'],
-                    SchemaParse.table_name == result['table_name'],
-                    SchemaParse.column_name == result['column_name']
+                existing = db.query(Schema).filter(
+                    Schema.user_id == user_id,
+                    Schema.schema_name == result['schema_name'],
+                    Schema.table_name == result['table_name'],
+                    Schema.column_name == result['column_name']
                 ).first()
                 
                 if existing:
                     duplicate_count += 1
                     continue
                 
-                schema_parse = SchemaParse(**result)
+                schema_parse = Schema(**result)
                 db.add(schema_parse)
                 new_count += 1
             
@@ -276,13 +276,13 @@ async def parse_ddl_text(
             if duplicate_count > 0:
                 message += f"，跳过 {duplicate_count} 条重复记录"
             
-            items = db.query(SchemaParse).filter(
-                SchemaParse.user_id == user_id,
-                SchemaParse.schema_name == request.schema_name
+            items = db.query(Schema).filter(
+                Schema.user_id == user_id,
+                Schema.schema_name == request.schema_name
             ).all()
             
-            return SchemaParseListResponse(
-                items=[SchemaParseItem.model_validate(item) for item in items],
+            return SchemaListResponse(
+                items=[SchemaItem.model_validate(item) for item in items],
                 total=len(items),
                 message=message
             )
@@ -298,7 +298,7 @@ async def parse_ddl_text(
         raise HTTPException(status_code=500, detail=f"解析失败：{str(e)}")
 
 
-@router.post("/schema/upload", response_model=SchemaParseListResponse)
+@router.post("/upload", response_model=SchemaListResponse)
 async def upload_ddl_file(
     file: UploadFile = File(...),
     schema_name: str = Form("default"),
@@ -311,7 +311,7 @@ async def upload_ddl_file(
         content = await file.read()
         ddl_text = content.decode('utf-8')
         
-        db = SqlSessionLocal()
+        db = SchemaSessionLocal()
         
         try:
             parsed_results = parse_ddl(ddl_text, schema_name, user_id, db)
@@ -322,18 +322,18 @@ async def upload_ddl_file(
             new_count = 0
             duplicate_count = 0
             for result in parsed_results:
-                existing = db.query(SchemaParse).filter(
-                    SchemaParse.user_id == user_id,
-                    SchemaParse.schema_name == result['schema_name'],
-                    SchemaParse.table_name == result['table_name'],
-                    SchemaParse.column_name == result['column_name']
+                existing = db.query(Schema).filter(
+                    Schema.user_id == user_id,
+                    Schema.schema_name == result['schema_name'],
+                    Schema.table_name == result['table_name'],
+                    Schema.column_name == result['column_name']
                 ).first()
                 
                 if existing:
                     duplicate_count += 1
                     continue
                 
-                schema_parse = SchemaParse(**result)
+                schema_parse = Schema(**result)
                 db.add(schema_parse)
                 new_count += 1
             
@@ -343,13 +343,13 @@ async def upload_ddl_file(
             if duplicate_count > 0:
                 message += f"，跳过 {duplicate_count} 条重复记录"
             
-            items = db.query(SchemaParse).filter(
-                SchemaParse.user_id == user_id,
-                SchemaParse.schema_name == schema_name
+            items = db.query(Schema).filter(
+                Schema.user_id == user_id,
+                Schema.schema_name == schema_name
             ).all()
             
-            return SchemaParseListResponse(
-                items=[SchemaParseItem.model_validate(item) for item in items],
+            return SchemaListResponse(
+                items=[SchemaItem.model_validate(item) for item in items],
                 total=len(items),
                 message=message
             )
@@ -365,7 +365,7 @@ async def upload_ddl_file(
         raise HTTPException(status_code=500, detail=f"解析失败：{str(e)}")
 
 
-@router.get("/schema/list", response_model=SchemaParseListResponse)
+@router.get("/list", response_model=SchemaListResponse)
 async def get_schema_list(
     schema_name: Optional[str] = None,
     table_name: Optional[str] = None,
@@ -376,21 +376,21 @@ async def get_schema_list(
     """获取用户的 Schema 解析列表"""
     try:
         user_id = user['user_id']
-        db = SqlSessionLocal()
+        db = SchemaSessionLocal()
         
         try:
-            query = db.query(SchemaParse).filter(SchemaParse.user_id == user_id)
+            query = db.query(Schema).filter(Schema.user_id == user_id)
             
             if schema_name:
-                query = query.filter(SchemaParse.schema_name == schema_name)
+                query = query.filter(Schema.schema_name == schema_name)
             if table_name:
-                query = query.filter(SchemaParse.table_name == table_name)
+                query = query.filter(Schema.table_name == table_name)
             
             total = query.count()
-            items = query.order_by(SchemaParse.created_at.desc()).limit(limit).offset(offset).all()
+            items = query.order_by(Schema.created_at.desc()).limit(limit).offset(offset).all()
             
-            return SchemaParseListResponse(
-                items=[SchemaParseItem.model_validate(item) for item in items],
+            return SchemaListResponse(
+                items=[SchemaItem.model_validate(item) for item in items],
                 total=total
             )
         finally:
@@ -401,7 +401,7 @@ async def get_schema_list(
         raise HTTPException(status_code=500, detail=f"获取失败：{str(e)}")
 
 
-@router.put("/schema/{schema_id}/sample-values")
+@router.put("/{schema_id}/sample-values")
 async def update_sample_values(
     schema_id: int,
     request: UpdateSampleValuesRequest,
@@ -410,12 +410,12 @@ async def update_sample_values(
     """更新字段的示例值"""
     try:
         user_id = user['user_id']
-        db = SqlSessionLocal()
+        db = SchemaSessionLocal()
         
         try:
-            item = db.query(SchemaParse).filter(
-                SchemaParse.id == schema_id,
-                SchemaParse.user_id == user_id
+            item = db.query(Schema).filter(
+                Schema.id == schema_id,
+                Schema.user_id == user_id
             ).first()
             
             if not item:
@@ -435,27 +435,27 @@ async def update_sample_values(
         raise HTTPException(status_code=500, detail=f"更新失败：{str(e)}")
 
 
-@router.get("/schema/stats")
+@router.get("/stats")
 async def get_schema_stats(
     user = Depends(get_current_user)
 ):
     """获取用户 Schema 统计数据"""
     try:
         user_id = user['user_id']
-        db = SqlSessionLocal()
+        db = SchemaSessionLocal()
         
         try:
             # 统计字段总数
-            column_count = db.query(SchemaParse).filter(SchemaParse.user_id == user_id).count()
+            column_count = db.query(Schema).filter(Schema.user_id == user_id).count()
             
             # 统计不重复的 schema 数量
-            schema_count = db.query(SchemaParse.schema_name).filter(
-                SchemaParse.user_id == user_id
+            schema_count = db.query(Schema.schema_name).filter(
+                Schema.user_id == user_id
             ).distinct().count()
             
             # 统计不重复的表数量
-            table_count = db.query(SchemaParse.table_name).filter(
-                SchemaParse.user_id == user_id
+            table_count = db.query(Schema.table_name).filter(
+                Schema.user_id == user_id
             ).distinct().count()
             
             return {
@@ -471,20 +471,20 @@ async def get_schema_stats(
         raise HTTPException(status_code=500, detail=f"统计失败：{str(e)}")
 
 
-@router.get("/schema/check", response_model=SchemaCheckResponse)
+@router.get("/check", response_model=SchemaCheckResponse)
 async def check_schema(
     user = Depends(get_current_user)
 ):
     """检查用户是否有 Schema 数据"""
     try:
         user_id = user['user_id']
-        db = SqlSessionLocal()
+        db = SchemaSessionLocal()
         
         try:
-            total = db.query(SchemaParse).filter(SchemaParse.user_id == user_id).count()
+            total = db.query(Schema).filter(Schema.user_id == user_id).count()
             
-            tables = db.query(SchemaParse.schema_name, SchemaParse.table_name).filter(
-                SchemaParse.user_id == user_id
+            tables = db.query(Schema.schema_name, Schema.table_name).filter(
+                Schema.user_id == user_id
             ).distinct().all()
             
             return SchemaCheckResponse(
@@ -500,7 +500,7 @@ async def check_schema(
         raise HTTPException(status_code=500, detail=f"检查失败：{str(e)}")
 
 
-@router.get("/schema/export")
+@router.get("/export")
 async def export_schema(
     schema_name: Optional[str] = None,
     table_name: Optional[str] = None,
@@ -509,15 +509,15 @@ async def export_schema(
     """导出 Schema 为 CSV"""
     try:
         user_id = user['user_id']
-        db = SqlSessionLocal()
+        db = SchemaSessionLocal()
         
         try:
-            query = db.query(SchemaParse).filter(SchemaParse.user_id == user_id)
+            query = db.query(Schema).filter(Schema.user_id == user_id)
             
             if schema_name:
-                query = query.filter(SchemaParse.schema_name == schema_name)
+                query = query.filter(Schema.schema_name == schema_name)
             if table_name:
-                query = query.filter(SchemaParse.table_name == table_name)
+                query = query.filter(Schema.table_name == table_name)
             
             items = query.all()
             
@@ -566,7 +566,7 @@ class BatchDeleteRequest(BaseModel):
     ids: List[int]
 
 
-@router.post("/schema/batch-delete")
+@router.post("/batch-delete")
 async def batch_delete_schema(
     request: BatchDeleteRequest,
     user = Depends(get_current_user)
@@ -574,14 +574,14 @@ async def batch_delete_schema(
     """批量删除 Schema 项"""
     try:
         user_id = user['user_id']
-        db = SqlSessionLocal()
+        db = SchemaSessionLocal()
         
         try:
             deleted_count = 0
             for schema_id in request.ids:
-                item = db.query(SchemaParse).filter(
-                    SchemaParse.id == schema_id,
-                    SchemaParse.user_id == user_id
+                item = db.query(Schema).filter(
+                    Schema.id == schema_id,
+                    Schema.user_id == user_id
                 ).first()
                 
                 if item:
@@ -599,7 +599,7 @@ async def batch_delete_schema(
         raise HTTPException(status_code=500, detail=f"删除失败：{str(e)}")
 
 
-@router.delete("/schema/table/{schema_name}/{table_name}")
+@router.delete("/table/{schema_name}/{table_name}")
 async def delete_table(
     schema_name: str,
     table_name: str,
@@ -608,13 +608,13 @@ async def delete_table(
     """按表删除所有字段"""
     try:
         user_id = user['user_id']
-        db = SqlSessionLocal()
+        db = SchemaSessionLocal()
         
         try:
-            deleted = db.query(SchemaParse).filter(
-                SchemaParse.user_id == user_id,
-                SchemaParse.schema_name == schema_name,
-                SchemaParse.table_name == table_name
+            deleted = db.query(Schema).filter(
+                Schema.user_id == user_id,
+                Schema.schema_name == schema_name,
+                Schema.table_name == table_name
             ).delete()
             
             db.commit()
@@ -628,7 +628,7 @@ async def delete_table(
         raise HTTPException(status_code=500, detail=f"删除失败：{str(e)}")
 
 
-@router.delete("/schema/schema/{schema_name}")
+@router.delete("/schema/{schema_name}")
 async def delete_schema_by_name(
     schema_name: str,
     user = Depends(get_current_user)
@@ -636,12 +636,12 @@ async def delete_schema_by_name(
     """按 Schema 名称删除所有字段"""
     try:
         user_id = user['user_id']
-        db = SqlSessionLocal()
+        db = SchemaSessionLocal()
         
         try:
-            deleted = db.query(SchemaParse).filter(
-                SchemaParse.user_id == user_id,
-                SchemaParse.schema_name == schema_name
+            deleted = db.query(Schema).filter(
+                Schema.user_id == user_id,
+                Schema.schema_name == schema_name
             ).delete()
             
             db.commit()
@@ -655,7 +655,7 @@ async def delete_schema_by_name(
         raise HTTPException(status_code=500, detail=f"删除失败：{str(e)}")
 
 
-@router.delete("/schema/{schema_id}")
+@router.delete("/{schema_id}")
 async def delete_schema(
     schema_id: int,
     user = Depends(get_current_user)
@@ -663,12 +663,12 @@ async def delete_schema(
     """删除 Schema 项"""
     try:
         user_id = user['user_id']
-        db = SqlSessionLocal()
+        db = SchemaSessionLocal()
         
         try:
-            item = db.query(SchemaParse).filter(
-                SchemaParse.id == schema_id,
-                SchemaParse.user_id == user_id
+            item = db.query(Schema).filter(
+                Schema.id == schema_id,
+                Schema.user_id == user_id
             ).first()
             
             if not item:
@@ -688,7 +688,7 @@ async def delete_schema(
         raise HTTPException(status_code=500, detail=f"删除失败：{str(e)}")
 
 
-@router.get("/schema/table-names")
+@router.get("/table-names")
 async def get_table_names(
     schema_name: Optional[str] = None,
     user = Depends(get_current_user)
@@ -696,15 +696,15 @@ async def get_table_names(
     """获取所有表名"""
     try:
         user_id = user['user_id']
-        db = SqlSessionLocal()
+        db = SchemaSessionLocal()
         
         try:
-            query = db.query(SchemaParse.table_name).filter(
-                SchemaParse.user_id == user_id
+            query = db.query(Schema.table_name).filter(
+                Schema.user_id == user_id
             ).distinct()
             
             if schema_name:
-                query = query.filter(SchemaParse.schema_name == schema_name)
+                query = query.filter(Schema.schema_name == schema_name)
             
             tables = query.all()
             
@@ -717,18 +717,18 @@ async def get_table_names(
         raise HTTPException(status_code=500, detail=f"获取失败：{str(e)}")
 
 
-@router.get("/schema/schema-names")
+@router.get("/schema-names")
 async def get_schema_names(
     user = Depends(get_current_user)
 ):
     """获取所有 schema 名称"""
     try:
         user_id = user['user_id']
-        db = SqlSessionLocal()
+        db = SchemaSessionLocal()
         
         try:
-            schemas = db.query(SchemaParse.schema_name).filter(
-                SchemaParse.user_id == user_id
+            schemas = db.query(Schema.schema_name).filter(
+                Schema.user_id == user_id
             ).distinct().all()
             
             return {"schemas": [s.schema_name for s in schemas]}

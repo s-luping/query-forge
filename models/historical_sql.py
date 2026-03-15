@@ -7,9 +7,9 @@ from sqlalchemy.sql import func
 from models import Base
 
 
-class SqlHistory(Base):
+class HistoricalSQL(Base):
     """SQL查询历史表"""
-    __tablename__ = 'sql_history'
+    __tablename__ = 'historical_sql'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
     query = Column(Text, nullable=False)
