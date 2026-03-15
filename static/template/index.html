@@ -55,30 +55,6 @@
     </div>
     <script src="/static/js/bootstrap.bundle.min.js"></script>
     <script>
-        window.addEventListener('load', function () {
-            const token = getCookie('token');
-
-            if (!token) {
-                window.location.href = '/login';
-                return;
-            }
-
-            fetch('/check-token', {
-                method: 'GET',
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            })
-                .then(response => {
-                    if (response.status === 401) {
-                        document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
-                        window.location.href = '/login';
-                    }
-                })
-                .catch(error => {
-                    console.error('Token verification error:', error);
-                });
-        });
 
         function getCookie(name) {
             const value = `; ${document.cookie}`;
