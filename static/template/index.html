@@ -48,6 +48,7 @@
         <span class="tpl-index-topbar-title">QueryForge 智能数据查询平台 <span class="tpl-index-topbar-version">v1.0</span></span>
         <div class="dropdown tpl-index-user-dropdown">
             <span id="user-info" class="tpl-index-user-info"></span>
+            <a id="login-link" href="/login" class="tpl-index-login-link" style="display:none;color:#fff;text-decoration:none;">登录</a>
             <div id="user-dropdown" class="tpl-index-user-dropdown-menu">
                 <a href="/logout" class="tpl-index-logout-link">退出登录</a>
             </div>
@@ -72,7 +73,18 @@
         }
         window.addEventListener('DOMContentLoaded', function () {
             const user = getUserNameFromToken();
-            if (user) document.getElementById('user-info').textContent = user;
+            const userInfo = document.getElementById('user-info');
+            const loginLink = document.getElementById('login-link');
+            const userDropdown = document.getElementById('user-dropdown');
+            if (user) {
+                userInfo.textContent = user;
+                userInfo.style.display = '';
+                loginLink.style.display = 'none';
+            } else {
+                userInfo.style.display = 'none';
+                loginLink.style.display = '';
+                userDropdown.style.display = 'none';
+            }
         });
 
         function toggleMenu(type) {
@@ -147,12 +159,16 @@
         document.addEventListener('DOMContentLoaded', function () {
             const userInfo = document.getElementById('user-info');
             const dropdown = document.getElementById('user-dropdown');
-            userInfo.addEventListener('mouseenter', function () {
-                dropdown.style.display = 'block';
-            });
-            userInfo.addEventListener('mouseleave', function () {
-                setTimeout(() => { if (!dropdown.matches(':hover')) dropdown.style.display = 'none'; }, 200);
-            });
+            const loginLink = document.getElementById('login-link');
+            
+            if (userInfo.style.display !== 'none') {
+                userInfo.addEventListener('mouseenter', function () {
+                    dropdown.style.display = 'block';
+                });
+                userInfo.addEventListener('mouseleave', function () {
+                    setTimeout(() => { if (!dropdown.matches(':hover')) dropdown.style.display = 'none'; }, 200);
+                });
+            }
             dropdown.addEventListener('mouseleave', function () {
                 dropdown.style.display = 'none';
             });
