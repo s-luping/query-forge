@@ -31,7 +31,7 @@ class ChartDataResponse(BaseModel):
     possible_chart_types: List[str] = []
 
 
-class SqlHistoryItem(BaseModel):
+class HistoricalSQLItem(BaseModel):
     """SQL历史记录项模型"""
     id: Optional[int] = None
     query: str
@@ -45,9 +45,9 @@ class SqlHistoryItem(BaseModel):
     knowledge_id: Optional[int] = None
 
 
-class SqlHistoryResponse(BaseModel):
+class HistoricalSQLResponse(BaseModel):
     """SQL历史记录响应模型"""
-    items: List[SqlHistoryItem]
+    items: List[HistoricalSQLItem]
     total: int
 
 

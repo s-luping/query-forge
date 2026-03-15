@@ -6,11 +6,11 @@ from fastapi import APIRouter, HTTPException, Depends, Query, Request
 from fastapi.security import HTTPBearer
 from typing import List, Dict
 
-from core.models import SqlHistoryItem, SqlHistoryResponse, RatingRequest
+from core.models import HistoricalSQLItem, HistoricalSQLResponse, RatingRequest
 from app.logger import logger
 from app.auth import get_current_user
 from models import HistorySessionLocal
-from models.sql_history import SqlHistory
+from models.historical_sql import HistoricalSQL
 
 
 router = APIRouter()
@@ -22,7 +22,7 @@ def add_history(query: str, sql_query: str, is_valid: bool, error_message: str, 
     """添加历史记录"""
     db = HistorySessionLocal()
     try:
-        history = SqlHistory(
+        history = HistoricalSQL(
             query=query,
             sql_query=sql_query,
             is_valid=is_valid,
@@ -44,10 +44,10 @@ def get_history(user_id: int, limit: int = 20, offset: int = 0) -> tuple:
     db = HistorySessionLocal()
     try:
         user_id_str = str(user_id)
-        query = db.query(SqlHistory).filter(SqlHistory.user_id == user_id_str)
+        query = db.query(HistoricalSQL).filter(HistoricalSQL.user_id == user_id_str)
         
         total = query.count()
-        items = query.order_by(SqlHistory.created_at.desc()).limit(limit).offset(offset).all()
+        items = query.order_by(HistoricalSQL.created_at.desc()).limit(limit).offset(offset).all()
         
         result = []
         for item in items:
@@ -74,9 +74,9 @@ def rate_history(history_id: int, user_id: int, rating: int) -> bool:
     db = HistorySessionLocal()
     try:
         user_id_str = str(user_id)
-        history = db.query(SqlHistory).filter(
-            SqlHistory.id == history_id,
-            SqlHistory.user_id == user_id_str
+        history = db.query(HistoricalSQL).filter(
+            HistoricalSQL.id == history_id,
+            HistoricalSQL.user_id == user_id_str
         ).first()
         
         if not history:
@@ -94,11 +94,11 @@ def get_successful_queries(user_id: int, limit: int = 5) -> List[Dict[str, str]]
     db = HistorySessionLocal()
     try:
         user_id_str = str(user_id)
-        items = db.query(SqlHistory).filter(
-            SqlHistory.user_id == user_id_str,
-            SqlHistory.is_valid == True,
-            SqlHistory.rating != None
-        ).order_by(SqlHistory.rating.desc(), SqlHistory.created_at.desc()).limit(limit).all()
+        items = db.query(HistoricalSQL).filter(
+            HistoricalSQL.user_id == user_id_str,
+            HistoricalSQL.is_valid == True,
+            HistoricalSQL.rating != None
+        ).order_by(HistoricalSQL.rating.desc(), HistoricalSQL.created_at.desc()).limit(limit).all()
         
         result = []
         for item in items:
@@ -111,7 +111,7 @@ def get_successful_queries(user_id: int, limit: int = 5) -> List[Dict[str, str]]
         db.close()
 
 
-@router.get("/history", response_model=SqlHistoryResponse)
+@router.get("/", response_model=HistoricalSQLResponse)
 async def get_sql_history(
     limit: int = Query(20, ge=1, le=100),
     offset: int = Query(0, ge=0),
@@ -122,9 +122,9 @@ async def get_sql_history(
         user_id = user['user_id']
         items, total = get_history(user_id, limit, offset)
 
-        history_items = [SqlHistoryItem(**item) for item in items]
+        history_items = [HistoricalSQLItem(**item) for item in items]
 
-        return SqlHistoryResponse(
+        return HistoricalSQLResponse(
             items=history_items,
             total=total
         )
@@ -134,7 +134,7 @@ async def get_sql_history(
         raise HTTPException(status_code=500, detail=f"获取历史记录失败: {str(e)}")
 
 
-@router.post("/history/rate")
+@router.post("/rate")
 async def rate_sql_history(
     request: RatingRequest,
     user = Depends(get_current_user)
@@ -163,7 +163,7 @@ async def rate_sql_history(
         raise HTTPException(status_code=500, detail=f"评分失败: {str(e)}")
 
 
-@router.delete("/history/{history_id}")
+@router.delete("/{history_id}")
 async def delete_sql_history(
     history_id: int,
     user = Depends(get_current_user)
@@ -172,9 +172,9 @@ async def delete_sql_history(
     db = HistorySessionLocal()
     try:
         user_id_str = str(user['user_id'])
-        history = db.query(SqlHistory).filter(
-            SqlHistory.id == history_id,
-            SqlHistory.user_id == user_id_str
+        history = db.query(HistoricalSQL).filter(
+            HistoricalSQL.id == history_id,
+            HistoricalSQL.user_id == user_id_str
         ).first()
         
         if not history:

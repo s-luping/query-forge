@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 import jwt
 from app.config import SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES
 from app.logger import logger
-from models import SessionLocal
+from models import AppSessionLocal
 from models.user import User
 from fastapi import HTTPException, Depends, Request
 
@@ -16,7 +16,7 @@ def authenticate_user(username: str, password: str):
     :return: 用户对象，如果验证失败则返回None
     """
     logger.debug(f"尝试验证用户: {username}")
-    with SessionLocal() as db:
+    with AppSessionLocal() as db:
         login_user = db.query(User).filter(User.username == username, User.password == password).first()
     if login_user:
         logger.info(f"用户验证成功: {username}")
@@ -60,7 +60,7 @@ async def get_current_user(request: Request):
             logger.warning(f"token缺少必要字段: user_id={user_id}, username={username}")
             raise HTTPException(status_code=401, detail="无效的token")
         
-        db = SessionLocal()
+        db = AppSessionLocal()
         try:
             user = db.query(User).filter(
                 User.id == user_id,

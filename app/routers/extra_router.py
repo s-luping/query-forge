@@ -10,7 +10,7 @@ from typing import Optional, List
 from app.logger import logger
 from app.auth import get_current_user
 from models import ExtraSessionLocal
-from models.extra import ExtraKnowledge
+from models.extra_knowledge import ExtraKnowledge
 
 
 router = APIRouter()
@@ -224,7 +224,7 @@ def delete_extra_knowledge(user_id: int, knowledge_id: int) -> bool:
         db.close()
 
 
-@router.get("/extra-knowledge", response_model=ExtraKnowledgeListResponse)
+@router.get("/", response_model=ExtraKnowledgeListResponse)
 async def list_extra_knowledge(
     limit: int = Query(20, ge=1, le=100),
     offset: int = Query(0, ge=0),
@@ -247,7 +247,7 @@ async def list_extra_knowledge(
         raise HTTPException(status_code=500, detail=f"获取失败: {str(e)}")
 
 
-@router.get("/extra-knowledge/{knowledge_id}", response_model=ExtraKnowledgeResponse)
+@router.get("/{knowledge_id}", response_model=ExtraKnowledgeResponse)
 async def get_single_extra_knowledge(
     knowledge_id: int,
     user = Depends(get_current_user)
@@ -269,7 +269,7 @@ async def get_single_extra_knowledge(
         raise HTTPException(status_code=500, detail=f"获取失败: {str(e)}")
 
 
-@router.post("/extra-knowledge")
+@router.post("/")
 async def create_new_extra_knowledge(
     request: ExtraKnowledgeRequest,
     user = Depends(get_current_user)
@@ -286,7 +286,7 @@ async def create_new_extra_knowledge(
         raise HTTPException(status_code=500, detail=f"创建失败: {str(e)}")
 
 
-@router.put("/extra-knowledge/{knowledge_id}")
+@router.put("/{knowledge_id}")
 async def update_existing_extra_knowledge(
     knowledge_id: int,
     request: ExtraKnowledgeRequest,
@@ -309,7 +309,7 @@ async def update_existing_extra_knowledge(
         raise HTTPException(status_code=500, detail=f"更新失败: {str(e)}")
 
 
-@router.delete("/extra-knowledge/{knowledge_id}")
+@router.delete("/{knowledge_id}")
 async def delete_existing_extra_knowledge(
     knowledge_id: int,
     user = Depends(get_current_user)

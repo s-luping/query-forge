@@ -18,7 +18,7 @@ from app.routers.history_router import router as history_router
 from app.routers.extra_router import router as extra_router
 from app.routers.table_data_router import router as table_data_router
 from app.config import SECRET_KEY, ALGORITHM
-from models import init_database, SessionLocal
+from models import init_database, AppSessionLocal
 from models.user import User
 
 
@@ -61,44 +61,12 @@ async def logout():
     return response
 
 
-@app.get("/check-token")
-async def check_token(request: Request):
-    """验证token是否有效"""
-    auth_header = request.headers.get('Authorization', '')
-    if auth_header.startswith('Bearer '):
-        token = auth_header[7:]
-    else:
-        token = request.cookies.get('token')
-    
-    if not token:
-        return JSONResponse(status_code=401, content={"detail": "未登录"})
-    
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        username = payload.get('username')
-        if not username:
-            return JSONResponse(status_code=401, content={"detail": "无效的token"})
-        
-        db = SessionLocal()
-        try:
-            user = db.query(User).filter(User.username == username, User.is_active == 1).first()
-            if not user:
-                return JSONResponse(status_code=401, content={"detail": "用户不存在"})
-            return {"valid": True, "username": username}
-        finally:
-            db.close()
-    except jwt.ExpiredSignatureError:
-        return JSONResponse(status_code=401, content={"detail": "token已过期"})
-    except jwt.InvalidTokenError:
-        return JSONResponse(status_code=401, content={"detail": "无效的token"})
-
-
 app.include_router(base_router, tags=["基础认证"])
 app.include_router(chat_to_sql_router, prefix="/api/chat-to-sql", tags=["chat_to_sql"])
-app.include_router(schema_router, prefix="/api", tags=["schema 管理"])
-app.include_router(history_router, prefix="/api/chat-to-sql", tags=["历史记录"])
-app.include_router(extra_router, prefix="/api", tags=["补充知识"])
-app.include_router(table_data_router, prefix="/api", tags=["表数据管理"])
+app.include_router(schema_router, prefix="/api/schema", tags=["schema 管理"])
+app.include_router(history_router, prefix="/api/history", tags=["历史记录"])
+app.include_router(extra_router, prefix="/api/extra-knowledge", tags=["补充知识"])
+app.include_router(table_data_router, prefix="/api/table-data", tags=["表数据管理"])
 
 
 if __name__ == "__main__":

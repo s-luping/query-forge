@@ -5,15 +5,18 @@
 import sqlite3
 import os
 import pandas as pd
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Request
 from pydantic import BaseModel
 from typing import List, Dict, Any, Optional
 
 from app.logger import logger
 from app.auth import get_current_user
 from app.config import TEMP_DB_PATH
-from models import SqlSessionLocal
-from models.schema_parse import SchemaParse
+from core.models import TextToSqlRequest, SqlValidationResponse, ChartDataResponse
+from core.DatabaseManager import DatabaseManager
+from models import SchemaSessionLocal, HistorySessionLocal
+from models.schema import Schema
+from models.historical_sql import HistoricalSQL
 from app.routers.history_router import add_history, get_successful_queries
 
 
@@ -137,7 +140,7 @@ class CreateTableResponse(BaseModel):
     table_name: str
 
 
-@router.post("/table-data/create-table", response_model=CreateTableResponse)
+@router.post("/create-table", response_model=CreateTableResponse)
 async def create_table_from_schema(
     request: CreateTableRequest,
     user = Depends(get_current_user)
@@ -145,7 +148,7 @@ async def create_table_from_schema(
     """根据解析的 Schema 创建临时表"""
     try:
         user_id = user['user_id']
-        db = SqlSessionLocal()
+        db = SchemaSessionLocal()
         
         try:
             schema_name = request.schema_name
@@ -154,10 +157,10 @@ async def create_table_from_schema(
             if not schema_name or not table_name:
                 raise HTTPException(status_code=400, detail="缺少 schema_name 或 table_name")
             
-            columns = db.query(SchemaParse).filter(
-                SchemaParse.user_id == user_id,
-                SchemaParse.schema_name == schema_name,
-                SchemaParse.table_name == table_name
+            columns = db.query(Schema).filter(
+                Schema.user_id == user_id,
+                Schema.schema_name == schema_name,
+                Schema.table_name == table_name
             ).all()
             
             if not columns:
@@ -191,7 +194,7 @@ async def create_table_from_schema(
         raise HTTPException(status_code=500, detail=f"创建失败：{str(e)}")
 
 
-@router.get("/table-data/{table_name}/exists", response_model=TableExistsResponse)
+@router.get("/{table_name}/exists", response_model=TableExistsResponse)
 async def check_table_exists(
     table_name: str,
     user = Depends(get_current_user)
@@ -220,7 +223,7 @@ async def check_table_exists(
         return TableExistsResponse(exists=False, table_name=table_name)
 
 
-@router.get("/table-data/{table_name}/preview", response_model=TableDataResponse)
+@router.get("/{table_name}/preview", response_model=TableDataResponse)
 async def preview_table_data(
     table_name: str,
     limit: int = 10,
@@ -268,7 +271,7 @@ async def preview_table_data(
         raise HTTPException(status_code=500, detail=f"查询失败：{str(e)}")
 
 
-@router.post("/table-data/{table_name}/update")
+@router.post("/{table_name}/update")
 async def update_table_data(
     table_name: str,
     request: TableDataUpdateRequest,
@@ -465,3 +468,56 @@ async def add_query_history(
     except Exception as e:
         logger.error(f"添加查询历史失败：{e}")
         raise HTTPException(status_code=500, detail=f"保存失败：{str(e)}")
+
+@router.post("/execute_sql", response_model=ChartDataResponse)
+async def execute_sql_with_sqlite(
+    request: Request,
+    user = Depends(get_current_user)
+):
+    """执行历史SQL查询并返回结果"""
+    try:
+        data = await request.json()
+        history_id = data.get('history_id')
+        
+        if not history_id:
+            raise HTTPException(status_code=400, detail="history_id 不能为空")
+        
+        user_id = user['user_id']
+
+        db = HistorySessionLocal()
+        try:
+            sql_history = db.query(HistoricalSQL).filter(
+                HistoricalSQL.id == history_id,
+                HistoricalSQL.user_id == str(user_id)
+            ).first()
+            if not sql_history:
+                raise HTTPException(status_code=404, detail="历史记录不存在或不属于该用户")
+
+            generated_sql = sql_history.sql_query
+        finally:
+            db.close()
+
+        temp_db_path = get_user_temp_db_path(user_id)
+        if not os.path.exists(temp_db_path):
+            raise HTTPException(
+                status_code=400,
+                detail="临时数据库不存在，请先在Schema管理中建表"
+            )
+        
+        db_manager = DatabaseManager(temp_db_path)
+        query_results = db_manager.execute_query(generated_sql, 100)
+
+        return ChartDataResponse(
+            sql_query=generated_sql,
+            data=query_results,
+            chart_type='table',
+            chart_config={},
+            total_rows=len(query_results),
+            possible_chart_types=['table']
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"SQL执行失败: {e}")
+        raise HTTPException(status_code=500, detail=f"执行失败: {str(e)}")

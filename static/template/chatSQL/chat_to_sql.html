@@ -446,7 +446,7 @@
             }
 
             try {
-                const response = await apiRequest('/api/chat-to-sql/history/rate', {
+                const response = await apiRequest('/api/history/rate', {
                     method: 'POST',
                     body: JSON.stringify({
                         history_id: currentHistoryId,
@@ -591,7 +591,7 @@
                 const limit = 10;
                 const offset = (historyCurrentPage - 1) * limit;
 
-                const response = await apiRequest(`/api/chat-to-sql/history?limit=${limit}&offset=${offset}`);
+                const response = await apiRequest(`/api/history?limit=${limit}&offset=${offset}`);
                 if (!response || !response.ok) {
                     throw new Error('加载历史记录失败');
                 }
@@ -709,7 +709,7 @@
                         }
                         
                         try {
-                            const response = await apiRequest(`/api/chat-to-sql/history/${historyId}`, {
+                            const response = await apiRequest(`/api/history/${historyId}`, {
                                 method: 'DELETE'
                             });
                             

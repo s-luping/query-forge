@@ -62,7 +62,7 @@ function getToken() {
 
 async function checkSchemaStatus() {
     try {
-        const response = await fetch('/api/chat-to-sql/check-schema', {
+        const response = await fetch('/api/schema/check', {
             method: 'GET',
             headers: {
                 'Authorization': `Bearer ${getToken()}`
@@ -147,7 +147,7 @@ executeBtn.addEventListener('click', async function () {
             requestBody.knowledge_id = selectedKnowledgeId;
         }
 
-        const validateResp = await fetch('/api/chat-to-sql/validate', {
+        const validateResp = await fetch('/api/chat-to-sql/generate_sql', {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${getToken()}`,
@@ -179,7 +179,7 @@ executeBtn.addEventListener('click', async function () {
 
         generatedSqlEl.textContent = validation.sql_query;
 
-        const response = await fetch('/api/chat-to-sql/execute', {
+        const response = await fetch('/api/table-data/chat-to-sql/execute', {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${getToken()}`,
@@ -255,7 +255,7 @@ submitRatingBtn.addEventListener('click', async function () {
     }
 
     try {
-        const response = await fetch('/api/chat-to-sql/history/rate', {
+        const response = await fetch('/api/history/rate', {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${getToken()}`,
@@ -298,7 +298,7 @@ async function loadHistory() {
         const limit = 10;
         const offset = (currentPage - 1) * limit;
 
-        const response = await fetch(`/api/chat-to-sql/history?limit=${limit}&offset=${offset}`, {
+        const response = await fetch(`/api/history?limit=${limit}&offset=${offset}`, {
             method: 'GET',
             headers: {
                 'Authorization': `Bearer ${getToken()}`

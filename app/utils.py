@@ -4,6 +4,9 @@
 """
 import os
 
+def get_zhipu_api_key() -> str:
+    """获取智谱AI API密钥"""
+    return os.getenv('ZHIPU_API_KEY', '')
 
 def _load_env_file():
     """加载.env文件"""
@@ -36,9 +39,9 @@ def get_history_db_path() -> str:
     return path
 
 
-def get_sql_db_path() -> str:
-    """获取SQL Schema数据库路径"""
-    path = os.getenv('SQL_DB_PATH', 'db/sys_sql.db')
+def get_schema_db_path() -> str:
+    """获取模式数据库路径"""
+    path = os.getenv('SCHEMA_DB_PATH', 'db/sys_schema.db')
     if not os.path.isabs(path):
         path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), path)
     return path
@@ -52,9 +55,7 @@ def get_extra_db_path() -> str:
     return path
 
 
-def get_zhipu_api_key() -> str:
-    """获取智谱AI API密钥"""
-    return os.getenv('ZHIPU_API_KEY', '')
+
 
 
 def get_temp_db_path() -> str:

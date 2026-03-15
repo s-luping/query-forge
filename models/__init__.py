@@ -7,7 +7,7 @@ import logging
 from datetime import datetime
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import declarative_base, sessionmaker
-from app.config import APP_DB_PATH, HISTORY_DB_PATH, SQL_DB_PATH, EXTRA_DB_PATH
+from app.config import APP_DB_PATH, HISTORY_DB_PATH, SCHEMA_DB_PATH, EXTRA_DB_PATH
 
 logger = logging.getLogger("app_logger")
 db_logger = logging.getLogger("sqlalchemy_logger")
@@ -26,8 +26,8 @@ history_engine = create_engine(
     connect_args={'check_same_thread': False}
 )
 
-sql_engine = create_engine(
-    f'sqlite:///{SQL_DB_PATH}',
+schema_engine = create_engine(
+    f'sqlite:///{SCHEMA_DB_PATH}',
     echo=False,
     connect_args={'check_same_thread': False}
 )
@@ -46,9 +46,10 @@ def app_engine_connect(dbapi_connection, connection_record):
 def history_engine_connect(dbapi_connection, connection_record):
     db_logger.debug(f"历史数据库连接创建: {HISTORY_DB_PATH}")
 
-@event.listens_for(sql_engine, "connect")
-def sql_engine_connect(dbapi_connection, connection_record):
-    db_logger.debug(f"SQL数据库连接创建: {SQL_DB_PATH}")
+@event.listens_for(schema_engine, "connect")
+def schema_engine_connect(dbapi_connection, connection_record):
+    db_logger.debug(f"模式数据库连接创建: {SCHEMA_DB_PATH}")
+
 
 @event.listens_for(extra_engine, "connect")
 def extra_engine_connect(dbapi_connection, connection_record):
@@ -56,10 +57,8 @@ def extra_engine_connect(dbapi_connection, connection_record):
 
 AppSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=app_engine)
 HistorySessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=history_engine)
-SqlSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=sql_engine)
+SchemaSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=schema_engine)
 ExtraSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=extra_engine)
-
-SessionLocal = AppSessionLocal
 
 
 def init_database():
@@ -73,14 +72,14 @@ def init_database():
     print(f"应用数据库表创建/检查完成: {APP_DB_PATH}")
     
     init_history_database()
-    init_sql_database()
+    init_schema_database()
     init_extra_database()
     create_default_admin()
 
 
 def _ensure_db_dirs():
     """确保数据库目录存在"""
-    for db_path in [APP_DB_PATH, HISTORY_DB_PATH, SQL_DB_PATH, EXTRA_DB_PATH]:
+    for db_path in [APP_DB_PATH, HISTORY_DB_PATH, SCHEMA_DB_PATH, EXTRA_DB_PATH]:
         db_dir = os.path.dirname(db_path)
         if db_dir and not os.path.exists(db_dir):
             os.makedirs(db_dir)
@@ -89,25 +88,25 @@ def _ensure_db_dirs():
 
 def init_history_database():
     """初始化历史记录数据库"""
-    from models.sql_history import SqlHistory
+    from models.historical_sql import HistoricalSQL
     
-    SqlHistory.__table__.create(bind=history_engine, checkfirst=True)
+    HistoricalSQL.__table__.create(bind=history_engine, checkfirst=True)
     logger.info(f"历史记录数据库表创建/检查完成: {HISTORY_DB_PATH}")
     print(f"历史记录数据库表创建/检查完成: {HISTORY_DB_PATH}")
 
 
-def init_sql_database():
+def init_schema_database():
     """初始化SQL Schema数据库"""
-    from models.schema_parse import SchemaParse
+    from models.schema import Schema
     
-    SchemaParse.__table__.create(bind=sql_engine, checkfirst=True)
-    logger.info(f"SQL Schema数据库表创建/检查完成: {SQL_DB_PATH}")
-    print(f"SQL Schema数据库表创建/检查完成: {SQL_DB_PATH}")
+    Schema.__table__.create(bind=schema_engine, checkfirst=True)
+    logger.info(f"模式数据库表创建/检查完成: {SCHEMA_DB_PATH}")
+    print(f"模式数据库表创建/检查完成: {SCHEMA_DB_PATH}")
 
 
 def init_extra_database():
     """初始化补充知识数据库"""
-    from models.extra import ExtraKnowledge
+    from models.extra_knowledge import ExtraKnowledge
     
     ExtraKnowledge.__table__.create(bind=extra_engine, checkfirst=True)
     logger.info(f"补充知识数据库表创建/检查完成: {EXTRA_DB_PATH}")
@@ -144,38 +143,3 @@ def create_default_admin():
     finally:
         db.close()
 
-
-def get_db():
-    """获取应用数据库会话"""
-    db = AppSessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
-
-def get_history_db():
-    """获取历史记录数据库会话"""
-    db = HistorySessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
-
-def get_sql_db():
-    """获取SQL Schema数据库会话"""
-    db = SqlSessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
-
-def get_extra_db():
-    """获取补充知识数据库会话"""
-    db = ExtraSessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
