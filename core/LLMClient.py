@@ -66,7 +66,7 @@ class LLMClient:
             raise ValueError(f"不支持的模型提供商: {provider}，支持的提供商: {list(self.MODEL_CONFIGS.keys())}")
         
         self.config = self.MODEL_CONFIGS[self.provider]
-        self.api_key = api_key or os.getenv(f'{self.provider.upper()}_API_KEY', '') or os.getenv('ZHIPU_API_KEY', '')
+        self.api_key = api_key or ''
         self.model = model or self.config['default_model']
         self.base_url = self.config['base_url']
         self.max_tokens = max_tokens
