@@ -4,10 +4,6 @@
 """
 import os
 
-def get_zhipu_api_key() -> str:
-    """获取智谱AI API密钥"""
-    return os.getenv('ZHIPU_API_KEY', '')
-
 def _load_env_file():
     """加载.env文件"""
     env_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), '.env')

@@ -8,7 +8,6 @@ services:
     volumes:
       - ./db:/app/db
     environment:
-      - ZHIPU_API_KEY=${ZHIPU_API_KEY}
       - SECRET_KEY=${SECRET_KEY}
       - ALGORITHM=${ALGORITHM}
       - ACCESS_TOKEN_EXPIRE_MINUTES=${ACCESS_TOKEN_EXPIRE_MINUTES}
