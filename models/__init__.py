@@ -5,65 +5,43 @@ models 包 - 包含所有 SQLAlchemy 模型和初始化逻辑
 import os
 import logging
 from datetime import datetime
-from sqlalchemy import create_engine, event, text
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import declarative_base, sessionmaker
 from app.config import APP_DB_PATH, HISTORY_DB_PATH, SCHEMA_DB_PATH, EXTRA_DB_PATH, LLM_DB_PATH
 
 logger = logging.getLogger("app_logger")
-db_logger = logging.getLogger("sqlalchemy_logger")
 
 Base = declarative_base()
 
 app_engine = create_engine(
     f'sqlite:///{APP_DB_PATH}',
-    echo=False,
+    echo=True,
     connect_args={'check_same_thread': False}
 )
 
 history_engine = create_engine(
     f'sqlite:///{HISTORY_DB_PATH}',
-    echo=False,
+    echo=True,
     connect_args={'check_same_thread': False}
 )
 
 schema_engine = create_engine(
     f'sqlite:///{SCHEMA_DB_PATH}',
-    echo=False,
+    echo=True,
     connect_args={'check_same_thread': False}
 )
 
 extra_engine = create_engine(
     f'sqlite:///{EXTRA_DB_PATH}',
-    echo=False,
+    echo=True,
     connect_args={'check_same_thread': False}
 )
 
 llm_engine = create_engine(
     f'sqlite:///{LLM_DB_PATH}',
-    echo=False,
+    echo=True,
     connect_args={'check_same_thread': False}
 )
-
-@event.listens_for(app_engine, "connect")
-def app_engine_connect(dbapi_connection, connection_record):
-    db_logger.debug(f"应用数据库连接创建: {APP_DB_PATH}")
-
-@event.listens_for(history_engine, "connect")
-def history_engine_connect(dbapi_connection, connection_record):
-    db_logger.debug(f"历史数据库连接创建: {HISTORY_DB_PATH}")
-
-@event.listens_for(schema_engine, "connect")
-def schema_engine_connect(dbapi_connection, connection_record):
-    db_logger.debug(f"模式数据库连接创建: {SCHEMA_DB_PATH}")
-
-
-@event.listens_for(extra_engine, "connect")
-def extra_engine_connect(dbapi_connection, connection_record):
-    db_logger.debug(f"补充知识数据库连接创建: {EXTRA_DB_PATH}")
-
-@event.listens_for(llm_engine, "connect")
-def llm_engine_connect(dbapi_connection, connection_record):
-    db_logger.debug(f"LLM调用记录数据库连接创建: {LLM_DB_PATH}")
 
 AppSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=app_engine)
 HistorySessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=history_engine)
