@@ -10,6 +10,7 @@ class TextToSqlRequest(BaseModel):
     knowledge_id: Optional[int] = None
     db_type: Optional[str] = "sqlite"
     schema_name: Optional[str] = None
+    llm_config_id: Optional[int] = None
 
 
 class SqlValidationResponse(BaseModel):

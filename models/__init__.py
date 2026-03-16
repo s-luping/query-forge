@@ -5,9 +5,9 @@ models 包 - 包含所有 SQLAlchemy 模型和初始化逻辑
 import os
 import logging
 from datetime import datetime
-from sqlalchemy import create_engine, event
+from sqlalchemy import create_engine, event, text
 from sqlalchemy.orm import declarative_base, sessionmaker
-from app.config import APP_DB_PATH, HISTORY_DB_PATH, SCHEMA_DB_PATH, EXTRA_DB_PATH
+from app.config import APP_DB_PATH, HISTORY_DB_PATH, SCHEMA_DB_PATH, EXTRA_DB_PATH, LLM_DB_PATH
 
 logger = logging.getLogger("app_logger")
 db_logger = logging.getLogger("sqlalchemy_logger")
@@ -38,6 +38,12 @@ extra_engine = create_engine(
     connect_args={'check_same_thread': False}
 )
 
+llm_engine = create_engine(
+    f'sqlite:///{LLM_DB_PATH}',
+    echo=False,
+    connect_args={'check_same_thread': False}
+)
+
 @event.listens_for(app_engine, "connect")
 def app_engine_connect(dbapi_connection, connection_record):
     db_logger.debug(f"应用数据库连接创建: {APP_DB_PATH}")
@@ -55,10 +61,15 @@ def schema_engine_connect(dbapi_connection, connection_record):
 def extra_engine_connect(dbapi_connection, connection_record):
     db_logger.debug(f"补充知识数据库连接创建: {EXTRA_DB_PATH}")
 
+@event.listens_for(llm_engine, "connect")
+def llm_engine_connect(dbapi_connection, connection_record):
+    db_logger.debug(f"LLM调用记录数据库连接创建: {LLM_DB_PATH}")
+
 AppSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=app_engine)
 HistorySessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=history_engine)
 SchemaSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=schema_engine)
 ExtraSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=extra_engine)
+LLMSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=llm_engine)
 
 
 def init_database():
@@ -66,20 +77,50 @@ def init_database():
     _ensure_db_dirs()
     
     from models.user import User
+    from models.llm_config import LLMConfig
     
     User.__table__.create(bind=app_engine, checkfirst=True)
+    LLMConfig.__table__.create(bind=app_engine, checkfirst=True)
+    
+    _migrate_llm_config_table()
+    
     logger.info(f"应用数据库表创建/检查完成: {APP_DB_PATH}")
     print(f"应用数据库表创建/检查完成: {APP_DB_PATH}")
     
     init_history_database()
     init_schema_database()
     init_extra_database()
+    init_llm_database()
     create_default_admin()
+
+
+def _migrate_llm_config_table():
+    """迁移llm_configs表，添加新字段"""
+    try:
+        with app_engine.connect() as conn:
+            result = conn.execute(text("PRAGMA table_info(llm_configs)"))
+            columns = [row[1] for row in result.fetchall()]
+            
+            if 'max_tokens' not in columns:
+                conn.execute(text("ALTER TABLE llm_configs ADD COLUMN max_tokens INTEGER DEFAULT 8000"))
+                logger.info("llm_configs表添加max_tokens字段")
+            
+            if 'temperature' not in columns:
+                conn.execute(text("ALTER TABLE llm_configs ADD COLUMN temperature REAL DEFAULT 0.7"))
+                logger.info("llm_configs表添加temperature字段")
+            
+            if 'timeout' not in columns:
+                conn.execute(text("ALTER TABLE llm_configs ADD COLUMN timeout INTEGER DEFAULT 300"))
+                logger.info("llm_configs表添加timeout字段")
+            
+            conn.commit()
+    except Exception as e:
+        logger.warning(f"llm_configs表迁移检查: {e}")
 
 
 def _ensure_db_dirs():
     """确保数据库目录存在"""
-    for db_path in [APP_DB_PATH, HISTORY_DB_PATH, SCHEMA_DB_PATH, EXTRA_DB_PATH]:
+    for db_path in [APP_DB_PATH, HISTORY_DB_PATH, SCHEMA_DB_PATH, EXTRA_DB_PATH, LLM_DB_PATH]:
         db_dir = os.path.dirname(db_path)
         if db_dir and not os.path.exists(db_dir):
             os.makedirs(db_dir)
@@ -111,6 +152,15 @@ def init_extra_database():
     ExtraKnowledge.__table__.create(bind=extra_engine, checkfirst=True)
     logger.info(f"补充知识数据库表创建/检查完成: {EXTRA_DB_PATH}")
     print(f"补充知识数据库表创建/检查完成: {EXTRA_DB_PATH}")
+
+
+def init_llm_database():
+    """初始化LLM调用记录数据库"""
+    from models.llm_log import LLMLog
+    
+    LLMLog.__table__.create(bind=llm_engine, checkfirst=True)
+    logger.info(f"LLM调用记录数据库表创建/检查完成: {LLM_DB_PATH}")
+    print(f"LLM调用记录数据库表创建/检查完成: {LLM_DB_PATH}")
 
 
 def create_default_admin():

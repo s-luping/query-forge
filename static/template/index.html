@@ -13,8 +13,17 @@
     <div class="tpl-index-layout">
         <!-- 左侧菜单栏 -->
         <div id="sidebar" class="tpl-index-sidebar">
-            <div class="tpl-index-sidebar-title">数据菜单</div>
+            <div class="tpl-index-sidebar-title">功能菜单</div>
             <div class="tpl-index-sidebar-content">
+                <div class="menu-group">
+                    <div class="menu-group-title" onclick="toggleMenu('llm')">大模型管理</div>
+                    <div id="menu-llm" class="menu-items" style="display:none;">
+                        <div class="menu-item"
+                            onclick="openWindow('LLM 模型配置','/static/template/llm/llm_config.html')">模型配置管理</div>
+                        <div class="menu-item"
+                            onclick="openWindow('LLM 调用记录','/static/template/llm/llm_logs.html')">调用记录查询</div>
+                    </div>
+                </div>
                 <div class="menu-group">
                     <div class="menu-group-title" onclick="toggleMenu('schema')">Schema 管理</div>
                     <div id="menu-schema" class="menu-items" style="display:none;">

@@ -11,7 +11,8 @@ from app.utils import (
     get_schema_db_path,
     get_extra_db_path,
     get_zhipu_api_key,
-    get_temp_db_path
+    get_temp_db_path,
+    get_llm_db_path
 )
 
 _load_env_file()
@@ -25,4 +26,5 @@ HISTORY_DB_PATH = get_history_db_path()
 SCHEMA_DB_PATH = get_schema_db_path()
 EXTRA_DB_PATH = get_extra_db_path()
 TEMP_DB_PATH = get_temp_db_path()
+LLM_DB_PATH = get_llm_db_path()
 ZHIPU_API_KEY = get_zhipu_api_key()

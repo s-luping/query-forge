@@ -17,6 +17,8 @@ from app.routers.schema_router import router as schema_router
 from app.routers.history_router import router as history_router
 from app.routers.extra_router import router as extra_router
 from app.routers.table_data_router import router as table_data_router
+from app.routers.llm_router import router as llm_router
+from app.routers.llm_config_router import router as llm_config_router
 from app.config import SECRET_KEY, ALGORITHM
 from models import init_database, AppSessionLocal
 from models.user import User
@@ -67,6 +69,8 @@ app.include_router(schema_router, prefix="/api/schema", tags=["schema 管理"])
 app.include_router(history_router, prefix="/api/history", tags=["历史记录"])
 app.include_router(extra_router, prefix="/api/extra-knowledge", tags=["补充知识"])
 app.include_router(table_data_router, prefix="/api/table-data", tags=["表数据管理"])
+app.include_router(llm_router, prefix="/api/llm", tags=["LLM调用记录"])
+app.include_router(llm_config_router, prefix="/api/llm-config", tags=["LLM配置管理"])
 
 
 if __name__ == "__main__":
