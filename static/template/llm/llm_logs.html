@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LLM 调用记录</title>
+    <link rel="stylesheet" href="/static/css/bootstrap.min.css">
+    <style>
+        body {
+            background: #f4f6fa;
+            font-size: 14px;
+        }
+
+        .container-fluid {
+            padding: 20px;
+        }
+
+        .stats-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .stats-item {
+            text-align: center;
+            padding: 10px;
+        }
+
+        .stats-value {
+            font-size: 28px;
+            font-weight: bold;
+        }
+
+        .stats-label {
+            font-size: 12px;
+            opacity: 0.9;
+        }
+
+        .card {
+            border: none;
+            border-radius: 12px;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+        }
+
+        .card-header {
+            background: white;
+            border-bottom: 1px solid #eee;
+            font-weight: 600;
+            padding: 15px 20px;
+            border-radius: 12px 12px 0 0 !important;
+        }
+
+        .table th {
+            background: #f8f9fa;
+            font-weight: 600;
+            border-bottom: 2px solid #dee2e6;
+            white-space: nowrap;
+        }
+
+        .table td {
+            vertical-align: middle;
+        }
+
+        .status-success {
+            color: #28a745;
+        }
+
+        .status-warning {
+            color: #ffc107;
+        }
+
+        .status-error {
+            color: #dc3545;
+        }
+
+        .question-cell {
+            max-width: 200px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .question-cell:hover {
+            white-space: normal;
+            overflow: visible;
+        }
+
+        .result-cell {
+            max-width: 250px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            font-family: monospace;
+            font-size: 12px;
+        }
+
+        .result-cell:hover {
+            white-space: pre-wrap;
+            overflow: visible;
+        }
+
+        .btn-sm {
+            padding: 4px 8px;
+            font-size: 12px;
+        }
+
+        .pagination-info {
+            color: #666;
+            font-size: 13px;
+        }
+
+        .detail-modal .modal-body {
+            max-height: 60vh;
+            overflow-y: auto;
+        }
+
+        .detail-item {
+            margin-bottom: 15px;
+        }
+
+        .detail-label {
+            font-weight: 600;
+            color: #666;
+            margin-bottom: 5px;
+        }
+
+        .detail-value {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 6px;
+            word-break: break-all;
+        }
+
+        .detail-value.sql {
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+
+        .filter-bar {
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container-fluid">
+        <div class="stats-card">
+            <div class="row">
+                <div class="col-md-2 stats-item">
+                    <div class="stats-value" id="totalCalls">0</div>
+                    <div class="stats-label">总调用次数</div>
+                </div>
+                <div class="col-md-2 stats-item">
+                    <div class="stats-value" id="totalTokens">0</div>
+                    <div class="stats-label">总Token消耗</div>
+                </div>
+                <div class="col-md-2 stats-item">
+                    <div class="stats-value" id="promptTokens">0</div>
+                    <div class="stats-label">输入Token</div>
+                </div>
+                <div class="col-md-2 stats-item">
+                    <div class="stats-value" id="completionTokens">0</div>
+                    <div class="stats-label">输出Token</div>
+                </div>
+                <div class="col-md-2 stats-item">
+                    <div class="stats-value" id="avgDuration">0</div>
+                    <div class="stats-label">平均耗时(ms)</div>
+                </div>
+                <div class="col-md-2 stats-item">
+                    <div class="stats-value" id="successRate">0%</div>
+                    <div class="stats-label">成功率</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>LLM 调用记录</span>
+                <div class="filter-bar">
+                    <select id="statusFilter" class="form-select form-select-sm" style="width: 120px;" onchange="loadLogs()">
+                        <option value="">全部状态</option>
+                        <option value="success">成功</option>
+                        <option value="warning">警告</option>
+                        <option value="error">错误</option>
+                    </select>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>问题</th>
+                                <th>模型</th>
+                                <th>条件</th>
+                                <th>结果</th>
+                                <th>耗时(ms)</th>
+                                <th>Token</th>
+                                <th>状态</th>
+                                <th>时间</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="logsTable">
+                            <tr>
+                                <td colspan="10" class="text-center text-muted py-4">加载中...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="d-flex justify-content-between align-items-center mt-3">
+                    <div class="pagination-info">
+                        共 <span id="totalCount">0</span> 条记录
+                    </div>
+                    <nav>
+                        <ul class="pagination pagination-sm mb-0" id="pagination">
+                        </ul>
+                    </nav>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade detail-modal" id="detailModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">调用详情</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="detailContent">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <link rel="stylesheet" href="/static/css/all.min.css">
+    <script src="/static/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const apiRequest = window.apiRequest || function (url, options = {}) {
+            const token = document.cookie.split('; ').find(row => row.startsWith('token='))?.split('=')[1];
+            const headers = { 'Content-Type': 'application/json' };
+            if (token) headers['Authorization'] = `Bearer ${token}`;
+            return fetch(url, { ...options, headers: { ...headers, ...options.headers } });
+        };
+
+        let currentPage = 1;
+        const pageSize = 20;
+
+        async function loadStats() {
+            try {
+                const response = await apiRequest('/api/llm/stats');
+                const data = await response.json();
+                
+                document.getElementById('totalCalls').textContent = data.total_calls;
+                document.getElementById('totalTokens').textContent = data.total_tokens.toLocaleString();
+                document.getElementById('promptTokens').textContent = data.total_prompt_tokens.toLocaleString();
+                document.getElementById('completionTokens').textContent = data.total_completion_tokens.toLocaleString();
+                document.getElementById('avgDuration').textContent = data.avg_duration_ms.toFixed(0);
+                document.getElementById('successRate').textContent = data.success_rate + '%';
+            } catch (e) {
+                console.error('加载统计失败:', e);
+            }
+        }
+
+        async function loadLogs() {
+            const status = document.getElementById('statusFilter').value;
+            const offset = (currentPage - 1) * pageSize;
+
+            try {
+                let url = `/api/llm/list?limit=${pageSize}&offset=${offset}`;
+                if (status) url += `&status=${status}`;
+
+                const response = await apiRequest(url);
+                const data = await response.json();
+
+                renderLogs(data.items);
+                renderPagination(data.total);
+                document.getElementById('totalCount').textContent = data.total;
+            } catch (e) {
+                console.error('加载记录失败:', e);
+                document.getElementById('logsTable').innerHTML = 
+                    '<tr><td colspan="10" class="text-center text-danger py-4">加载失败</td></tr>';
+            }
+        }
+
+        function renderLogs(items) {
+            const tbody = document.getElementById('logsTable');
+            
+            if (!items || items.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="10" class="text-center text-muted py-4">暂无记录</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = items.map(item => `
+                <tr>
+                    <td>${item.id}</td>
+                    <td class="question-cell" title="${escapeHtml(item.question)}">${escapeHtml(item.question)}</td>
+                    <td>${item.model}</td>
+                    <td><small>${item.conditions || '-'}</small></td>
+                    <td class="result-cell" title="${escapeHtml(item.result || '')}">${escapeHtml(item.result || '-')}</td>
+                    <td>${item.duration_ms ? item.duration_ms.toFixed(0) : '-'}</td>
+                    <td>
+                        <small>
+                            ${item.total_tokens || 0}
+                            <span class="text-muted">(${item.prompt_tokens || 0}/${item.completion_tokens || 0})</span>
+                        </small>
+                    </td>
+                    <td>
+                        <span class="status-${item.status}">${getStatusText(item.status)}</span>
+                    </td>
+                    <td><small>${formatTime(item.created_at)}</small></td>
+                    <td>
+                        <button class="btn btn-outline-primary btn-sm me-1" onclick="showDetail(${item.id})">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                        <button class="btn btn-outline-danger btn-sm" onclick="deleteLog(${item.id})">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function renderPagination(total) {
+            const totalPages = Math.ceil(total / pageSize);
+            const pagination = document.getElementById('pagination');
+
+            if (totalPages <= 1) {
+                pagination.innerHTML = '';
+                return;
+            }
+
+            let html = '';
+            
+            if (currentPage > 1) {
+                html += `<li class="page-item"><a class="page-link" href="#" onclick="goToPage(${currentPage - 1})">上一页</a></li>`;
+            }
+
+            for (let i = 1; i <= totalPages && i <= 5; i++) {
+                html += `<li class="page-item ${i === currentPage ? 'active' : ''}">
+                    <a class="page-link" href="#" onclick="goToPage(${i})">${i}</a>
+                </li>`;
+            }
+
+            if (totalPages > 5) {
+                html += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
+                html += `<li class="page-item ${totalPages === currentPage ? 'active' : ''}">
+                    <a class="page-link" href="#" onclick="goToPage(${totalPages})">${totalPages}</a>
+                </li>`;
+            }
+
+            if (currentPage < totalPages) {
+                html += `<li class="page-item"><a class="page-link" href="#" onclick="goToPage(${currentPage + 1})">下一页</a></li>`;
+            }
+
+            pagination.innerHTML = html;
+        }
+
+        function goToPage(page) {
+            currentPage = page;
+            loadLogs();
+        }
+
+        async function showDetail(id) {
+            try {
+                const response = await apiRequest(`/api/llm/${id}`);
+                const item = await response.json();
+
+                document.getElementById('detailContent').innerHTML = `
+                    <div class="detail-item">
+                        <div class="detail-label">问题</div>
+                        <div class="detail-value">${escapeHtml(item.question)}</div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 detail-item">
+                            <div class="detail-label">模型</div>
+                            <div class="detail-value">${item.model}</div>
+                        </div>
+                        <div class="col-md-6 detail-item">
+                            <div class="detail-label">条件</div>
+                            <div class="detail-value">${item.conditions || '-'}</div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-3 detail-item">
+                            <div class="detail-label">耗时</div>
+                            <div class="detail-value">${item.duration_ms ? item.duration_ms.toFixed(2) : '-'} ms</div>
+                        </div>
+                        <div class="col-md-3 detail-item">
+                            <div class="detail-label">输入Token</div>
+                            <div class="detail-value">${item.prompt_tokens || 0}</div>
+                        </div>
+                        <div class="col-md-3 detail-item">
+                            <div class="detail-label">输出Token</div>
+                            <div class="detail-value">${item.completion_tokens || 0}</div>
+                        </div>
+                        <div class="col-md-3 detail-item">
+                            <div class="detail-label">总Token</div>
+                            <div class="detail-value">${item.total_tokens || 0}</div>
+                        </div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">生成结果</div>
+                        <div class="detail-value sql">${escapeHtml(item.result || '-')}</div>
+                    </div>
+                    ${item.error_message ? `
+                    <div class="detail-item">
+                        <div class="detail-label">错误信息</div>
+                        <div class="detail-value text-danger">${escapeHtml(item.error_message)}</div>
+                    </div>
+                    ` : ''}
+                    <div class="detail-item">
+                        <div class="detail-label">调用时间</div>
+                        <div class="detail-value">${formatTime(item.created_at)}</div>
+                    </div>
+                `;
+
+                new bootstrap.Modal(document.getElementById('detailModal')).show();
+            } catch (e) {
+                alert('获取详情失败');
+            }
+        }
+
+        async function deleteLog(id) {
+            if (!confirm('确定要删除这条记录吗？')) return;
+
+            try {
+                const response = await apiRequest(`/api/llm/${id}`, { method: 'DELETE' });
+                const data = await response.json();
+
+                if (data.message) {
+                    loadLogs();
+                    loadStats();
+                }
+            } catch (e) {
+                alert('删除失败');
+            }
+        }
+
+        function getStatusText(status) {
+            const map = {
+                'success': '成功',
+                'warning': '警告',
+                'error': '错误'
+            };
+            return map[status] || status;
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function formatTime(time) {
+            if (!time) return '-';
+            return new Date(time).toLocaleString('zh-CN');
+        }
+
+        document.addEventListener('DOMContentLoaded', function () {
+            loadStats();
+            loadLogs();
+        });
+    </script>
+</body>
+
+</html>

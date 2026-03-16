@@ -67,3 +67,11 @@ def get_temp_db_path() -> str:
     if not path.endswith(os.sep):
         path = path + os.sep
     return path
+
+
+def get_llm_db_path() -> str:
+    """获取LLM调用记录数据库路径"""
+    path = os.getenv('LLM_DB_PATH', 'db/sys_llm.db')
+    if not os.path.isabs(path):
+        path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), path)
+    return path

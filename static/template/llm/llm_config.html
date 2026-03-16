@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LLM 模型配置</title>
+    <link rel="stylesheet" href="/static/css/bootstrap.min.css">
+    <style>
+        body {
+            background: #f4f6fa;
+            font-size: 14px;
+        }
+
+        .container-fluid {
+            padding: 20px;
+        }
+
+        .card {
+            border: none;
+            border-radius: 12px;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+            margin-bottom: 20px;
+        }
+
+        .card-header {
+            background: white;
+            border-bottom: 1px solid #eee;
+            font-weight: 600;
+            padding: 15px 20px;
+            border-radius: 12px 12px 0 0 !important;
+        }
+
+        .provider-card {
+            cursor: pointer;
+            transition: all 0.3s;
+            border: 2px solid transparent;
+        }
+
+        .provider-card:hover {
+            border-color: #667eea;
+            transform: translateY(-2px);
+        }
+
+        .provider-card.selected {
+            border-color: #667eea;
+            background: linear-gradient(135deg, #667eea10 0%, #764ba210 100%);
+        }
+
+        .provider-logo {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+
+        .provider-name {
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .provider-models {
+            font-size: 12px;
+            color: #666;
+        }
+
+        .config-item {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 10px;
+        }
+
+        .config-item.default {
+            border-left: 3px solid #28a745;
+        }
+
+        .status-badge {
+            font-size: 11px;
+            padding: 2px 8px;
+            border-radius: 10px;
+        }
+
+        .btn-test {
+            min-width: 100px;
+        }
+
+        .form-label {
+            font-weight: 500;
+        }
+
+        .api-key-input {
+            font-family: monospace;
+        }
+
+        .alert-inline {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container-fluid">
+        <div class="row">
+            <div class="col-md-5">
+                <div class="card">
+                    <div class="card-header">
+                        <i class="fas fa-robot me-2"></i>支持的模型提供商
+                    </div>
+                    <div class="card-body">
+                        <div class="row" id="providersList">
+                            <div class="text-center text-muted py-4">加载中...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-7">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <span><i class="fas fa-cog me-2"></i>添加/编辑配置</span>
+                        <button class="btn btn-outline-secondary btn-sm" onclick="resetForm()">
+                            <i class="fas fa-redo me-1"></i>重置
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <form id="configForm">
+                            <input type="hidden" id="configId">
+                            
+                            <div class="mb-3">
+                                <label class="form-label">模型提供商</label>
+                                <input type="text" class="form-control" id="providerName" readonly>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">模型名称</label>
+                                <input type="text" class="form-control" id="modelInput" 
+                                       list="modelList" placeholder="选择或输入模型名称" required>
+                                <datalist id="modelList">
+                                    <option value="">请先选择提供商</option>
+                                </datalist>
+                                <small class="text-muted">可从列表选择或手动输入自定义模型名称</small>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">API 密钥</label>
+                                <div class="input-group">
+                                    <input type="password" class="form-control api-key-input" id="apiKey" 
+                                           placeholder="请输入API密钥">
+                                    <button class="btn btn-outline-secondary" type="button" onclick="toggleApiKey()">
+                                        <i class="fas fa-eye" id="apiKeyToggleIcon"></i>
+                                    </button>
+                                </div>
+                                <small class="text-muted" id="apiKeyHint">新建配置时必填，编辑时留空则保持原值</small>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">自定义API地址 (可选)</label>
+                                <input type="text" class="form-control" id="baseUrl" 
+                                       placeholder="留空使用默认地址">
+                            </div>
+
+                            <div class="row mb-3">
+                                <div class="col-md-4">
+                                    <label class="form-label">Max Tokens</label>
+                                    <input type="number" class="form-control" id="maxTokens" 
+                                           value="8000" min="100" max="128000">
+                                    <small class="text-muted">最大生成token数</small>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Temperature</label>
+                                    <input type="number" class="form-control" id="temperature" 
+                                           value="0.7" min="0" max="2" step="0.1">
+                                    <small class="text-muted">生成随机性 (0-2)</small>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Timeout (秒)</label>
+                                    <input type="number" class="form-control" id="timeout" 
+                                           value="300" min="30" max="600">
+                                    <small class="text-muted">请求超时时间</small>
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">备注</label>
+                                <textarea class="form-control" id="description" rows="2" 
+                                          placeholder="可选备注信息"></textarea>
+                            </div>
+
+                            <div class="mb-3 form-check">
+                                <input type="checkbox" class="form-check-input" id="isDefault">
+                                <label class="form-check-label" for="isDefault">设为默认模型</label>
+                            </div>
+
+                            <div class="d-flex gap-2">
+                                <button type="button" class="btn btn-outline-primary btn-test" onclick="testConnection()">
+                                    <i class="fas fa-plug me-1"></i>测试连接
+                                </button>
+                                <button type="submit" class="btn btn-primary flex-grow-1">
+                                    <i class="fas fa-save me-1"></i>保存配置
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <i class="fas fa-list me-2"></i>已保存的配置
+                    </div>
+                    <div class="card-body" id="configList">
+                        <div class="text-center text-muted py-4">暂无配置</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <link rel="stylesheet" href="/static/css/all.min.css">
+    <script src="/static/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const apiRequest = window.apiRequest || function (url, options = {}) {
+            const token = document.cookie.split('; ').find(row => row.startsWith('token='))?.split('=')[1];
+            const headers = { 'Content-Type': 'application/json' };
+            if (token) headers['Authorization'] = `Bearer ${token}`;
+            return fetch(url, { ...options, headers: { ...headers, ...options.headers } });
+        };
+
+        let providers = [];
+        let selectedProvider = null;
+
+        const providerIcons = {
+            'glm': { icon: '🤖', color: '#1a73e8' },
+            'qwen': { icon: '🔮', color: '#ff6a00' },
+            'deepseek': { icon: '🧠', color: '#6366f1' },
+            'doubao': { icon: '🫛', color: '#00d4aa' },
+            'openai': { icon: '💬', color: '#10a37f' }
+        };
+
+        async function loadProviders() {
+            try {
+                const response = await apiRequest('/api/llm-config/providers');
+                providers = await response.json();
+                renderProviders();
+            } catch (e) {
+                document.getElementById('providersList').innerHTML = 
+                    '<div class="col-12 text-center text-danger py-4">加载失败</div>';
+            }
+        }
+
+        function renderProviders() {
+            const container = document.getElementById('providersList');
+            container.innerHTML = providers.map(p => `
+                <div class="col-6 col-md-4 mb-3">
+                    <div class="card provider-card" onclick="selectProvider('${p.provider}')" 
+                         id="provider-${p.provider}">
+                        <div class="card-body text-center py-3">
+                            <div class="provider-logo mx-auto" 
+                                 style="background: ${providerIcons[p.provider]?.color || '#666'}20">
+                                ${providerIcons[p.provider]?.icon || '🤖'}
+                            </div>
+                            <div class="provider-name">${p.name}</div>
+                            <div class="provider-models">${p.models.length} 个模型</div>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function selectProvider(provider) {
+            selectedProvider = providers.find(p => p.provider === provider);
+            
+            document.querySelectorAll('.provider-card').forEach(el => {
+                el.classList.remove('selected');
+            });
+            document.getElementById(`provider-${provider}`).classList.add('selected');
+            
+            document.getElementById('providerName').value = selectedProvider.name;
+            
+            const modelList = document.getElementById('modelList');
+            modelList.innerHTML = selectedProvider.models.map(m => 
+                `<option value="${m}">`
+            ).join('');
+            
+            document.getElementById('modelInput').value = selectedProvider.default_model;
+            
+            document.getElementById('configId').value = '';
+            document.getElementById('apiKey').value = '';
+            document.getElementById('baseUrl').value = '';
+            document.getElementById('description').value = '';
+            document.getElementById('isDefault').checked = false;
+        }
+
+        function toggleApiKey() {
+            const input = document.getElementById('apiKey');
+            const icon = document.getElementById('apiKeyToggleIcon');
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.classList.replace('fa-eye', 'fa-eye-slash');
+            } else {
+                input.type = 'password';
+                icon.classList.replace('fa-eye-slash', 'fa-eye');
+            }
+        }
+
+        async function testConnection() {
+            if (!selectedProvider) {
+                alert('请先选择模型提供商');
+                return;
+            }
+
+            const configId = document.getElementById('configId').value;
+            const apiKey = document.getElementById('apiKey').value;
+            const model = document.getElementById('modelInput').value;
+            const baseUrl = document.getElementById('baseUrl').value;
+            const maxTokens = parseInt(document.getElementById('maxTokens').value) || 8000;
+            const temperature = parseFloat(document.getElementById('temperature').value) || 0.7;
+
+            if (!apiKey && !configId) {
+                alert('请输入API密钥');
+                return;
+            }
+
+            const btn = document.querySelector('.btn-test');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>测试中...';
+            btn.disabled = true;
+
+            try {
+                const requestData = {
+                    provider: selectedProvider.provider,
+                    model: model,
+                    base_url: baseUrl || null,
+                    max_tokens: maxTokens,
+                    temperature: temperature
+                };
+                
+                if (apiKey) {
+                    requestData.api_key = apiKey;
+                }
+                if (configId) {
+                    requestData.config_id = parseInt(configId);
+                }
+                
+                const response = await apiRequest('/api/llm-config/test', {
+                    method: 'POST',
+                    body: JSON.stringify(requestData)
+                });
+                const result = await response.json();
+
+                if (result.success) {
+                    alert('✅ ' + result.message);
+                } else {
+                    alert('❌ ' + result.message);
+                }
+            } catch (e) {
+                alert('测试失败: ' + e.message);
+            } finally {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            }
+        }
+
+        document.getElementById('configForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            if (!selectedProvider) {
+                alert('请先选择模型提供商');
+                return;
+            }
+
+            const configId = document.getElementById('configId').value;
+            const apiKeyValue = document.getElementById('apiKey').value;
+            
+            const data = {
+                provider: selectedProvider.provider,
+                model: document.getElementById('modelInput').value,
+                base_url: document.getElementById('baseUrl').value || null,
+                max_tokens: parseInt(document.getElementById('maxTokens').value) || 8000,
+                temperature: parseFloat(document.getElementById('temperature').value) || 0.7,
+                timeout: parseInt(document.getElementById('timeout').value) || 300,
+                is_default: document.getElementById('isDefault').checked,
+                description: document.getElementById('description').value || null
+            };
+            
+            if (apiKeyValue) {
+                data.api_key = apiKeyValue;
+            }
+
+            try {
+                let response;
+                if (configId) {
+                    response = await apiRequest(`/api/llm-config/${configId}`, {
+                        method: 'PUT',
+                        body: JSON.stringify(data)
+                    });
+                } else {
+                    if (!apiKeyValue) {
+                        alert('请输入API密钥');
+                        return;
+                    }
+                    response = await apiRequest('/api/llm-config/create', {
+                        method: 'POST',
+                        body: JSON.stringify(data)
+                    });
+                }
+
+                const result = await response.json();
+                
+                if (result.message) {
+                    alert('✅ ' + result.message);
+                    loadConfigs();
+                    resetForm();
+                } else {
+                    alert('❌ 保存失败');
+                }
+            } catch (e) {
+                const error = await e.json?.() || { detail: e.message };
+                alert('保存失败: ' + (error.detail || e.message));
+            }
+        });
+
+        async function loadConfigs() {
+            try {
+                const response = await apiRequest('/api/llm-config/list');
+                const data = await response.json();
+                renderConfigs(data.items);
+            } catch (e) {
+                document.getElementById('configList').innerHTML = 
+                    '<div class="text-center text-danger py-4">加载失败</div>';
+            }
+        }
+
+        function renderConfigs(items) {
+            const container = document.getElementById('configList');
+            
+            if (!items || items.length === 0) {
+                container.innerHTML = '<div class="text-center text-muted py-4">暂无配置</div>';
+                return;
+            }
+
+            container.innerHTML = items.map(item => `
+                <div class="config-item ${item.is_default ? 'default' : ''}">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <div class="fw-bold">
+                                ${providerIcons[item.provider]?.icon || '🤖'} 
+                                ${item.model}
+                                ${item.is_default ? '<span class="status-badge bg-success text-white ms-2">默认</span>' : ''}
+                                ${!item.is_active ? '<span class="status-badge bg-secondary text-white ms-2">已禁用</span>' : ''}
+                            </div>
+                            <small class="text-muted">
+                                API Key: ${item.api_key_masked}
+                                ${item.base_url ? `<br>自定义地址: ${item.base_url}` : ''}
+                                <br>Max Tokens: ${item.max_tokens} | Temperature: ${item.temperature} | Timeout: ${item.timeout}s
+                            </small>
+                            ${item.description ? `<div class="mt-1"><small>${item.description}</small></div>` : ''}
+                        </div>
+                        <div class="btn-group btn-group-sm">
+                            <button class="btn btn-outline-primary" onclick="editConfig(${item.id})" title="编辑">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            ${!item.is_default ? `
+                            <button class="btn btn-outline-success" onclick="setDefault(${item.id})" title="设为默认">
+                                <i class="fas fa-star"></i>
+                            </button>
+                            ` : ''}
+                            <button class="btn btn-outline-danger" onclick="deleteConfig(${item.id})" title="删除">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function editConfig(id) {
+            try {
+                const response = await apiRequest(`/api/llm-config/list`);
+                const data = await response.json();
+                const config = data.items.find(c => c.id === id);
+                
+                if (!config) {
+                    alert('配置不存在');
+                    return;
+                }
+
+                selectProvider(config.provider);
+                document.getElementById('configId').value = config.id;
+                document.getElementById('modelInput').value = config.model;
+                document.getElementById('apiKey').value = '';
+                document.getElementById('apiKey').placeholder = '****** (不修改请留空)';
+                document.getElementById('apiKeyHint').textContent = '当前已保存API密钥，留空则保持原值不变';
+                if (config.base_url) {
+                    document.getElementById('baseUrl').value = config.base_url;
+                }
+                document.getElementById('maxTokens').value = config.max_tokens || 8000;
+                document.getElementById('temperature').value = config.temperature || 0.7;
+                document.getElementById('timeout').value = config.timeout || 300;
+                document.getElementById('isDefault').checked = config.is_default;
+                if (config.description) {
+                    document.getElementById('description').value = config.description;
+                }
+            } catch (e) {
+                alert('获取配置失败');
+            }
+        }
+
+        async function setDefault(id) {
+            try {
+                const response = await apiRequest(`/api/llm-config/set-default/${id}`, {
+                    method: 'POST'
+                });
+                const result = await response.json();
+                
+                if (result.message) {
+                    loadConfigs();
+                }
+            } catch (e) {
+                alert('设置失败');
+            }
+        }
+
+        async function deleteConfig(id) {
+            if (!confirm('确定要删除这个配置吗？')) return;
+
+            try {
+                const response = await apiRequest(`/api/llm-config/${id}`, {
+                    method: 'DELETE'
+                });
+                const result = await response.json();
+                
+                if (result.message) {
+                    loadConfigs();
+                }
+            } catch (e) {
+                alert('删除失败');
+            }
+        }
+
+        function resetForm() {
+            document.getElementById('configId').value = '';
+            document.getElementById('apiKey').value = '';
+            document.getElementById('apiKey').placeholder = '请输入API密钥';
+            document.getElementById('apiKeyHint').textContent = '新建配置时必填，编辑时留空则保持原值';
+            document.getElementById('baseUrl').value = '';
+            document.getElementById('maxTokens').value = 8000;
+            document.getElementById('temperature').value = 0.7;
+            document.getElementById('timeout').value = 300;
+            document.getElementById('description').value = '';
+            document.getElementById('isDefault').checked = false;
+            document.getElementById('modelInput').value = '';
+            
+            document.querySelectorAll('.provider-card').forEach(el => {
+                el.classList.remove('selected');
+            });
+            selectedProvider = null;
+            document.getElementById('providerName').value = '';
+            document.getElementById('modelList').innerHTML = '<option value="">请先选择提供商</option>';
+        }
+
+        document.addEventListener('DOMContentLoaded', function () {
+            loadProviders();
+            loadConfigs();
+        });
+    </script>
+</body>
+
+</html>

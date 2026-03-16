@@ -127,13 +127,19 @@
                     <textarea class="form-control" id="userQuery" rows="3" placeholder="例如：查询所有用户的姓名和邮箱"></textarea>
                 </div>
                 <div class="row mb-3">
-                    <div class="col-md-4">
+                    <div class="col-md-3">
                         <label class="form-label">Schema: <span class="text-danger">*</span></label>
                         <select class="form-select" id="schemaFilter" onchange="onSchemaFilterChange()">
                             <option value="">请选择</option>
                         </select>
                     </div>
-                    <div class="col-md-4">
+                    <div class="col-md-3">
+                        <label class="form-label">模型选择:</label>
+                        <select class="form-select" id="llmConfigSelect">
+                            <option value="">默认模型</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
                         <label class="form-label">数据库类型:</label>
                         <select class="form-select" id="sqlDbType">
                             <option value="sqlite" selected>SQLite</option>
@@ -143,7 +149,7 @@
                             <option value="sqlserver">SQL Server</option>
                         </select>
                     </div>
-                    <div class="col-md-4 d-flex align-items-end">
+                    <div class="col-md-3 d-flex align-items-end">
                         <button class="btn btn-primary w-100" id="generateBtn" onclick="generateSQL()">
                             <span id="generateBtnText">生成 SQL</span>
                             <span id="generateSpinner" class="spinner-border spinner-border-sm d-none ms-2" role="status"></span>
@@ -532,6 +538,7 @@
             generateSpinner.classList.remove('d-none');
 
             try {
+                const llmConfigId = document.getElementById('llmConfigSelect').value;
                 const requestBody = {
                     query: query,
                     db_type: dbType,
@@ -540,6 +547,10 @@
                 
                 if (selectedKnowledgeId) {
                     requestBody.knowledge_id = selectedKnowledgeId;
+                }
+                
+                if (llmConfigId) {
+                    requestBody.llm_config_id = parseInt(llmConfigId);
                 }
 
                 const response = await apiRequest('/api/chat-to-sql/generate_sql', {
@@ -1037,7 +1048,32 @@
 
         document.addEventListener('DOMContentLoaded', () => {
             loadSchemaOptions();
+            loadLLMConfigs();
         });
+        
+        async function loadLLMConfigs() {
+            try {
+                const response = await apiRequest('/api/llm-config/list');
+                if (response && response.ok) {
+                    const data = await response.json();
+                    const select = document.getElementById('llmConfigSelect');
+                    select.innerHTML = '<option value="">默认模型</option>';
+                    
+                    data.items.forEach(config => {
+                        const defaultFlag = config.is_default ? ' (默认)' : '';
+                        const option = document.createElement('option');
+                        option.value = config.id;
+                        option.textContent = `${config.model}${defaultFlag}`;
+                        if (config.is_default) {
+                            option.selected = true;
+                        }
+                        select.appendChild(option);
+                    });
+                }
+            } catch (e) {
+                console.error('加载 LLM 配置列表失败:', e);
+            }
+        }
     </script>
 </body>
 
