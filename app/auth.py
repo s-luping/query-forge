@@ -1,11 +1,13 @@
 # -*- coding: UTF-8 -*-
 from datetime import datetime, timedelta
+
 import jwt
+from fastapi import HTTPException, Request
+
 from app.config import SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES
 from app.logger import logger
 from models import AppSessionLocal
 from models.user import User
-from fastapi import HTTPException, Depends, Request
 
 
 def authenticate_user(username: str, password: str):
@@ -28,7 +30,7 @@ def authenticate_user(username: str, password: str):
 def create_access_token(data: dict, expires_delta=ACCESS_TOKEN_EXPIRE_MINUTES):
     """创建JWT访问令牌"""
     to_encode = data.copy()
-    if expires_delta and expires_delta > 0 and expires_delta < 60 * 60 * 24 * 7:
+    if expires_delta and 0 < expires_delta < 60 * 60 * 24 * 7:
         expire = datetime.utcnow() + timedelta(minutes=expires_delta)
     else:
         expire = datetime.utcnow() + timedelta(minutes=15)
@@ -46,20 +48,20 @@ async def get_current_user(request: Request):
         token = auth_header[7:]
     else:
         token = request.cookies.get('token')
-    
+
     if not token:
         logger.warning("请求缺少认证token")
         raise HTTPException(status_code=401, detail="未登录，请先登录")
-    
+
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         user_id = payload.get('user_id')
         username = payload.get('username')
-        
+
         if not user_id or not username:
             logger.warning(f"token缺少必要字段: user_id={user_id}, username={username}")
             raise HTTPException(status_code=401, detail="无效的token")
-        
+
         db = AppSessionLocal()
         try:
             user = db.query(User).filter(

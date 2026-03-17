@@ -1,27 +1,28 @@
-import time
-import os
 from datetime import datetime
-from fastapi import APIRouter, HTTPException, Depends, Query
-from app.auth import authenticate_user, create_access_token
-from app.logger import logger
-from pydantic import BaseModel
 from typing import Optional
+
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
+
+from app.auth import authenticate_user, create_access_token
+from app.limiter import limiter
+from app.logger import logger
 from models import AppSessionLocal
 from models.user import User
-from app.limiter import limiter
-
-
 
 router = APIRouter()
+
 
 class LoginRequest(BaseModel):
     username: str
     password: str
 
+
 class RegisterRequest(BaseModel):
     username: str
     password: str
     email: Optional[str] = None
+
 
 @limiter.limit("2/minute")
 @router.post("/login")
@@ -36,7 +37,7 @@ async def login(request: LoginRequest):
             raise HTTPException(status_code=401, detail="用户名或密码错误")
         if not user.is_active:
             raise HTTPException(status_code=401, detail="用户未激活")
-        
+
         db = AppSessionLocal()
         try:
             db_user = db.query(User).filter(User.id == user.id).first()
@@ -45,7 +46,7 @@ async def login(request: LoginRequest):
                 db.commit()
         finally:
             db.close()
-        
+
         response = {"user_id": user.id, "username": user.username, "role": user.role}
         token = create_access_token(response)
         logger.info(f"用户登录成功: {username}")
@@ -56,6 +57,7 @@ async def login(request: LoginRequest):
     except Exception as e:
         logger.error(f"登录失败: {e}")
         raise HTTPException(status_code=500, detail=f"登录失败: {str(e)}")
+
 
 @limiter.limit("2/minute")
 @router.post("/register")
@@ -87,7 +89,7 @@ async def register(request: RegisterRequest):
             )
             db.add(new_user)
             db.commit()
-            
+
             return {"message": "注册成功", "username": username}
         finally:
             db.close()
@@ -97,4 +99,3 @@ async def register(request: RegisterRequest):
     except Exception as e:
         logger.error(f"注册失败: {e}")
         raise HTTPException(status_code=500, detail=f"注册失败: {str(e)}")
-

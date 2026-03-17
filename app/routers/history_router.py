@@ -2,23 +2,24 @@
 """
 历史记录路由 - SQL查询历史管理
 """
-from fastapi import APIRouter, HTTPException, Depends, Query, Request
-from fastapi.security import HTTPBearer
 from typing import List, Dict
 
-from core.models import HistoricalSQLItem, HistoricalSQLResponse, RatingRequest
-from app.logger import logger
+from fastapi import APIRouter, HTTPException, Depends, Query
+from fastapi.security import HTTPBearer
+
 from app.auth import get_current_user
+from app.logger import logger
+from core.models import HistoricalSQLItem, HistoricalSQLResponse, RatingRequest
 from models import HistorySessionLocal
 from models.historical_sql import HistoricalSQL
-
 
 router = APIRouter()
 
 security = HTTPBearer(auto_error=False)
 
 
-def add_history(query: str, sql_query: str, is_valid: bool, error_message: str, user_id: int, schema_name: str = None, knowledge_id: int = None) -> int:
+def add_history(query: str, sql_query: str, is_valid: bool, error_message: str, user_id: int, schema_name: str = None,
+                knowledge_id: int = None) -> int:
     """添加历史记录"""
     db = HistorySessionLocal()
     try:
@@ -45,10 +46,10 @@ def get_history(user_id: int, limit: int = 20, offset: int = 0) -> tuple:
     try:
         user_id_str = str(user_id)
         query = db.query(HistoricalSQL).filter(HistoricalSQL.user_id == user_id_str)
-        
+
         total = query.count()
         items = query.order_by(HistoricalSQL.created_at.desc()).limit(limit).offset(offset).all()
-        
+
         result = []
         for item in items:
             result.append({
@@ -63,7 +64,7 @@ def get_history(user_id: int, limit: int = 20, offset: int = 0) -> tuple:
                 'schema_name': item.schema_name,
                 'knowledge_id': item.knowledge_id
             })
-        
+
         return result, total
     finally:
         db.close()
@@ -78,10 +79,10 @@ def rate_history(history_id: int, user_id: int, rating: int) -> bool:
             HistoricalSQL.id == history_id,
             HistoricalSQL.user_id == user_id_str
         ).first()
-        
+
         if not history:
             return False
-        
+
         history.rating = rating
         db.commit()
         return True
@@ -99,7 +100,7 @@ def get_successful_queries(user_id: int, limit: int = 5) -> List[Dict[str, str]]
             HistoricalSQL.is_valid == True,
             HistoricalSQL.rating != None
         ).order_by(HistoricalSQL.rating.desc(), HistoricalSQL.created_at.desc()).limit(limit).all()
-        
+
         result = []
         for item in items:
             result.append({
@@ -113,9 +114,9 @@ def get_successful_queries(user_id: int, limit: int = 5) -> List[Dict[str, str]]
 
 @router.get("/", response_model=HistoricalSQLResponse)
 async def get_sql_history(
-    limit: int = Query(20, ge=1, le=100),
-    offset: int = Query(0, ge=0),
-    user = Depends(get_current_user)
+        limit: int = Query(20, ge=1, le=100),
+        offset: int = Query(0, ge=0),
+        user=Depends(get_current_user)
 ):
     """获取SQL历史记录"""
     try:
@@ -136,8 +137,8 @@ async def get_sql_history(
 
 @router.post("/rate")
 async def rate_sql_history(
-    request: RatingRequest,
-    user = Depends(get_current_user)
+        request: RatingRequest,
+        user=Depends(get_current_user)
 ):
     """对SQL历史记录进行评分"""
     try:
@@ -165,8 +166,8 @@ async def rate_sql_history(
 
 @router.delete("/{history_id}")
 async def delete_sql_history(
-    history_id: int,
-    user = Depends(get_current_user)
+        history_id: int,
+        user=Depends(get_current_user)
 ):
     """删除SQL历史记录"""
     db = HistorySessionLocal()
@@ -176,15 +177,15 @@ async def delete_sql_history(
             HistoricalSQL.id == history_id,
             HistoricalSQL.user_id == user_id_str
         ).first()
-        
+
         if not history:
             raise HTTPException(status_code=404, detail="历史记录不存在或不属于该用户")
-        
+
         db.delete(history)
         db.commit()
-        
+
         return {"success": True, "message": "删除成功"}
-        
+
     except HTTPException:
         raise
     except Exception as e:

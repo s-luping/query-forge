@@ -4,13 +4,14 @@ SQL查询历史模型
 """
 from sqlalchemy import Column, Integer, String, DateTime, Text, Boolean
 from sqlalchemy.sql import func
+
 from models import Base
 
 
 class HistoricalSQL(Base):
     """SQL查询历史表"""
     __tablename__ = 'historical_sql'
-    
+
     id = Column(Integer, primary_key=True, autoincrement=True)
     query = Column(Text, nullable=False)
     sql_query = Column(Text, nullable=False)

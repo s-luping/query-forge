@@ -2,17 +2,17 @@
 """
 LLM配置管理路由
 """
-from fastapi import APIRouter, HTTPException, Depends
-from typing import Optional, List
-from pydantic import BaseModel
 from datetime import datetime
+from typing import Optional, List
 
-from app.logger import logger
+from fastapi import APIRouter, HTTPException, Depends
+from pydantic import BaseModel
+
 from app.auth import get_current_user
+from app.logger import logger
+from core.LLMClient import LLMClient
 from models import AppSessionLocal
 from models.llm_config import LLMConfig
-from core.LLMClient import LLMClient
-
 
 router = APIRouter()
 
@@ -97,18 +97,18 @@ async def get_providers():
 
 @router.get("/list", response_model=LLMConfigListResponse)
 async def get_configs(
-    user = Depends(get_current_user)
+        user=Depends(get_current_user)
 ):
     """获取用户的LLM配置列表"""
     try:
         user_id = user['user_id']
         db = AppSessionLocal()
-        
+
         try:
             configs = db.query(LLMConfig).filter(
                 LLMConfig.user_id == user_id
             ).order_by(LLMConfig.is_default.desc(), LLMConfig.created_at.desc()).all()
-            
+
             items = []
             for config in configs:
                 api_key_masked = mask_api_key(config.api_key)
@@ -127,11 +127,11 @@ async def get_configs(
                     created_at=config.created_at,
                     updated_at=config.updated_at
                 ))
-            
+
             return LLMConfigListResponse(items=items, total=len(items))
         finally:
             db.close()
-            
+
     except Exception as e:
         logger.error(f"获取LLM配置失败: {e}")
         raise HTTPException(status_code=500, detail=f"获取配置失败: {str(e)}")
@@ -139,29 +139,29 @@ async def get_configs(
 
 @router.post("/create")
 async def create_config(
-    request: LLMConfigCreate,
-    user = Depends(get_current_user)
+        request: LLMConfigCreate,
+        user=Depends(get_current_user)
 ):
     """创建LLM配置"""
     try:
         user_id = user['user_id']
         db = AppSessionLocal()
-        
+
         try:
             existing = db.query(LLMConfig).filter(
                 LLMConfig.user_id == user_id,
                 LLMConfig.provider == request.provider
             ).first()
-            
+
             if existing:
                 raise HTTPException(status_code=400, detail="该模型提供商已存在配置，请使用编辑功能")
-            
+
             if request.is_default:
                 db.query(LLMConfig).filter(
                     LLMConfig.user_id == user_id,
                     LLMConfig.is_default == True
                 ).update({'is_default': False})
-            
+
             config = LLMConfig(
                 user_id=user_id,
                 provider=request.provider,
@@ -176,11 +176,11 @@ async def create_config(
             )
             db.add(config)
             db.commit()
-            
+
             return {"message": "配置创建成功", "id": config.id}
         finally:
             db.close()
-            
+
     except HTTPException:
         raise
     except Exception as e:
@@ -190,24 +190,24 @@ async def create_config(
 
 @router.put("/{config_id}")
 async def update_config(
-    config_id: int,
-    request: LLMConfigUpdate,
-    user = Depends(get_current_user)
+        config_id: int,
+        request: LLMConfigUpdate,
+        user=Depends(get_current_user)
 ):
     """更新LLM配置"""
     try:
         user_id = user['user_id']
         db = AppSessionLocal()
-        
+
         try:
             config = db.query(LLMConfig).filter(
                 LLMConfig.id == config_id,
                 LLMConfig.user_id == user_id
             ).first()
-            
+
             if not config:
                 raise HTTPException(status_code=404, detail="配置不存在")
-            
+
             if request.model is not None:
                 config.model = request.model
             if request.api_key is not None:
@@ -224,7 +224,7 @@ async def update_config(
                 config.is_active = request.is_active
             if request.description is not None:
                 config.description = request.description
-            
+
             if request.is_default:
                 db.query(LLMConfig).filter(
                     LLMConfig.user_id == user_id,
@@ -232,13 +232,13 @@ async def update_config(
                     LLMConfig.id != config_id
                 ).update({'is_default': False})
                 config.is_default = True
-            
+
             db.commit()
-            
+
             return {"message": "配置更新成功"}
         finally:
             db.close()
-            
+
     except HTTPException:
         raise
     except Exception as e:
@@ -248,30 +248,30 @@ async def update_config(
 
 @router.delete("/{config_id}")
 async def delete_config(
-    config_id: int,
-    user = Depends(get_current_user)
+        config_id: int,
+        user=Depends(get_current_user)
 ):
     """删除LLM配置"""
     try:
         user_id = user['user_id']
         db = AppSessionLocal()
-        
+
         try:
             config = db.query(LLMConfig).filter(
                 LLMConfig.id == config_id,
                 LLMConfig.user_id == user_id
             ).first()
-            
+
             if not config:
                 raise HTTPException(status_code=404, detail="配置不存在")
-            
+
             db.delete(config)
             db.commit()
-            
+
             return {"message": "配置删除成功"}
         finally:
             db.close()
-            
+
     except HTTPException:
         raise
     except Exception as e:
@@ -281,15 +281,15 @@ async def delete_config(
 
 @router.post("/test")
 async def test_connection(
-    request: TestConnectionRequest,
-    user = Depends(get_current_user)
+        request: TestConnectionRequest,
+        user=Depends(get_current_user)
 ):
     """测试API连接"""
     try:
         user_id = user['user_id']
         api_key = request.api_key
         base_url = request.base_url
-        
+
         if not api_key and request.config_id:
             db = AppSessionLocal()
             try:
@@ -303,23 +303,23 @@ async def test_connection(
                         base_url = config.base_url
             finally:
                 db.close()
-        
+
         if not api_key:
             return {"success": False, "message": "API密钥未配置"}
-        
+
         client = LLMClient(
             provider=request.provider,
             api_key=api_key,
             model=request.model,
             max_tokens=request.max_tokens or 8000
         )
-        
+
         if base_url:
             client.base_url = base_url
-        
+
         result = client.test_connection()
         return result
-        
+
     except Exception as e:
         logger.error(f"测试连接失败: {e}")
         return {"success": False, "message": f"测试失败: {str(e)}"}
@@ -327,36 +327,36 @@ async def test_connection(
 
 @router.post("/set-default/{config_id}")
 async def set_default_config(
-    config_id: int,
-    user = Depends(get_current_user)
+        config_id: int,
+        user=Depends(get_current_user)
 ):
     """设置默认配置"""
     try:
         user_id = user['user_id']
         db = AppSessionLocal()
-        
+
         try:
             config = db.query(LLMConfig).filter(
                 LLMConfig.id == config_id,
                 LLMConfig.user_id == user_id
             ).first()
-            
+
             if not config:
                 raise HTTPException(status_code=404, detail="配置不存在")
-            
+
             db.query(LLMConfig).filter(
                 LLMConfig.user_id == user_id,
                 LLMConfig.is_default == True
             ).update({'is_default': False})
-            
+
             config.is_default = True
             config.is_active = True
             db.commit()
-            
+
             return {"message": "已设置为默认配置"}
         finally:
             db.close()
-            
+
     except HTTPException:
         raise
     except Exception as e:
@@ -366,23 +366,23 @@ async def set_default_config(
 
 @router.get("/default")
 async def get_default_config(
-    user = Depends(get_current_user)
+        user=Depends(get_current_user)
 ):
     """获取用户的默认配置"""
     try:
         user_id = user['user_id']
         db = AppSessionLocal()
-        
+
         try:
             config = db.query(LLMConfig).filter(
                 LLMConfig.user_id == user_id,
                 LLMConfig.is_default == True,
                 LLMConfig.is_active == True
             ).first()
-            
+
             if not config:
                 return {"has_default": False, "config": None}
-            
+
             return {
                 "has_default": True,
                 "config": {
@@ -398,7 +398,7 @@ async def get_default_config(
             }
         finally:
             db.close()
-            
+
     except Exception as e:
         logger.error(f"获取默认配置失败: {e}")
         raise HTTPException(status_code=500, detail=f"获取配置失败: {str(e)}")

@@ -1,12 +1,5 @@
 # -*- coding: UTF-8 -*-
-import sys
-import os
-import random
-import hashlib
 import requests
-import time
-import json
-
 
 
 def scheduled_task_example(say):
@@ -18,4 +11,3 @@ def scheduled_task_example(say):
     }
     # 使用json参数发送JSON数据，而不是使用data参数发送表单数据
     token = requests.get('http://127.0.0.1:8188/check-token', headers=headers)
-

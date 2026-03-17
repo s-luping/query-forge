@@ -1,12 +1,13 @@
-import re
 import csv
-import pymysql
 import os
+import re
+
+import pymysql
 
 
 class DBSchemaUtil:
     """数据库Schema工具类 - 从外部数据库读取DDL并生成CSV"""
-    
+
     def __init__(self, db_config, tables=None):
         self.db_config = db_config
         self.tables = tables
@@ -80,7 +81,8 @@ class DBSchemaUtil:
             table_struct = table_struct_match.group(1)
             for line in table_struct.split('\n'):
                 line = line.strip()
-                if not line or line.startswith('PRIMARY KEY') or line.startswith('FOREIGN KEY') or line.startswith('KEY'):
+                if not line or line.startswith('PRIMARY KEY') or line.startswith('FOREIGN KEY') or line.startswith(
+                        'KEY'):
                     continue
                 if line.endswith(','):
                     line = line[:-1].strip()
@@ -156,7 +158,7 @@ class DBSchemaUtil:
             writer = csv.writer(csvfile)
             if write_header:
                 writer.writerow(['db_id', 'db_type', 'table_name', 'column_name', 'column_types',
-                                'column_descriptions', 'table_comment', 'primary_key', 'foreign_key'])
+                                 'column_descriptions', 'table_comment', 'primary_key', 'foreign_key'])
 
             for row in columns:
                 row[2] = actual_table_name

@@ -2,27 +2,24 @@
 """
 QueryForge SQL生成路由
 """
-import time
-import os
 import hashlib
-from fastapi import APIRouter, HTTPException, Depends, Request
+import time
+from typing import Optional
+
+from fastapi import APIRouter, HTTPException, Depends
 from fastapi.security import HTTPBearer
-from typing import List, Dict, Optional
 
-from core.models import TextToSqlRequest, SqlValidationResponse, ChartDataResponse
-from core.SQLGenerator import SqlGenerator
-from core.DatabaseManager import DatabaseManager
-from core.LLMClient import LLMClient
-from app.logger import logger
 from app.auth import get_current_user
-from app.config import TEMP_DB_PATH
-from app.routers.history_router import add_history, get_successful_queries
+from app.logger import logger
 from app.routers.extra_router import get_extra_knowledge_by_id
+from app.routers.history_router import add_history, get_successful_queries
+from core.LLMClient import LLMClient
+from core.SQLGenerator import SqlGenerator
+from core.models import TextToSqlRequest, SqlValidationResponse
 from models import SchemaSessionLocal, LLMSessionLocal, AppSessionLocal
-from models.schema import Schema
-from models.llm_log import LLMLog
 from models.llm_config import LLMConfig
-
+from models.llm_log import LLMLog
+from models.schema import Schema
 
 router = APIRouter()
 

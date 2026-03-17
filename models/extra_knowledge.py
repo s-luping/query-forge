@@ -4,13 +4,14 @@
 """
 from sqlalchemy import Column, Integer, String, DateTime, Text
 from sqlalchemy.sql import func
+
 from models import Base
 
 
 class ExtraKnowledge(Base):
     """外部知识表"""
     __tablename__ = 'extra_knowledge'
-    
+
     id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(Integer, nullable=False)
     title = Column(String(200))

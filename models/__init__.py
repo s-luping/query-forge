@@ -2,11 +2,13 @@
 """
 models 包 - 包含所有 SQLAlchemy 模型和初始化逻辑
 """
-import os
 import logging
+import os
 from datetime import datetime
+
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import declarative_base, sessionmaker
+
 from app.config import APP_DB_PATH, HISTORY_DB_PATH, SCHEMA_DB_PATH, EXTRA_DB_PATH, LLM_DB_PATH
 
 logger = logging.getLogger("app_logger")
@@ -53,18 +55,18 @@ LLMSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=llm_engin
 def init_database():
     """初始化所有数据库表结构"""
     _ensure_db_dirs()
-    
+
     from models.user import User
     from models.llm_config import LLMConfig
-    
+
     User.__table__.create(bind=app_engine, checkfirst=True)
     LLMConfig.__table__.create(bind=app_engine, checkfirst=True)
-    
+
     _migrate_llm_config_table()
-    
+
     logger.info(f"应用数据库表创建/检查完成: {APP_DB_PATH}")
     print(f"应用数据库表创建/检查完成: {APP_DB_PATH}")
-    
+
     init_history_database()
     init_schema_database()
     init_extra_database()
@@ -78,19 +80,19 @@ def _migrate_llm_config_table():
         with app_engine.connect() as conn:
             result = conn.execute(text("PRAGMA table_info(llm_configs)"))
             columns = [row[1] for row in result.fetchall()]
-            
+
             if 'max_tokens' not in columns:
                 conn.execute(text("ALTER TABLE llm_configs ADD COLUMN max_tokens INTEGER DEFAULT 8000"))
                 logger.info("llm_configs表添加max_tokens字段")
-            
+
             if 'temperature' not in columns:
                 conn.execute(text("ALTER TABLE llm_configs ADD COLUMN temperature REAL DEFAULT 0.7"))
                 logger.info("llm_configs表添加temperature字段")
-            
+
             if 'timeout' not in columns:
                 conn.execute(text("ALTER TABLE llm_configs ADD COLUMN timeout INTEGER DEFAULT 300"))
                 logger.info("llm_configs表添加timeout字段")
-            
+
             conn.commit()
     except Exception as e:
         logger.warning(f"llm_configs表迁移检查: {e}")
@@ -108,7 +110,7 @@ def _ensure_db_dirs():
 def init_history_database():
     """初始化历史记录数据库"""
     from models.historical_sql import HistoricalSQL
-    
+
     HistoricalSQL.__table__.create(bind=history_engine, checkfirst=True)
     logger.info(f"历史记录数据库表创建/检查完成: {HISTORY_DB_PATH}")
     print(f"历史记录数据库表创建/检查完成: {HISTORY_DB_PATH}")
@@ -117,7 +119,7 @@ def init_history_database():
 def init_schema_database():
     """初始化SQL Schema数据库"""
     from models.schema import Schema
-    
+
     Schema.__table__.create(bind=schema_engine, checkfirst=True)
     logger.info(f"模式数据库表创建/检查完成: {SCHEMA_DB_PATH}")
     print(f"模式数据库表创建/检查完成: {SCHEMA_DB_PATH}")
@@ -126,7 +128,7 @@ def init_schema_database():
 def init_extra_database():
     """初始化补充知识数据库"""
     from models.extra_knowledge import ExtraKnowledge
-    
+
     ExtraKnowledge.__table__.create(bind=extra_engine, checkfirst=True)
     logger.info(f"补充知识数据库表创建/检查完成: {EXTRA_DB_PATH}")
     print(f"补充知识数据库表创建/检查完成: {EXTRA_DB_PATH}")
@@ -135,7 +137,7 @@ def init_extra_database():
 def init_llm_database():
     """初始化LLM调用记录数据库"""
     from models.llm_log import LLMLog
-    
+
     LLMLog.__table__.create(bind=llm_engine, checkfirst=True)
     logger.info(f"LLM调用记录数据库表创建/检查完成: {LLM_DB_PATH}")
     print(f"LLM调用记录数据库表创建/检查完成: {LLM_DB_PATH}")
@@ -144,7 +146,7 @@ def init_llm_database():
 def create_default_admin():
     """创建默认管理员用户"""
     from models.user import User
-    
+
     db = AppSessionLocal()
     try:
         admin = db.query(User).filter(User.username == 'admin').first()
@@ -170,4 +172,3 @@ def create_default_admin():
         db.rollback()
     finally:
         db.close()
-

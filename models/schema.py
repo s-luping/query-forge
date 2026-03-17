@@ -5,19 +5,15 @@ DDL解析结果模型
 """
 
 from sqlalchemy import Column, Integer, String, DateTime, Text, ForeignKey, Boolean
-
 from sqlalchemy.sql import func
 
 from models import Base
 
 
-
 class Schema(Base):
-
     """数据库模式表"""
 
     __tablename__ = 'schema'
-    
 
     id = Column(Integer, primary_key=True, autoincrement=True)
 
@@ -44,4 +40,3 @@ class Schema(Base):
     sample_values = Column(Text)
 
     created_at = Column(DateTime, default=func.now())
-

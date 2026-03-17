@@ -4,6 +4,7 @@
 """
 import os
 
+
 def _load_env_file():
     """加载.env文件"""
     env_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), '.env')
@@ -49,9 +50,6 @@ def get_extra_db_path() -> str:
     if not os.path.isabs(path):
         path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), path)
     return path
-
-
-
 
 
 def get_temp_db_path() -> str:

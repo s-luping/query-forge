@@ -2,23 +2,23 @@
 """
 表数据管理路由 - 数据查看、编辑和 SQL 查询
 """
-import sqlite3
 import os
+import sqlite3
+from typing import List, Dict, Any, Optional
+
 import pandas as pd
 from fastapi import APIRouter, HTTPException, Depends, Request
 from pydantic import BaseModel
-from typing import List, Dict, Any, Optional
 
-from app.logger import logger
 from app.auth import get_current_user
 from app.config import TEMP_DB_PATH
-from core.models import TextToSqlRequest, SqlValidationResponse, ChartDataResponse
+from app.logger import logger
+from app.routers.history_router import get_successful_queries
 from core.DatabaseManager import DatabaseManager
+from core.models import ChartDataResponse
 from models import SchemaSessionLocal, HistorySessionLocal
-from models.schema import Schema
 from models.historical_sql import HistoricalSQL
-from app.routers.history_router import add_history, get_successful_queries
-
+from models.schema import Schema
 
 router = APIRouter()
 

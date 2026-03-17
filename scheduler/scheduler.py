@@ -1,7 +1,5 @@
 # -*- coding: utf-8 -*-
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from apscheduler.triggers.cron import CronTrigger
-from scheduler.jobs import scheduled_task_example
 
 
 class SchedulerManager:

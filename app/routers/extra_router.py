@@ -2,16 +2,16 @@
 """
 补充知识路由 - 领域知识管理
 """
-from fastapi import APIRouter, HTTPException, Depends, Request, Query
-from fastapi.security import HTTPBearer
-from pydantic import BaseModel, field_validator
 from typing import Optional, List
 
-from app.logger import logger
+from fastapi import APIRouter, HTTPException, Depends, Query
+from fastapi.security import HTTPBearer
+from pydantic import BaseModel, field_validator
+
 from app.auth import get_current_user
+from app.logger import logger
 from models import ExtraSessionLocal
 from models.extra_knowledge import ExtraKnowledge
-
 
 router = APIRouter()
 

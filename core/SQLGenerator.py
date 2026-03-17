@@ -1,5 +1,5 @@
 import re
-from typing import List, Optional, Tuple, Dict, Any
+from typing import List, Optional, Tuple, Dict
 
 
 class SqlGenerator:
@@ -28,14 +28,14 @@ class SqlGenerator:
         return identifier
 
     def generate_sql_prompt(
-        self,
-        query: str,
-        schema_csv: str = "",
-        sample_values: str = "",
-        table_relations: str = "",
-        history_queries: List[Dict[str, str]] = None,
-        domain_knowledge: str = "",
-        db_type: str = "sqlite"
+            self,
+            query: str,
+            schema_csv: str = "",
+            sample_values: str = "",
+            table_relations: str = "",
+            history_queries: List[Dict[str, str]] = None,
+            domain_knowledge: str = "",
+            db_type: str = "sqlite"
     ) -> str:
         """生成用于大模型的SQL生成提示
 
@@ -70,7 +70,7 @@ class SqlGenerator:
         if history_queries:
             history_section = "以下是类似的历史查询，可参考其SQL写法：\n"
             for i, h in enumerate(history_queries[:3]):
-                history_section += f"{i+1}. Q: {h['query']}\n   A: {h['sql'][:200]}...\n\n"
+                history_section += f"{i + 1}. Q: {h['query']}\n   A: {h['sql'][:200]}...\n\n"
 
         domain_section = ""
         if domain_knowledge:

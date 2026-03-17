@@ -2,9 +2,10 @@
 """
 多模型LLM客户端 - 支持GLM、Qwen、DeepSeek、Doubao等主流大模型
 """
-import os
-import requests
 import time
+
+import requests
+
 from app.logger import logger, llm_logger
 
 
@@ -49,7 +50,7 @@ class LLMClient:
         }
     }
 
-    def __init__(self, provider: str = 'glm', api_key: str = "", model: str = None, 
+    def __init__(self, provider: str = 'glm', api_key: str = "", model: str = None,
                  max_tokens: int = 8000, timeout: int = 300, temperature: float = 0.7):
         """
         初始化客户端
@@ -61,10 +62,10 @@ class LLMClient:
         :param temperature: 生成随机性 (0-2)
         """
         self.provider = provider.lower() if provider else 'glm'
-        
+
         if self.provider not in self.MODEL_CONFIGS:
             raise ValueError(f"不支持的模型提供商: {provider}，支持的提供商: {list(self.MODEL_CONFIGS.keys())}")
-        
+
         self.config = self.MODEL_CONFIGS[self.provider]
         self.api_key = api_key or ''
         self.model = model or self.config['default_model']
@@ -111,10 +112,10 @@ class LLMClient:
 
         logger.info(f"调用 {self.config['name']} API...")
         start_time = time.time()
-        
+
         llm_logger.info(f"【请求模型】{self.config['name']} - {self.model}")
         llm_logger.info(f"【发送内容】\n{prompt[:500]}...")
-        
+
         try:
             response = requests.post(
                 self.base_url,
@@ -142,20 +143,21 @@ class LLMClient:
 
         raw_sql = result['choices'][0]['message']['content'].strip()
         sql = self._extract_sql(raw_sql)
-        
+
         elapsed_time = time.time() - start_time
-        
+
         prompt_tokens = result.get('usage', {}).get('prompt_tokens', 0)
         completion_tokens = result.get('usage', {}).get('completion_tokens', 0)
         total_tokens = result.get('usage', {}).get('total_tokens', 0)
-        
-        logger.info(f"LLM调用完成 - 耗时: {elapsed_time:.2f}s, 输入tokens: {prompt_tokens}, 输出tokens: {completion_tokens}, 总tokens: {total_tokens}")
-        
+
+        logger.info(
+            f"LLM调用完成 - 耗时: {elapsed_time:.2f}s, 输入tokens: {prompt_tokens}, 输出tokens: {completion_tokens}, 总tokens: {total_tokens}")
+
         llm_logger.info(f"【响应内容】\n{raw_sql}")
         llm_logger.info(f"【提取SQL】\n{sql}")
         llm_logger.info(f"【Token消耗】输入: {prompt_tokens}, 输出: {completion_tokens}, 总计: {total_tokens}")
         llm_logger.info(f"【耗时】{elapsed_time:.2f}秒")
-        
+
         return {
             'sql': sql,
             'raw_response': raw_sql,
@@ -172,7 +174,7 @@ class LLMClient:
         try:
             if not self.api_key:
                 return {'success': False, 'message': 'API密钥未配置'}
-            
+
             headers = {
                 "Authorization": f"{self.config['auth_prefix']} {self.api_key}",
                 "Content-Type": "application/json"
@@ -182,14 +184,14 @@ class LLMClient:
                 "messages": [{"role": "user", "content": "你好"}],
                 "max_tokens": 10
             }
-            
+
             response = requests.post(
                 self.base_url,
                 headers=headers,
                 json=payload,
                 timeout=30
             )
-            
+
             if response.status_code == 200:
                 return {'success': True, 'message': f'{self.config["name"]} API连接成功'}
             else:
