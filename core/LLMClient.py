@@ -114,7 +114,7 @@ class LLMClient:
         start_time = time.time()
 
         llm_logger.info(f"【请求模型】{self.config['name']} - {self.model}")
-        llm_logger.info(f"【发送内容】\n{prompt[:500]}...")
+        llm_logger.info(f"【发送内容】\n{prompt}...")#[:500]
 
         try:
             response = requests.post(

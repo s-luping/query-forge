@@ -17,31 +17,31 @@ Base = declarative_base()
 
 app_engine = create_engine(
     f'sqlite:///{APP_DB_PATH}',
-    echo=True,
+    echo=False,
     connect_args={'check_same_thread': False}
 )
 
 history_engine = create_engine(
     f'sqlite:///{HISTORY_DB_PATH}',
-    echo=True,
+    echo=False,
     connect_args={'check_same_thread': False}
 )
 
 schema_engine = create_engine(
     f'sqlite:///{SCHEMA_DB_PATH}',
-    echo=True,
+    echo=False,
     connect_args={'check_same_thread': False}
 )
 
 extra_engine = create_engine(
     f'sqlite:///{EXTRA_DB_PATH}',
-    echo=True,
+    echo=False,
     connect_args={'check_same_thread': False}
 )
 
 llm_engine = create_engine(
     f'sqlite:///{LLM_DB_PATH}',
-    echo=True,
+    echo=False,
     connect_args={'check_same_thread': False}
 )
 

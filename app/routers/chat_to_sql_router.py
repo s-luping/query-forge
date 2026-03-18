@@ -4,7 +4,7 @@ QueryForge SQL生成路由
 """
 import hashlib
 import time
-from typing import Optional
+from typing import Optional, List, Set
 
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.security import HTTPBearer
@@ -15,6 +15,9 @@ from app.routers.extra_router import get_extra_knowledge_by_id
 from app.routers.history_router import add_history, get_successful_queries
 from core.LLMClient import LLMClient
 from core.SQLGenerator import SqlGenerator
+from core.SQLPipeline import SQLPipeline
+from core.KeywordExtractor import KeywordExtractor
+from core.VectorIndexBuilder import VECTOR_INDEX_THRESHOLD
 from core.models import TextToSqlRequest, SqlValidationResponse
 from models import SchemaSessionLocal, LLMSessionLocal, AppSessionLocal
 from models.llm_config import LLMConfig
@@ -24,10 +27,9 @@ from models.schema import Schema
 router = APIRouter()
 
 sql_generator = SqlGenerator()
+keyword_extractor = KeywordExtractor()
 
 validation_cache = {}
-
-
 
 security = HTTPBearer(auto_error=False)
 
@@ -48,7 +50,7 @@ def get_user_llm_config(user_id: int, config_id: Optional[int] = None) -> Option
                 LLMConfig.is_default == True,
                 LLMConfig.is_active == True
             ).first()
-        
+
         if config:
             return {
                 'provider': config.provider,
@@ -64,8 +66,8 @@ def get_user_llm_config(user_id: int, config_id: Optional[int] = None) -> Option
         db.close()
 
 
-def save_llm_log(user_id: int, question: str, model: str, conditions: str, 
-                 result: str, duration_ms: float, prompt_tokens: int, 
+def save_llm_log(user_id: int, question: str, model: str, conditions: str,
+                 result: str, duration_ms: float, prompt_tokens: int,
                  completion_tokens: int, total_tokens: int, status: str = 'success',
                  error_message: str = None):
     """保存LLM调用记录"""
@@ -94,23 +96,77 @@ def save_llm_log(user_id: int, question: str, model: str, conditions: str,
         db.close()
 
 
-
-def get_user_schema_csv(user_id: int, schema_name: str = None) -> str:
-    """获取用户的模式并生成CSV格式的内容"""
+def get_field_count(user_id: int, schema_name: str = None) -> int:
+    """获取字段数量"""
     db = SchemaSessionLocal()
     try:
-        query = db.query(Schema)\
-        .filter(Schema.user_id == user_id, Schema.schema_name == schema_name)
-        
+        query = db.query(Schema).filter(Schema.user_id == user_id)
+        if schema_name:
+            query = query.filter(Schema.schema_name == schema_name)
+        return query.count()
+    finally:
+        db.close()
+
+
+def extract_keywords(query: str) -> List[str]:
+    """从查询中提取关键词"""
+    return keyword_extractor.extract(query, top_k=15)
+
+
+def get_relevant_tables(user_id: int, schema_name: str, keywords: List[str]) -> Set[str]:
+    """获取与关键词相关的表"""
+    db = SchemaSessionLocal()
+    try:
+        query = db.query(Schema).filter(
+            Schema.user_id == user_id,
+            Schema.schema_name == schema_name
+        )
+        items = query.all()
+
+        relevant_tables = set()
+        keyword_set = set(k.lower() for k in keywords)
+
+        for item in items:
+            table_name = (item.table_name or '').lower()
+            column_name = (item.column_name or '').lower()
+            column_desc = (item.column_description or '').lower()
+
+            for keyword in keyword_set:
+                if keyword in table_name or keyword in column_name or keyword in column_desc:
+                    relevant_tables.add(item.table_name)
+                    break
+
+        return relevant_tables
+    finally:
+        db.close()
+
+
+def get_user_schema_csv(user_id: int, schema_name: str, keywords: List[str] = None) -> str:
+    """获取用户的模式并生成CSV格式的内容（只包含相关表）"""
+    db = SchemaSessionLocal()
+    try:
+        relevant_tables = None
+        if keywords:
+            relevant_tables = get_relevant_tables(user_id, schema_name, keywords)
+            logger.info(f"相关表: {relevant_tables}")
+
+        query = db.query(Schema).filter(
+            Schema.user_id == user_id,
+            Schema.schema_name == schema_name
+        )
+
+        if relevant_tables:
+            query = query.filter(Schema.table_name.in_(relevant_tables))
+
         items = query.order_by(Schema.table_name, Schema.column_name).all()
-        
+
         if not items:
             return ""
-        
+
         lines = ['schema_name,table_name,column_name,column_type,column_description,table_comment,primary_key,foreign_key,is_nullable,default_value']
         for item in items:
             lines.append(','.join([
-                item.schema_name,
+                item.schema_name or '',
                 item.table_name,
                 item.column_name,
                 item.column_type or '',
@@ -121,20 +177,51 @@ def get_user_schema_csv(user_id: int, schema_name: str = None) -> str:
                 'YES' if item.is_nullable else 'NO',
                 item.default_value or ''
             ]))
-        
+
         return '\n'.join(lines)
     finally:
         db.close()
 
 
+def get_sample_values_csv(user_id: int, schema_name: str, keywords: List[str] = None) -> str:
+    """获取字段示例值CSV（只包含相关表）"""
+    db = SchemaSessionLocal()
+    try:
+        relevant_tables = None
+        if keywords:
+            relevant_tables = get_relevant_tables(user_id, schema_name, keywords)
+
+        query = db.query(Schema).filter(
+            Schema.user_id == user_id,
+            Schema.schema_name == schema_name
+        )
+
+        if relevant_tables:
+            query = query.filter(Schema.table_name.in_(relevant_tables))
+
+        items = query.all()
+
+        sample_lines = []
+        for item in items:
+            if item.sample_values:
+                sample_list = [v.strip() for v in item.sample_values.split(',') if v.strip()]
+                if sample_list:
+                    sample_lines.append(f"{item.table_name}.{item.column_name}: {', '.join(sample_list[:5])}")
+
+        return '\n'.join(sample_lines)
+    finally:
+        db.close()
+
 
 @router.post("/generate_sql")
 async def generate_sql(
     request: TextToSqlRequest,
-    user = Depends(get_current_user)
+    user=Depends(get_current_user)
 ):
     """生成SQL"""
     user_id = user['user_id']
+    start_time = time.time()
+
     try:
         cache_key = hashlib.md5(
             f"{user_id}_{request.query}_{request.knowledge_id}_{request.schema_name}".encode()).hexdigest()
@@ -145,73 +232,141 @@ async def generate_sql(
                 logger.info(f"使用缓存的生成结果: {request.query[:50]}...")
                 return cached_sql
 
-        schema_csv = get_user_schema_csv(user_id, request.schema_name)
-        if not schema_csv:
-            raise HTTPException(
-                status_code=400,
-                detail="获取Schema失败，请检查您的Schema配置"
-            )
-        
-        sample_values = ""
-        table_relations = ""
-        domain_knowledge = ""
-        
-        if request.knowledge_id:
-            knowledge = get_extra_knowledge_by_id(user_id, request.knowledge_id)
-            if knowledge:
-                sample_values = knowledge.get("sample_values_section", "")
-                table_relations = knowledge.get("table_relations_section", "")
-                domain_knowledge = knowledge.get("domain_knowledge_section", "")
-        
-        history_queries = get_successful_queries(user_id)
-        
-        prompt = sql_generator.generate_sql_prompt(
-            query=request.query,
-            schema_csv=schema_csv,
-            sample_values=sample_values,
-            table_relations=table_relations,
-            history_queries=history_queries,
-            domain_knowledge=domain_knowledge,
-            db_type=request.db_type
-        )
-        
-        logger.info(f"生成SQL提示: {prompt[:200]}...")
+        field_count = get_field_count(user_id, request.schema_name)
+        use_vector_search = field_count >= VECTOR_INDEX_THRESHOLD
 
-        llm_config = get_user_llm_config(user_id, request.llm_config_id)
-        
-        if llm_config:
-            llm_client = LLMClient(
-                provider=llm_config['provider'],
-                api_key=llm_config['api_key'],
-                model=llm_config['model'],
-                max_tokens=llm_config['max_tokens'],
-                timeout=llm_config['timeout'],
-                temperature=llm_config['temperature']
+        logger.info(f"字段数量: {field_count}, 阈值: {VECTOR_INDEX_THRESHOLD}, 使用向量搜索: {use_vector_search}")
+
+        keywords = extract_keywords(request.query)
+        logger.info(f"提取的关键词: {keywords}")
+
+        if use_vector_search:
+            logger.info("使用向量搜索流程...")
+            llm_config = get_user_llm_config(user_id, request.llm_config_id)
+
+            if llm_config:
+                llm_client = LLMClient(
+                    provider=llm_config['provider'],
+                    api_key=llm_config['api_key'],
+                    model=llm_config['model'],
+                    max_tokens=llm_config['max_tokens'],
+                    timeout=llm_config['timeout'],
+                    temperature=llm_config['temperature']
+                )
+                if llm_config.get('base_url'):
+                    llm_client.base_url = llm_config['base_url']
+                logger.info(f"使用用户配置的模型: {llm_config['provider']} - {llm_config['model']}")
+            else:
+                llm_client = LLMClient()
+                logger.info("使用默认模型配置")
+
+            pipeline = SQLPipeline(
+                user_id=user_id,
+                llm_client=llm_client,
+                sql_generator=sql_generator
             )
-            if llm_config['base_url']:
-                llm_client.base_url = llm_config['base_url']
-            logger.info(f"使用用户配置的模型: {llm_config['provider']} - {llm_config['model']}")
+
+            history_queries = get_successful_queries(user_id)
+
+            pipeline_result = pipeline.run_pipeline(
+                query=request.query,
+                schema_name=request.schema_name,
+                domain_knowledge="",
+                history_queries=history_queries,
+                db_type=request.db_type
+            )
+
+            generated_sql = pipeline_result['sql']
+            is_valid = pipeline_result['is_valid']
+            error_msg = pipeline_result['error_message']
+            columns = pipeline_result['columns']
+            used_vector = pipeline_result.get('used_vector_search', False)
+
+            prompt_tokens = 0
+            completion_tokens = 0
+            total_tokens = 0
+
         else:
-            llm_client = LLMClient()
-            logger.info("使用默认模型配置")
+            logger.info("使用直接CSV流程（筛选相关表）...")
 
-        llm_result = llm_client.call_llm_with_details(prompt)
-        generated_sql = llm_result['sql']
-        logger.info(f"大模型生成的SQL: {generated_sql}")
+            schema_csv = get_user_schema_csv(user_id, request.schema_name, keywords)
+            if not schema_csv:
+                raise HTTPException(
+                    status_code=400,
+                    detail="获取Schema失败，请检查您的Schema配置"
+                )
 
-        is_valid, error_msg, columns = sql_generator.validate_sql(generated_sql)
+            sample_values = get_sample_values_csv(user_id, request.schema_name, keywords)
+            table_relations = ""
+            domain_knowledge = ""
 
-        conditions = f"schema_name={request.schema_name}, knowledge_id={request.knowledge_id}, db_type={request.db_type}"
+            if request.knowledge_id:
+                knowledge = get_extra_knowledge_by_id(user_id, request.knowledge_id)
+                if knowledge:
+                    sample_values = knowledge.get("sample_values_section", sample_values)
+                    table_relations = knowledge.get("table_relations_section", "")
+                    domain_knowledge = knowledge.get("domain_knowledge_section", "")
+
+            history_queries = get_successful_queries(user_id)
+
+            prompt = sql_generator.generate_sql_prompt(
+                query=request.query,
+                schema_csv=schema_csv,
+                sample_values=sample_values,
+                table_relations=table_relations,
+                history_queries=history_queries,
+                domain_knowledge=domain_knowledge,
+                db_type=request.db_type
+            )
+
+            logger.info(f"生成SQL提示: {len(prompt)} 字符")
+
+            llm_config = get_user_llm_config(user_id, request.llm_config_id)
+
+            if llm_config:
+                llm_client = LLMClient(
+                    provider=llm_config['provider'],
+                    api_key=llm_config['api_key'],
+                    model=llm_config['model'],
+                    max_tokens=llm_config['max_tokens'],
+                    timeout=llm_config['timeout'],
+                    temperature=llm_config['temperature']
+                )
+                if llm_config.get('base_url'):
+                    llm_client.base_url = llm_config['base_url']
+                logger.info(f"使用用户配置的模型: {llm_config['provider']} - {llm_config['model']}")
+            else:
+                llm_client = LLMClient()
+                logger.info("使用默认模型配置")
+
+            llm_result = llm_client.call_llm_with_details(prompt)
+            generated_sql = llm_result['sql']
+            prompt_tokens = llm_result.get('prompt_tokens', 0)
+            completion_tokens = llm_result.get('completion_tokens', 0)
+            total_tokens = llm_result.get('total_tokens', 0)
+
+            is_valid, error_msg, columns = sql_generator.validate_sql(generated_sql)
+            used_vector = False
+
+        duration_ms = (time.time() - start_time) * 1000
+
+        logger.info(f"生成SQL: {generated_sql}")
+        logger.info(f"字段数: {field_count}, 是否使用向量: {used_vector}, 耗时: {duration_ms:.2f}ms")
+
+        conditions = f"schema_name={request.schema_name}, knowledge_id={request.knowledge_id}, db_type={request.db_type}, field_count={field_count}, vector_search={use_vector_search}"
+
+        model_name = llm_client.model if hasattr(llm_client, 'model') else 'unknown'
+
         save_llm_log(
             user_id=user_id,
             question=request.query,
-            model=llm_result['model'],
+            model=model_name,
             conditions=conditions,
             result=generated_sql,
-            duration_ms=llm_result['duration_ms'],
-            prompt_tokens=llm_result['prompt_tokens'],
-            completion_tokens=llm_result['completion_tokens'],
-            total_tokens=llm_result['total_tokens'],
+            duration_ms=duration_ms,
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            total_tokens=total_tokens,
             status='success' if is_valid else 'warning',
             error_message=error_msg if not is_valid else None
         )
@@ -247,7 +402,7 @@ async def generate_sql(
             model='unknown',
             conditions=f"schema_name={request.schema_name}, knowledge_id={request.knowledge_id}",
             result='',
-            duration_ms=0,
+            duration_ms=(time.time() - start_time) * 1000,
             prompt_tokens=0,
             completion_tokens=0,
             total_tokens=0,
@@ -255,6 +410,3 @@ async def generate_sql(
             error_message=str(e)
         )
         raise HTTPException(status_code=500, detail=f"处理失败: {str(e)}")
-
-
-

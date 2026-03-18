@@ -13,6 +13,10 @@ logging.basicConfig(
     level=logging.INFO,
 )
 
+sqlalchemy_logger = logging.getLogger('sqlalchemy.engine')
+sqlalchemy_logger.setLevel(logging.WARNING)
+sqlalchemy_logger.propagate = False
+
 logger = logging.getLogger("app_logger")
 logger.setLevel(logging.DEBUG)
 
@@ -56,7 +60,3 @@ db_formatter = logging.Formatter(
 )
 db_file_handler.setFormatter(db_formatter)
 db_logger.addHandler(db_file_handler)
-
-sqlalchemy_engine_logger = logging.getLogger('sqlalchemy.engine')
-sqlalchemy_engine_logger.setLevel(logging.INFO)
-sqlalchemy_engine_logger.addHandler(db_file_handler)

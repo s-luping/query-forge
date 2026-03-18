@@ -64,15 +64,17 @@ async def logout():
 
 
 app.include_router(base_router, tags=["基础认证"])
-app.include_router(chat_to_sql_router, prefix="/api/chat-to-sql", tags=["chat_to_sql"])
+app.include_router(chat_to_sql_router,
+                   prefix="/api/chat-to-sql", tags=["chat_to_sql"])
 app.include_router(schema_router, prefix="/api/schema", tags=["schema 管理"])
 app.include_router(history_router, prefix="/api/history", tags=["历史记录"])
 app.include_router(extra_router, prefix="/api/extra-knowledge", tags=["补充知识"])
 app.include_router(table_data_router, prefix="/api/table-data", tags=["表数据管理"])
 app.include_router(llm_router, prefix="/api/llm", tags=["LLM调用记录"])
-app.include_router(llm_config_router, prefix="/api/llm-config", tags=["LLM配置管理"])
+app.include_router(llm_config_router,
+                   prefix="/api/llm-config", tags=["LLM配置管理"])
 
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=8188,
+    uvicorn.run("main:app", host="localhost", port=8188,
                 reload=True, workers=10)

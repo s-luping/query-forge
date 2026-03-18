@@ -3,6 +3,9 @@ __pycache__
 .vscode
 .venv
 *.zip
-/logs
+*.log
 *.db
 .env
+
+db/temp
+db/vectors

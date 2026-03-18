@@ -91,6 +91,43 @@ class DDLParseError(Exception):
     pass
 
 
+def _auto_build_vector_index(user_id: int, schema_name: str, total_field_count: int) -> Optional[str]:
+    """
+    自动构建向量索引
+    当字段数量超过阈值时自动触发索引构建
+    :param user_id: 用户ID
+    :param schema_name: Schema名称
+    :param total_field_count: 用户总字段数量
+    :return: 索引构建消息（如果有）
+    """
+    from core.VectorIndexBuilder import VectorIndexBuilder, VECTOR_INDEX_THRESHOLD
+
+    if total_field_count < VECTOR_INDEX_THRESHOLD:
+        logger.info(f"字段数量 {total_field_count} 未达到阈值 {VECTOR_INDEX_THRESHOLD}，跳过自动索引构建")
+        return None
+
+    try:
+        builder = VectorIndexBuilder(user_id)
+        info = builder.get_index_info(schema_name)
+
+        all_exist = all(idx['exists'] for idx in info['indexes'].values())
+        if all_exist:
+            logger.info("向量索引已存在，跳过自动构建")
+            return None
+
+        logger.info(f"字段数量 {total_field_count} 超过阈值 {VECTOR_INDEX_THRESHOLD}，自动构建向量索引")
+        result = builder.build_indexes(schema_name)
+
+        if result.get('success'):
+            return f"已自动创建向量索引（字段数: {total_field_count}）"
+        else:
+            return None
+
+    except Exception as e:
+        logger.warning(f"自动构建向量索引失败: {e}")
+        return None
+
+
 def parse_ddl(ddl: str, schema_name: str, user_id: int, db: Session) -> List[dict]:
     """解析 DDL 语句并返回解析结果（仅支持单库，表名不能重复）"""
     results = []
@@ -99,17 +136,20 @@ def parse_ddl(ddl: str, schema_name: str, user_id: int, db: Session) -> List[dic
     use_matches = list(re.finditer(use_pattern, ddl, re.IGNORECASE))
     if use_matches:
         dbs = [m.group(1).strip('`') for m in use_matches]
-        raise DDLParseError(f"不支持多库 DDL，检测到 USE 语句切换数据库：{', '.join(set(dbs))}。请仅上传单个数据库的 DDL。")
+        raise DDLParseError(
+            f"不支持多库 DDL，检测到 USE 语句切换数据库：{', '.join(set(dbs))}。请仅上传单个数据库的 DDL。")
 
     create_db_pattern = r'CREATE\s+DATABASE\s+(?:IF\s+NOT\s+EXISTS\s+)?`?([^`\s;]+)`?'
-    create_db_matches = list(re.finditer(create_db_pattern, ddl, re.IGNORECASE))
+    create_db_matches = list(re.finditer(
+        create_db_pattern, ddl, re.IGNORECASE))
     if len(create_db_matches) > 1:
         dbs = [m.group(1).strip('`') for m in create_db_matches]
         raise DDLParseError(
             f"不支持多库 DDL，检测到多个 CREATE DATABASE 语句：{', '.join(dbs)}。请仅上传单个数据库的 DDL。")
 
     create_table_pattern = r'CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?`?([^`\s(]+)`?\s*\('
-    create_matches = list(re.finditer(create_table_pattern, ddl, re.IGNORECASE))
+    create_matches = list(re.finditer(
+        create_table_pattern, ddl, re.IGNORECASE))
 
     if not create_matches:
         return results
@@ -167,11 +207,13 @@ def parse_single_table(table_ddl: str, schema_name: str, user_id: int) -> List[d
 
     table_comment = ''
     rest_of_ddl = table_ddl[paren_end + 1:]
-    table_comment_match = re.search(r"COMMENT\s*=?\s*['\"]([^'\"]+)['\"]", rest_of_ddl, re.IGNORECASE)
+    table_comment_match = re.search(
+        r"COMMENT\s*=?\s*['\"]([^'\"]+)['\"]", rest_of_ddl, re.IGNORECASE)
     if table_comment_match:
         table_comment = table_comment_match.group(1)
 
-    pk_match = re.search(r'PRIMARY KEY\s*\(([^)]+)\)', table_struct, re.IGNORECASE)
+    pk_match = re.search(
+        r'PRIMARY KEY\s*\(([^)]+)\)', table_struct, re.IGNORECASE)
     primary_keys = []
     if pk_match:
         pk_str = pk_match.group(1)
@@ -193,15 +235,18 @@ def parse_single_table(table_ddl: str, schema_name: str, user_id: int) -> List[d
                 continue
         column_name = col_name_match.group(1).strip('`')
 
-        rest = line[col_name_match.end():].strip() if col_name_match.end() < len(line) else ''
+        rest = line[col_name_match.end():].strip(
+        ) if col_name_match.end() < len(line) else ''
 
         type_match = re.match(r'([a-zA-Z0-9_]+(?:\([^)]*\))?)', rest)
         column_type = type_match.group(1) if type_match else ''
 
-        rest = rest[type_match.end():].strip() if type_match and type_match.end() < len(rest) else ''
+        rest = rest[type_match.end():].strip(
+        ) if type_match and type_match.end() < len(rest) else ''
 
         column_desc = ''
-        comment_match = re.search(r"COMMENT\s*=?\s*['\"]([^'\"]+)['\"]", rest, re.IGNORECASE)
+        comment_match = re.search(
+            r"COMMENT\s*=?\s*['\"]([^'\"]+)['\"]", rest, re.IGNORECASE)
         if comment_match:
             column_desc = comment_match.group(1)
 
@@ -210,7 +255,8 @@ def parse_single_table(table_ddl: str, schema_name: str, user_id: int) -> List[d
             is_nullable = False
 
         default_value = None
-        default_match = re.search(r"DEFAULT\s+(['\"]?)([^'\"\s,]+)\1", rest, re.IGNORECASE)
+        default_match = re.search(
+            r"DEFAULT\s+(['\"]?)([^'\"\s,]+)\1", rest, re.IGNORECASE)
         if default_match:
             default_value = default_match.group(2)
         elif re.search(r'\bDEFAULT\s+NULL\b', rest, re.IGNORECASE):
@@ -246,7 +292,8 @@ async def parse_ddl_text(
         db = SchemaSessionLocal()
 
         try:
-            parsed_results = parse_ddl(request.ddl_text, request.schema_name, user_id, db)
+            parsed_results = parse_ddl(
+                request.ddl_text, request.schema_name, user_id, db)
 
             if not parsed_results:
                 raise HTTPException(status_code=400, detail="无法解析 DDL，请检查格式")
@@ -279,6 +326,14 @@ async def parse_ddl_text(
                 Schema.user_id == user_id,
                 Schema.schema_name == request.schema_name
             ).all()
+
+            total_field_count = db.query(Schema).filter(
+                Schema.user_id == user_id
+            ).count()
+
+            index_message = _auto_build_vector_index(user_id, request.schema_name, total_field_count)
+            if index_message:
+                message += f"。{index_message}"
 
             return SchemaListResponse(
                 items=[SchemaItem.model_validate(item) for item in items],
@@ -316,7 +371,8 @@ async def upload_ddl_file(
             parsed_results = parse_ddl(ddl_text, schema_name, user_id, db)
 
             if not parsed_results:
-                raise HTTPException(status_code=400, detail="无法解析 DDL 文件，请检查格式")
+                raise HTTPException(
+                    status_code=400, detail="无法解析 DDL 文件，请检查格式")
 
             new_count = 0
             duplicate_count = 0
@@ -346,6 +402,14 @@ async def upload_ddl_file(
                 Schema.user_id == user_id,
                 Schema.schema_name == schema_name
             ).all()
+
+            total_field_count = db.query(Schema).filter(
+                Schema.user_id == user_id
+            ).count()
+
+            index_message = _auto_build_vector_index(user_id, schema_name, total_field_count)
+            if index_message:
+                message += f"。{index_message}"
 
             return SchemaListResponse(
                 items=[SchemaItem.model_validate(item) for item in items],
@@ -386,7 +450,8 @@ async def get_schema_list(
                 query = query.filter(Schema.table_name == table_name)
 
             total = query.count()
-            items = query.order_by(Schema.created_at.desc()).limit(limit).offset(offset).all()
+            items = query.order_by(Schema.created_at.desc()).limit(
+                limit).offset(offset).all()
 
             return SchemaListResponse(
                 items=[SchemaItem.model_validate(item) for item in items],
@@ -397,6 +462,75 @@ async def get_schema_list(
 
     except Exception as e:
         logger.error(f"获取 Schema 列表失败：{e}")
+        raise HTTPException(status_code=500, detail=f"获取失败：{str(e)}")
+
+
+class BuildIndexRequest(BaseModel):
+    """构建索引请求"""
+    schema_name: Optional[str] = None
+    rebuild: bool = False
+    llm_config_id: Optional[int] = None
+
+
+class IndexInfoResponse(BaseModel):
+    """索引信息响应"""
+    user_id: int
+    vector_dir: str
+    field_count: int
+    should_build_index: bool
+    threshold: int
+    indexes: dict
+
+
+@router.post("/build-vector-index")
+async def build_vector_index(
+    request: BuildIndexRequest,
+    user=Depends(get_current_user)
+):
+    """构建向量索引"""
+    try:
+        user_id = user['user_id']
+
+        from core.VectorIndexBuilder import VectorIndexBuilder
+
+        builder = VectorIndexBuilder(user_id)
+
+        if request.rebuild:
+            result = builder.rebuild_indexes(request.schema_name)
+            message = "向量索引重建成功"
+        else:
+            result = builder.build_indexes(request.schema_name)
+            message = "向量索引构建成功"
+
+        return {
+            "success": True,
+            "message": message,
+            "result": result
+        }
+
+    except Exception as e:
+        logger.error(f"构建向量索引失败：{e}")
+        raise HTTPException(status_code=500, detail=f"构建失败：{str(e)}")
+
+
+@router.get("/vector-index-info", response_model=IndexInfoResponse)
+async def get_vector_index_info(
+    schema_name: Optional[str] = None,
+    user=Depends(get_current_user)
+):
+    """获取向量索引信息"""
+    try:
+        user_id = user['user_id']
+
+        from core.VectorIndexBuilder import VectorIndexBuilder
+
+        builder = VectorIndexBuilder(user_id)
+        info = builder.get_index_info(schema_name)
+
+        return IndexInfoResponse(**info)
+
+    except Exception as e:
+        logger.error(f"获取向量索引信息失败：{e}")
         raise HTTPException(status_code=500, detail=f"获取失败：{str(e)}")
 
 
@@ -445,7 +579,8 @@ async def get_schema_stats(
 
         try:
             # 统计字段总数
-            column_count = db.query(Schema).filter(Schema.user_id == user_id).count()
+            column_count = db.query(Schema).filter(
+                Schema.user_id == user_id).count()
 
             # 统计不重复的 schema 数量
             schema_count = db.query(Schema.schema_name).filter(
