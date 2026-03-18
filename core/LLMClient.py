@@ -6,7 +6,7 @@ import time
 
 import requests
 
-from app.logger import logger, llm_logger
+from app.logger import llm_logger
 
 
 class LLMClient:
@@ -110,11 +110,10 @@ class LLMClient:
             "max_tokens": self.max_tokens
         }
 
-        logger.info(f"调用 {self.config['name']} API...")
         start_time = time.time()
 
         llm_logger.info(f"【请求模型】{self.config['name']} - {self.model}")
-        llm_logger.info(f"【发送内容】\n{prompt}...")#[:500]
+        llm_logger.info(f"【发送内容】\n{prompt}")
 
         try:
             response = requests.post(
@@ -124,20 +123,17 @@ class LLMClient:
                 timeout=self.timeout
             )
         except Exception as e:
-            logger.error(f"网络请求异常: {e}")
             llm_logger.error(f"【网络请求异常】{e}")
             raise RuntimeError(f"调用 {self.config['name']} API网络请求失败: {e}") from e
 
         if response.status_code != 200:
             error_msg = f"API返回错误状态码: {response.status_code}, {response.text}"
-            logger.error(error_msg)
             llm_logger.error(f"【API错误】{error_msg}")
             raise ValueError(error_msg)
 
         result = response.json()
         if 'choices' not in result or not result['choices']:
             error_msg = f"API响应缺少choices字段: {result}"
-            logger.error(error_msg)
             llm_logger.error(f"【响应异常】{error_msg}")
             raise ValueError(error_msg)
 
@@ -149,9 +145,6 @@ class LLMClient:
         prompt_tokens = result.get('usage', {}).get('prompt_tokens', 0)
         completion_tokens = result.get('usage', {}).get('completion_tokens', 0)
         total_tokens = result.get('usage', {}).get('total_tokens', 0)
-
-        logger.info(
-            f"LLM调用完成 - 耗时: {elapsed_time:.2f}s, 输入tokens: {prompt_tokens}, 输出tokens: {completion_tokens}, 总tokens: {total_tokens}")
 
         llm_logger.info(f"【响应内容】\n{raw_sql}")
         llm_logger.info(f"【提取SQL】\n{sql}")

@@ -103,9 +103,14 @@ def get_successful_queries(user_id: int, limit: int = 5) -> List[Dict[str, str]]
 
         result = []
         for item in items:
+            sql = item.sql_query
+            if sql:
+                sql = ' '.join(sql.split())
+                if len(sql) > 500:
+                    sql = sql[:500] + '...'
             result.append({
                 'query': item.query,
-                'sql': item.sql_query
+                'sql': sql
             })
         return result
     finally:

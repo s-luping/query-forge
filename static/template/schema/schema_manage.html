@@ -149,6 +149,19 @@
         .table th:nth-child(8) { width: 50px; }
         .table th:nth-child(9) { width: 130px; }
         .table th:nth-child(10) { width: 70px; }
+        .nav-tabs .nav-link {
+            color: rgba(255,255,255,0.8) !important;
+        }
+        .nav-tabs .nav-link.active {
+            color: #667eea !important;
+            background-color: white !important;
+        }
+        .input-group-text {
+            background-color: #f8f9fa;
+        }
+        .form-select-sm {
+            font-size: 0.875rem;
+        }
     </style>
 </head>
 
@@ -156,12 +169,11 @@
     <div class="container-fluid">
         <div class="row mb-4">
             <div class="col-12">
-                <h3 class="text-center">Schema 管理 - DDL 解析</h3>
-                <p class="text-center text-muted">上传或输入 DDL 语句，自动解析表结构信息</p>
+                <h3 class="text-center">Schema 管理 - DDL/JSON 解析</h3>
+                <p class="text-center text-muted">支持多种数据库 DDL 解析和 Spider JSON 格式</p>
             </div>
         </div>
 
-        <!-- 统计卡片 -->
         <div class="row mb-4">
             <div class="col-md-4">
                 <div class="card stats-card">
@@ -183,12 +195,14 @@
             </div>
         </div>
 
-        <!-- DDL 输入区域 -->
         <div class="card">
             <div class="card-header">
                 <ul class="nav nav-tabs card-header-tabs" id="inputTabs" role="tablist">
                     <li class="nav-item">
-                        <a class="nav-link active text-white" id="text-tab" data-bs-toggle="tab" href="#textInput" role="tab">文本输入</a>
+                        <a class="nav-link active text-white" id="text-tab" data-bs-toggle="tab" href="#textInput" role="tab">DDL 文本</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link text-white" id="json-tab" data-bs-toggle="tab" href="#jsonInput" role="tab">JSON 文本</a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link text-white" id="file-tab" data-bs-toggle="tab" href="#fileInput" role="tab">文件上传</a>
@@ -197,32 +211,76 @@
             </div>
             <div class="card-body">
                 <div class="tab-content" id="inputTabsContent">
-                    <!-- 文本输入 -->
                     <div class="tab-pane fade show active" id="textInput" role="tabpanel">
-                        <div class="mb-3">
-                            <label for="schemaName" class="form-label">Schema 名称:</label>
-                            <input type="text" class="form-control" id="schemaName" value="default" placeholder="输入 Schema 名称">
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="schemaName" class="form-label">默认 Schema 名称 <small class="text-muted">(可选，DDL中无数据库信息时使用)</small>:</label>
+                                <input type="text" class="form-control" id="schemaName" value="" placeholder="留空则自动从DDL中提取">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="dbType" class="form-label">数据库类型:</label>
+                                <select class="form-select" id="dbType">
+                                    <option value="auto">自动检测</option>
+                                    <option value="mysql">MySQL / MariaDB</option>
+                                    <option value="postgresql">PostgreSQL</option>
+                                    <option value="oracle">Oracle</option>
+                                    <option value="sqlserver">SQL Server</option>
+                                    <option value="sqlite">SQLite</option>
+                                    <option value="hive">Hive</option>
+                                    <option value="doris">Doris</option>
+                                    <option value="clickhouse">ClickHouse</option>
+                                </select>
+                            </div>
                         </div>
                         <div class="mb-3">
-                            <label for="ddlText" class="form-label">DDL 语句:</label>
-                            <textarea class="form-control ddl-textarea" id="ddlText" rows="10" placeholder="请输入 CREATE TABLE 语句..."></textarea>
+                            <label for="ddlText" class="form-label">DDL 语句 <small class="text-muted">(支持多数据库，自动从 CREATE DATABASE/USE 语句提取 schema)</small>:</label>
+                            <textarea class="form-control ddl-textarea" id="ddlText" rows="10" placeholder="请输入 CREATE TABLE 语句...&#10;&#10;支持 MySQL, PostgreSQL, Oracle, SQL Server, Hive, Doris, ClickHouse 等多种数据库 DDL&#10;支持多数据库解析，会自动从 CREATE DATABASE 或 USE 语句中提取数据库名"></textarea>
                         </div>
                         <button class="btn btn-primary" onclick="parseDDLText()">
                             <i class="fas fa-play"></i> 解析 DDL
                         </button>
                     </div>
                     
-                    <!-- 文件上传 -->
-                    <div class="tab-pane fade" id="fileInput" role="tabpanel">
+                    <div class="tab-pane fade" id="jsonInput" role="tabpanel">
                         <div class="mb-3">
-                            <label for="schemaNameFile" class="form-label">Schema 名称:</label>
-                            <input type="text" class="form-control" id="schemaNameFile" value="default" placeholder="输入 Schema 名称">
+                            <label for="schemaNameJson" class="form-label">默认 Schema 名称 <small class="text-muted">(可选，JSON中无db_id/schema_name时使用)</small>:</label>
+                            <input type="text" class="form-control" id="schemaNameJson" value="" placeholder="留空则自动从JSON中提取">
+                        </div>
+                        <div class="mb-3">
+                            <label for="jsonText" class="form-label">JSON 内容 <small class="text-muted">(支持多数据库，自动从 db_id/schema_name 提取)</small>:</label>
+                            <textarea class="form-control ddl-textarea" id="jsonText" rows="12" placeholder="请输入 Spider 格式或自定义格式的 JSON...&#10;&#10;Spider 格式示例（支持多数据库数组）：&#10;[&#10;  {&#10;    &quot;db_id&quot;: &quot;mydb1&quot;,&#10;    &quot;table_names_original&quot;: [&quot;user&quot;],&#10;    &quot;column_names_original&quot;: [[0, &quot;id&quot;], [0, &quot;name&quot;]],&#10;    &quot;column_types&quot;: [&quot;integer&quot;, &quot;text&quot;],&#10;    &quot;primary_keys&quot;: [1]&#10;  }&#10;]&#10;&#10;自定义格式示例：&#10;{&#10;  &quot;schema_name&quot;: &quot;mydb&quot;,&#10;  &quot;tables&quot;: [{&quot;name&quot;: &quot;user&quot;, &quot;columns&quot;: [...]}]&#10;}"></textarea>
+                        </div>
+                        <button class="btn btn-primary" onclick="parseJSONText()">
+                            <i class="fas fa-play"></i> 解析 JSON
+                        </button>
+                    </div>
+                    
+                    <div class="tab-pane fade" id="fileInput" role="tabpanel">
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="schemaNameFile" class="form-label">默认 Schema 名称 <small class="text-muted">(可选)</small>:</label>
+                                <input type="text" class="form-control" id="schemaNameFile" value="" placeholder="留空则自动从文件中提取">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="dbTypeFile" class="form-label">数据库类型 <small class="text-muted">(仅DDL文件需要)</small>:</label>
+                                <select class="form-select" id="dbTypeFile">
+                                    <option value="auto">自动检测</option>
+                                    <option value="mysql">MySQL / MariaDB</option>
+                                    <option value="postgresql">PostgreSQL</option>
+                                    <option value="oracle">Oracle</option>
+                                    <option value="sqlserver">SQL Server</option>
+                                    <option value="sqlite">SQLite</option>
+                                    <option value="hive">Hive</option>
+                                    <option value="doris">Doris</option>
+                                    <option value="clickhouse">ClickHouse</option>
+                                </select>
+                            </div>
                         </div>
                         <div id="fileDropZone">
                             <i class="fas fa-cloud-upload-alt fa-3x text-muted mb-3"></i>
-                            <p class="mb-0">拖拽 DDL 文件到此处，或点击选择文件</p>
-                            <small class="text-muted">支持 .sql, .txt 文件</small>
-                            <input type="file" id="ddlFile" accept=".sql,.txt" style="display: none;">
+                            <p class="mb-0">拖拽文件到此处，或点击选择文件</p>
+                            <small class="text-muted">支持 .sql, .txt, .json 文件（支持多数据库解析）</small>
+                            <input type="file" id="ddlFile" accept=".sql,.txt,.json" style="display: none;">
                         </div>
                         <div id="selectedFile" class="mt-2" style="display: none;">
                             <span class="badge bg-info" id="fileName"></span>
@@ -235,7 +293,6 @@
             </div>
         </div>
 
-        <!-- 筛选区域 -->
         <div class="filter-section">
             <div class="row">
                 <div class="col-md-3">
@@ -261,7 +318,6 @@
             </div>
         </div>
 
-        <!-- 解析结果 -->
         <div class="card">
             <div class="card-header d-flex justify-content-between align-items-center">
                 <span>解析结果</span>
@@ -295,7 +351,6 @@
                         </tbody>
                     </table>
                 </div>
-                <!-- 分页控件 -->
                 <div id="paginationContainer" class="card-footer d-flex justify-content-between align-items-center" style="display: none !important;">
                     <div>
                         <span id="paginationInfo">第 1 页，共 1 页，总计 0 条</span>
@@ -438,13 +493,13 @@
 
         async function loadTableOptions(schemaName) {
             try {
-                const response = await apiRequest(`/api/schema/table-names?schema_name=${encodeURIComponent(schemaName)}`);
+                const response = await apiRequest(`/api/schema/tables?schema_name=${encodeURIComponent(schemaName)}`);
                 if (response && response.ok) {
                     const data = await response.json();
                     const tableSelect = document.getElementById('filterTable');
                     tableSelect.innerHTML = '<option value="">全部</option>';
                     data.tables.forEach(t => {
-                        tableSelect.innerHTML += `<option value="${t}">${t}</option>`;
+                        tableSelect.innerHTML += `<option value="${t.name}">${t.name}${t.description ? ' - ' + t.description : ''}</option>`;
                     });
                 }
             } catch (e) {
@@ -503,7 +558,7 @@
             if (!confirm(`确定要删除表 "${schema}.${table}" 的所有数据吗？此操作不可恢复！`)) return;
             
             try {
-                const response = await apiRequest(`/api/schema/table/${encodeURIComponent(schema)}/${encodeURIComponent(table)}`, {
+                const response = await apiRequest(`/api/schema/table?schema_name=${encodeURIComponent(schema)}&table_name=${encodeURIComponent(table)}`, {
                     method: 'DELETE'
                 });
                 
@@ -527,7 +582,7 @@
 
         async function loadFilterOptions() {
             try {
-                const schemaResp = await apiRequest('/api/schema/schema-names');
+                const schemaResp = await apiRequest('/api/schema/schemas');
                 if (schemaResp && schemaResp.ok) {
                     const data = await schemaResp.json();
                     const schemaSelect = document.getElementById('filterSchema');
@@ -538,31 +593,16 @@
                     });
                     schemaSelect.value = currentValue;
                 }
-
-                const tableResp = await apiRequest('/api/schema/table-names');
-                if (tableResp && tableResp.ok) {
-                    const data = await tableResp.json();
-                    const tableSelect = document.getElementById('filterTable');
-                    const currentValue = tableSelect.value;
-                    tableSelect.innerHTML = '<option value="">全部</option>';
-                    data.tables.forEach(t => {
-                        tableSelect.innerHTML += `<option value="${t}">${t}</option>`;
-                    });
-                    tableSelect.value = currentValue;
-                }
             } catch (e) {
                 console.error('加载筛选选项失败:', e);
             }
         }
 
         async function parseDDLText() {
-            const schemaName = document.getElementById('schemaName').value.trim();
+            const schemaName = document.getElementById('schemaName').value.trim() || 'default';
             const ddlText = document.getElementById('ddlText').value.trim();
+            const dbType = document.getElementById('dbType').value;
 
-            if (!schemaName) {
-                alert('请输入 Schema 名称');
-                return;
-            }
             if (!ddlText) {
                 alert('请输入 DDL 语句');
                 return;
@@ -573,7 +613,8 @@
                     method: 'POST',
                     body: JSON.stringify({
                         schema_name: schemaName,
-                        ddl_text: ddlText
+                        ddl_text: ddlText,
+                        db_type: dbType
                     })
                 });
 
@@ -593,15 +634,46 @@
             }
         }
 
+        async function parseJSONText() {
+            const schemaName = document.getElementById('schemaNameJson').value.trim() || 'default';
+            const jsonText = document.getElementById('jsonText').value.trim();
+
+            if (!jsonText) {
+                alert('请输入 JSON 内容');
+                return;
+            }
+
+            try {
+                const response = await apiRequest('/api/schema/parse-json', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        schema_name: schemaName,
+                        json_text: jsonText
+                    })
+                });
+
+                if (response && response.ok) {
+                    const data = await response.json();
+                    alert(`解析成功！共解析 ${data.total} 个字段${data.message ? '，' + data.message : ''}`);
+                    loadStats();
+                    loadSchemaList();
+                    loadFilterOptions();
+                    document.getElementById('jsonText').value = '';
+                } else {
+                    const error = await response.json();
+                    alert('解析失败：' + (error.detail || '未知错误'));
+                }
+            } catch (e) {
+                alert('解析失败：' + e.message);
+            }
+        }
+
         async function uploadDDLFile() {
-            const schemaName = document.getElementById('schemaNameFile').value.trim();
+            const schemaName = document.getElementById('schemaNameFile').value.trim() || 'default';
+            const dbType = document.getElementById('dbTypeFile').value;
             const fileInput = document.getElementById('ddlFile');
             const file = fileInput.files[0];
 
-            if (!schemaName) {
-                alert('请输入 Schema 名称');
-                return;
-            }
             if (!file) {
                 alert('请选择文件');
                 return;
@@ -609,6 +681,7 @@
 
             const formData = new FormData();
             formData.append('schema_name', schemaName);
+            formData.append('db_type', dbType);
             formData.append('file', file);
 
             try {
@@ -670,25 +743,28 @@
 
             if (!confirm(`确定要删除选中的 ${checkboxes.length} 条记录吗？`)) return;
 
-            try {
-                const ids = Array.from(checkboxes).map(cb => parseInt(cb.value));
-                const response = await apiRequest('/api/schema/batch-delete', {
-                    method: 'POST',
-                    body: JSON.stringify({ ids })
-                });
-
-                if (response && response.ok) {
-                    alert('删除成功');
-                    loadStats();
-                    loadSchemaList();
-                    loadFilterOptions();
-                } else {
-                    const error = await response.json();
-                    alert('删除失败：' + (error.detail || '未知错误'));
+            let successCount = 0;
+            let failCount = 0;
+            
+            for (const cb of checkboxes) {
+                try {
+                    const response = await apiRequest(`/api/schema/${cb.value}`, {
+                        method: 'DELETE'
+                    });
+                    if (response && response.ok) {
+                        successCount++;
+                    } else {
+                        failCount++;
+                    }
+                } catch (e) {
+                    failCount++;
                 }
-            } catch (e) {
-                alert('删除失败：' + e.message);
             }
+
+            alert(`删除完成：成功 ${successCount} 条，失败 ${failCount} 条`);
+            loadStats();
+            loadSchemaList();
+            loadFilterOptions();
         }
 
         function toggleSelectAll() {

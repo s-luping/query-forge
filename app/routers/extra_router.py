@@ -127,36 +127,6 @@ def get_extra_knowledge_by_id(user_id: int, knowledge_id: int) -> Optional[dict]
         db.close()
 
 
-def get_extra_knowledge_for_llm(user_id: int) -> dict:
-    """获取用于LLM的补充知识（合并所有有效知识）"""
-    db = ExtraSessionLocal()
-    try:
-        items = db.query(ExtraKnowledge).filter(
-            ExtraKnowledge.user_id == user_id,
-            ExtraKnowledge.is_active == 1
-        ).all()
-        
-        sample_values = []
-        table_relations = []
-        domain_knowledge = []
-        
-        for item in items:
-            if item.sample_values_section:
-                sample_values.append(item.sample_values_section)
-            if item.table_relations_section:
-                table_relations.append(item.table_relations_section)
-            if item.domain_knowledge_section:
-                domain_knowledge.append(item.domain_knowledge_section)
-        
-        return {
-            'sample_values_section': '\n'.join(sample_values) if sample_values else None,
-            'table_relations_section': '\n'.join(table_relations) if table_relations else None,
-            'domain_knowledge_section': '\n'.join(domain_knowledge) if domain_knowledge else None
-        }
-    finally:
-        db.close()
-
-
 def create_extra_knowledge(user_id: int, data: ExtraKnowledgeRequest) -> int:
     """创建补充知识"""
     db = ExtraSessionLocal()

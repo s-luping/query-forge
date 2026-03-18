@@ -266,7 +266,7 @@
         }
 
         async function loadDataSchemaOptions() {
-            const schemaResp = await apiRequest('/api/schema/schema-names');
+            const schemaResp = await apiRequest('/api/schema/schemas');
             if (schemaResp && schemaResp.ok) {
                 const data = await schemaResp.json();
                 const select = document.getElementById('dataSchemaFilter');
@@ -302,14 +302,14 @@
         }
 
         async function loadDataTables(schemaName) {
-            const url = `/api/schema/table-names?schema_name=${encodeURIComponent(schemaName)}`;
+            const url = `/api/schema/tables?schema_name=${encodeURIComponent(schemaName)}`;
             const resp = await apiRequest(url);
             if (resp && resp.ok) {
                 const data = await resp.json();
                 const select = document.getElementById('dataTableSelect');
                 select.innerHTML = '<option value="">请选择表</option>';
                 data.tables.forEach(t => {
-                    select.innerHTML += `<option value="${t}">${t}</option>`;
+                    select.innerHTML += `<option value="${t.name}">${t.name}${t.description ? ' - ' + t.description : ''}</option>`;
                 });
             }
         }

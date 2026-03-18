@@ -34,8 +34,10 @@ async def login(request: LoginRequest):
 
         user = authenticate_user(username, password)
         if user is None:
+            logger.warning(f"登录失败 - 用户名或密码错误: {username}")
             raise HTTPException(status_code=401, detail="用户名或密码错误")
         if not user.is_active:
+            logger.warning(f"登录失败 - 用户未激活: {username}")
             raise HTTPException(status_code=401, detail="用户未激活")
 
         db = AppSessionLocal()
@@ -49,7 +51,7 @@ async def login(request: LoginRequest):
 
         response = {"user_id": user.id, "username": user.username, "role": user.role}
         token = create_access_token(response)
-        logger.info(f"用户登录成功: {username}")
+        logger.info(f"登录成功 - user_id={user.id} username={username} role={user.role}")
         return {"access_token": token, "token_type": "bearer"}
 
     except HTTPException:
@@ -78,6 +80,7 @@ async def register(request: RegisterRequest):
         try:
             existing_user = db.query(User).filter(User.username == username).first()
             if existing_user:
+                logger.warning(f"注册失败 - 用户名已存在: {username}")
                 raise HTTPException(status_code=400, detail="用户名已存在")
 
             new_user = User(
@@ -90,6 +93,7 @@ async def register(request: RegisterRequest):
             db.add(new_user)
             db.commit()
 
+            logger.info(f"注册成功 - username={username} email={email}")
             return {"message": "注册成功", "username": username}
         finally:
             db.close()

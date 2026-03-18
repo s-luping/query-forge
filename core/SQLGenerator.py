@@ -33,15 +33,15 @@ class SqlGenerator:
             schema_csv: str = "",
             sample_values: str = "",
             table_relations: str = "",
-            history_queries: List[Dict[str, str]] = None,
             domain_knowledge: str = "",
+            history_queries: List[Dict[str, str]] = None,
             db_type: str = "sqlite"
     ) -> str:
         """生成用于大模型的SQL生成提示
 
         Args:
-            query: 用户查询
-            schema_csv: 表结构CSV内容（从数据库动态获取）
+            query: 用户查询文本
+            schema_csv: 表结构（从数据库动态获取）
             sample_values: 字段示例值文本
             table_relations: 表间关系文本
             history_queries: 历史成功查询 [{query, sql}]
@@ -79,8 +79,8 @@ class SqlGenerator:
         db_name = db_type.upper() if db_type else "MySQL"
         prompt = (
             f"你是一个专业的SQL生成助手。请根据用户的自然语言查询、表结构(csv)、领域知识和规则，生成正确的{db_name}查询语句。\n"
-            f"【用户问题】\n{query}"
-            f"【表结构(csv)】\n{schema_csv}\n"
+            f"【用户问题】\n{query}\n"
+            f"【表结构】\n{schema_csv}\n"
             f"【字段示例值】\n{sample_values_section}"
             f"【表间关系】\n{table_relations_section}"
             f"【领域知识】\n{domain_section}"

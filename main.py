@@ -1,5 +1,6 @@
 # -*- coding: UTF-8 -*-
 from contextlib import asynccontextmanager
+import time
 import uvicorn
 from fastapi import Depends, FastAPI, Request
 from fastapi.staticfiles import StaticFiles
@@ -11,6 +12,7 @@ import jwt
 
 from scheduler.scheduler import scheduler_manager
 from app.limiter import limiter
+from app.logger import logger
 from app.routers.base_router import router as base_router
 from app.routers.chat_to_sql_router import router as chat_to_sql_router
 from app.routers.schema_router import router as schema_router
@@ -29,11 +31,14 @@ async def lifespan(app: FastAPI):
     init_database()
     scheduler_manager.init_scheduler()
     scheduler_manager.start()
+    logger.info("应用启动完成")
     yield
     scheduler_manager.shutdown()
+    logger.info("应用关闭")
 
 
-app = FastAPI(docs_url=None, redoc_url=None, lifespan=lifespan)
+
+app = FastAPI(docs_url="/docs", redoc_url="/redoc", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
@@ -46,6 +51,40 @@ app.add_middleware(
 )
 
 
+@app.middleware("http")
+async def access_log_middleware(request: Request, call_next):
+    start_time = time.time()
+    
+    excluded_paths = ["/static", "/favicon.ico", "/__reload__"]
+    if any(request.url.path.startswith(path) for path in excluded_paths):
+        return await call_next(request)
+    
+    user_id = None
+    username = None
+    token = request.cookies.get("token") or request.headers.get("Authorization", "").replace("Bearer ", "")
+    if token:
+        try:
+            payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+            user_id = payload.get("user_id")
+            username = payload.get("sub")
+        except:
+            pass
+    
+    response = await call_next(request)
+    
+    duration = (time.time() - start_time) * 1000
+    
+    log_message = f"[{request.method}] {request.url.path} - {response.status_code} - {duration:.2f}ms"
+    if user_id:
+        log_message += f" - user_id={user_id} username={username}"
+    else:
+        log_message += " - anonymous"
+    
+    logger.info(log_message)
+    
+    return response
+
+
 @app.get("/")
 async def root():
     return FileResponse("static/template/index.html")
@@ -53,6 +92,7 @@ async def root():
 
 @app.get("/login")
 async def login():
+    logger.info("访问登录页面")
     return FileResponse("static/template/login.html")
 
 
@@ -60,6 +100,7 @@ async def login():
 async def logout():
     response = FileResponse("static/template/login.html")
     response.set_cookie(key="token", value="", expires=0)
+    logger.info("用户登出")
     return response
 
 

@@ -1,4 +1,13 @@
 # -*- coding: UTF-8 -*-
+"""
+日志系统配置
+
+日志文件分离说明：
+- app.log: 应用日志（API请求、认证、业务操作等）
+- sqlalchemy.log: 数据库查询日志（SQL执行记录）
+- llm.log: 大模型请求日志（LLM API调用详情）
+- pipeline.log: SQL生成过程日志（关键词提取、向量召回、表聚合等）
+"""
 import logging
 import os
 from logging.handlers import RotatingFileHandler
@@ -7,56 +16,65 @@ LOG_DIR = "logs"
 if not os.path.exists(LOG_DIR):
     os.makedirs(LOG_DIR)
 
-logging.basicConfig(
-    format="%(asctime)s - %(name)s - %(levelname)s -%(module)s: %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S %p",
+
+def _create_logger(
+    name: str,
+    filename: str,
+    level: int = logging.INFO,
+    fmt: str = "%(asctime)s - %(levelname)s - %(message)s",
+    max_bytes: int = 1024 * 1024 * 1024,
+    add_console: bool = True
+) -> logging.Logger:
+    """创建独立的日志记录器"""
+    log_logger = logging.getLogger(name)
+    log_logger.setLevel(level)
+    log_logger.propagate = False
+
+    file_handler = RotatingFileHandler(
+        os.path.join(LOG_DIR, filename),
+        maxBytes=max_bytes,
+        encoding="utf-8",
+    )
+    formatter = logging.Formatter(fmt, datefmt="%Y-%m-%d %H:%M:%S %p")
+    file_handler.setFormatter(formatter)
+    log_logger.addHandler(file_handler)
+
+    if add_console:
+        console_handler = logging.StreamHandler()
+        console_handler.setFormatter(formatter)
+        log_logger.addHandler(console_handler)
+
+    return log_logger
+
+
+logger = _create_logger(
+    name="app",
+    filename="app.log",
     level=logging.INFO,
+    fmt="%(asctime)s - %(levelname)s -%(module)s: %(message)s",
+    add_console=True
 )
 
-sqlalchemy_logger = logging.getLogger('sqlalchemy.engine')
-sqlalchemy_logger.setLevel(logging.WARNING)
-sqlalchemy_logger.propagate = False
-
-logger = logging.getLogger("app_logger")
-logger.setLevel(logging.DEBUG)
-
-console_handler = logging.StreamHandler()
-file_handler = RotatingFileHandler(
-    os.path.join(LOG_DIR, "app.log"),
-    maxBytes=1024 * 1024 * 1024,
-    encoding="utf-8",
+llm_logger = _create_logger(
+    name="llm",
+    filename="llm.log",
+    level=logging.DEBUG,
+    fmt="%(asctime)s - %(levelname)s\n%(message)s\n" + "=" * 80,
+    add_console=False
 )
 
-formatter = logging.Formatter(
-    "%(asctime)s - %(name)s - %(levelname)s -%(module)s: %(message)s"
+pipeline_logger = _create_logger(
+    name="pipeline",
+    filename="pipeline.log",
+    level=logging.DEBUG,
+    fmt="%(asctime)s\n%(message)s\n" + "=" * 80,
+    add_console=False
 )
-console_handler.setFormatter(formatter)
-file_handler.setFormatter(formatter)
 
-logger.addHandler(file_handler)
-
-llm_logger = logging.getLogger("llm_logger")
-llm_logger.setLevel(logging.DEBUG)
-llm_file_handler = RotatingFileHandler(
-    os.path.join(LOG_DIR, "llm.log"),
-    maxBytes=1024 * 1024 * 1024,
-    encoding="utf-8",
+sqlalchemy_logger = _create_logger(
+    name="sqlalchemy.engine",
+    filename="sqlalchemy.log",
+    level=logging.INFO,
+    fmt="%(asctime)s - %(message)s",
+    add_console=False
 )
-llm_formatter = logging.Formatter(
-    "%(asctime)s - %(levelname)s\n%(message)s\n" + "=" * 80
-)
-llm_file_handler.setFormatter(llm_formatter)
-llm_logger.addHandler(llm_file_handler)
-
-db_logger = logging.getLogger("sqlalchemy_logger")
-db_logger.setLevel(logging.DEBUG)
-db_file_handler = RotatingFileHandler(
-    os.path.join(LOG_DIR, "sqlalchemy.log"),
-    maxBytes=1024 * 1024 * 1024,
-    encoding="utf-8",
-)
-db_formatter = logging.Formatter(
-    "%(asctime)s - %(levelname)s - %(message)s"
-)
-db_file_handler.setFormatter(db_formatter)
-db_logger.addHandler(db_file_handler)

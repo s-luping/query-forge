@@ -2,7 +2,6 @@
 """
 models 包 - 包含所有 SQLAlchemy 模型和初始化逻辑
 """
-import logging
 import os
 from datetime import datetime
 
@@ -10,8 +9,7 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.orm import declarative_base, sessionmaker
 
 from app.config import APP_DB_PATH, HISTORY_DB_PATH, SCHEMA_DB_PATH, EXTRA_DB_PATH, LLM_DB_PATH
-
-logger = logging.getLogger("app_logger")
+from app.logger import logger
 
 Base = declarative_base()
 
