@@ -21,7 +21,7 @@ from datetime import datetime
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_DIR = os.path.dirname(SCRIPT_DIR)
-DB_DIR = os.path.join(PROJECT_DIR, "db")
+DB_DIR = SCRIPT_DIR
 
 BASE_URL = "http://localhost:8188"
 
@@ -207,6 +207,14 @@ def main():
                 }
                 error_count += 1
                 log_message(f"  失败: {response.status_code}", log_file)
+                
+                log_message("=" * 60, log_file)
+                log_message(f"处理失败，是否继续? (y/n): ", log_file)
+                print(f"\n失败: {response.status_code} - {response.text[:200]}")
+                cont = input("处理失败，是否继续? (y/n): ").strip().lower()
+                if cont != 'y':
+                    log_message("用户选择停止", log_file)
+                    break
         
         except Exception as e:
             elapsed = time.time() - start_time
@@ -222,6 +230,14 @@ def main():
             }
             error_count += 1
             log_message(f"  异常: {e}", log_file)
+            
+            log_message("=" * 60, log_file)
+            log_message(f"处理异常，是否继续? (y/n): ", log_file)
+            print(f"\n异常: {e}")
+            cont = input("处理异常，是否继续? (y/n): ").strip().lower()
+            if cont != 'y':
+                log_message("用户选择停止", log_file)
+                break
         
         results.append(result)
         
