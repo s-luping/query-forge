@@ -3521,7 +3521,7 @@
     "instance_id": "250",
     "db_id": "ccks_macro",
     "question": "Please look at the record of money gold in the central bank's balance sheet.",
-    "sql": "SELECT ed_moneyauthoritybs.EndDate, ed_moneyauthoritybs.MoneyAndGold\nFROM ed_moneyauthoritybs\nWHERE ed_moneyauthoritybs.EndDate = 'your_specific_date'; -- 请替换为具体日期",
+    "sql": "SELECT ed_moneyauthoritybs.EndDate, ed_moneyauthoritybs.MoneyAndGold\nFROM ed_moneyauthoritybs\nWHERE ed_moneyauthoritybs.EndDate = 'your_specific_date';",
     "is_valid": false,
     "error_message": "检测到潜在的SQL注入风险",
     "columns": null,
