@@ -147,8 +147,9 @@
         .table th:nth-child(6) { width: 90px; }
         .table th:nth-child(7) { width: 120px; }
         .table th:nth-child(8) { width: 50px; }
-        .table th:nth-child(9) { width: 130px; }
-        .table th:nth-child(10) { width: 70px; }
+        .table th:nth-child(9) { width: 100px; }
+        .table th:nth-child(10) { width: 130px; }
+        .table th:nth-child(11) { width: 70px; }
         .nav-tabs .nav-link {
             color: rgba(255,255,255,0.8) !important;
         }
@@ -343,6 +344,7 @@
                                 <th>字段描述</th>
                                 <th>表描述</th>
                                 <th>主键</th>
+                                <th>外键</th>
                                 <th>创建时间</th>
                                 <th>操作</th>
                             </tr>
@@ -424,6 +426,7 @@
                                 <td class="table-cell-ellipsis">${item.column_description || ''}</td>
                                 <td class="table-cell-ellipsis">${item.table_description || ''}</td>
                                 <td>${item.column_key ? '<span class="pk-badge">PK</span>' : ''}</td>
+                                <td class="table-cell-ellipsis">${item.foreign_key || ''}</td>
                                 <td>${new Date(item.created_at).toLocaleString()}</td>
                                 <td>
                                     <button class="btn btn-sm btn-outline-danger" onclick="deleteSchema(${item.id})">

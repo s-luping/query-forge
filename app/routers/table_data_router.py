@@ -141,7 +141,7 @@ class CreateTableResponse(BaseModel):
 
 
 @router.post("/create-table", response_model=CreateTableResponse)
-async def create_table_from_schema(
+def create_table_from_schema(
     request: CreateTableRequest,
     user = Depends(get_current_user)
 ):
@@ -195,7 +195,7 @@ async def create_table_from_schema(
 
 
 @router.get("/{table_name}/exists", response_model=TableExistsResponse)
-async def check_table_exists(
+def check_table_exists(
     table_name: str,
     user = Depends(get_current_user)
 ):
@@ -224,7 +224,7 @@ async def check_table_exists(
 
 
 @router.get("/{table_name}/preview", response_model=TableDataResponse)
-async def preview_table_data(
+def preview_table_data(
     table_name: str,
     limit: int = 10,
     user = Depends(get_current_user)
@@ -272,7 +272,7 @@ async def preview_table_data(
 
 
 @router.post("/{table_name}/update")
-async def update_table_data(
+def update_table_data(
     table_name: str,
     request: TableDataUpdateRequest,
     user = Depends(get_current_user)
@@ -369,7 +369,7 @@ async def update_table_data(
 
 
 @router.post("/chat-to-sql/execute", response_model=SqlExecuteResponse)
-async def execute_sql(
+def execute_sql(
     request: SqlExecuteRequest,
     user = Depends(get_current_user)
 ):
@@ -417,7 +417,7 @@ async def execute_sql(
 
 
 @router.get("/chat-to-sql/history")
-async def get_query_history(
+def get_query_history(
     limit: int = 20,
     offset: int = 0,
     user = Depends(get_current_user)
@@ -441,7 +441,7 @@ async def get_query_history(
 
 
 @router.post("/chat-to-sql/history")
-async def add_query_history(
+def add_query_history(
     query: str,
     sql: str,
     result_summary: str = "",

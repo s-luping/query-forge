@@ -4,6 +4,7 @@
 模型路径: D:\projects\QueryForge\models\embeddings\bge-m3
 """
 import os
+import threading
 
 os.environ.setdefault('HF_ENDPOINT', 'https://modelscope.cn')
 
@@ -24,6 +25,7 @@ class EmbeddingModel:
     _instance = None
     _dimension = 1024
     _model_name = 'bge-m3'
+    _lock = threading.Lock()
 
     @classmethod
     def get_local_model_path(cls, model_name: str = None) -> Optional[str]:
@@ -44,25 +46,27 @@ class EmbeddingModel:
     @classmethod
     def get_instance(cls, model_name: str = 'bge-m3'):
         if cls._instance is None:
-            local_path = cls.get_local_model_path(model_name)
+            with cls._lock:
+                if cls._instance is None:
+                    local_path = cls.get_local_model_path(model_name)
 
-            try:
-                from sentence_transformers import SentenceTransformer
-                logger.info(f"加载 Embedding 模型: {model_name}")
+                    try:
+                        from sentence_transformers import SentenceTransformer
+                        logger.info(f"加载 Embedding 模型: {model_name}")
 
-                if local_path:
-                    cls._instance = SentenceTransformer(local_path)
-                    logger.info(f"从本地加载模型: {local_path}")
-                else:
-                    raise RuntimeError(f"未找到本地模型，请先运行 download_model.py 下载模型")
+                        if local_path:
+                            cls._instance = SentenceTransformer(local_path)
+                            logger.info(f"从本地加载模型: {local_path}")
+                        else:
+                            raise RuntimeError(f"未找到本地模型，请先运行 download_model.py 下载模型")
 
-                cls._dimension = cls._instance.get_sentence_embedding_dimension()
-                logger.info(f"模型加载完成，维度: {cls._dimension}")
+                        cls._dimension = cls._instance.get_sentence_embedding_dimension()
+                        logger.info(f"模型加载完成，维度: {cls._dimension}")
 
-            except ImportError:
-                raise ImportError("sentence-transformers 未安装，请运行: pip install sentence-transformers")
-            except Exception as e:
-                raise RuntimeError(f"加载模型失败: {e}")
+                    except ImportError:
+                        raise ImportError("sentence-transformers 未安装，请运行: pip install sentence-transformers")
+                    except Exception as e:
+                        raise RuntimeError(f"加载模型失败: {e}")
 
         return cls._instance
 

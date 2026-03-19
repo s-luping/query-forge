@@ -20,7 +20,7 @@ class LLMConfig(Base):
     api_key = Column(Text, nullable=False)
     base_url = Column(String(500))
     max_tokens = Column(Integer, default=8000)
-    temperature = Column(Float, default=0.7)
+    temperature = Column(Float, default=0.2)
     timeout = Column(Integer, default=300)
     is_default = Column(Boolean, default=False)
     is_active = Column(Boolean, default=True)

@@ -26,7 +26,7 @@ class RegisterRequest(BaseModel):
 
 @limiter.limit("2/minute")
 @router.post("/login")
-async def login(request: LoginRequest):
+def login(request: LoginRequest):
     """登录"""
     try:
         username = request.username
@@ -63,7 +63,7 @@ async def login(request: LoginRequest):
 
 @limiter.limit("2/minute")
 @router.post("/register")
-async def register(request: RegisterRequest):
+def register(request: RegisterRequest):
     """注册"""
     try:
         username = request.username

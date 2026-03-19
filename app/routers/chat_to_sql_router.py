@@ -11,7 +11,7 @@ from fastapi.security import HTTPBearer
 
 from app.auth import get_current_user
 from app.logger import logger
-from app.routers.extra_router import get_extra_knowledge_by_id
+from app.routers.extra_router import get_extra_knowledge_safe
 from app.routers.history_router import get_successful_queries
 from core.LLMClient import LLMClient
 from core.SQLGenerator import SqlGenerator
@@ -71,17 +71,6 @@ def get_history_queries_safe(user_id: int) -> list:
         return []
 
 
-def get_extra_knowledge_safe(user_id: int, knowledge_id: Optional[int]) -> dict:
-    """获取补充知识（可选，失败返回空字典）"""
-    if not knowledge_id:
-        return {}
-    try:
-        return get_extra_knowledge_by_id(user_id, knowledge_id) or {}
-    except Exception as e:
-        logger.warning(f"获取补充知识失败（非致命）: {e}")
-        return {}
-
-
 def save_llm_log(user_id: int, question: str, model: str, conditions: str,
                  result: str, duration_ms: float, prompt_tokens: int,
                  completion_tokens: int, total_tokens: int, status: str = 'success',
@@ -113,7 +102,7 @@ def save_llm_log(user_id: int, question: str, model: str, conditions: str,
 
 
 @router.post("/generate_sql")
-async def generate_sql(
+def generate_sql(
     request: TextToSqlRequest,
     user=Depends(get_current_user)
 ):
@@ -171,17 +160,13 @@ async def generate_sql(
         logger.info(f"历史查询: {len(history_queries)} 条")
 
         knowledge = get_extra_knowledge_safe(user_id, request.knowledge_id)
-        sample_values = knowledge.get("sample_values_section", "")
-        table_relations = knowledge.get("table_relations_section", "")
-        domain_knowledge = knowledge.get("domain_knowledge_section", "")
-        logger.info(f"补充知识: {'已加载' if knowledge else '无'}")
+        extra_knowledge = knowledge.get("extra_knowledge", "")
+        logger.info(f"补充知识: {'已加载' if extra_knowledge else '无'}")
 
         pipeline_result = pipeline.run_pipeline(
             query=request.query,
             schema_name=request.schema_name,
-            sample_values=sample_values,
-            table_relations=table_relations,
-            domain_knowledge=domain_knowledge,
+            extra_knowledge=extra_knowledge.strip() if extra_knowledge else "",
             history_queries=history_queries,
             db_type=request.db_type
         )

@@ -106,20 +106,8 @@
                         </button>
                     </div>
                     <div id="selectedKnowledgeDetails" class="mt-2 small">
-                        <div class="row">
-                            <div class="col-md-4">
-                                <strong>字段示例值：</strong>
-                                <pre id="selectedSampleValues" class="bg-light p-1 mb-0" style="font-size: 11px; max-height: 80px; overflow-y: auto;"></pre>
-                            </div>
-                            <div class="col-md-4">
-                                <strong>表间关系：</strong>
-                                <pre id="selectedTableRelations" class="bg-light p-1 mb-0" style="font-size: 11px; max-height: 80px; overflow-y: auto;"></pre>
-                            </div>
-                            <div class="col-md-4">
-                                <strong>领域知识：</strong>
-                                <pre id="selectedDomainKnowledge" class="bg-light p-1 mb-0" style="font-size: 11px; max-height: 80px; overflow-y: auto;"></pre>
-                            </div>
-                        </div>
+                        <strong>补充知识：</strong>
+                        <pre id="selectedExtraKnowledge" class="bg-light p-1 mb-0" style="font-size: 11px; max-height: 120px; overflow-y: auto; white-space: pre-wrap;"></pre>
                     </div>
                 </div>
                 <div class="mb-3">
@@ -257,19 +245,9 @@
                                     <input type="text" class="form-control" id="knowledgeTitle" placeholder="例如：订单状态说明">
                                 </div>
                                 <div class="mb-3">
-                                    <label for="sampleValuesSection" class="form-label">字段示例值</label>
-                                    <textarea class="form-control" id="sampleValuesSection" rows="3" placeholder="例如：&#10;users.status: active, inactive, pending&#10;orders.status: pending, paid, shipped, completed"></textarea>
-                                    <div class="form-text">列出字段的常见值，格式：表名。字段名：值 1, 值 2, 值 3</div>
-                                </div>
-                                <div class="mb-3">
-                                    <label for="tableRelationsSection" class="form-label">表间关系说明</label>
-                                    <textarea class="form-control" id="tableRelationsSection" rows="3" placeholder="例如：&#10;orders.user_id 关联 users.id&#10;order_items.order_id 关联 orders.id"></textarea>
-                                    <div class="form-text">描述表之间的关联关系，帮助大模型理解 JOIN 操作</div>
-                                </div>
-                                <div class="mb-3">
-                                    <label for="domainKnowledgeSection" class="form-label">领域知识</label>
-                                    <textarea class="form-control" id="domainKnowledgeSection" rows="5" placeholder="例如：&#10;1. 查询用户订单时，通常需要关联 users 表和 orders 表&#10;2. 状态为'completed'的订单才算完成"></textarea>
-                                    <div class="form-text">添加业务领域相关的知识，帮助大模型理解业务逻辑</div>
+                                    <label for="extraKnowledgeSection" class="form-label">补充知识</label>
+                                    <textarea class="form-control" id="extraKnowledgeSection" rows="8" placeholder="【字段值样例】&#10;users.status: active, inactive, pending&#10;orders.status: pending, paid, shipped, completed&#10;&#10;【表间关系】&#10;orders.user_id 关联 users.id&#10;order_items.order_id 关联 orders.id&#10;&#10;【领域知识】&#10;1. 查询用户订单时，通常需要关联 users 表和 orders 表&#10;2. 状态为'completed'的订单才算完成"></textarea>
+                                    <div class="form-text">支持三种格式：【字段值样例】、【表间关系】、【领域知识】，每种格式可单独使用</div>
                                 </div>
                                 <div class="d-flex justify-content-end">
                                     <button type="button" class="btn btn-secondary me-2" onclick="resetKnowledgeForm()">重置</button>
@@ -298,16 +276,8 @@
                 </div>
                 <div class="modal-body">
                     <div class="mb-3">
-                        <h6>字段示例值</h6>
-                        <pre id="viewSampleValues" class="bg-light p-2" style="white-space: pre-wrap;"></pre>
-                    </div>
-                    <div class="mb-3">
-                        <h6>表间关系说明</h6>
-                        <pre id="viewTableRelations" class="bg-light p-2" style="white-space: pre-wrap;"></pre>
-                    </div>
-                    <div class="mb-3">
-                        <h6>领域知识</h6>
-                        <pre id="viewDomainKnowledge" class="bg-light p-2" style="white-space: pre-wrap;"></pre>
+                        <h6>补充知识</h6>
+                        <pre id="viewExtraKnowledge" class="bg-light p-2" style="white-space: pre-wrap;"></pre>
                     </div>
                     <div class="text-muted small">
                         <span id="viewKnowledgeTime"></span>
@@ -806,7 +776,7 @@
 
                 knowledgeList.innerHTML = data.items.map(item => {
                     const title = item.title || '未命名知识';
-                    const preview = (item.domain_knowledge_section || item.sample_values_section || '').substring(0, 100);
+                    const preview = (item.extra_knowledge || '').substring(0, 100);
                     const isSelected = selectedKnowledgeId === item.id;
 
                     return `
@@ -894,9 +864,7 @@
                 const data = await response.json();
 
                 document.getElementById('viewKnowledgeTitle').textContent = data.title || '未命名知识';
-                document.getElementById('viewSampleValues').textContent = data.sample_values_section || '无';
-                document.getElementById('viewTableRelations').textContent = data.table_relations_section || '无';
-                document.getElementById('viewDomainKnowledge').textContent = data.domain_knowledge_section || '无';
+                document.getElementById('viewExtraKnowledge').textContent = data.extra_knowledge || '无';
                 document.getElementById('viewKnowledgeTime').textContent = `创建时间：${data.created_at || ''} | 更新时间：${data.updated_at || ''}`;
 
                 viewKnowledgeModal.show();
@@ -919,9 +887,7 @@
                 editingKnowledgeId = id;
                 document.getElementById('knowledgeId').value = id;
                 document.getElementById('knowledgeTitle').value = data.title || '';
-                document.getElementById('sampleValuesSection').value = data.sample_values_section || '';
-                document.getElementById('tableRelationsSection').value = data.table_relations_section || '';
-                document.getElementById('domainKnowledgeSection').value = data.domain_knowledge_section || '';
+                document.getElementById('extraKnowledgeSection').value = data.extra_knowledge || '';
 
                 document.getElementById('add-tab').click();
 
@@ -953,9 +919,7 @@
             editingKnowledgeId = null;
             document.getElementById('knowledgeId').value = '';
             document.getElementById('knowledgeTitle').value = '';
-            document.getElementById('sampleValuesSection').value = '';
-            document.getElementById('tableRelationsSection').value = '';
-            document.getElementById('domainKnowledgeSection').value = '';
+            document.getElementById('extraKnowledgeSection').value = '';
         }
 
         async function selectKnowledge(id, title) {
@@ -967,10 +931,7 @@
                 const response = await apiRequest(`/api/extra-knowledge/${id}`);
                 if (response && response.ok) {
                     const data = await response.json();
-                    
-                    document.getElementById('selectedSampleValues').textContent = data.sample_values_section || '无';
-                    document.getElementById('selectedTableRelations').textContent = data.table_relations_section || '无';
-                    document.getElementById('selectedDomainKnowledge').textContent = data.domain_knowledge_section || '无';
+                    document.getElementById('selectedExtraKnowledge').textContent = data.extra_knowledge || '无';
                 }
             } catch (e) {
                 console.error('加载知识详情失败:', e);
@@ -990,11 +951,11 @@
         document.getElementById('knowledgeForm').addEventListener('submit', async function(e) {
             e.preventDefault();
 
+            const extraText = document.getElementById('extraKnowledgeSection').value;
+
             const data = {
                 title: document.getElementById('knowledgeTitle').value,
-                sample_values_section: document.getElementById('sampleValuesSection').value,
-                table_relations_section: document.getElementById('tableRelationsSection').value,
-                domain_knowledge_section: document.getElementById('domainKnowledgeSection').value
+                extra_knowledge: extraText
             };
 
             try {
@@ -1019,7 +980,7 @@
 
                 const result = await response.json();
 
-                if (response.ok && result.success) {
+                if (response.ok) {
                     alert(editingKnowledgeId ? '更新成功！' : '创建成功！');
                     resetKnowledgeForm();
                     document.getElementById('list-tab').click();

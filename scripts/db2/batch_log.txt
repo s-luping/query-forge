@@ -1,2731 +1,765 @@
-[2026-03-19 14:23:10] ============================================================
-[2026-03-19 14:23:10] 开始批量SQL生成任务 - db2
-[2026-03-19 14:23:10] ============================================================
-[2026-03-19 14:23:10] 共加载 344 条问题
-[2026-03-19 14:23:12] 登录成功
-[2026-03-19 14:23:12] [1/344] 处理问题 #1
-[2026-03-19 14:23:12]   db_id: ccks_stock
-[2026-03-19 14:23:12]   question: Who are the actual controllers of Wuliangye and Zhangyu?...
-[2026-03-19 14:23:49]   失败: 500
-[2026-03-19 14:23:50] [2/344] 处理问题 #2
-[2026-03-19 14:23:50]   db_id: ccks_stock
-[2026-03-19 14:23:50]   question: List the name of the equity transferee, the number of shares held after the tran...
-[2026-03-19 14:23:53]   失败: 500
-[2026-03-19 14:23:54] [3/344] 处理问题 #3
-[2026-03-19 14:23:54]   db_id: ccks_stock
-[2026-03-19 14:23:54]   question: List the company code of the company with the largest proportion of newly added ...
-[2026-03-19 14:27:15] ============================================================
-[2026-03-19 14:27:15] 开始批量SQL生成任务 - db2
-[2026-03-19 14:27:15] ============================================================
-[2026-03-19 14:27:15] 共加载 344 条问题
-[2026-03-19 14:27:17] 登录成功
-[2026-03-19 14:27:17] [1/344] 处理问题 #1
-[2026-03-19 14:27:17]   db_id: ccks_stock
-[2026-03-19 14:27:17]   question: Who are the actual controllers of Wuliangye and Zhangyu?...
-[2026-03-19 14:27:21]   失败: 500
-[2026-03-19 14:27:21] [2/344] 处理问题 #2
-[2026-03-19 14:27:21]   db_id: ccks_stock
-[2026-03-19 14:27:21]   question: List the name of the equity transferee, the number of shares held after the tran...
-[2026-03-19 14:27:24]   失败: 500
-[2026-03-19 14:27:25] [3/344] 处理问题 #3
-[2026-03-19 14:27:25]   db_id: ccks_stock
-[2026-03-19 14:27:25]   question: List the company code of the company with the largest proportion of newly added ...
-[2026-03-19 14:32:55] ============================================================
-[2026-03-19 14:32:55] 开始批量SQL生成任务 - db2
-[2026-03-19 14:32:55] ============================================================
-[2026-03-19 14:32:55] 共加载 344 条问题
-[2026-03-19 14:32:57] 登录成功
-[2026-03-19 14:32:57] [1/344] 处理问题 #1
-[2026-03-19 14:32:57]   db_id: ccks_stock
-[2026-03-19 14:32:57]   question: Who are the actual controllers of Wuliangye and Zhangyu?...
-[2026-03-19 14:33:09]   成功! 耗时: 12.55s
-[2026-03-19 14:33:09]   SQL: SELECT DISTINCT ControllerName
+[2026-03-20 02:37:56] ============================================================
+[2026-03-20 02:37:56] 开始批量SQL生成任务 - db2
+[2026-03-20 02:37:56] ============================================================
+[2026-03-20 02:37:56] 共加载 344 条问题
+[2026-03-20 02:37:58] 登录成功
+[2026-03-20 02:38:00] 加载到 90 个模型配置
+[2026-03-20 02:38:00]   - doubao/doubao-1-5-pro-32k-character-250715 (ID: 90)
+[2026-03-20 02:38:00]   - doubao/doubao-1-5-lite-32k-250115 (ID: 89)
+[2026-03-20 02:38:00]   - doubao/doubao-1-5-pro-32k-250115 (ID: 88)
+[2026-03-20 02:38:00]   - doubao/doubao-seed-1-6-250615 (ID: 87)
+[2026-03-20 02:38:00]   - doubao/doubao-seed-1-6-251015 (ID: 86)
+[2026-03-20 02:38:00]   - doubao/doubao-seed-1-6-vision-250815 (ID: 85)
+[2026-03-20 02:38:00]   - doubao/doubao-seed-1-6-flash-250828 (ID: 84)
+[2026-03-20 02:38:00]   - doubao/doubao-seed-1-6-lite-251015 (ID: 83)
+[2026-03-20 02:38:00]   - doubao/doubao-seed-code-preview-251028 (ID: 82)
+[2026-03-20 02:38:00]   - doubao/doubao-seed-1-8-251228 (ID: 81)
+[2026-03-20 02:38:00]   - doubao/doubao-seed-2-0-code-preview-260215 (ID: 80)
+[2026-03-20 02:38:00]   - doubao/doubao-seed-2-0-mini-260215 (ID: 79)
+[2026-03-20 02:38:00]   - doubao/doubao-seed-2-0-lite-260215 (ID: 78)
+[2026-03-20 02:38:00]   - doubao/doubao-seed-2-0-pro-260215 (ID: 77)
+[2026-03-20 02:38:00]   - qwen/qwen2-vl-7b-instruct (ID: 76)
+[2026-03-20 02:38:00]   - qwen/qwen2-vl-2b-instruct (ID: 75)
+[2026-03-20 02:38:00]   - qwen/qwen-plus-1220 (ID: 74)
+[2026-03-20 02:38:00]   - qwen/qwen1.5-72b-chat (ID: 73)
+[2026-03-20 02:38:00]   - qwen/qwen-max-0428 (ID: 72)
+[2026-03-20 02:38:00]   - qwen/qwen1.5-32b-chat (ID: 71)
+[2026-03-20 02:38:00]   - qwen/qwen2.5-coder-32b-instruct (ID: 70)
+[2026-03-20 02:38:00]   - qwen/deepseek-r1-0528 (ID: 69)
+[2026-03-20 02:38:00]   - qwen/qwen2.5-math-72b-instruct (ID: 68)
+[2026-03-20 02:38:00]   - qwen/qwen2-7b-instruct (ID: 67)
+[2026-03-20 02:38:00]   - qwen/qwen-plus-2025-07-14 (ID: 66)
+[2026-03-20 02:38:00]   - qwen/qwen-math-plus-latest (ID: 65)
+[2026-03-20 02:38:00]   - qwen/qwen-vl-max-2025-01-25 (ID: 64)
+[2026-03-20 02:38:00]   - qwen/qwen-math-turbo-latest (ID: 63)
+[2026-03-20 02:38:00]   - qwen/qwen-mt-turbo (ID: 62)
+[2026-03-20 02:38:00]   - qwen/qwen-plus-2025-04-28 (ID: 61)
+[2026-03-20 02:38:00]   - qwen/deepseek-v3 (ID: 60)
+[2026-03-20 02:38:00]   - qwen/deepseek-r1-distill-qwen-14b (ID: 59)
+[2026-03-20 02:38:00]   - qwen/MiniMax-M2.1 (ID: 58)
+[2026-03-20 02:38:00]   - qwen/qwen-plus-character (ID: 57)
+[2026-03-20 02:38:00]   - qwen/qwen-plus-2025-12-01 (ID: 56)
+[2026-03-20 02:38:00]   - qwen/qwen2.5-32b-instruct (ID: 55)
+[2026-03-20 02:38:00]   - qwen/qwen-math-plus-0919 (ID: 54)
+[2026-03-20 02:38:00]   - qwen/qwen-max-0919 (ID: 53)
+[2026-03-20 02:38:00]   - qwen/qwen-mt-plus (ID: 52)
+[2026-03-20 02:38:00]   - qwen/qwen-coder-turbo (ID: 51)
+[2026-03-20 02:38:00]   - qwen/deepseek-r1 (ID: 50)
+[2026-03-20 02:38:00]   - qwen/qwen-math-turbo-0919 (ID: 49)
+[2026-03-20 02:38:00]   - qwen/qwen1.5-14b-chat (ID: 48)
+[2026-03-20 02:38:00]   - qwen/qwen2.5-coder-14b-instruct (ID: 47)
+[2026-03-20 02:38:00]   - qwen/qwen-vl-plus-2025-08-15 (ID: 46)
+[2026-03-20 02:38:00]   - qwen/qwen-vl-plus-2025-01-25 (ID: 45)
+[2026-03-20 02:38:00]   - qwen/qwen2-57b-a14b-instruct (ID: 44)
+[2026-03-20 02:38:00]   - qwen/qwen-plus-2025-01-25 (ID: 43)
+[2026-03-20 02:38:00]   - qwen/qwen-mt-lite (ID: 42)
+[2026-03-20 02:38:00]   - qwen/gui-plus (ID: 41)
+[2026-03-20 02:38:00]   - qwen/qwen-math-plus (ID: 40)
+[2026-03-20 02:38:00]   - qwen/qwen2-vl-72b-instruct (ID: 39)
+[2026-03-20 02:38:00]   - qwen/qwen2.5-coder-7b-instruct (ID: 38)
+[2026-03-20 02:38:00]   - qwen/qwen-plus-0112 (ID: 37)
+[2026-03-20 02:38:00]   - qwen/qwen2.5-14b-instruct-1m (ID: 36)
+[2026-03-20 02:38:00]   - qwen/qwen3-vl-flash-2025-10-15 (ID: 35)
+[2026-03-20 02:38:00]   - qwen/qwen3-vl-flash-2026-01-22 (ID: 34)
+[2026-03-20 02:38:00]   - qwen/qwen-plus-2025-09-11 (ID: 33)
+[2026-03-20 02:38:00]   - qwen/qwen2.5-3b-instruct (ID: 32)
+[2026-03-20 02:38:00]   - qwen/qwen2.5-72b-instruct (ID: 31)
+[2026-03-20 02:38:00]   - qwen/qwq-32b-preview (ID: 30)
+[2026-03-20 02:38:00]   - qwen/qwen-long (ID: 29)
+[2026-03-20 02:38:00]   - qwen/tongyi-xiaomi-analysis-pro (ID: 28)
+[2026-03-20 02:38:00]   - qwen/qwen-math-plus-0816 (ID: 27)
+[2026-03-20 02:38:00]   - qwen/deepseek-r1-distill-qwen-32b (ID: 26)
+[2026-03-20 02:38:00]   - qwen/qwen1.5-7b-chat (ID: 25)
+[2026-03-20 02:38:00]   - qwen/deepseek-v3.1 (ID: 24)
+[2026-03-20 02:38:00]   - qwen/qwen-vl-plus-0102 (ID: 23)
+[2026-03-20 02:38:00]   - qwen/qwen2.5-vl-7b-instruct (ID: 22)
+[2026-03-20 02:38:00]   - qwen/qwen-mt-flash (ID: 21)
+[2026-03-20 02:38:00]   - qwen/qwen2.5-14b-instruct (ID: 20)
+[2026-03-20 02:38:00]   - qwen/deepseek-r1-distill-qwen-7b (ID: 19)
+[2026-03-20 02:38:00]   - qwen/qwen2.5-vl-3b-instruct (ID: 18)
+[2026-03-20 02:38:00]   - qwen/qwen2-72b-instruct (ID: 17)
+[2026-03-20 02:38:00]   - qwen/qwen-vl-max-1230 (ID: 16)
+[2026-03-20 02:38:00]   - qwen/tongyi-intent-detect-v3 (ID: 15)
+[2026-03-20 02:38:00]   - qwen/qwen-vl-plus-2025-05-07 (ID: 14)
+[2026-03-20 02:38:00]   - qwen/qwen2.5-math-7b-instruct (ID: 13)
+[2026-03-20 02:38:00]   - qwen/qwen1.5-110b-chat (ID: 12)
+[2026-03-20 02:38:00]   - qwen/qwen-math-turbo (ID: 11)
+[2026-03-20 02:38:00]   - qwen/qwen-vl-max-1119 (ID: 10)
+[2026-03-20 02:38:00]   - qwen/qwen-vl-max-2025-04-02 (ID: 9)
+[2026-03-20 02:38:00]   - qwen/qwen-coder-plus-latest (ID: 8)
+[2026-03-20 02:38:00]   - qwen/qwen-long-2025-01-25 (ID: 7)
+[2026-03-20 02:38:00]   - qwen/qwen-long-latest (ID: 6)
+[2026-03-20 02:38:00]   - qwen/qwen-turbo-2025-07-15 (ID: 5)
+[2026-03-20 02:38:00]   - qwen/qwen-turbo-2025-04-28 (ID: 4)
+[2026-03-20 02:38:00]   - qwen/qwen-turbo-2025-02-11 (ID: 3)
+[2026-03-20 02:38:00]   - qwen/qwen-plus-2025-07-28 (ID: 2)
+[2026-03-20 02:38:00]   - qwen/qwen-plus-latest (ID: 1)
+[2026-03-20 02:38:00] 
+[1/344] 处理问题 #1
+[2026-03-20 02:38:00]   schema: ccks_stock
+[2026-03-20 02:38:00]   question: Who are the actual controllers of Wuliangye and Zhangyu?...
+[2026-03-20 02:38:00]   尝试模型 [1/90]: doubao/doubao-1-5-pro-32k-character-250715
+[2026-03-20 02:38:14]     成功! 耗时: 13.32s
+[2026-03-20 02:38:14]     SQL: SELECT ControllerName
 FROM lc_actualcontroller
-WHERE ChiName IN ('Wuliangye', 'Zhangyu');...
-[2026-03-19 14:33:10] [2/344] 处理问题 #2
-[2026-03-19 14:33:10]   db_id: ccks_stock
-[2026-03-19 14:33:10]   question: List the name of the equity transferee, the number of shares held after the tran...
-[2026-03-19 14:33:15]   成功! 耗时: 5.46s
-[2026-03-19 14:33:15]   SQL: SELECT 
-    t2.ReceiverName AS EquityTransferee, 
-    t2.SumAfterTran AS Number_of_shares_held_after...
-[2026-03-19 14:33:16] [3/344] 处理问题 #3
-[2026-03-19 14:33:16]   db_id: ccks_stock
-[2026-03-19 14:33:16]   question: List the company code of the company with the largest proportion of newly added ...
-[2026-03-19 14:33:19]   成功! 耗时: 3.82s
-[2026-03-19 14:33:19]   SQL: SELECT CompanyCode
+WHERE ChiName = '五粮液' OR ChiName = '张裕';...
+[2026-03-20 02:38:14] 
+[2/344] 处理问题 #2
+[2026-03-20 02:38:14]   schema: ccks_stock
+[2026-03-20 02:38:14]   question: List the name of the equity transferee, the number of shares held after the tran...
+[2026-03-20 02:38:14]   尝试模型 [1/90]: doubao/doubao-1-5-lite-32k-250115
+[2026-03-20 02:38:18]     成功! 耗时: 4.44s
+[2026-03-20 02:38:18]     SQL: SELECT ReceiverName, SumAfterRece, PCTAfterTran
+FROM lc_sharetransfer
+WHERE SecuCode = 'Shengtian Ne...
+[2026-03-20 02:38:19] 
+[3/344] 处理问题 #3
+[2026-03-20 02:38:19]   schema: ccks_stock
+[2026-03-20 02:38:19]   question: List the company code of the company with the largest proportion of newly added ...
+[2026-03-20 02:38:19]   尝试模型 [1/90]: doubao/doubao-1-5-pro-32k-250115
+[2026-03-20 02:38:26]     成功! 耗时: 7.54s
+[2026-03-20 02:38:26]     SQL: SELECT lc_ashareseasonednewissue.CompanyCode
 FROM lc_ashareseasonednewissue
-ORDER BY OughtShares / ActualShares DESC
-LIMIT 1;...
-[2026-03-19 14:33:20] [4/344] 处理问题 #4
-[2026-03-19 14:33:20]   db_id: ccks_fund
-[2026-03-19 14:33:20]   question: How many fund managers have more than 6 years of working experience and a positi...
-[2026-03-19 14:34:05]   成功! 耗时: 44.73s
-[2026-03-19 14:34:05]   SQL: SELECT COUNT(DISTINCT mfm.cn)
-FROM mf_fmretscaleanalysis mfm
-JOIN mf_managerexperience me ON mfm.Per...
-[2026-03-19 14:34:05] [5/344] 处理问题 #5
-[2026-03-19 14:34:05]   db_id: ccks_fund
-[2026-03-19 14:34:05]   question: Provide the fund managers who manage more than 5 equity funds and their backgrou...
-[2026-03-19 14:34:09]   成功! 耗时: 3.93s
-[2026-03-19 14:34:09]   SQL: SELECT DISTINCT fmfm.cn, fmfm.bg_info
-FROM mf_fmretscaleanalysis AS fmfm
-JOIN mf_advisorscalerank AS...
-[2026-03-19 14:34:10] [6/344] 处理问题 #6
-[2026-03-19 14:34:10]   db_id: ccks_fund
-[2026-03-19 14:34:10]   question: See which bonds are held by Boshi Theme and have a quantity of more than 100,000...
-[2026-03-19 14:34:14]   成功! 耗时: 4.43s
-[2026-03-19 14:34:14]   SQL: SELECT DISTINCT bp.BondCode, bp.BondAbbr
-FROM mf_bondportifoliodetail bp
-JOIN mf_mainfinancialindexq...
-[2026-03-19 14:34:15] [7/344] 处理问题 #7
-[2026-03-19 14:34:15]   db_id: ccks_macro
-[2026-03-19 14:34:15]   question: Please check the index value of "Production Materials - Raw Materials" in our "I...
-[2026-03-19 14:34:46]   成功! 耗时: 31.48s
-[2026-03-19 14:34:46]   SQL: SELECT IndexValue
-FROM in_meansofproductionpi
-WHERE IndexTitle = 'Production Materials - Raw Materia...
-[2026-03-19 14:34:47] [8/344] 处理问题 #8
-[2026-03-19 14:34:47]   db_id: ccks_stock
-[2026-03-19 14:34:47]   question: What are the names of the allotment shareholders and the corresponding number of...
-[2026-03-19 14:34:51]   成功! 耗时: 3.91s
-[2026-03-19 14:34:51]   SQL: SELECT DISTINCT l.SHName, l.HoldingSum
-FROM lc_relatedsh l
-JOIN lc_asharereplacement r ON l.CompanyC...
-[2026-03-19 14:34:51] [9/344] 处理问题 #9
-[2026-03-19 14:34:51]   db_id: ccks_fund
-[2026-03-19 14:34:51]   question: List the number of funds managed by each fund manager and their ranking....
-[2026-03-19 14:34:56]   成功! 耗时: 4.56s
-[2026-03-19 14:34:56]   SQL: SELECT 
-    p.ChineseName AS FundManagerName,
-    COUNT(f.NumberOfFunds) AS NumberOfFundsManaged,
-  ...
-[2026-03-19 14:34:56] [10/344] 处理问题 #10
-[2026-03-19 14:34:56]   db_id: ccks_stock
-[2026-03-19 14:34:56]   question: What is the main business scope of Jingyan Technology? Can you help me check it?...
-[2026-03-19 14:35:00]   成功! 耗时: 3.46s
-[2026-03-19 14:35:00]   SQL: SELECT DISTINCT BusinessMajor
-FROM lc_business
-WHERE ChiName = 'Jingyan Technology';...
-[2026-03-19 14:35:00]   已保存中间结果 (10/344)
-[2026-03-19 14:35:00] [11/344] 处理问题 #11
-[2026-03-19 14:35:00]   db_id: ccks_stock
-[2026-03-19 14:35:00]   question: Which investors had their stocks frozen two years ago? Display the names of the ...
-[2026-03-19 14:35:04]   成功! 耗时: 4.00s
-[2026-03-19 14:35:04]   SQL: SELECT DISTINCT SHName
-FROM lc_relatedsh
-JOIN lc_sharefp ON lc_relatedsh.SecuCode = lc_sharefp.SecuC...
-[2026-03-19 14:35:05] [12/344] 处理问题 #12
-[2026-03-19 14:35:05]   db_id: ccks_fund
-[2026-03-19 14:35:05]   question: Xiao Li, can you please check the performance of "Harvest Zhongchuang 400 ETF" t...
-[2026-03-19 14:35:09]   成功! 耗时: 4.61s
-[2026-03-19 14:35:09]   SQL: SELECT 
-    mfp.EndDate, 
-    mfp.UnitNV AS DailyUnitNetValue, 
-    mfp.AccumulatedUnitNV AS Cumulat...
-[2026-03-19 14:35:10] [13/344] 处理问题 #13
-[2026-03-19 14:35:10]   db_id: ccks_stock
-[2026-03-19 14:35:10]   question: What were the main operating income and main operating costs of China Aluminum C...
-[2026-03-19 14:35:14]   成功! 耗时: 4.60s
-[2026-03-19 14:35:14]   SQL: SELECT 
-    T1.MainOperIncome, 
-    T1.MainOperCost 
-FROM 
-    lc_mainoperincome AS T1 
-JOIN 
-    lc...
-[2026-03-19 14:35:15] [14/344] 处理问题 #14
-[2026-03-19 14:35:15]   db_id: ccks_macro
-[2026-03-19 14:35:15]   question: Please count the records where the import value exceeds 20 million but the expor...
-[2026-03-19 14:35:19]   成功! 耗时: 3.77s
-[2026-03-19 14:35:19]   SQL: SELECT ExImValue AS ImportValue, ExValueOfGoods AS ExportValue
-FROM ed_exportimport
-WHERE ExImValue ...
-[2026-03-19 14:35:19] [15/344] 处理问题 #15
-[2026-03-19 14:35:19]   db_id: ccks_stock
-[2026-03-19 14:35:19]   question: List the legal representative and general manager of Hang Seng Electronics....
-[2026-03-19 14:35:23]   成功! 耗时: 3.63s
-[2026-03-19 14:35:23]   SQL: SELECT T1.LegalRepr, T1.GeneralManager
-FROM lc_stockarchives AS T1
-WHERE T1.ChiName = 'Hang Seng Ele...
-[2026-03-19 14:35:23] [16/344] 处理问题 #16
-[2026-03-19 14:35:23]   db_id: ccks_stock
-[2026-03-19 14:35:23]   question: What is the industry situation of Chongqing Bank's IPO?...
-[2026-03-19 14:35:28]   成功! 耗时: 4.55s
-[2026-03-19 14:35:28]   SQL: SELECT 
-    lc_ipodeclaration.ChiName AS CompanyName,
-    lc_ipodeclaration.CSRCIndustryName AS Indu...
-[2026-03-19 14:35:28] [17/344] 处理问题 #17
-[2026-03-19 14:35:28]   db_id: ccks_fund
-[2026-03-19 14:35:28]   question: Show the fund codes and fund manager names of the award-winning funds....
-[2026-03-19 14:35:32]   成功! 耗时: 3.91s
-[2026-03-19 14:35:32]   SQL: SELECT DISTINCT m.FundCode, mf.ChineseName
-FROM mf_awards m
-JOIN mf_fmtermanalysis mf ON m.FundManag...
-[2026-03-19 14:35:33] [18/344] 处理问题 #18
-[2026-03-19 14:35:33]   db_id: ccks_stock
-[2026-03-19 14:35:33]   question: What is the daily trading volume and turnover amount of Caesar Culture's stock?...
-[2026-03-19 14:35:37]   成功! 耗时: 4.08s
-[2026-03-19 14:35:37]   SQL: SELECT 
-    qd.TradingDay, 
-    qd.TurnoverVolume, 
-    qd.TurnoverValue 
-FROM 
-    qt_dailyquote qd...
-[2026-03-19 14:35:37] [19/344] 处理问题 #19
-[2026-03-19 14:35:37]   db_id: ccks_stock
-[2026-03-19 14:35:37]   question: What are the top 4 companies in Zhejiang Province with the highest interest expe...
-[2026-03-19 14:35:42]   成功! 耗时: 4.51s
-[2026-03-19 14:35:42]   SQL: SELECT lcb.CompanyName, lcb.MainBusiness, SUM(qtd.InterestExpense) AS TotalInterestExpense
-FROM lc_s...
-[2026-03-19 14:35:42] [20/344] 处理问题 #20
-[2026-03-19 14:35:42]   db_id: ccks_stock
-[2026-03-19 14:35:42]   question: Which institution underwrote the shares of 000158 and what is the quantity?...
-[2026-03-19 14:35:46]   成功! 耗时: 4.05s
-[2026-03-19 14:35:46]   SQL: SELECT DISTINCT i.FullName AS InstitutionName, i.UnderwritingVol AS UnderwritingQuantity
-FROM lc_iss...
-[2026-03-19 14:35:46]   已保存中间结果 (20/344)
-[2026-03-19 14:35:47] [21/344] 处理问题 #21
-[2026-03-19 14:35:47]   db_id: ccks_stock
-[2026-03-19 14:35:47]   question: Which companies in Zhejiang Province had a main operating income exceeding 100 b...
-[2026-03-19 14:35:51]   成功! 耗时: 3.94s
-[2026-03-19 14:35:51]   SQL: SELECT DISTINCT ChiName
-FROM lc_mainoperincome
-JOIN lc_stockarchives ON lc_mainoperincome.CompanyCod...
-[2026-03-19 14:35:51] [22/344] 处理问题 #22
-[2026-03-19 14:35:51]   db_id: ccks_stock
-[2026-03-19 14:35:51]   question: Who is the legal representative of which company is Ding Zhenhua?...
-[2026-03-19 14:35:55]   成功! 耗时: 4.15s
-[2026-03-19 14:35:55]   SQL: SELECT T2.ChiName AS CompanyName, T2.LegalRepr AS LegalRepresentative
-FROM lc_stockarchives AS T2
-JO...
-[2026-03-19 14:35:56] [23/344] 处理问题 #23
-[2026-03-19 14:35:56]   db_id: ccks_macro
-[2026-03-19 14:35:56]   question: What is the gross domestic product of China in recent years?...
-[2026-03-19 14:36:00]   成功! 耗时: 3.83s
-[2026-03-19 14:36:00]   SQL: SELECT EndDate, GDP
-FROM ed_grossdomesticproduct
-WHERE Province = 'China' AND EndDate IN (
-    SELEC...
-[2026-03-19 14:36:00] [24/344] 处理问题 #24
-[2026-03-19 14:36:00]   db_id: ccks_fund
-[2026-03-19 14:36:00]   question: What is the benchmark growth rate of ChinaAMC ETF for governance fund since this...
-[2026-03-19 14:36:04]   成功! 耗时: 3.64s
-[2026-03-19 14:36:04]   SQL: SELECT BenchGRForThisMonth
-FROM mf_benchmarkgrowthrate
-WHERE ChiName = 'ChinaAMC ETF' AND FundTypeNa...
-[2026-03-19 14:36:04] [25/344] 处理问题 #25
-[2026-03-19 14:36:04]   db_id: ccks_fund
-[2026-03-19 14:36:04]   question: Find the name of the fund with the highest return among funds with an index cycl...
-[2026-03-19 14:36:08]   成功! 耗时: 3.78s
-[2026-03-19 14:36:08]   SQL: SELECT ChiName
-FROM mf_fundreturnrank
-WHERE IndexCycle = 'one month'
-ORDER BY FundReturn DESC
-LIMIT ...
-[2026-03-19 14:36:09] [26/344] 处理问题 #26
-[2026-03-19 14:36:09]   db_id: ccks_fund
-[2026-03-19 14:36:09]   question: What is the number of funds corresponding to the grouping statistics by risk lev...
-[2026-03-19 14:36:13]   成功! 耗时: 4.29s
-[2026-03-19 14:36:13]   SQL: SELECT 
-    T.risk_level, 
-    COUNT(T.fund_id) AS number_of_funds
-FROM (
-    SELECT 
-        QDIINV...
-[2026-03-19 14:36:13] [27/344] 处理问题 #27
-[2026-03-19 14:36:13]   db_id: ccks_macro
-[2026-03-19 14:36:13]   question: What are the base code, minimum value, and maximum value of the "Transaction Com...
-[2026-03-19 14:36:17]   成功! 耗时: 3.86s
-[2026-03-19 14:36:17]   SQL: SELECT BasisCode, ValueFloor AS MinimumValue, ValueCeiling AS MaximumValue
-FROM ed_taxrate
-WHERE Ite...
-[2026-03-19 14:36:18] [28/344] 处理问题 #28
-[2026-03-19 14:36:18]   db_id: ccks_fund
-[2026-03-19 14:36:18]   question: Please briefly describe the awards received by our "E Fund Ruiheng" fund....
-[2026-03-19 14:36:22]   成功! 耗时: 3.96s
-[2026-03-19 14:36:22]   SQL: SELECT a.Year, a.AwardName
-FROM mf_awards a
-JOIN mf_fundrisklevel f ON a.FundCode = f.InnerCode
-WHER...
-[2026-03-19 14:36:22] [29/344] 处理问题 #29
-[2026-03-19 14:36:22]   db_id: ccks_macro
-[2026-03-19 14:36:22]   question: Please display the social retail value of our joint venture units and individual...
-[2026-03-19 14:36:26]   成功! 耗时: 3.93s
-[2026-03-19 14:36:26]   SQL: SELECT 
-    JointVentures AS SocialRetailValueOfJointVentureUnits, 
-    SelfEmployed AS SocialRetail...
-[2026-03-19 14:36:27] [30/344] 处理问题 #30
-[2026-03-19 14:36:27]   db_id: ccks_fund
-[2026-03-19 14:36:27]   question: What is the organization form of China Asset Management Co., Ltd.?...
-[2026-03-19 14:36:30]   成功! 耗时: 3.60s
-[2026-03-19 14:36:30]   SQL: SELECT ChiName
-FROM mf_assetallocation
-WHERE ChiName LIKE '中国资产管理有限公司';...
-[2026-03-19 14:36:30]   已保存中间结果 (30/344)
-[2026-03-19 14:36:31] [31/344] 处理问题 #31
-[2026-03-19 14:36:31]   db_id: ccks_stock
-[2026-03-19 14:36:31]   question: How many companies had main operating income exceeding 100,000,000 in 2019?...
-[2026-03-19 14:36:34]   成功! 耗时: 3.64s
-[2026-03-19 14:36:34]   SQL: SELECT COUNT(DISTINCT CompanyCode) AS CompanyCount
-FROM lc_mainoperincome
-WHERE MainOperIncome > 100...
-[2026-03-19 14:36:35] [32/344] 处理问题 #32
-[2026-03-19 14:36:35]   db_id: ccks_stock
-[2026-03-19 14:36:35]   question: What is the lower and upper limit of the issuance volume corresponding to stock ...
-[2026-03-19 14:36:39]   成功! 耗时: 3.84s
-[2026-03-19 14:36:39]   SQL: SELECT IssueVolFloor, IssueVolCeiling
-FROM lc_ashareseasonednewissue
-WHERE SecuCode = '002305' AND I...
-[2026-03-19 14:36:39] [33/344] 处理问题 #33
-[2026-03-19 14:36:39]   db_id: ccks_fund
-[2026-03-19 14:36:39]   question: Please help display the rate of return since the beginning of the week and since...
-[2026-03-19 14:36:44]   成功! 耗时: 4.87s
-[2026-03-19 14:36:44]   SQL: SELECT 
-    f.SecuCode,
-    f.SecuAbbr,
-    f.FundTypeName,
-    f.FundReturn,
-    f.FundReturnMean,
-...
-[2026-03-19 14:36:45] [34/344] 处理问题 #34
-[2026-03-19 14:36:45]   db_id: ccks_fund
-[2026-03-19 14:36:45]   question: Look and see if there are any funds holding position in '21 in and out 06'. What...
-[2026-03-19 14:36:49]   成功! 耗时: 4.36s
-[2026-03-19 14:36:49]   SQL: SELECT DISTINCT T1.FundTypeName
-FROM mf_fmscaleanalysisn AS T1
-JOIN mf_fundmanagernew AS T2 ON T1.Pe...
-[2026-03-19 14:36:50] [35/344] 处理问题 #35
-[2026-03-19 14:36:50]   db_id: ccks_stock
-[2026-03-19 14:36:50]   question: The total share capital change of 000422 and 600168...
-[2026-03-19 14:36:55]   成功! 耗时: 5.06s
-[2026-03-19 14:36:55]   SQL: SELECT 
-    s1.CompanyCode, 
-    s1.SecuCode, 
-    s1.TranDate, 
-    s1.SumBeforeTran - s1.SumAfterT...
-[2026-03-19 14:36:55] [36/344] 处理问题 #36
-[2026-03-19 14:36:55]   db_id: ccks_fund
-[2026-03-19 14:36:55]   question: The number of fund managers with more than 5 current funds, grouped and counted ...
-[2026-03-19 14:37:00]   成功! 耗时: 4.53s
-[2026-03-19 14:37:00]   SQL: SELECT e.EducationBackground, COUNT(*) AS ManagerCount
-FROM (
-    SELECT PersonalCode
-    FROM mf_fm...
-[2026-03-19 14:37:00] [37/344] 处理问题 #37
-[2026-03-19 14:37:00]   db_id: ccks_fund
-[2026-03-19 14:37:00]   question: How many fund managers in total have a highest education level of Doctor or Post...
-[2026-03-19 14:37:04]   成功! 耗时: 3.70s
-[2026-03-19 14:37:04]   SQL: SELECT COUNT(DISTINCT PersonalCode) AS TotalManagers
+JOIN lc_stockarchives ON...
+[2026-03-20 02:38:27] 
+[4/344] 处理问题 #4
+[2026-03-20 02:38:27]   schema: ccks_fund
+[2026-03-20 02:38:27]   question: How many fund managers have more than 6 years of working experience and a positi...
+[2026-03-20 02:38:27]   尝试模型 [1/90]: doubao/doubao-seed-1-6-250615
+[2026-03-20 02:39:23]     成功! 耗时: 56.61s
+[2026-03-20 02:39:23]     SQL: SELECT COUNT(DISTINCT mf_fundmanagernew.PersonalCode)
 FROM mf_personalinfo
-WHERE Education IN ('Docto...
-[2026-03-19 14:37:04] [38/344] 处理问题 #38
-[2026-03-19 14:37:04]   db_id: ccks_fund
-[2026-03-19 14:37:04]   question: Please recommend a fund with a daily return rate and a weekly return rate both e...
-[2026-03-19 14:37:09]   成功! 耗时: 4.43s
-[2026-03-19 14:37:09]   SQL: SELECT DISTINCT mf_netvalue.SecuCode, mf_netvalue.NVDailyGrowthRate, mf_netvalue.NVWeeklyGrowthRate
-...
-[2026-03-19 14:37:09] [39/344] 处理问题 #39
-[2026-03-19 14:37:09]   db_id: ccks_stock
-[2026-03-19 14:37:09]   question: What are the names and investment amounts of investors in stock 600000 whose inv...
-[2026-03-19 14:37:13]   成功! 耗时: 3.83s
-[2026-03-19 14:37:13]   SQL: SELECT SHName, SHInvestSum
-FROM lc_relatedsh
-WHERE SecuCode = '600000' AND SHInvestSum > 10000000;...
-[2026-03-19 14:37:14] [40/344] 处理问题 #40
-[2026-03-19 14:37:14]   db_id: ccks_fund
-[2026-03-19 14:37:14]   question: What are the names of fund managers whose security codes start with 15 and have ...
-[2026-03-19 14:37:17]   成功! 耗时: 3.83s
-[2026-03-19 14:37:17]   SQL: SELECT DISTINCT ChiName
-FROM mf_fundmanagernew
-WHERE SecuCode LIKE '15%' AND Performance > 0.7;...
-[2026-03-19 14:37:17]   已保存中间结果 (40/344)
-[2026-03-19 14:37:18] [41/344] 处理问题 #41
-[2026-03-19 14:37:18]   db_id: ccks_fund
-[2026-03-19 14:37:18]   question: View the benchmark growth rate for each fund and their year-to-date benchmark gr...
-[2026-03-19 14:37:22]   成功! 耗时: 4.28s
-[2026-03-19 14:37:22]   SQL: SELECT 
-    b.ChiName AS FundName,
-    b.ChiNameAbbr AS FundAbbreviation,
-    b.SecuCode AS FundCode...
-[2026-03-19 14:37:23] [42/344] 处理问题 #42
-[2026-03-19 14:37:23]   db_id: ccks_stock
-[2026-03-19 14:37:23]   question: What is the number of listed companies in recent years whose main operating prof...
-[2026-03-19 14:37:27]   成功! 耗时: 4.02s
-[2026-03-19 14:37:27]   SQL: SELECT COUNT(DISTINCT lc_stockholdingst.CompanyCode) AS NumberOfListedCompanies
-FROM lc_stockholding...
-[2026-03-19 14:37:27] [43/344] 处理问题 #43
-[2026-03-19 14:37:27]   db_id: ccks_fund
-[2026-03-19 14:37:27]   question: What are the top ten funds ranked by benchmark growth rate over the past ten yea...
-[2026-03-19 14:37:31]   成功! 耗时: 4.11s
-[2026-03-19 14:37:31]   SQL: SELECT 
-    m.InnerCode, 
-    m.ChiName, 
-    m.ChiNameAbbr, 
-    m.BenchGRFor10Year AS BenchmarkGro...
-[2026-03-19 14:37:32] [44/344] 处理问题 #44
-[2026-03-19 14:37:32]   db_id: ccks_macro
-[2026-03-19 14:37:32]   question: What is the charging basis of "Handling fee" for "convertible bonds"? What are t...
-[2026-03-19 14:37:36]   成功! 耗时: 4.43s
-[2026-03-19 14:37:36]   SQL: SELECT ed_taxrate.BasisCode, ed_taxrate.RatioFloor, ed_taxrate.RatioCeiling
-FROM ed_taxrate
-JOIN ed_...
-[2026-03-19 14:37:37] [45/344] 处理问题 #45
-[2026-03-19 14:37:37]   db_id: ccks_fund
-[2026-03-19 14:37:37]   question: What is the benchmark growth rate of the China Europe New Trend A fund since thi...
-[2026-03-19 14:37:40]   成功! 耗时: 3.46s
-[2026-03-19 14:37:40]   SQL: SELECT BenchGRForThisWeek
-FROM mf_benchmarkgrowthrate
-WHERE ChiName = 'China Europe New Trend A';...
-[2026-03-19 14:37:41] [46/344] 处理问题 #46
-[2026-03-19 14:37:41]   db_id: ccks_fund
-[2026-03-19 14:37:41]   question: Display the names of fund managers and their background introductions with a net...
-[2026-03-19 14:37:45]   成功! 耗时: 4.59s
-[2026-03-19 14:37:45]   SQL: SELECT 
-    p.ChineseName AS FundManagerName, 
-    f.BriefIntro AS BackgroundIntroduction
-FROM 
+JOIN mf_fundmanagernew ON...
+[2026-03-20 02:39:23] 
+[5/344] 处理问题 #5
+[2026-03-20 02:39:23]   schema: ccks_fund
+[2026-03-20 02:39:24]   question: Provide the fund managers who manage more than 5 equity funds and their backgrou...
+[2026-03-20 02:39:24]   尝试模型 [1/90]: doubao/doubao-seed-1-6-251015
+[2026-03-20 02:39:53]     成功! 耗时: 29.95s
+[2026-03-20 02:39:53]     SQL: SELECT 
+    s.ChineseName, 
+    s.EquityFundN, 
+    t.EmploymentAll, 
+    t.EmploymentCompany, 
     ...
-[2026-03-19 14:37:46] [47/344] 处理问题 #47
-[2026-03-19 14:37:46]   db_id: ccks_fund
-[2026-03-19 14:37:46]   question: What are the 10 funds with the highest monthly benchmark growth rate and their f...
-[2026-03-19 14:37:50]   成功! 耗时: 3.98s
-[2026-03-19 14:37:50]   SQL: SELECT 
-    m.ChiName AS FundName, 
-    m.SecuCode AS FundCode, 
-    f.FundTypeName 
-FROM 
-    mf_be...
-[2026-03-19 14:37:50] [48/344] 处理问题 #48
-[2026-03-19 14:37:50]   db_id: ccks_fund
-[2026-03-19 14:37:50]   question: Look up the return rate data since the establishment of the fund....
-[2026-03-19 14:37:54]   成功! 耗时: 3.81s
-[2026-03-19 14:37:54]   SQL: SELECT 
-    RRSinceStart, 
-    AnnualizedRRSinceStart
-FROM 
-    mf_netvalueperformancehis
-WHERE 
-   ...
-[2026-03-19 14:37:55] [49/344] 处理问题 #49
-[2026-03-19 14:37:55]   db_id: ccks_fund
-[2026-03-19 14:37:55]   question: Which fund management company has a general manager with the last name Liu?...
-[2026-03-19 14:37:59]   成功! 耗时: 4.10s
-[2026-03-19 14:37:59]   SQL: SELECT DISTINCT ia.InvestAdvisorName
-FROM mf_investadvisoroutline ia
-JOIN mf_fundmanagernew fm ON ia...
-[2026-03-19 14:37:59] [50/344] 处理问题 #50
-[2026-03-19 14:37:59]   db_id: ccks_fund
-[2026-03-19 14:37:59]   question: What are the fund manager names and tenure for funds with a risk level of "中"?...
-[2026-03-19 14:38:03]   成功! 耗时: 4.11s
-[2026-03-19 14:38:03]   SQL: SELECT DISTINCT mf_fundmanagernew.Name, mf_fundmanagernew.ManagementTime
-FROM mf_fundmanagernew
-JOIN...
-[2026-03-19 14:38:03]   已保存中间结果 (50/344)
-[2026-03-19 14:38:04] [51/344] 处理问题 #51
-[2026-03-19 14:38:04]   db_id: ccks_fund
-[2026-03-19 14:38:04]   question: Calculate which investment type has the lowest average annualized return rate si...
-[2026-03-19 14:38:07]   成功! 耗时: 3.54s
-[2026-03-19 14:38:07]   SQL: SELECT FundTypeName
-FROM mf_netvalueperformancehis
-GROUP BY FundTypeName
-ORDER BY AVG(AnnualizedRRSi...
-[2026-03-19 14:38:08] [52/344] 处理问题 #52
-[2026-03-19 14:38:08]   db_id: ccks_stock
-[2026-03-19 14:38:08]   question: Please help me to find the names of the listed companies in the "lithium battery...
-[2026-03-19 14:38:12]   成功! 耗时: 4.33s
-[2026-03-19 14:38:12]   SQL: SELECT 
-    l.ChiName AS CompanyName, 
-    l.LegalPersonRepr AS LegalRepresentative, 
-    l.Address ...
-[2026-03-19 14:38:13] [53/344] 处理问题 #53
-[2026-03-19 14:38:13]   db_id: ccks_fund
-[2026-03-19 14:38:13]   question: Which bond funds were listed on the Shenzhen Stock Exchange in the fourth quarte...
-[2026-03-19 14:38:17]   成功! 耗时: 4.46s
-[2026-03-19 14:38:17]   SQL: SELECT DISTINCT f.ChiName
-FROM mf_fundarchives f
-JOIN mf_bondportifoliodetail bp ON f.InnerCode = bp...
-[2026-03-19 14:38:18] [54/344] 处理问题 #54
-[2026-03-19 14:38:18]   db_id: ccks_stock
-[2026-03-19 14:38:18]   question: I heard that many listed companies conducted share repurchases last year, please...
-[2026-03-19 14:38:21]   成功! 耗时: 3.70s
-[2026-03-19 14:38:21]   SQL: SELECT COUNT(*) AS RepurchaseCount
-FROM lc_buyback
-WHERE PlacedYear = '2022';...
-[2026-03-19 14:38:22] [55/344] 处理问题 #55
-[2026-03-19 14:38:22]   db_id: ccks_stock
-[2026-03-19 14:38:22]   question: Actual controller of Dongfang Electronics...
-[2026-03-19 14:38:26]   成功! 耗时: 3.68s
-[2026-03-19 14:38:26]   SQL: SELECT CompanyCode, ChiName, ControllerName
-FROM lc_actualcontroller
-WHERE ChiName = 'Dongfang Elect...
-[2026-03-19 14:38:26] [56/344] 处理问题 #56
-[2026-03-19 14:38:26]   db_id: ccks_fund
-[2026-03-19 14:38:26]   question: How many fund managers have entered the securities industry in the past year?...
-[2026-03-19 14:38:30]   成功! 耗时: 3.99s
-[2026-03-19 14:38:30]   SQL: SELECT COUNT(DISTINCT ChineseName) AS NumberOfManagers
-FROM mf_fmtermanalysis
-WHERE PracticeDate >= ...
-[2026-03-19 14:38:31] [57/344] 处理问题 #57
-[2026-03-19 14:38:31]   db_id: ccks_fund
-[2026-03-19 14:38:31]   question: How many LOF funds have had a non-negative benchmark growth rate since the begin...
-[2026-03-19 14:38:34]   成功! 耗时: 3.79s
-[2026-03-19 14:38:34]   SQL: SELECT COUNT(DISTINCT InnerCode) AS LOF_Fund_Count
-FROM mf_benchmarkgrowthrate
-WHERE BenchGRForThisW...
-[2026-03-19 14:38:35] [58/344] 处理问题 #58
-[2026-03-19 14:38:35]   db_id: ccks_fund
-[2026-03-19 14:38:35]   question: What is the average value of the cumulative net asset value per unit of this fun...
-[2026-03-19 14:38:39]   成功! 耗时: 3.97s
-[2026-03-19 14:38:39]   SQL: SELECT AVG(mf_netvalue.UnitNV) AS AverageUnitNV
+[2026-03-20 02:39:54] 
+[6/344] 处理问题 #6
+[2026-03-20 02:39:54]   schema: ccks_fund
+[2026-03-20 02:39:54]   question: See which bonds are held by Boshi Theme and have a quantity of more than 100,000...
+[2026-03-20 02:39:54]   尝试模型 [1/90]: doubao/doubao-seed-1-6-vision-250815
+[2026-03-20 02:40:08]     成功! 耗时: 14.61s
+[2026-03-20 02:40:08]     SQL: SELECT BondAbbr, BondCode, HoldVolume, SecuAbbr
+FROM mf_bondportifoliodetail
+WHERE SecuAbbr LIKE '%B...
+[2026-03-20 02:40:09] 
+[7/344] 处理问题 #7
+[2026-03-20 02:40:09]   schema: ccks_macro
+[2026-03-20 02:40:09]   question: Please check the index value of "Production Materials - Raw Materials" in our "I...
+[2026-03-20 02:40:09]   尝试模型 [1/90]: doubao/doubao-seed-1-6-flash-250828
+[2026-03-20 02:40:59]     成功! 耗时: 50.65s
+[2026-03-20 02:40:59]     SQL: SELECT IndexValue FROM in_meansofproductionpi WHERE IndexTitle = 'Production Materials - Raw Materia...
+[2026-03-20 02:41:00] 
+[8/344] 处理问题 #8
+[2026-03-20 02:41:00]   schema: ccks_stock
+[2026-03-20 02:41:00]   question: What are the names of the allotment shareholders and the corresponding number of...
+[2026-03-20 02:41:00]   尝试模型 [1/90]: doubao/doubao-seed-1-6-lite-251015
+[2026-03-20 02:41:20]     成功! 耗时: 20.81s
+[2026-03-20 02:41:20]     SQL: SELECT SHName, OughtShares FROM lc_largeshsubscription WHERE ChiName = 'Yatai Group';...
+[2026-03-20 02:41:21] 
+[9/344] 处理问题 #9
+[2026-03-20 02:41:21]   schema: ccks_fund
+[2026-03-20 02:41:21]   question: List the number of funds managed by each fund manager and their ranking....
+[2026-03-20 02:41:21]   尝试模型 [1/90]: doubao/doubao-seed-code-preview-251028
+[2026-03-20 02:41:38]     成功! 耗时: 17.18s
+[2026-03-20 02:41:38]     SQL: SELECT ChineseName, NumberOfFunds, TotalFundNRank 
+FROM mf_fmscaleanalysisn;...
+[2026-03-20 02:41:38] 
+[10/344] 处理问题 #10
+[2026-03-20 02:41:38]   schema: ccks_stock
+[2026-03-20 02:41:38]   question: What is the main business scope of Jingyan Technology? Can you help me check it?...
+[2026-03-20 02:41:38]   尝试模型 [1/90]: doubao/doubao-seed-1-8-251228
+[2026-03-20 02:41:45]     成功! 耗时: 6.52s
+[2026-03-20 02:41:45]     SQL: SELECT BusinessMajor FROM lc_business WHERE ChiName = 'Jingyan Technology';...
+[2026-03-20 02:41:45]   已保存中间结果 (10/344)
+[2026-03-20 02:41:45]   当前统计: 成功 10, 失败 0
+[2026-03-20 02:41:45]   可用模型: 90/90
+[2026-03-20 02:41:45] 
+[11/344] 处理问题 #11
+[2026-03-20 02:41:45]   schema: ccks_stock
+[2026-03-20 02:41:45]   question: Which investors had their stocks frozen two years ago? Display the names of the ...
+[2026-03-20 02:41:45]   尝试模型 [1/90]: doubao/doubao-seed-2-0-code-preview-260215
+[2026-03-20 02:42:02]     成功! 耗时: 17.31s
+[2026-03-20 02:42:02]     SQL: SELECT DISTINCT FPSHName FROM lc_sharefp WHERE date(StartDate) >= date('now','-2 years','start of ye...
+[2026-03-20 02:42:03] 
+[12/344] 处理问题 #12
+[2026-03-20 02:42:03]   schema: ccks_fund
+[2026-03-20 02:42:03]   question: Xiao Li, can you please check the performance of "Harvest Zhongchuang 400 ETF" t...
+[2026-03-20 02:42:03]   尝试模型 [1/90]: doubao/doubao-seed-2-0-mini-260215
+[2026-03-20 02:42:30]     成功! 耗时: 27.50s
+[2026-03-20 02:42:30]     SQL: SELECT EndDate, UnitNV, AccumulatedUnitNV
 FROM mf_netvalue
-WHERE mf_netvalue.SecuCode = '16341...
-[2026-03-19 14:38:39] [59/344] 处理问题 #59
-[2026-03-19 14:38:39]   db_id: ccks_fund
-[2026-03-19 14:38:39]   question: Which fund has the highest one-year benchmark growth rate?...
-[2026-03-19 14:38:43]   成功! 耗时: 3.52s
-[2026-03-19 14:38:43]   SQL: SELECT ChiName, BenchGRFor1Year
-FROM mf_benchmarkgrowthrate
-ORDER BY BenchGRFor1Year DESC
-LIMIT 1;...
-[2026-03-19 14:38:43] [60/344] 处理问题 #60
-[2026-03-19 14:38:43]   db_id: ccks_stock
-[2026-03-19 14:38:43]   question: Display the number of shares and the percentage of total shares involved in 3001...
-[2026-03-19 14:38:48]   成功! 耗时: 4.15s
-[2026-03-19 14:38:48]   SQL: SELECT 
-    AccuMarketableAShares AS NumberOfShares, 
-    (AccuMarketableAShares / TotalAShares) * 1...
-[2026-03-19 14:38:48]   已保存中间结果 (60/344)
-[2026-03-19 14:38:48] [61/344] 处理问题 #61
-[2026-03-19 14:38:48]   db_id: ccks_macro
-[2026-03-19 14:38:48]   question: What are the amounts of imported goods and exported goods over the years? Please...
-[2026-03-19 14:38:52]   成功! 耗时: 3.66s
-[2026-03-19 14:38:52]   SQL: SELECT 
-    ReportPeriod AS Year, 
-    ExValueOfGoods AS ExportedGoodsAmount, 
-    ImValueOfGoods AS...
-[2026-03-19 14:38:52] [62/344] 处理问题 #62
-[2026-03-19 14:38:52]   db_id: ccks_macro
-[2026-03-19 14:38:52]   question: What is the amount of claims on non-financial institutions when domestic loans i...
-[2026-03-19 14:38:57]   成功! 耗时: 4.30s
-[2026-03-19 14:38:57]   SQL: SELECT ed_chinamoneyandbanking.SubjectSum
-FROM ed_chinamoneyandbanking
-JOIN ed_moneyauthoritybs ON e...
-[2026-03-19 14:38:57] [63/344] 处理问题 #63
-[2026-03-19 14:38:57]   db_id: ccks_stock
-[2026-03-19 14:38:57]   question: What are the names of the shareholders in the allotment of 000659?...
-[2026-03-19 14:39:01]   成功! 耗时: 3.73s
-[2026-03-19 14:39:01]   SQL: SELECT DISTINCT SHName
-FROM lc_relatedsh
-WHERE SecuCode = '000659' AND PlaCode IS NOT NULL;...
-[2026-03-19 14:39:01] [64/344] 处理问题 #64
-[2026-03-19 14:39:01]   db_id: ccks_macro
-[2026-03-19 14:39:01]   question: Show the amounts of corporate savings, financial deposits, and government loans ...
-[2026-03-19 14:39:07]   成功! 耗时: 5.44s
-[2026-03-19 14:39:07]   SQL: SELECT 
-    ed_chinafibalancesheetrmb.EndDate,
-    ed_chinafibalancesheetrmb.CorporateSavings AS Cor...
-[2026-03-19 14:39:07] [65/344] 处理问题 #65
-[2026-03-19 14:39:07]   db_id: ccks_fund
-[2026-03-19 14:39:07]   question: What is the average rate of return for funds with the operating form "ETF" in th...
-[2026-03-19 14:39:11]   成功! 耗时: 3.56s
-[2026-03-19 14:39:11]   SQL: SELECT AVG(WeightedAvgReturn) AS AverageRateOfReturn
-FROM mf_fmretscaleanalysis
-WHERE FundTypeName =...
-[2026-03-19 14:39:11] [66/344] 处理问题 #66
-[2026-03-19 14:39:11]   db_id: ccks_fund
-[2026-03-19 14:39:11]   question: Look at funds and managers whose benchmark growth rate has been positive since t...
-[2026-03-19 14:39:16]   成功! 耗时: 4.33s
-[2026-03-19 14:39:16]   SQL: SELECT DISTINCT m.InnerCode, m.ChiName, m.ChiNameAbbr, fm.Name, fm.PostName
-FROM mf_netvalue mv
-JOIN...
-[2026-03-19 14:39:16] [67/344] 处理问题 #67
-[2026-03-19 14:39:16]   db_id: ccks_stock
-[2026-03-19 14:39:16]   question: How many listed companies are there respectively in Shanghai and Beijing?...
-[2026-03-19 14:39:20]   成功! 耗时: 3.98s
-[2026-03-19 14:39:20]   SQL: SELECT 
-    SUM(CASE WHEN State = 'Shanghai' THEN 1 ELSE 0 END) AS Shanghai_Companies,
-    SUM(CASE ...
-[2026-03-19 14:39:21] [68/344] 处理问题 #68
-[2026-03-19 14:39:21]   db_id: ccks_fund
-[2026-03-19 14:39:21]   question: Which funds have received awards from the awarding institution "14561"?...
-[2026-03-19 14:39:25]   成功! 耗时: 4.32s
-[2026-03-19 14:39:25]   SQL: SELECT DISTINCT mf_fundreturnrank.SecuCode
-FROM mf_fundreturnrank
-JOIN mf_awards ON mf_fundreturnran...
-[2026-03-19 14:39:25] [69/344] 处理问题 #69
-[2026-03-19 14:39:25]   db_id: ccks_stock
-[2026-03-19 14:39:25]   question: Please help me find out which companies in Hubei Province have a total number of...
-[2026-03-19 14:39:29]   成功! 耗时: 3.94s
-[2026-03-19 14:39:29]   SQL: SELECT ChiName
-FROM lc_sharestru
-JOIN lc_stockarchives ON lc_sharestru.CompanyCode = lc_stockarchive...
-[2026-03-19 14:39:30] [70/344] 处理问题 #70
-[2026-03-19 14:39:30]   db_id: ccks_fund
-[2026-03-19 14:39:30]   question: How many funds have an annualized rate of return exceeding 40% since inception?...
-[2026-03-19 14:39:34]   成功! 耗时: 3.95s
-[2026-03-19 14:39:34]   SQL: SELECT COUNT(DISTINCT SecuCode) AS NumberOfFunds
-FROM mf_netvalueperformancehis
-WHERE AnnualizedRRSi...
-[2026-03-19 14:39:34]   已保存中间结果 (70/344)
-[2026-03-19 14:39:34] [71/344] 处理问题 #71
-[2026-03-19 14:39:34]   db_id: ccks_fund
-[2026-03-19 14:39:34]   question: Look at the benchmark growth rate data for fund 512510 since the beginning of th...
-[2026-03-19 14:39:38]   成功! 耗时: 3.70s
-[2026-03-19 14:39:38]   SQL: SELECT 
-    BenchGRForThisWeek
-FROM 
-    mf_benchmarkgrowthrate
-WHERE 
-    SecuCode = '512510' AND 
-...
-[2026-03-19 14:39:39] [72/344] 处理问题 #72
-[2026-03-19 14:39:39]   db_id: ccks_macro
-[2026-03-19 14:39:39]   question: What is the amount of claims on other depositary corporations and the amount of ...
-[2026-03-19 14:39:42]   成功! 耗时: 3.88s
-[2026-03-19 14:39:42]   SQL: SELECT 
-    SUM(ClaimsOnOtherDepositCorp) AS AmountOfClaimsOnOtherDepositCorp,
-    SUM(LiabToOtherDe...
-[2026-03-19 14:39:43] [73/344] 处理问题 #73
-[2026-03-19 14:39:43]   db_id: ccks_fund
-[2026-03-19 14:39:43]   question: I want to know the two-year return rate data for each fund....
-[2026-03-19 14:39:46]   成功! 耗时: 3.52s
-[2026-03-19 14:39:46]   SQL: SELECT 
-    SecuCode, 
-    ChiName, 
-    RRInTwoYear
-FROM 
-    mf_netvalueperformancehis
-WHERE 
-    ...
-[2026-03-19 14:39:47] [74/344] 处理问题 #74
-[2026-03-19 14:39:47]   db_id: ccks_macro
-[2026-03-19 14:39:47]   question: What is the amount of annual industrial value added for "All Industrial Enterpri...
-[2026-03-19 14:39:51]   成功! 耗时: 3.93s
-[2026-03-19 14:39:51]   SQL: SELECT SUM(IndustrialValueAdded) AS AnnualIndustrialValueAdded
-FROM ed_industryproduction
-WHERE Repo...
-[2026-03-19 14:39:51] [75/344] 处理问题 #75
-[2026-03-19 14:39:51]   db_id: ccks_stock
-[2026-03-19 14:39:51]   question: Look at the change in closing price of Zhanglu Group every month....
-[2026-03-19 14:39:55]   成功! 耗时: 3.86s
-[2026-03-19 14:39:55]   SQL: SELECT 
-    qt_monthdata.EndDate AS Month, 
-    qt_monthdata.ClosePrice 
-FROM 
-    qt_monthdata 
-WHE...
-[2026-03-19 14:39:56] [76/344] 处理问题 #76
-[2026-03-19 14:39:56]   db_id: ccks_stock
-[2026-03-19 14:39:56]   question: Query the company name and the number of newly added tradable A-shares in 2021....
-[2026-03-19 14:40:00]   成功! 耗时: 4.29s
-[2026-03-19 14:40:00]   SQL: SELECT 
-    qt_sharesfloatingschedule.ChiName AS CompanyName, 
-    qt_sharesfloatingschedule.NewMark...
-[2026-03-19 14:40:01] [77/344] 处理问题 #77
-[2026-03-19 14:40:01]   db_id: ccks_stock
-[2026-03-19 14:40:01]   question: Hi, can you help me calculate the names and codes of the listed companies in "Gu...
-[2026-03-19 14:40:05]   成功! 耗时: 4.64s
-[2026-03-19 14:40:05]   SQL: SELECT T1.ChiName, T1.CompanyCode
-FROM lc_business AS T1
-JOIN lc_dividend AS T2 ON T1.CompanyCode = ...
-[2026-03-19 14:40:06] [78/344] 处理问题 #78
-[2026-03-19 14:40:06]   db_id: ccks_fund
-[2026-03-19 14:40:06]   question: Please help me check the daily growth rate of the open-end fund unit net value f...
-[2026-03-19 14:40:09]   成功! 耗时: 3.77s
-[2026-03-19 14:40:09]   SQL: SELECT 
-    EndDate, 
-    NVDailyGrowthRate
-FROM 
-    mf_netvalue
-WHERE 
-    InnerCode = 510220
-ORDE...
-[2026-03-19 14:40:10] [79/344] 处理问题 #79
-[2026-03-19 14:40:10]   db_id: ccks_fund
-[2026-03-19 14:40:10]   question: Wang wants to know the weekly growth rate of our fund's net asset value per shar...
-[2026-03-19 14:40:14]   成功! 耗时: 3.84s
-[2026-03-19 14:40:14]   SQL: SELECT 
-    SecuCode AS FundCode,
-    NVWeeklyGrowthRate AS WeeklyGrowthRate
-FROM 
-    mf_netvalue
-W...
-[2026-03-19 14:40:14] [80/344] 处理问题 #80
-[2026-03-19 14:40:14]   db_id: ccks_stock
-[2026-03-19 14:40:14]   question: Please help me see which stocks are in the "3D Glass" sector and list their stoc...
-[2026-03-19 14:40:19]   成功! 耗时: 4.57s
-[2026-03-19 14:40:19]   SQL: SELECT 
-    la.ChiName AS StockName,
-    sbd.SecretaryBD AS SecretaryName,
-    sbd.SecretaryBDTel AS...
-[2026-03-19 14:40:19]   已保存中间结果 (80/344)
-[2026-03-19 14:40:19] [81/344] 处理问题 #81
-[2026-03-19 14:40:19]   db_id: ccks_stock
-[2026-03-19 14:40:19]   question: Is the IPO company of the accounting firm Lixin Accounting Firm?...
-[2026-03-19 14:40:23]   成功! 耗时: 4.09s
-[2026-03-19 14:40:23]   SQL: SELECT DISTINCT lc_ipodeclaration.AccountingFirm
+WHERE SecuAbbr = 'Harvest Zhongchuang 400...
+[2026-03-20 02:42:30] 
+[13/344] 处理问题 #13
+[2026-03-20 02:42:30]   schema: ccks_stock
+[2026-03-20 02:42:30]   question: What were the main operating income and main operating costs of China Aluminum C...
+[2026-03-20 02:42:30]   尝试模型 [1/90]: doubao/doubao-seed-2-0-lite-260215
+[2026-03-20 02:42:45]     成功! 耗时: 14.99s
+[2026-03-20 02:42:45]     SQL: SELECT ChiName, MainOperIncome, MainOperCost
+FROM lc_mainoperincome
+WHERE (ChiName LIKE '%中国铝业%' OR ...
+[2026-03-20 02:42:46] 
+[14/344] 处理问题 #14
+[2026-03-20 02:42:46]   schema: ccks_macro
+[2026-03-20 02:42:46]   question: Please count the records where the import value exceeds 20 million but the expor...
+[2026-03-20 02:42:46]   尝试模型 [1/90]: doubao/doubao-seed-2-0-pro-260215
+[2026-03-20 02:43:15]     成功! 耗时: 29.28s
+[2026-03-20 02:43:15]     SQL: SELECT COUNT(*) OVER() AS matched_record_count, ImValueOfGoods AS import_value, ExValueOfGoods AS ex...
+[2026-03-20 02:43:15] 
+[15/344] 处理问题 #15
+[2026-03-20 02:43:15]   schema: ccks_stock
+[2026-03-20 02:43:15]   question: List the legal representative and general manager of Hang Seng Electronics....
+[2026-03-20 02:43:15]   尝试模型 [1/90]: qwen/qwen2-vl-7b-instruct
+[2026-03-20 02:43:20]     失败: API错误: 500 - {"detail":"处理失败: API返回错误状态码: 400, {\"error\":{\"message\":\"<400> InternalError.Algo.In
+[2026-03-20 02:43:20]   尝试模型 [2/90]: qwen/qwen2-vl-2b-instruct
+[2026-03-20 02:43:26]     失败: API错误: 500 - {"detail":"处理失败: API返回错误状态码: 400, {\"error\":{\"message\":\"<400> InternalError.Algo.In
+[2026-03-20 02:43:26]   尝试模型 [3/90]: qwen/qwen-plus-1220
+[2026-03-20 02:43:32]     成功! 耗时: 5.92s
+[2026-03-20 02:43:32]     SQL: SELECT "lc_stockarchives.LegalRepr" AS LegalRepresentative, "lc_stockarchives.GeneralManager" AS Gen...
+[2026-03-20 02:43:32] 
+[16/344] 处理问题 #16
+[2026-03-20 02:43:32]   schema: ccks_stock
+[2026-03-20 02:43:32]   question: What is the industry situation of Chongqing Bank's IPO?...
+[2026-03-20 02:43:32]   尝试模型 [1/88]: qwen/qwen1.5-72b-chat
+[2026-03-20 02:43:37]     失败: API错误: 500 - {"detail":"处理失败: API返回错误状态码: 400, {\"error\":{\"message\":\"<400> InternalError.Algo.In
+[2026-03-20 02:43:37]   尝试模型 [2/88]: qwen/qwen-max-0428
+[2026-03-20 02:43:45]     成功! 耗时: 7.94s
+[2026-03-20 02:43:45]     SQL: SELECT lc_ipodeclaration.CSRCIndustryName AS IndustrySituation
 FROM lc_ipodeclaration
-JOIN lc_issueandlistagent ON...
-[2026-03-19 14:40:24] [82/344] 处理问题 #82
-[2026-03-19 14:40:24]   db_id: ccks_fund
-[2026-03-19 14:40:24]   question: Does Fuguo Tianhui A have the names and codes information of the bond holdings?...
-[2026-03-19 14:40:28]   成功! 耗时: 4.09s
-[2026-03-19 14:40:28]   SQL: SELECT b.BondCode, b.BondAbbr, b.HoldVolume, b.MarketValue, b.RatioInNV
-FROM mf_bondportifoliodetail...
-[2026-03-19 14:40:29] [83/344] 处理问题 #83
-[2026-03-19 14:40:29]   db_id: ccks_fund
-[2026-03-19 14:40:29]   question: I want to check which managers have received awards from "China Fund News" in th...
-[2026-03-19 14:40:33]   成功! 耗时: 4.11s
-[2026-03-19 14:40:33]   SQL: SELECT DISTINCT mf_fundmanagernew.FundManager, mf_fundmanagernew.ChineseName
-FROM mf_awards
-JOIN mf_...
-[2026-03-19 14:40:33] [84/344] 处理问题 #84
-[2026-03-19 14:40:33]   db_id: ccks_fund
-[2026-03-19 14:40:33]   question: Take a look at the bond with the minimum holding quantity in Penghua Value....
-[2026-03-19 14:40:38]   成功! 耗时: 4.46s
-[2026-03-19 14:40:38]   SQL: SELECT b.*
-FROM mf_bondportifoliodetail b
-JOIN mf_fundarchives fa ON b.InnerCode = fa.InnerCode
-WHER...
-[2026-03-19 14:40:38] [85/344] 处理问题 #85
-[2026-03-19 14:40:38]   db_id: ccks_stock
-[2026-03-19 14:40:38]   question: The top ten companies with the highest average annual R&D investment after 2017....
-[2026-03-19 14:40:42]   成功! 耗时: 4.18s
-[2026-03-19 14:40:42]   SQL: SELECT 
-    ChiName, 
-    AVG(TotalRDInput) AS AvgAnnualRDInput
-FROM 
-    lc_intassetsdetail
-WHERE 
-...
-[2026-03-19 14:40:43] [86/344] 处理问题 #86
-[2026-03-19 14:40:43]   db_id: ccks_stock
-[2026-03-19 14:40:43]   question: What are the top ten cities with the most listed companies?...
-[2026-03-19 14:40:47]   成功! 耗时: 3.79s
-[2026-03-19 14:40:47]   SQL: SELECT City, COUNT(*) AS CompanyCount
-FROM lc_stockarchives
-GROUP BY City
-ORDER BY CompanyCount DESC...
-[2026-03-19 14:40:47] [87/344] 处理问题 #87
-[2026-03-19 14:40:47]   db_id: ccks_fund
-[2026-03-19 14:40:47]   question: Calculate the average years of experience of fund managers with different highes...
-[2026-03-19 14:40:51]   成功! 耗时: 4.18s
-[2026-03-19 14:40:51]   SQL: SELECT 
-    p.Education, 
-    AVG(m.ExperienceTime) AS AverageYearsOfExperience
-FROM 
-    mf_persona...
-[2026-03-19 14:40:52] [88/344] 处理问题 #88
-[2026-03-19 14:40:52]   db_id: ccks_stock
-[2026-03-19 14:40:52]   question: The number of shares allocated and the number of actual shares allocated for Don...
-[2026-03-19 14:40:56]   成功! 耗时: 4.12s
-[2026-03-19 14:40:56]   SQL: SELECT 
-    SUM(BaseShares) AS AllocatedShares, 
-    SUM(ActualPlaVol) AS ActualAllocatedShares
-FROM...
-[2026-03-19 14:40:56] [89/344] 处理问题 #89
-[2026-03-19 14:40:56]   db_id: ccks_macro
-[2026-03-19 14:40:56]   question: In Jiangsu Province, which has always been economically developed, please show t...
-[2026-03-19 14:41:01]   成功! 耗时: 4.59s
-[2026-03-19 14:41:01]   SQL: SELECT 
-    i.ReportPeriod AS AnnualPeriod, 
-    i.LIValueAP AS LightIndustryQuantity, 
-    i.HIValu...
-[2026-03-19 14:41:02] [90/344] 处理问题 #90
-[2026-03-19 14:41:02]   db_id: ccks_fund
-[2026-03-19 14:41:02]   question: Find the top ten funds in terms of total AUM rank in the money market funds and ...
-[2026-03-19 14:41:06]   成功! 耗时: 4.37s
-[2026-03-19 14:41:06]   SQL: SELECT 
-    mf_fcretscaleanalysis.FundTypeName,
-    mf_fcretscaleanalysis.TotalAUM,
-    mf_fcretscal...
-[2026-03-19 14:41:06]   已保存中间结果 (90/344)
-[2026-03-19 14:41:06] [91/344] 处理问题 #91
-[2026-03-19 14:41:06]   db_id: ccks_stock
-[2026-03-19 14:41:06]   question: Companies with underwriting ratios greater than 1%...
-[2026-03-19 14:41:10]   成功! 耗时: 3.76s
-[2026-03-19 14:41:10]   SQL: SELECT CompanyCode, ChiName, UnderwritingRatio
-FROM lc_issueandlistagent
-WHERE UnderwritingRatio > 0...
-[2026-03-19 14:41:11] [92/344] 处理问题 #92
-[2026-03-19 14:41:11]   db_id: ccks_fund
-[2026-03-19 14:41:11]   question: Do you know the two-year return rate of each fund?...
-[2026-03-19 14:41:15]   成功! 耗时: 3.83s
-[2026-03-19 14:41:15]   SQL: SELECT 
-    SecuCode, 
-    RRInTwoYear
-FROM 
-    mf_netvalueperformancehis
-WHERE 
-    RRInTwoYear IS...
-[2026-03-19 14:41:15] [93/344] 处理问题 #93
-[2026-03-19 14:41:15]   db_id: ccks_fund
-[2026-03-19 14:41:15]   question: What are the ETF funds with positive benchmark growth rates and their specific d...
-[2026-03-19 14:41:19]   成功! 耗时: 4.27s
-[2026-03-19 14:41:19]   SQL: SELECT 
-    mf_netvalue.ChiName, 
-    mf_netvalue.NVDailyGrowthRate, 
-    mf_benchmarkgrowthrate.Ben...
-[2026-03-19 14:41:20] [94/344] 处理问题 #94
-[2026-03-19 14:41:20]   db_id: ccks_stock
-[2026-03-19 14:41:20]   question: What is the scope of operation and core business of Shenzhen Technology?...
-[2026-03-19 14:41:23]   成功! 耗时: 3.45s
-[2026-03-19 14:41:23]   SQL: SELECT BusinessMajor, MainBusiness, IndustryName
-FROM lc_business
-WHERE ChiName = '深圳技术';...
-[2026-03-19 14:41:24] [95/344] 处理问题 #95
-[2026-03-19 14:41:24]   db_id: ccks_stock
-[2026-03-19 14:41:24]   question: Which companies have a total share capital exceeding 10 million?...
-[2026-03-19 14:41:27]   成功! 耗时: 3.72s
-[2026-03-19 14:41:27]   SQL: SELECT DISTINCT ChiName, CompanyCode, TotalShares
-FROM lc_sharestru
-WHERE TotalShares > 10000000;...
-[2026-03-19 14:41:28] [96/344] 处理问题 #96
-[2026-03-19 14:41:28]   db_id: ccks_stock
-[2026-03-19 14:41:28]   question: What is the stock code of Industrial Securities?...
-[2026-03-19 14:41:31]   成功! 耗时: 3.46s
-[2026-03-19 14:41:31]   SQL: SELECT SecuCode FROM lc_ipodeclaration WHERE ChiName = 'Industrial Securities';...
-[2026-03-19 14:41:32] [97/344] 处理问题 #97
-[2026-03-19 14:41:32]   db_id: ccks_macro
-[2026-03-19 14:41:32]   question: What is the social retail sales data of "national" state-owned and collective in...
-[2026-03-19 14:41:36]   成功! 耗时: 3.97s
-[2026-03-19 14:41:36]   SQL: SELECT ReportPeriod, RetailValueOfSCGoods
-FROM ed_retailvalueofscgoods
-WHERE ReportPeriod = '1999' A...
-[2026-03-19 14:41:36] [98/344] 处理问题 #98
-[2026-03-19 14:41:36]   db_id: ccks_macro
-[2026-03-19 14:41:36]   question: Li Gong wants to know the index value of "Non-Metallic Mineral Product Industry"...
-[2026-03-19 14:41:40]   成功! 耗时: 3.61s
-[2026-03-19 14:41:40]   SQL: SELECT IndexValue
-FROM ed_producerpiformp
-WHERE ReportPeriod = 'same period last year'
-  AND IndexNa...
-[2026-03-19 14:41:41] [99/344] 处理问题 #99
-[2026-03-19 14:41:41]   db_id: ccks_stock
-[2026-03-19 14:41:41]   question: How many companies are there in Guangdong Province with the first industry being...
-[2026-03-19 14:41:44]   成功! 耗时: 3.69s
-[2026-03-19 14:41:44]   SQL: SELECT COUNT(DISTINCT CompanyCode) AS CompanyCount
-FROM lc_exgindustry
-WHERE FirstIndustryName = 'Re...
-[2026-03-19 14:41:45] [100/344] 处理问题 #100
-[2026-03-19 14:41:45]   db_id: ccks_stock
-[2026-03-19 14:41:45]   question: What are the objects and purposes of the stock Jinchuankou's stock issuance?...
-[2026-03-19 14:41:49]   成功! 耗时: 4.10s
-[2026-03-19 14:41:49]   SQL: SELECT 
-    a.SecuCode,
-    a.ChiName,
-    a.IssuePurpose,
-    a.IssueObject
-FROM 
-    lc_ashareseas...
-[2026-03-19 14:41:49]   已保存中间结果 (100/344)
-[2026-03-19 14:41:49] [101/344] 处理问题 #101
-[2026-03-19 14:41:49]   db_id: ccks_stock
-[2026-03-19 14:41:49]   question: Find the sponsor institution and representative of 002805....
-[2026-03-19 14:41:53]   成功! 耗时: 3.95s
-[2026-03-19 14:41:53]   SQL: SELECT T1.SponsorName, T1.SponsorRepresentative
-FROM lc_ipodeclaration AS T1
-JOIN lc_asharereplaceme...
-[2026-03-19 14:41:54] [102/344] 处理问题 #102
-[2026-03-19 14:41:54]   db_id: ccks_stock
-[2026-03-19 14:41:54]   question: What is the second industry with the highest number of companies included in the...
-[2026-03-19 14:41:58]   成功! 耗时: 3.71s
-[2026-03-19 14:41:58]   SQL: SELECT SecondIndustryName
-FROM lc_exgindustry
-WHERE FirstIndustryName = 'Manufacturing'
-ORDER BY COU...
-[2026-03-19 14:41:58] [103/344] 处理问题 #103
-[2026-03-19 14:41:58]   db_id: ccks_fund
-[2026-03-19 14:41:58]   question: What is the full name of funds starting with 510?...
-[2026-03-19 14:42:02]   成功! 耗时: 4.43s
-[2026-03-19 14:42:02]   SQL: SELECT ChiName
-FROM mf_fundmanagernew
-WHERE InnerCode LIKE '510%'...
-[2026-03-19 14:42:03] [104/344] 处理问题 #104
-[2026-03-19 14:42:03]   db_id: ccks_stock
-[2026-03-19 14:42:03]   question: The quarterly growth rate of per capita holdings of Jingji Zhinong in the second...
-[2026-03-19 14:42:07]   成功! 耗时: 3.84s
-[2026-03-19 14:42:07]   SQL: SELECT 
-    AvgHoldSumGRQuarter
-FROM 
-    lc_shnumber
-WHERE 
-    ChiName = 'Jingji Zhinong' AND 
-   ...
-[2026-03-19 14:42:07] [105/344] 处理问题 #105
-[2026-03-19 14:42:07]   db_id: ccks_stock
-[2026-03-19 14:42:07]   question: Which company had the highest proportion of research and development investment ...
-[2026-03-19 14:42:11]   成功! 耗时: 3.87s
-[2026-03-19 14:42:11]   SQL: SELECT ChiName
-FROM lc_intassetsdetail
-WHERE RDInputRatio = (
-    SELECT MAX(RDInputRatio)
-    FROM ...
-[2026-03-19 14:42:12] [106/344] 处理问题 #106
-[2026-03-19 14:42:12]   db_id: ccks_stock
-[2026-03-19 14:42:12]   question: What is the number of non-marketable A shares and total A shares for 300475?...
-[2026-03-19 14:42:16]   成功! 耗时: 4.15s
-[2026-03-19 14:42:16]   SQL: SELECT 
-    SUM(T1.NonMarketableAShares * 10000) AS Non Marketable A Shares,
-    SUM(T1.TotalAShares...
-[2026-03-19 14:42:16] [107/344] 处理问题 #107
-[2026-03-19 14:42:16]   db_id: ccks_fund
-[2026-03-19 14:42:16]   question: Please tally the maximum, minimum, and average years of experience for fund mana...
-[2026-03-19 14:42:21]   成功! 耗时: 4.87s
-[2026-03-19 14:42:21]   SQL: SELECT 
-    Education, 
-    MAX(YearsOfExperience) AS MaxExperience, 
-    MIN(YearsOfExperience) AS ...
-[2026-03-19 14:42:22] [108/344] 处理问题 #108
-[2026-03-19 14:42:22]   db_id: ccks_fund
-[2026-03-19 14:42:22]   question: See which fund and fund manager hold Industrial Bank Convertible Bonds....
-[2026-03-19 14:42:26]   成功! 耗时: 4.17s
-[2026-03-19 14:42:26]   SQL: SELECT DISTINCT f.FundName, p.ChineseName
-FROM mf_fundarchives f
-JOIN mf_personalinfo p ON f.Manager...
-[2026-03-19 14:42:26] [109/344] 处理问题 #109
-[2026-03-19 14:42:26]   db_id: ccks_fund
-[2026-03-19 14:42:26]   question: What is the name of the fund manager with the highest fund net growth rate among...
-[2026-03-19 14:42:31]   成功! 耗时: 4.21s
-[2026-03-19 14:42:31]   SQL: SELECT mf_fmscaleanalysisn.ChineseName
-FROM mf_fmscaleanalysisn
-JOIN mf_fundmanagernew ON mf_fmscale...
-[2026-03-19 14:42:31] [110/344] 处理问题 #110
-[2026-03-19 14:42:31]   db_id: ccks_stock
-[2026-03-19 14:42:31]   question: What is the main business of Changshan Beiming that I want to buy?...
-[2026-03-19 14:42:35]   成功! 耗时: 3.57s
-[2026-03-19 14:42:35]   SQL: SELECT MainBusiness
-FROM lc_business
-WHERE ChiName = 'changshan beiming';...
-[2026-03-19 14:42:35]   已保存中间结果 (110/344)
-[2026-03-19 14:42:35] [111/344] 处理问题 #111
-[2026-03-19 14:42:35]   db_id: ccks_stock
-[2026-03-19 14:42:35]   question: Can you help me check the company codes with operating expenses not exceeding 10...
-[2026-03-19 14:42:39]   成功! 耗时: 4.19s
-[2026-03-19 14:42:39]   SQL: SELECT DISTINCT lc_business.CompanyCode
-FROM lc_business
-JOIN lc_actualcontroller ON lc_business.Com...
-[2026-03-19 14:42:40] [112/344] 处理问题 #112
-[2026-03-19 14:42:40]   db_id: ccks_stock
-[2026-03-19 14:42:40]   question: List the companies along with their average shareholdings per account and the pr...
-[2026-03-19 14:42:44]   成功! 耗时: 4.20s
-[2026-03-19 14:42:44]   SQL: SELECT 
-    T1.ChiName AS CompanyName,
-    T1.AverageHoldSum AS AverageShareholdingsPerAccount,
-    ...
-[2026-03-19 14:42:45] [113/344] 处理问题 #113
-[2026-03-19 14:42:45]   db_id: ccks_stock
-[2026-03-19 14:42:45]   question: Which province has the most listed companies?...
-[2026-03-19 14:42:48]   成功! 耗时: 3.47s
-[2026-03-19 14:42:48]   SQL: SELECT State, COUNT(*) AS CompanyCount
-FROM lc_stockarchives
-GROUP BY State
-ORDER BY CompanyCount DE...
-[2026-03-19 14:42:49] [114/344] 处理问题 #114
-[2026-03-19 14:42:49]   db_id: ccks_fund
-[2026-03-19 14:42:49]   question: List the top ten funds ranked by the highest annualized benchmark growth rate si...
-[2026-03-19 14:42:52]   成功! 耗时: 3.82s
-[2026-03-19 14:42:52]   SQL: SELECT SecuCode, ChiName, AnnualizedBRForSince
-FROM mf_benchmarkgrowthrate
-ORDER BY AnnualizedBRForS...
-[2026-03-19 14:42:53] [115/344] 处理问题 #115
-[2026-03-19 14:42:53]   db_id: ccks_macro
-[2026-03-19 14:42:53]   question: Can you help me take a look at the records of domestic loans and overseas loans ...
-[2026-03-19 14:42:56]   成功! 耗时: 3.64s
-[2026-03-19 14:42:56]   SQL: SELECT 
-    DomesticLoans, 
-    OverseasLoans 
-FROM 
-    ed_chinamoneyandbanking 
-WHERE 
-    ReportP...
-[2026-03-19 14:42:57] [116/344] 处理问题 #116
-[2026-03-19 14:42:57]   db_id: ccks_fund
-[2026-03-19 14:42:57]   question: What is the average management scale of Guoyuan Securities' stock-type fund comp...
-[2026-03-19 14:43:02]   成功! 耗时: 4.71s
-[2026-03-19 14:43:02]   SQL: SELECT 
-    AVG(mf_fcretscalerank.TotalAUMTypeAvg) AS GuoyuanSecuritiesAvgScale,
-    AVG(mf_fcretsca...
-[2026-03-19 14:43:02] [117/344] 处理问题 #117
-[2026-03-19 14:43:02]   db_id: ccks_fund
-[2026-03-19 14:43:02]   question: Provide the funds and fund types with positive benchmark growth rates for two ye...
-[2026-03-19 14:43:07]   成功! 耗时: 4.32s
-[2026-03-19 14:43:07]   SQL: SELECT 
-    mf_netvalue.SecuCode AS FundCode,
-    mf_netvalue.ChiName AS FundName,
-    mf_netvalue.F...
-[2026-03-19 14:43:07] [118/344] 处理问题 #118
-[2026-03-19 14:43:07]   db_id: ccks_stock
-[2026-03-19 14:43:07]   question: I want to know the bonus share ratio and actual cash dividend amount of Dongxu L...
-[2026-03-19 14:43:12]   成功! 耗时: 4.76s
-[2026-03-19 14:43:12]   SQL: SELECT 
-    d.BonusShareRatio, 
-    d.ActualCashDiviRMB
-FROM 
-    lc_dividend d
-JOIN 
-    lc_asharer...
-[2026-03-19 14:43:12] [119/344] 处理问题 #119
-[2026-03-19 14:43:12]   db_id: ccks_stock
-[2026-03-19 14:43:12]   question: Calculate the cities where the stocks in the "Big Data" sector are located and w...
-[2026-03-19 14:43:17]   成功! 耗时: 4.66s
-[2026-03-19 14:43:17]   SQL: SELECT DISTINCT L.State, L.City, L.SecretaryBD
-FROM lc_stockarchives L
-JOIN lc_ipodeclaration D ON L...
-[2026-03-19 14:43:17] [120/344] 处理问题 #120
-[2026-03-19 14:43:17]   db_id: ccks_stock
-[2026-03-19 14:43:17]   question: Display companies belonging to the primary industry "Manufacturing"....
-[2026-03-19 14:43:21]   成功! 耗时: 3.35s
-[2026-03-19 14:43:21]   SQL: SELECT DISTINCT ChiName
-FROM lc_exgindustry
-WHERE FirstIndustryName = 'Manufacturing';...
-[2026-03-19 14:43:21]   已保存中间结果 (120/344)
-[2026-03-19 14:43:21] [121/344] 处理问题 #121
-[2026-03-19 14:43:21]   db_id: ccks_fund
-[2026-03-19 14:43:21]   question: What is the one-year fund benchmark growth rate of Zhong Ou Growth A?...
-[2026-03-19 14:43:25]   成功! 耗时: 3.45s
-[2026-03-19 14:43:25]   SQL: SELECT BenchGRFor1Year
-FROM mf_benchmarkgrowthrate
-WHERE ChiNameAbbr = 'Zhong Ou Growth A';...
-[2026-03-19 14:43:25] [122/344] 处理问题 #122
-[2026-03-19 14:43:25]   db_id: ccks_stock
-[2026-03-19 14:43:25]   question: What are the top 6 stocks ranked by the highest bonus share ratio?...
-[2026-03-19 14:43:29]   成功! 耗时: 3.92s
-[2026-03-19 14:43:29]   SQL: SELECT SecuCode, ChiName, ChiNameAbbr, BonusShareRatio
-FROM lc_dividend
-ORDER BY BonusShareRatio DES...
-[2026-03-19 14:43:30] [123/344] 处理问题 #123
-[2026-03-19 14:43:30]   db_id: ccks_stock
-[2026-03-19 14:43:30]   question: List the actual controller and nationality of Changhang Phoenix Shipping....
-[2026-03-19 14:43:34]   成功! 耗时: 3.97s
-[2026-03-19 14:43:34]   SQL: SELECT T1.ControllerName, T1.NationalityDesc
-FROM lc_actualcontroller AS T1
-JOIN lc_relatedsh AS T2 ...
-[2026-03-19 14:43:34] [124/344] 处理问题 #124
-[2026-03-19 14:43:34]   db_id: ccks_fund
-[2026-03-19 14:43:34]   question: Please show me the monthly return rates of various funds....
-[2026-03-19 14:43:38]   成功! 耗时: 3.70s
-[2026-03-19 14:43:38]   SQL: SELECT 
-    m.FundTypeName,
-    m.MonRetTypeAvg AS MonthlyReturnRate
-FROM 
-    mf_fmretandscalerank ...
-[2026-03-19 14:43:38] [125/344] 处理问题 #125
-[2026-03-19 14:43:38]   db_id: ccks_fund
-[2026-03-19 14:43:38]   question: Which funds with "ETF" as the operating form and "Medium" as the risk level are ...
-[2026-03-19 14:43:42]   成功! 耗时: 3.78s
-[2026-03-19 14:43:42]   SQL: SELECT DISTINCT ChiName
-FROM mf_fundarchives
-WHERE Type = 'ETF' AND RiskReturncharacter LIKE '%Mediu...
-[2026-03-19 14:43:43] [126/344] 处理问题 #126
-[2026-03-19 14:43:43]   db_id: ccks_macro
-[2026-03-19 14:43:43]   question: Please list the amount of total assets and total liabilities for each year in th...
-[2026-03-19 14:43:47]   成功! 耗时: 4.01s
-[2026-03-19 14:43:47]   SQL: SELECT 
-    ReportPeriod AS Year,
-    SUM(TotalAssets) AS TotalAssets,
-    SUM(TotalLiability) AS To...
-[2026-03-19 14:43:47] [127/344] 处理问题 #127
-[2026-03-19 14:43:47]   db_id: ccks_stock
-[2026-03-19 14:43:47]   question: List the share repurchase situation of Kuajishan in the past year, including the...
-[2026-03-19 14:43:52]   成功! 耗时: 4.65s
-[2026-03-19 14:43:52]   SQL: SELECT 
-    b.AdvanceDate AS 'Projection Announcement Date',
-    b.BuybackSum AS 'Quantity of Share ...
-[2026-03-19 14:43:52] [128/344] 处理问题 #128
-[2026-03-19 14:43:52]   db_id: ccks_fund
-[2026-03-19 14:43:52]   question: Who are the presidents of Rongtong Fund and Huatai-PineBridge Fund?...
-[2026-03-19 14:43:56]   成功! 耗时: 4.15s
-[2026-03-19 14:43:56]   SQL: SELECT DISTINCT fm.PostName, fm.Name
-FROM mf_fundmanagernew fm
-JOIN mf_fundarchives fa ON fm.InnerCo...
-[2026-03-19 14:43:57] [129/344] 处理问题 #129
-[2026-03-19 14:43:57]   db_id: ccks_fund
-[2026-03-19 14:43:57]   question: Give the funds with a benchmark growth rate of more than 30% for three years....
-[2026-03-19 14:44:01]   成功! 耗时: 3.82s
-[2026-03-19 14:44:01]   SQL: SELECT DISTINCT m.InnerCode, m.ChiName, m.ChiNameAbbr, m.SecuAbbr, m.SecuCode
-FROM mf_netvalue m
-JOI...
-[2026-03-19 14:44:01] [130/344] 处理问题 #130
-[2026-03-19 14:44:01]   db_id: ccks_fund
-[2026-03-19 14:44:01]   question: Which funds have a market value of more than 100 million on a single stock, and ...
-[2026-03-19 14:44:05]   成功! 耗时: 4.02s
-[2026-03-19 14:44:05]   SQL: SELECT DISTINCT k.SecuCode, k.StockAbbr, k.MarketValue
-FROM mf_keystockportfolio k
-JOIN mf_fmretscal...
-[2026-03-19 14:44:05]   已保存中间结果 (130/344)
-[2026-03-19 14:44:06] [131/344] 处理问题 #131
-[2026-03-19 14:44:06]   db_id: ccks_fund
-[2026-03-19 14:44:06]   question: Hello, can you search for which fund companies have previously received awards f...
-[2026-03-19 14:44:10]   成功! 耗时: 3.96s
-[2026-03-19 14:44:10]   SQL: SELECT DISTINCT mf_fcnumofmanager.ChiName
-FROM mf_fcnumofmanager
-JOIN mf_awards ON mf_fcnumofmanager...
-[2026-03-19 14:44:10] [132/344] 处理问题 #132
-[2026-03-19 14:44:10]   db_id: ccks_stock
-[2026-03-19 14:44:10]   question: Search for industry information of Tianqi Lithium....
-[2026-03-19 14:44:14]   成功! 耗时: 4.17s
-[2026-03-19 14:44:14]   SQL: SELECT i.FirstIndustryName, i.SecondIndustryName, b.MainBusiness, b.MainName, s.RegAddr, s.Website
-F...
-[2026-03-19 14:44:15] [133/344] 处理问题 #133
-[2026-03-19 14:44:15]   db_id: ccks_stock
-[2026-03-19 14:44:15]   question: Tell me the minimum and upper limit corresponding to the stock issuance of stock...
-[2026-03-19 14:44:19]   成功! 耗时: 4.03s
-[2026-03-19 14:44:19]   SQL: SELECT 
-    MIN(IssuePriceFloor) AS MinPrice, 
-    MAX(IssuePriceCeiling) AS MaxPrice
-FROM 
-    lc_a...
-[2026-03-19 14:44:20] [134/344] 处理问题 #134
-[2026-03-19 14:44:20]   db_id: ccks_macro
-[2026-03-19 14:44:20]   question: Hi, please help me look into the number of records for other foreign currencies ...
-[2026-03-19 14:44:23]   成功! 耗时: 3.71s
-[2026-03-19 14:44:23]   SQL: SELECT COUNT(*) 
-FROM ed_chinafibalancesheetrmb 
-WHERE CurrencyName NOT IN ('RMB', 'CNY') AND OrgDep...
-[2026-03-19 14:44:24] [135/344] 处理问题 #135
-[2026-03-19 14:44:24]   db_id: ccks_stock
-[2026-03-19 14:44:24]   question: I want to know if the equity of 600076 has ever been frozen. Please list the nam...
-[2026-03-19 14:44:28]   成功! 耗时: 4.18s
-[2026-03-19 14:44:28]   SQL: SELECT 
-    FP.FPSHName, 
-    FP.InvolvedSum
-FROM 
-    lc_sharefp FP
-JOIN 
-    lc_asharereplacement ...
-[2026-03-19 14:44:28] [136/344] 处理问题 #136
-[2026-03-19 14:44:28]   db_id: ccks_macro
-[2026-03-19 14:44:28]   question: Is the "transaction commission rate" of "fund" high? Please list its highest and...
-[2026-03-19 14:44:33]   成功! 耗时: 4.23s
-[2026-03-19 14:44:33]   SQL: SELECT 
-    MAX(T1.transaction_commission_rate) AS highest_rate, 
-    MIN(T1.transaction_commission_...
-[2026-03-19 14:44:33] [137/344] 处理问题 #137
-[2026-03-19 14:44:33]   db_id: ccks_fund
-[2026-03-19 14:44:33]   question: How many fund managers newly entered the securities industry two years ago?...
-[2026-03-19 14:44:37]   成功! 耗时: 3.84s
-[2026-03-19 14:44:37]   SQL: SELECT COUNT(*) AS NewManagersCount
-FROM mf_fundmanagernew
-WHERE Incumbent = 'Y'
-  AND AccessionDate...
-[2026-03-19 14:44:37] [138/344] 处理问题 #138
-[2026-03-19 14:44:37]   db_id: ccks_stock
-[2026-03-19 14:44:37]   question: What is the underwriting quantity of institutions for the Tianjian Group stock a...
-[2026-03-19 14:44:42]   成功! 耗时: 4.67s
-[2026-03-19 14:44:42]   SQL: SELECT SUM(lc_issueandlistagent.UnderwritingVol) AS UnderwritingQuantity
-FROM lc_issueandlistagent
-J...
-[2026-03-19 14:44:43] [139/344] 处理问题 #139
-[2026-03-19 14:44:43]   db_id: ccks_stock
-[2026-03-19 14:44:43]   question: Which industry has the most IPO companies?...
-[2026-03-19 14:44:46]   成功! 耗时: 3.82s
-[2026-03-19 14:44:46]   SQL: SELECT T1.FirstIndustryName
-FROM lc_ipodeclaration AS T1
-JOIN lc_stockholdingst AS T2 ON T1.CompanyC...
-[2026-03-19 14:44:47] [140/344] 处理问题 #140
-[2026-03-19 14:44:47]   db_id: ccks_macro
-[2026-03-19 14:44:47]   question: Please list the names and corresponding values of each "National Economic Indust...
-[2026-03-19 14:44:51]   成功! 耗时: 3.67s
-[2026-03-19 14:44:51]   SQL: SELECT SubjectName, SubjectSum
-FROM ed_newincreasingloan
-WHERE ReportPeriod = 'previous year same pe...
-[2026-03-19 14:44:51]   已保存中间结果 (140/344)
-[2026-03-19 14:44:51] [141/344] 处理问题 #141
-[2026-03-19 14:44:51]   db_id: ccks_macro
-[2026-03-19 14:44:51]   question: Please help me check the end-of-period balance of financial bonds for financial ...
-[2026-03-19 14:44:56]   成功! 耗时: 4.44s
-[2026-03-19 14:44:56]   SQL: SELECT ed_financialbalance.EndDate, ed_financialbalance.ReportPeriod, ed_financialbalance.SubjectNam...
-[2026-03-19 14:44:56] [142/344] 处理问题 #142
-[2026-03-19 14:44:56]   db_id: ccks_fund
-[2026-03-19 14:44:56]   question: What are the nationalities of fund managers whose average fund size is less than...
-[2026-03-19 14:45:01]   成功! 耗时: 4.44s
-[2026-03-19 14:45:01]   SQL: SELECT DISTINCT T3.Nationality
-FROM mf_fmscaleanalysisn AS T1
-JOIN mf_personalinfo AS T2 ON T1.Perso...
-[2026-03-19 14:45:01] [143/344] 处理问题 #143
-[2026-03-19 14:45:01]   db_id: ccks_stock
-[2026-03-19 14:45:01]   question: How many companies have foreign exchange gains or losses exceeding 10 million?...
-[2026-03-19 14:45:05]   成功! 耗时: 3.88s
-[2026-03-19 14:45:05]   SQL: SELECT COUNT(DISTINCT CompanyCode) AS CompanyCount
-FROM lc_financialexpense
-WHERE ExchangeProLoss > ...
-[2026-03-19 14:45:05] [144/344] 处理问题 #144
-[2026-03-19 14:45:05]   db_id: ccks_fund
-[2026-03-19 14:45:05]   question: The ranking information of fund manager Li Xiaowei's total AUM among peers....
-[2026-03-19 14:45:10]   成功! 耗时: 4.61s
-[2026-03-19 14:45:10]   SQL: SELECT 
-    f.TotalAUMRank AS "Total AUM Ranking Among Peers"
-FROM 
-    mf_fmtermanalysis ma
-JOIN 
- ...
-[2026-03-19 14:45:11] [145/344] 处理问题 #145
-[2026-03-19 14:45:11]   db_id: ccks_stock
-[2026-03-19 14:45:11]   question: How much is the recent three-year cash dividend amount and actual cash dividend ...
-[2026-03-19 14:45:16]   成功! 耗时: 4.94s
-[2026-03-19 14:45:16]   SQL: SELECT 
-    T.DividendImplementDate, 
-    T.DiviStartDate, 
-    T.DiviEndDate, 
-    T.DividendImplem...
-[2026-03-19 14:45:16] [146/344] 处理问题 #146
-[2026-03-19 14:45:16]   db_id: ccks_stock
-[2026-03-19 14:45:16]   question: I heard that Mr. Li bought a basket of stocks, among which are the ones with cas...
-[2026-03-19 14:45:20]   成功! 耗时: 4.47s
-[2026-03-19 14:45:20]   SQL: SELECT 
-    s.SecuCode, 
-    s.CompanyCode, 
-    s.ChiName, 
-    l.DistributionSum 
-FROM 
-    lc_sha...
-[2026-03-19 14:45:21] [147/344] 处理问题 #147
-[2026-03-19 14:45:21]   db_id: ccks_fund
-[2026-03-19 14:45:21]   question: Find out which fund manager manages the most number of bond funds and who is the...
-[2026-03-19 14:45:25]   成功! 耗时: 3.69s
-[2026-03-19 14:45:25]   SQL: SELECT ChineseName
-FROM mf_fmtermanalysis
-WHERE BondFundN = (
-    SELECT MAX(BondFundN)
-    FROM mf_...
-[2026-03-19 14:45:25] [148/344] 处理问题 #148
-[2026-03-19 14:45:25]   db_id: ccks_stock
-[2026-03-19 14:45:25]   question: On which trading days did stock 300770 have turnover deals exceeding 50,000 lots...
-[2026-03-19 14:45:29]   成功! 耗时: 3.69s
-[2026-03-19 14:45:29]   SQL: SELECT DISTINCT TradingDay
+JOIN lc_stocka...
+[2026-03-20 02:43:45] 
+[17/344] 处理问题 #17
+[2026-03-20 02:43:45]   schema: ccks_fund
+[2026-03-20 02:43:45]   question: Show the fund codes and fund manager names of the award-winning funds....
+[2026-03-20 02:43:45]   尝试模型 [1/87]: qwen/qwen1.5-32b-chat
+[2026-03-20 02:43:50]     失败: API错误: 500 - {"detail":"处理失败: API返回错误状态码: 400, {\"error\":{\"message\":\"<400> InternalError.Algo.In
+[2026-03-20 02:43:50]   尝试模型 [2/87]: qwen/qwen2.5-coder-32b-instruct
+[2026-03-20 02:43:54]     成功! 耗时: 4.34s
+[2026-03-20 02:43:54]     SQL: SELECT `mf_awards`.`FundCode`, `mf_awards`.`FundManager`
+FROM `mf_awards`
+WHERE `mf_awards`.`WinnerT...
+[2026-03-20 02:43:55] 
+[18/344] 处理问题 #18
+[2026-03-20 02:43:55]   schema: ccks_stock
+[2026-03-20 02:43:55]   question: What is the daily trading volume and turnover amount of Caesar Culture's stock?...
+[2026-03-20 02:43:55]   尝试模型 [1/86]: qwen/deepseek-r1-0528
+[2026-03-20 02:44:28]     成功! 耗时: 33.05s
+[2026-03-20 02:44:28]     SQL: SELECT TradingDay, TurnoverVolume, TurnoverValue
 FROM qt_dailyquote
-WHERE SecuCode = '300770' AND TurnoverDeals > 5000;...
-[2026-03-19 14:45:29] [149/344] 处理问题 #149
-[2026-03-19 14:45:29]   db_id: ccks_stock
-[2026-03-19 14:45:29]   question: The proportion of freely tradable shares held by insurance companies in Bu Bu Ga...
-[2026-03-19 14:45:34]   成功! 耗时: 4.27s
-[2026-03-19 14:45:34]   SQL: SELECT T2.InsuranceCorpsHoldPropA
-FROM lc_stockholdingst AS T2
-JOIN lc_sharesfloatingschedule AS T1 ...
-[2026-03-19 14:45:34] [150/344] 处理问题 #150
-[2026-03-19 14:45:34]   db_id: ccks_fund
-[2026-03-19 14:45:34]   question: How many fund managers have a bachelor's degree and a negative fund net growth r...
-[2026-03-19 14:45:38]   成功! 耗时: 3.92s
-[2026-03-19 14:45:38]   SQL: SELECT COUNT(DISTINCT PersonalCode) AS ManagerCount
-FROM mf_fmscaleanalysisn
-JOIN mf_personalinfo ON...
-[2026-03-19 14:45:38]   已保存中间结果 (150/344)
-[2026-03-19 14:45:39] [151/344] 处理问题 #151
-[2026-03-19 14:45:39]   db_id: ccks_stock
-[2026-03-19 14:45:39]   question: What are the minimum and maximum issuance volumes of the additional issuance (00...
-[2026-03-19 14:45:42]   成功! 耗时: 3.81s
-[2026-03-19 14:45:42]   SQL: SELECT MIN(IssueVol) AS MinIssuanceVolume, MAX(IssueVol) AS MaxIssuanceVolume
-FROM lc_ashareseasoned...
-[2026-03-19 14:45:43] [152/344] 处理问题 #152
-[2026-03-19 14:45:43]   db_id: ccks_stock
-[2026-03-19 14:45:43]   question: Please list the major shareholders of the share allotment for 000686....
-[2026-03-19 14:45:47]   成功! 耗时: 4.13s
-[2026-03-19 14:45:47]   SQL: SELECT DISTINCT l.SHName, l.HoldingPCT
-FROM lc_relatedsh l
-JOIN lc_ashareplacement a ON l.CompanyCod...
-[2026-03-19 14:45:48] [153/344] 处理问题 #153
-[2026-03-19 14:45:48]   db_id: ccks_fund
-[2026-03-19 14:45:48]   question: What are the net asset value and net value per share of Huaxia 50ETF at the end ...
-[2026-03-19 14:45:51]   成功! 耗时: 3.90s
-[2026-03-19 14:45:51]   SQL: SELECT 
-    NetAssetsValue, 
-    NVPerShare 
-FROM 
-    mf_mainfinancialindexq 
-WHERE 
-    ChiName = ...
-[2026-03-19 14:45:52] [154/344] 处理问题 #154
-[2026-03-19 14:45:52]   db_id: ccks_stock
-[2026-03-19 14:45:52]   question: How many times did the single repurchase amount of 600196 exceed 100 million yua...
-[2026-03-19 14:45:55]   成功! 耗时: 3.52s
-[2026-03-19 14:45:55]   SQL: SELECT COUNT(*) 
-FROM lc_buyback 
-WHERE BuybackMoney > 100000000;...
-[2026-03-19 14:45:56] [155/344] 处理问题 #155
-[2026-03-19 14:45:56]   db_id: ccks_fund
-[2026-03-19 14:45:56]   question: How many fund managers have an annualized Sortino ratio greater than 2, grouped ...
-[2026-03-19 14:46:00]   成功! 耗时: 4.10s
-[2026-03-19 14:46:00]   SQL: SELECT COUNT(DISTINCT p.PersonalCode) AS ManagerCount, a.Gender
-FROM mf_fmperfanalysis p
-JOIN mf_adv...
-[2026-03-19 14:46:01] [156/344] 处理问题 #156
-[2026-03-19 14:46:01]   db_id: ccks_stock
-[2026-03-19 14:46:01]   question: Display the company name, executive name, and initial shareholding number in Han...
-[2026-03-19 14:46:05]   成功! 耗时: 4.48s
-[2026-03-19 14:46:05]   SQL: SELECT 
-    lc_executivesholdings.ChiName AS CompanyName, 
-    lc_executivesholdings.LeaderName AS E...
-[2026-03-19 14:46:06] [157/344] 处理问题 #157
-[2026-03-19 14:46:06]   db_id: ccks_fund
-[2026-03-19 14:46:06]   question: Which fund managers have a benchmark growth rate of over 100% since inception, a...
-[2026-03-19 14:46:09]   成功! 耗时: 3.80s
-[2026-03-19 14:46:09]   SQL: SELECT DISTINCT fm.Name AS FundManagerName, mg.BenchGRForSince AS BenchmarkGrowthRate
-FROM mf_fundma...
-[2026-03-19 14:46:10] [158/344] 处理问题 #158
-[2026-03-19 14:46:10]   db_id: ccks_macro
-[2026-03-19 14:46:10]   question: Please help me query the "cumulative year-end" total retail sales of consumer go...
-[2026-03-19 14:46:14]   成功! 耗时: 3.92s
-[2026-03-19 14:46:14]   SQL: SELECT 
-    Province, 
-    City, 
-    SUM(RetailValueOfSCGoods) AS CumulativeYearEndTotalRetailSales...
-[2026-03-19 14:46:14] [159/344] 处理问题 #159
-[2026-03-19 14:46:14]   db_id: ccks_fund
-[2026-03-19 14:46:14]   question: What are the top ten funds, managers, and performance benchmarks in terms of ben...
-[2026-03-19 14:46:19]   成功! 耗时: 4.61s
-[2026-03-19 14:46:19]   SQL: SELECT 
-    b.ChiName AS FundName,
-    m.ChineseName AS ManagerName,
-    b.DailyBenchGR AS Benchmark...
-[2026-03-19 14:46:19] [160/344] 处理问题 #160
-[2026-03-19 14:46:19]   db_id: ccks_stock
-[2026-03-19 14:46:19]   question: What is the major shareholder of the rights issue of Aerospace Development?...
-[2026-03-19 14:46:23]   成功! 耗时: 4.05s
-[2026-03-19 14:46:23]   SQL: SELECT lsr.SHName AS MajorShareholder
-FROM lc_relatedsh lsr
-JOIN lc_largeshsubscription lls ON lsr.C...
-[2026-03-19 14:46:23]   已保存中间结果 (160/344)
-[2026-03-19 14:46:24] [161/344] 处理问题 #161
-[2026-03-19 14:46:24]   db_id: ccks_fund
-[2026-03-19 14:46:24]   question: What are the sizes of QDII and monetary funds managed by Liu Gesong?...
-[2026-03-19 14:46:28]   成功! 耗时: 3.66s
-[2026-03-19 14:46:28]   SQL: SELECT QDIINV AS QDII_Size, MonetaryFundNV AS Monetary_Fund_Size
-FROM mf_fmscaleanalysisn
-WHERE Chin...
-[2026-03-19 14:46:28] [162/344] 处理问题 #162
-[2026-03-19 14:46:28]   db_id: ccks_macro
-[2026-03-19 14:46:28]   question: Please help me retrieve the index value of "Special Equipment Manufacturing Indu...
-[2026-03-19 14:46:32]   成功! 耗时: 3.84s
-[2026-03-19 14:46:32]   SQL: SELECT IndexValue
-FROM in_meansofproductionpi
-WHERE IndexTitle = 'Special Equipment Manufacturing In...
-[2026-03-19 14:46:32] [163/344] 处理问题 #163
-[2026-03-19 14:46:32]   db_id: ccks_stock
-[2026-03-19 14:46:32]   question: The proportion of non-restricted circulating shares of Chongqing Construction En...
-[2026-03-19 14:46:37]   成功! 耗时: 4.65s
-[2026-03-19 14:46:37]   SQL: SELECT 
-    lcs.NonRestrictedShares * 100 / lcs.Ashares AS ProportionOfNonRestrictedShares
-FROM 
-   ...
-[2026-03-19 14:46:38] [164/344] 处理问题 #164
-[2026-03-19 14:46:38]   db_id: ccks_fund
-[2026-03-19 14:46:38]   question: Which managers have a benchmark growth rate greater than 0 since the beginning o...
-[2026-03-19 14:46:42]   成功! 耗时: 3.98s
-[2026-03-19 14:46:42]   SQL: SELECT DISTINCT m.PostName
-FROM mf_fundmanagernew m
-JOIN mf_benchmarkgrowthrate b ON m.InnerCode = b...
-[2026-03-19 14:46:42] [165/344] 处理问题 #165
-[2026-03-19 14:46:42]   db_id: ccks_fund
-[2026-03-19 14:46:42]   question: What is the average number of funds managed by fund managers and the average tot...
-[2026-03-19 14:46:46]   成功! 耗时: 4.23s
-[2026-03-19 14:46:46]   SQL: SELECT 
-    AVG(mf_fcnumofmanager.NumOfManager) AS AverageNumOfManagers,
-    AVG(mf_fmscaleanalysisn...
-[2026-03-19 14:46:47] [166/344] 处理问题 #166
-[2026-03-19 14:46:47]   db_id: ccks_fund
-[2026-03-19 14:46:47]   question: What is the investment type of Invesco Resources?...
-[2026-03-19 14:46:50]   成功! 耗时: 3.58s
-[2026-03-19 14:46:50]   SQL: SELECT InvestmentType
-FROM mf_fundarchives
-WHERE ChiName = 'Invesco Resources';...
-[2026-03-19 14:46:51] [167/344] 处理问题 #167
-[2026-03-19 14:46:51]   db_id: ccks_fund
-[2026-03-19 14:46:51]   question: Which managers were awarded last year?...
-[2026-03-19 14:46:55]   成功! 耗时: 3.74s
-[2026-03-19 14:46:55]   SQL: SELECT DISTINCT mf_awards.FundManager
-FROM mf_awards
-WHERE mf_awards.Year = 'last year';...
-[2026-03-19 14:46:55] [168/344] 处理问题 #168
-[2026-03-19 14:46:55]   db_id: ccks_stock
-[2026-03-19 14:46:55]   question: Display the shareholder information of Aishida, including shareholder name, numb...
-[2026-03-19 14:46:59]   成功! 耗时: 4.02s
-[2026-03-19 14:46:59]   SQL: SELECT 
-    r.SHName AS ShareholderName, 
-    r.HoldingSum AS NumberOfSharesHeld, 
-    r.HoldingPCT ...
-[2026-03-19 14:47:00] [169/344] 处理问题 #169
-[2026-03-19 14:47:00]   db_id: ccks_stock
-[2026-03-19 14:47:00]   question: List the major shareholders, shareholding quantity, and shareholding percentage ...
-[2026-03-19 14:47:04]   成功! 耗时: 3.98s
-[2026-03-19 14:47:04]   SQL: SELECT 
-    r.SHNName AS MajorShareholder, 
-    r.HoldingSum AS ShareholdingQuantity, 
-    r.Holding...
-[2026-03-19 14:47:04] [170/344] 处理问题 #170
-[2026-03-19 14:47:04]   db_id: ccks_fund
-[2026-03-19 14:47:04]   question: Can you check for me which fund companies were awarded last year?...
-[2026-03-19 14:47:08]   成功! 耗时: 3.67s
-[2026-03-19 14:47:08]   SQL: SELECT DISTINCT FundCompany
-FROM mf_awards
-WHERE Year = 'last year';...
-[2026-03-19 14:47:08]   已保存中间结果 (170/344)
-[2026-03-19 14:47:08] [171/344] 处理问题 #171
-[2026-03-19 14:47:08]   db_id: ccks_fund
-[2026-03-19 14:47:08]   question: Find the fund manager with the highest number of bond fund management, and the q...
-[2026-03-19 14:47:12]   成功! 耗时: 3.76s
-[2026-03-19 14:47:12]   SQL: SELECT ChineseName, BondFundN
-FROM mf_advisorscalerank
-WHERE BondFundN = (
-    SELECT MAX(BondFundN)...
-[2026-03-19 14:47:13] [172/344] 处理问题 #172
-[2026-03-19 14:47:13]   db_id: ccks_stock
-[2026-03-19 14:47:13]   question: Shareholders and actual number of allotment shares in Qi Di Pharmaceutical's all...
-[2026-03-19 14:47:17]   成功! 耗时: 3.96s
-[2026-03-19 14:47:17]   SQL: SELECT 
-    l ChiName, 
-    l.AcutalPlaVol AS ActualNumberOfAllotmentShares
-FROM 
-    lc_asharerepla...
-[2026-03-19 14:47:17] [173/344] 处理问题 #173
-[2026-03-19 14:47:17]   db_id: ccks_stock
-[2026-03-19 14:47:17]   question: Which are the top 4 companies in Zhejiang Province with the highest interest exp...
-[2026-03-19 14:47:21]   成功! 耗时: 4.00s
-[2026-03-19 14:47:21]   SQL: SELECT l.CompanyName, l.EndDate, l.TotalShare, l.ClosePrice
-FROM lc_stockarchives l
-JOIN lc_freefloa...
-[2026-03-19 14:47:22] [174/344] 处理问题 #174
-[2026-03-19 14:47:22]   db_id: ccks_stock
-[2026-03-19 14:47:22]   question: Average underwriting volume for each institution....
-[2026-03-19 14:47:25]   成功! 耗时: 3.87s
-[2026-03-19 14:47:25]   SQL: SELECT 
-    lc_issueandlistagent.FullName AS InstitutionName,
-    SUM(lc_issueandlistagent.Underwrit...
-[2026-03-19 14:47:26] [175/344] 处理问题 #175
-[2026-03-19 14:47:26]   db_id: ccks_stock
-[2026-03-19 14:47:26]   question: What is the total share capital and circulating share capital of Shandong Expres...
-[2026-03-19 14:47:30]   成功! 耗时: 3.93s
-[2026-03-19 14:47:30]   SQL: SELECT 
-    SUM(TotalAShares) AS TotalShareCapital, 
-    SUM(AccuMarketableAShares) AS CirculatingSh...
-[2026-03-19 14:47:30] [176/344] 处理问题 #176
-[2026-03-19 14:47:30]   db_id: ccks_fund
-[2026-03-19 14:47:30]   question: Display the number of fund managers whose annualized alpha exceeds 0.1, grouped ...
-[2026-03-19 14:47:35]   成功! 耗时: 4.52s
-[2026-03-19 14:47:35]   SQL: SELECT T2.Nationality, COUNT(T1.PersonalCode) AS NumberOfManagers
-FROM mf_fmretscaleanalysis T1
-JOIN...
-[2026-03-19 14:47:35] [177/344] 处理问题 #177
-[2026-03-19 14:47:35]   db_id: ccks_fund
-[2026-03-19 14:47:35]   question: What is the type of fund with the lowest average management scale compared to th...
-[2026-03-19 14:47:41]   成功! 耗时: 5.12s
-[2026-03-19 14:47:41]   SQL: SELECT T1.FundTypeName, T1.TotalFundNV / 100 AS TotalManagementScale
-FROM mf_fundarchives AS T1
-JOIN...
-[2026-03-19 14:47:41] [178/344] 处理问题 #178
-[2026-03-19 14:47:41]   db_id: ccks_fund
-[2026-03-19 14:47:41]   question: Count the number of fund managers whose average rate of return is greater than 0...
-[2026-03-19 14:47:46]   成功! 耗时: 4.77s
-[2026-03-19 14:47:46]   SQL: SELECT 
-    ed.Education, 
-    COUNT(*) AS NumberOfManagers
-FROM 
-    mf_fmretscaleanalysis ras
-JOIN...
-[2026-03-19 14:47:46] [179/344] 处理问题 #179
-[2026-03-19 14:47:46]   db_id: ccks_fund
-[2026-03-19 14:47:46]   question: Do you know the record of the rate of return for each fund in the past month?...
-[2026-03-19 14:47:50]   成功! 耗时: 3.81s
-[2026-03-19 14:47:50]   SQL: SELECT 
-    SecuCode, 
-    ChiName, 
-    FundReturn 
-FROM 
-    mf_fundreturnrank 
-WHERE 
-    FundRet...
-[2026-03-19 14:47:51] [180/344] 处理问题 #180
-[2026-03-19 14:47:51]   db_id: ccks_fund
-[2026-03-19 14:47:51]   question: Please help me search for the annual return rate data of various funds....
-[2026-03-19 14:47:54]   成功! 耗时: 3.60s
-[2026-03-19 14:47:54]   SQL: SELECT 
-    ChiName, 
-    FundTypeName, 
-    FundAnnReturn 
-FROM 
-    mf_fundreturnrank 
-WHERE 
-    ...
-[2026-03-19 14:47:54]   已保存中间结果 (180/344)
-[2026-03-19 14:47:55] [181/344] 处理问题 #181
-[2026-03-19 14:47:55]   db_id: ccks_fund
-[2026-03-19 14:47:55]   question: Which fund managers in the entire market manage a total scale exceeding 20 billi...
-[2026-03-19 14:47:58]   成功! 耗时: 3.70s
-[2026-03-19 14:47:58]   SQL: SELECT DISTINCT fm.ChineseName
-FROM mf_fmscaleanalysisn fm
-WHERE fm.TotalFundNV > 2000;...
-[2026-03-19 14:47:59] [182/344] 处理问题 #182
-[2026-03-19 14:47:59]   db_id: ccks_fund
-[2026-03-19 14:47:59]   question: What are the funds with a weekly benchmark growth rate higher than 2% and their ...
-[2026-03-19 14:48:03]   成功! 耗时: 3.84s
-[2026-03-19 14:48:03]   SQL: SELECT 
-    m ChiName, 
-    NVWeeklyGrowthRate 
-FROM 
-    mf_netvalue m 
-JOIN 
-    mf_benchmarkgrowt...
-[2026-03-19 14:48:03] [183/344] 处理问题 #183
-[2026-03-19 14:48:03]   db_id: ccks_fund
-[2026-03-19 14:48:03]   question: How many stocks are held by the funds?...
-[2026-03-19 14:48:07]   成功! 耗时: 3.68s
-[2026-03-19 14:48:07]   SQL: SELECT COUNT(DISTINCT InnerCode) AS NumberOfStockHeldFunds
-FROM mf_keystockportfolio;...
-[2026-03-19 14:48:07] [184/344] 处理问题 #184
-[2026-03-19 14:48:07]   db_id: ccks_macro
-[2026-03-19 14:48:07]   question: Please retrieve the relevant index value of "Gas Production and Supply Industry"...
-[2026-03-19 14:48:11]   成功! 耗时: 3.60s
-[2026-03-19 14:48:11]   SQL: SELECT IndexValue
-FROM ed_industryproduction
-WHERE ReportPeriod = 'last year same month'
-AND IndexTy...
-[2026-03-19 14:48:12] [185/344] 处理问题 #185
-[2026-03-19 14:48:12]   db_id: ccks_fund
-[2026-03-19 14:48:12]   question: Please list the records of the size of return on investment for each fund since ...
-[2026-03-19 14:48:15]   成功! 耗时: 3.60s
-[2026-03-19 14:48:15]   SQL: SELECT 
-    FundTypeName, 
-    TimeInterval, 
-    WeightedAvgReturn 
-FROM 
-    mf_fmretscaleanalysis...
-[2026-03-19 14:48:16] [186/344] 处理问题 #186
-[2026-03-19 14:48:16]   db_id: ccks_fund
-[2026-03-19 14:48:16]   question: Search for the weekly return rate values of each fund....
-[2026-03-19 14:48:19]   成功! 耗时: 3.67s
-[2026-03-19 14:48:19]   SQL: SELECT DISTINCT FundTypeName, RRInSelectedWeek AS WeeklyReturnRate
-FROM mf_netvalueperformancehis
-WH...
-[2026-03-19 14:48:20] [187/344] 处理问题 #187
-[2026-03-19 14:48:20]   db_id: ccks_stock
-[2026-03-19 14:48:20]   question: List the names of all listed companies in the same industry as Shenzhen Technolo...
-[2026-03-19 14:48:24]   成功! 耗时: 4.00s
-[2026-03-19 14:48:24]   SQL: SELECT DISTINCT l ChiName
-FROM lc_business l
-JOIN lc_exgindustry i ON l.CompanyCode = i.CompanyCode
-...
-[2026-03-19 14:48:24] [188/344] 处理问题 #188
-[2026-03-19 14:48:24]   db_id: ccks_stock
-[2026-03-19 14:48:24]   question: How many companies had operating income exceeding 100 million yuan last year?...
-[2026-03-19 14:48:28]   成功! 耗时: 3.77s
-[2026-03-19 14:48:28]   SQL: SELECT COUNT(DISTINCT CompanyCode) AS CompanyCount
-FROM lc_mainoperincome
-WHERE MainOperIncome > 100...
-[2026-03-19 14:48:29] [189/344] 处理问题 #189
-[2026-03-19 14:48:29]   db_id: ccks_stock
-[2026-03-19 14:48:29]   question: Help me check the abbreviations and company introduction information of listed c...
-[2026-03-19 14:48:33]   成功! 耗时: 4.19s
-[2026-03-19 14:48:33]   SQL: SELECT 
-    lc_stockarchives.ChiNameAbbr, 
-    lc_stockarchives.BriefIntroText
-FROM 
-    lc_stockarc...
-[2026-03-19 14:48:33] [190/344] 处理问题 #190
-[2026-03-19 14:48:33]   db_id: ccks_stock
-[2026-03-19 14:48:33]   question: I heard that there are individual stocks whose frozen quantity accounts for more...
-[2026-03-19 14:48:37]   成功! 耗时: 4.10s
-[2026-03-19 14:48:37]   SQL: SELECT T1.SecuCode, T1.ChiName, T1.InactiveFloats
-FROM lc_sharefp T1
-JOIN lc_sharestru T2 ON T1.Secu...
-[2026-03-19 14:48:37]   已保存中间结果 (190/344)
-[2026-03-19 14:48:38] [191/344] 处理问题 #191
-[2026-03-19 14:48:38]   db_id: ccks_fund
-[2026-03-19 14:48:38]   question: Hi, can you please help me check the one-year rate of return value for each fund...
-[2026-03-19 14:48:42]   成功! 耗时: 4.38s
-[2026-03-19 14:48:42]   SQL: SELECT 
-    mf_fundarchives.SecuCode AS FundCode,
-    mf_fundarchives.ChiName AS FundName,
-    mf_ne...
-[2026-03-19 14:48:43] [192/344] 处理问题 #192
-[2026-03-19 14:48:43]   db_id: ccks_stock
-[2026-03-19 14:48:43]   question: Can you show me the company codes of the companies with main operating profit be...
-[2026-03-19 14:48:47]   成功! 耗时: 4.06s
-[2026-03-19 14:48:47]   SQL: SELECT DISTINCT CompanyCode
-FROM lc_business
-WHERE BusinessMajor LIKE '%main operating profit%'
-AND ...
-[2026-03-19 14:48:47] [193/344] 处理问题 #193
-[2026-03-19 14:48:47]   db_id: ccks_macro
-[2026-03-19 14:48:47]   question: Please display the detailed annual total assets data since the records exist, an...
-[2026-03-19 14:48:51]   成功! 耗时: 3.85s
-[2026-03-19 14:48:51]   SQL: SELECT ReportPeriod, TotalAssets
-FROM ed_moneyauthoritybs
-WHERE TotalAssets IS NOT NULL
-ORDER BY Rep...
-[2026-03-19 14:48:52] [194/344] 处理问题 #194
-[2026-03-19 14:48:52]   db_id: ccks_stock
-[2026-03-19 14:48:52]   question: Query the institutions and their legal representatives who participated in the i...
-[2026-03-19 14:48:56]   成功! 耗时: 4.48s
-[2026-03-19 14:48:56]   SQL: SELECT 
-    i.FullName AS InstitutionName,
-    i.LegalPersonRepr AS LegalRepresentative,
-    s.Inves...
-[2026-03-19 14:48:57] [195/344] 处理问题 #195
-[2026-03-19 14:48:57]   db_id: ccks_macro
-[2026-03-19 14:48:57]   question: I want to know the index value of "Living Materials" in the "Industrial Structur...
-[2026-03-19 14:49:01]   成功! 耗时: 3.81s
-[2026-03-19 14:49:01]   SQL: SELECT IndexValue
-FROM ed_producerpiformp
-WHERE IndexName = 'Industrial Structure Classification Ind...
-[2026-03-19 14:49:01] [196/344] 处理问题 #196
-[2026-03-19 14:49:01]   db_id: ccks_stock
-[2026-03-19 14:49:01]   question: The R&D investment of Shenzhen Technology in 2017....
-[2026-03-19 14:49:05]   成功! 耗时: 3.79s
-[2026-03-19 14:49:05]   SQL: SELECT TotalRDInput
-FROM lc_intassetsdetail
-WHERE ChiName = 'Shenzhen Technology' AND EndDate = '201...
-[2026-03-19 14:49:05] [197/344] 处理问题 #197
-[2026-03-19 14:49:05]   db_id: ccks_fund
-[2026-03-19 14:49:05]   question: Help me find out which funds have received awards and list the names of the awar...
-[2026-03-19 14:49:09]   成功! 耗时: 3.83s
-[2026-03-19 14:49:09]   SQL: SELECT DISTINCT mfa.FundName, mwa.AwardName
-FROM mf_awards mwa
-JOIN mf_fundarchives mfa ON mwa.Fund ...
-[2026-03-19 14:49:10] [198/344] 处理问题 #198
-[2026-03-19 14:49:10]   db_id: ccks_fund
-[2026-03-19 14:49:10]   question: What is the average number of years of work experience for fund managers with di...
-[2026-03-19 14:49:14]   成功! 耗时: 4.00s
-[2026-03-19 14:49:14]   SQL: SELECT 
-    p.Education, 
-    AVG(m.ExperienceTime) AS AverageYearsOfExperience
-FROM 
-    mf_persona...
-[2026-03-19 14:49:14] [199/344] 处理问题 #199
-[2026-03-19 14:49:14]   db_id: ccks_macro
-[2026-03-19 14:49:14]   question: What is the amount of retail sales of consumer goods in the wholesale and retail...
-[2026-03-19 14:49:18]   成功! 耗时: 3.55s
-[2026-03-19 14:49:18]   SQL: SELECT SUM(RetailValueOfSCGoods) AS TotalRetailSales
-FROM ed_retailvalueofscgoods
-WHERE WholesaleRet...
-[2026-03-19 14:49:18] [200/344] 处理问题 #200
-[2026-03-19 14:49:18]   db_id: ccks_stock
-[2026-03-19 14:49:18]   question: In which provinces are the companies that invested more than 1 billion yuan in r...
-[2026-03-19 14:49:22]   成功! 耗时: 4.24s
-[2026-03-19 14:49:22]   SQL: SELECT DISTINCT lc_stockarchives.State
-FROM lc_intassetsdetail
-JOIN lc_stockarchives ON lc_intassets...
-[2026-03-19 14:49:22]   已保存中间结果 (200/344)
-[2026-03-19 14:49:23] [201/344] 处理问题 #201
-[2026-03-19 14:49:23]   db_id: ccks_stock
-[2026-03-19 14:49:23]   question: Are there any stocks that belong to multiple concept sectors? If so, please list...
-[2026-03-19 14:49:27]   成功! 耗时: 3.92s
-[2026-03-19 14:49:27]   SQL: SELECT DISTINCT SecuCode
-FROM lc_coconcept
-WHERE SecuCode IN (
-    SELECT SecuCode
-    FROM lc_cocon...
-[2026-03-19 14:49:27] [202/344] 处理问题 #202
-[2026-03-19 14:49:27]   db_id: ccks_fund
-[2026-03-19 14:49:27]   question: Please find the names of the top 11 funds ranked by return in Fund Return Rank w...
-[2026-03-19 14:49:31]   成功! 耗时: 3.77s
-[2026-03-19 14:49:31]   SQL: SELECT ChiName
-FROM mf_fundreturnrank
-WHERE IndexCycle = 'three years'
-ORDER BY FundReturn DESC
-LIMI...
-[2026-03-19 14:49:32] [203/344] 处理问题 #203
-[2026-03-19 14:49:32]   db_id: ccks_stock
-[2026-03-19 14:49:32]   question: Which companies conducted dividend distribution and share transfer in 2022?...
-[2026-03-19 14:49:35]   成功! 耗时: 3.81s
-[2026-03-19 14:49:35]   SQL: SELECT DISTINCT lci.ChiName, lci.CompanyCode
-FROM lc_dividend ldi
-JOIN lc_sharetransfer lci ON ldi.C...
-[2026-03-19 14:49:36] [204/344] 处理问题 #204
-[2026-03-19 14:49:36]   db_id: ccks_fund
-[2026-03-19 14:49:36]   question: List the funds and managers that hold 21 Guokai 06....
-[2026-03-19 14:49:40]   成功! 耗时: 4.29s
-[2026-03-19 14:49:40]   SQL: SELECT DISTINCT f.fundarchives.ChiName AS FundName, p.mf_personalinfo.ChineseName AS ManagerName
-FRO...
-[2026-03-19 14:49:41] [205/344] 处理问题 #205
-[2026-03-19 14:49:41]   db_id: ccks_stock
-[2026-03-19 14:49:41]   question: Display the minimum and maximum closing prices of each stock since 2022....
-[2026-03-19 14:49:45]   成功! 耗时: 4.71s
-[2026-03-19 14:49:45]   SQL: SELECT 
-    qt_dailyquote.SecuCode AS StockCode,
-    MIN(qt_dailyquote.ClosePrice) AS MinClosingPric...
-[2026-03-19 14:49:46] [206/344] 处理问题 #206
-[2026-03-19 14:49:46]   db_id: ccks_stock
-[2026-03-19 14:49:46]   question: What are the different sponsoring institutions for IPO of 603806?...
-[2026-03-19 14:49:50]   成功! 耗时: 3.69s
-[2026-03-19 14:49:50]   SQL: SELECT DISTINCT SponsorName
-FROM lc_ipodeclaration
-WHERE SecuCode = '603806';...
-[2026-03-19 14:49:50] [207/344] 处理问题 #207
-[2026-03-19 14:49:50]   db_id: ccks_stock
-[2026-03-19 14:49:50]   question: Who were the recipients of Vanke's equity in 2013?...
-[2026-03-19 14:49:54]   成功! 耗时: 3.69s
-[2026-03-19 14:49:54]   SQL: SELECT DISTINCT PlaObject
-FROM lc_asharereplacement
-WHERE PlaYear = '2013';...
-[2026-03-19 14:49:54] [208/344] 处理问题 #208
-[2026-03-19 14:49:54]   db_id: ccks_stock
-[2026-03-19 14:49:54]   question: What is the stock code of Lao Feng Xiang?...
-[2026-03-19 14:49:58]   成功! 耗时: 3.62s
-[2026-03-19 14:49:58]   SQL: SELECT SecuCode
-FROM lc_sharefpsta
-WHERE ChiName = 'Lao Feng Xiang';...
-[2026-03-19 14:49:58] [209/344] 处理问题 #209
-[2026-03-19 14:49:58]   db_id: ccks_stock
-[2026-03-19 14:49:58]   question: Which company has the highest proportion of unrestricted circulating A shares he...
-[2026-03-19 14:50:03]   成功! 耗时: 4.22s
-[2026-03-19 14:50:03]   SQL: SELECT T1.CompanyCode, T1.ChiName
-FROM lc_stockholdingst AS T1
-JOIN lc_sharestru AS T2 ON T1.Company...
-[2026-03-19 14:50:03] [210/344] 处理问题 #210
-[2026-03-19 14:50:03]   db_id: ccks_fund
-[2026-03-19 14:50:03]   question: What are the funds and fund managers with negative benchmark growth rates today?...
-[2026-03-19 14:50:08]   成功! 耗时: 4.31s
-[2026-03-19 14:50:08]   SQL: SELECT DISTINCT f.FundTypeName, fm.ChineseName, bg.DailyBenchGR
-FROM mf_fmretandscalerank fm
-JOIN mf...
-[2026-03-19 14:50:08]   已保存中间结果 (210/344)
-[2026-03-19 14:50:08] [211/344] 处理问题 #211
-[2026-03-19 14:50:08]   db_id: ccks_fund
-[2026-03-19 14:50:08]   question: How many fund managers have managed a total scale of no less than 5 billion yuan...
-[2026-03-19 14:50:13]   成功! 耗时: 4.96s
-[2026-03-19 14:50:13]   SQL: SELECT 
-    Education, 
-    COUNT(*) AS ManagerCount
-FROM 
-    mf_fmscaleanalysisn
-JOIN 
-    mf_fmte...
-[2026-03-19 14:50:13] [212/344] 处理问题 #212
-[2026-03-19 14:50:13]   db_id: ccks_stock
-[2026-03-19 14:50:13]   question: What are the shareholder names and the respective shareholdings of 300184?...
-[2026-03-19 14:50:17]   成功! 耗时: 3.90s
-[2026-03-19 14:50:17]   SQL: SELECT 
-    r.SHName AS ShareholderName, 
-    r.HoldingSum AS Shareholding
-FROM 
-    lc_relatedsh r
-...
-[2026-03-19 14:50:18] [213/344] 处理问题 #213
-[2026-03-19 14:50:18]   db_id: ccks_fund
-[2026-03-19 14:50:18]   question: Calculate the maximum, minimum, and average years of experience for fund manager...
-[2026-03-19 14:50:23]   成功! 耗时: 4.79s
-[2026-03-19 14:50:23]   SQL: SELECT 
-    Education,
-    MAX(YearsOfExperience) AS MaxExperience,
-    MIN(YearsOfExperience) AS Mi...
-[2026-03-19 14:50:23] [214/344] 处理问题 #214
-[2026-03-19 14:50:23]   db_id: ccks_fund
-[2026-03-19 14:50:23]   question: Look at the bond holdings, market value, and manager information of 510130....
-[2026-03-19 14:50:28]   成功! 耗时: 4.56s
-[2026-03-19 14:50:28]   SQL: SELECT 
-    b.InnerCode,
-    b.ChiName,
-    b.MarketValue,
-    m.ChineseName AS ManagerName,
-    i.I...
-[2026-03-19 14:50:28] [215/344] 处理问题 #215
-[2026-03-19 14:50:28]   db_id: ccks_stock
-[2026-03-19 14:50:28]   question: Which stocks had a dividend base exceeding 10 million in the previous year?...
-[2026-03-19 14:50:32]   成功! 耗时: 3.78s
-[2026-03-19 14:50:32]   SQL: SELECT DISTINCT l.SecuCode, l.ChiName
-FROM lc_dividend l
-WHERE l.DiviBase > 10000000;...
-[2026-03-19 14:50:33] [216/344] 处理问题 #216
-[2026-03-19 14:50:33]   db_id: ccks_fund
-[2026-03-19 14:50:33]   question: What is the name of the fund manager with the highest Sortino ratio for a "one-y...
-[2026-03-19 14:50:37]   成功! 耗时: 4.76s
-[2026-03-19 14:50:37]   SQL: SELECT 
-    p.ChineseName AS FundManagerName,
-    p.Background
-FROM 
-    mf_fmperfanalysis fpa
-JOIN ...
-[2026-03-19 14:50:38] [217/344] 处理问题 #217
-[2026-03-19 14:50:38]   db_id: ccks_fund
-[2026-03-19 14:50:38]   question: Help me take a look at the fund's return rate since this month and the return ra...
-[2026-03-19 14:50:42]   成功! 耗时: 3.79s
-[2026-03-19 14:50:42]   SQL: SELECT 
-    SecuCode, 
-    ChiName, 
-    RRInSelectedMonth AS ReturnRateSinceThisMonth, 
-    RRSince...
-[2026-03-19 14:50:42] [218/344] 处理问题 #218
-[2026-03-19 14:50:42]   db_id: ccks_fund
-[2026-03-19 14:50:42]   question: How many funds of different types have positive weekly benchmark growth rate?...
-[2026-03-19 14:50:46]   成功! 耗时: 3.83s
-[2026-03-19 14:50:46]   SQL: SELECT FundTypeName, COUNT(*) AS PositiveGrowthCount
-FROM mf_benchmarkgrowthrate
-WHERE WeeklyBenchGR...
-[2026-03-19 14:50:46] [219/344] 处理问题 #219
-[2026-03-19 14:50:46]   db_id: ccks_stock
-[2026-03-19 14:50:46]   question: What is the intermediary structure and major shareholder of Tianjian Group durin...
-[2026-03-19 14:50:51]   成功! 耗时: 4.74s
-[2026-03-19 14:50:51]   SQL: SELECT 
-    s.ChiName AS CompanyName,
-    t.ReceiverName AS MajorShareholder
-FROM 
-    lc_sharetrans...
-[2026-03-19 14:50:52] [220/344] 处理问题 #220
-[2026-03-19 14:50:52]   db_id: ccks_fund
-[2026-03-19 14:50:52]   question: I want to know the annual return rate of each fund....
-[2026-03-19 14:50:55]   成功! 耗时: 3.57s
-[2026-03-19 14:50:55]   SQL: SELECT 
-    FundTypeName, 
-    ChiName, 
-    FundAnnReturn 
-FROM 
-    mf_fundreturnrank 
-WHERE 
-    ...
-[2026-03-19 14:50:55]   已保存中间结果 (220/344)
-[2026-03-19 14:50:56] [221/344] 处理问题 #221
-[2026-03-19 14:50:56]   db_id: ccks_stock
-[2026-03-19 14:50:56]   question: Query the information of major shareholder for rights issue of stock 600088....
-[2026-03-19 14:51:01]   成功! 耗时: 4.78s
-[2026-03-19 14:51:01]   SQL: SELECT 
-    lsr.SecuCode, 
-    lsr.SHRName, 
-    lsr.HoldingSum, 
-    lsr.HoldingPCT
-FROM 
-    lc_re...
-[2026-03-19 14:51:01] [222/344] 处理问题 #222
-[2026-03-19 14:51:01]   db_id: ccks_stock
-[2026-03-19 14:51:01]   question: Which company has the highest other financial expenses?...
-[2026-03-19 14:51:05]   成功! 耗时: 3.75s
-[2026-03-19 14:51:05]   SQL: SELECT ChiName, MAX(OtherFinancialExpense) AS MaxOtherFinancialExpense
-FROM lc_financialexpense
-GROU...
-[2026-03-19 14:51:05] [223/344] 处理问题 #223
-[2026-03-19 14:51:05]   db_id: ccks_fund
-[2026-03-19 14:51:05]   question: What is the benchmark growth rate of E Fund Non-Bank ETF for six months?...
-[2026-03-19 14:51:09]   成功! 耗时: 3.57s
-[2026-03-19 14:51:09]   SQL: SELECT BenchGRFor6Month
-FROM mf_benchmarkgrowthrate
-WHERE ChiName = 'E Fund Non-Bank ETF';...
-[2026-03-19 14:51:09] [224/344] 处理问题 #224
-[2026-03-19 14:51:09]   db_id: ccks_macro
-[2026-03-19 14:51:09]   question: I want to know the enterprise income and corporate income tax in Jiangsu Provinc...
-[2026-03-19 14:51:14]   成功! 耗时: 4.13s
-[2026-03-19 14:51:14]   SQL: SELECT 
-    ed_financialbalance.Year AS Year, 
-    ed_financialbalance.EnterpriseIncome AS Enterpris...
-[2026-03-19 14:51:14] [225/344] 处理问题 #225
-[2026-03-19 14:51:14]   db_id: ccks_fund
-[2026-03-19 14:51:14]   question: Please help me check the rate of return for each fund since this month....
-[2026-03-19 14:51:18]   成功! 耗时: 3.64s
-[2026-03-19 14:51:18]   SQL: SELECT 
-    ChiName, 
-    FundReturn 
-FROM 
-    mf_fundreturnrank 
-WHERE 
-    FundReturn IS NOT NULL...
-[2026-03-19 14:51:18] [226/344] 处理问题 #226
-[2026-03-19 14:51:18]   db_id: ccks_stock
-[2026-03-19 14:51:18]   question: What are the listed companies where Fujian Provincial Department of Finance is t...
-[2026-03-19 14:51:22]   成功! 耗时: 3.91s
-[2026-03-19 14:51:22]   SQL: SELECT DISTINCT lc_ipodeclaration.ChiName
-FROM lc_ipodeclaration
-JOIN lc_sharefp ON lc_ipodeclaratio...
-[2026-03-19 14:51:23] [227/344] 处理问题 #227
-[2026-03-19 14:51:23]   db_id: ccks_stock
-[2026-03-19 14:51:23]   question: Information about the law firms and accounting firms of IPO companies....
-[2026-03-19 14:51:27]   成功! 耗时: 4.10s
-[2026-03-19 14:51:27]   SQL: SELECT 
-    i.LawFirm, 
-    i.SignatureLaw, 
-    i.AccountingFirm, 
-    i.SignatureAccountant
-FROM 
-...
-[2026-03-19 14:51:27] [228/344] 处理问题 #228
-[2026-03-19 14:51:27]   db_id: ccks_stock
-[2026-03-19 14:51:27]   question: The major shareholder of Guangzhou Langqi's allotment...
-[2026-03-19 14:51:31]   成功! 耗时: 3.76s
-[2026-03-19 14:51:31]   SQL: SELECT lsl.SHName AS MajorShareholder
-FROM lc_largeshsubscription lsl
-WHERE lsl.ChiName = '广州朗启';...
-[2026-03-19 14:51:31] [229/344] 处理问题 #229
-[2026-03-19 14:51:31]   db_id: ccks_macro
-[2026-03-19 14:51:31]   question: What is the amount of commercial taxes in the fiscal revenue and expenditure of ...
-[2026-03-19 14:51:35]   成功! 耗时: 3.61s
-[2026-03-19 14:51:35]   SQL: SELECT ReportArea, Province, SUM(CommercialTax) AS TotalCommercialTax
-FROM ed_financialbalance
-WHERE...
-[2026-03-19 14:51:36] [230/344] 处理问题 #230
-[2026-03-19 14:51:36]   db_id: ccks_fund
-[2026-03-19 14:51:36]   question: Find the number of funds with positive returns in the fund with an index cycle o...
-[2026-03-19 14:51:39]   成功! 耗时: 3.94s
-[2026-03-19 14:51:39]   SQL: SELECT FundTypeName, COUNT(*) AS PositiveReturnCount
-FROM mf_fundreturnrank
-WHERE IndexCycle = 'one ...
-[2026-03-19 14:51:40]   已保存中间结果 (230/344)
-[2026-03-19 14:51:40] [231/344] 处理问题 #231
-[2026-03-19 14:51:40]   db_id: ccks_stock
-[2026-03-19 14:51:40]   question: How many times were there stock issuance events in total in 2022?...
-[2026-03-19 14:51:44]   成功! 耗时: 3.78s
-[2026-03-19 14:51:44]   SQL: SELECT COUNT(*) AS TotalIssuances
-FROM lc_ashareseasonednewissue
-WHERE IssueStartDate LIKE '2022-%';...
-[2026-03-19 14:51:44] [232/344] 处理问题 #232
-[2026-03-19 14:51:44]   db_id: ccks_fund
-[2026-03-19 14:51:44]   question: Help me check the three-year annualized return rate information of the fund....
-[2026-03-19 14:51:48]   成功! 耗时: 3.88s
-[2026-03-19 14:51:48]   SQL: SELECT 
-    SecuCode, 
-    SecuAbbr, 
-    ChineseName, 
-    AnnualizedRRInThreeYear 
-FROM 
-    mf_ne...
-[2026-03-19 14:51:49] [233/344] 处理问题 #233
-[2026-03-19 14:51:49]   db_id: ccks_stock
-[2026-03-19 14:51:49]   question: I heard that many companies have performed well recently. Please help me query t...
-[2026-03-19 14:51:52]   成功! 耗时: 3.55s
-[2026-03-19 14:51:52]   SQL: SELECT DISTINCT SecuCode
-FROM lc_mainoperincome
-WHERE GrossProfit > 1;...
-[2026-03-19 14:51:53] [234/344] 处理问题 #234
-[2026-03-19 14:51:53]   db_id: ccks_stock
-[2026-03-19 14:51:53]   question: Can I know the major shareholder, the number of shares held, and the shareholdin...
-[2026-03-19 14:51:57]   成功! 耗时: 3.96s
-[2026-03-19 14:51:57]   SQL: SELECT 
-    r.SHName AS MajorShareholder, 
-    r.HoldingSum AS NumberOfSharesHeld, 
-    r.HoldingPCT...
-[2026-03-19 14:51:57] [235/344] 处理问题 #235
-[2026-03-19 14:51:57]   db_id: ccks_fund
-[2026-03-19 14:51:57]   question: What is the name and brief introduction of the fund manager with the highest num...
-[2026-03-19 14:52:02]   成功! 耗时: 4.75s
-[2026-03-19 14:52:02]   SQL: SELECT m.Name, f.BriefIntro
-FROM mf_fundmanagernew m
-JOIN mf_fmscaleanalysisn s ON m.PersonalCode = ...
-[2026-03-19 14:52:02] [236/344] 处理问题 #236
-[2026-03-19 14:52:02]   db_id: ccks_stock
-[2026-03-19 14:52:02]   question: The historical highest P/E ratio and P/B ratio of stock 600352....
-[2026-03-19 14:52:06]   成功! 耗时: 3.96s
-[2026-03-19 14:52:06]   SQL: SELECT MAX(pe_ratio) AS HighestPE, MAX(pb_ratio) AS HighestPB
-FROM (
-    SELECT pe_ratio, pb_ratio
- ...
-[2026-03-19 14:52:07] [237/344] 处理问题 #237
-[2026-03-19 14:52:07]   db_id: ccks_stock
-[2026-03-19 14:52:07]   question: In 2020, which companies in Zhejiang Province had a total R&D investment exceedi...
-[2026-03-19 14:52:11]   成功! 耗时: 4.02s
-[2026-03-19 14:52:11]   SQL: SELECT ChiName
+WHERE ChiName = '凯撒文化';...
+[2026-03-20 02:44:28] 
+[19/344] 处理问题 #19
+[2026-03-20 02:44:28]   schema: ccks_stock
+[2026-03-20 02:44:28]   question: What are the top 4 companies in Zhejiang Province with the highest interest expe...
+[2026-03-20 02:44:28]   尝试模型 [1/86]: qwen/qwen2.5-math-72b-instruct
+[2026-03-20 02:44:44]     失败: API错误: 500 - {"detail":"处理失败: API返回错误状态码: 400, {\"error\":{\"message\":\"<400> InternalError.Algo.In
+[2026-03-20 02:44:44]   尝试模型 [2/86]: qwen/qwen2-7b-instruct
+[2026-03-20 02:44:48]     失败: API错误: 500 - {"detail":"处理失败: API返回错误状态码: 400, {\"error\":{\"message\":\"<400> InternalError.Algo.In
+[2026-03-20 02:44:48]   尝试模型 [3/86]: qwen/qwen-plus-2025-07-14
+[2026-03-20 02:44:53]     成功! 耗时: 4.55s
+[2026-03-20 02:44:53]     SQL: SELECT T1.ChiName, T2.InterestExpense
+FROM lc_stockarchives T1
+JOIN qt_monthdata T2 ON T1.CompanyCod...
+[2026-03-20 02:44:53] 
+[20/344] 处理问题 #20
+[2026-03-20 02:44:53]   schema: ccks_stock
+[2026-03-20 02:44:53]   question: Which institution underwrote the shares of 000158 and what is the quantity?...
+[2026-03-20 02:44:53]   尝试模型 [1/84]: qwen/qwen-math-plus-latest
+[2026-03-20 02:44:59]     失败: API错误: 500 - {"detail":"处理失败: API返回错误状态码: 400, {\"error\":{\"message\":\"<400> InternalError.Algo.In
+[2026-03-20 02:44:59]   尝试模型 [2/84]: qwen/qwen-vl-max-2025-01-25
+[2026-03-20 02:45:05]     成功! 耗时: 6.10s
+[2026-03-20 02:45:05]     SQL: SELECT lc_legaldistribution.AquirerName, lc_legaldistribution.AquiredSum 
+FROM lc_legaldistribution ...
+[2026-03-20 02:45:05]   已保存中间结果 (20/344)
+[2026-03-20 02:45:05]   当前统计: 成功 20, 失败 0
+[2026-03-20 02:45:05]   可用模型: 83/90
+[2026-03-20 02:45:05] 
+[21/344] 处理问题 #21
+[2026-03-20 02:45:05]   schema: ccks_stock
+[2026-03-20 02:45:05]   question: Which companies in Zhejiang Province had a main operating income exceeding 100 b...
+[2026-03-20 02:45:05]   尝试模型 [1/83]: qwen/qwen-math-turbo-latest
+[2026-03-20 02:45:11]     失败: API错误: 500 - {"detail":"处理失败: API返回错误状态码: 400, {\"error\":{\"message\":\"<400> InternalError.Algo.In
+[2026-03-20 02:45:11]   尝试模型 [2/83]: qwen/qwen-mt-turbo
+[2026-03-20 02:45:14]     成功! 耗时: 3.10s
+[2026-03-20 02:45:14]     SQL: SELECT ChiName FROM lc_mainoperincome WHERE MainOperIncome > 100000000000 AND Province = 'Zhejiang'...
+[2026-03-20 02:45:14] 
+[22/344] 处理问题 #22
+[2026-03-20 02:45:14]   schema: ccks_stock
+[2026-03-20 02:45:14]   question: Who is the legal representative of which company is Ding Zhenhua?...
+[2026-03-20 02:45:14]   尝试模型 [1/82]: qwen/qwen-plus-2025-04-28
+[2026-03-20 02:45:19]     成功! 耗时: 4.77s
+[2026-03-20 02:45:19]     SQL: SELECT lc_stockarchives.ChiName, lc_issueandlistagent.LegalPersonRepr
 FROM lc_stockarchives
-JOIN lc_intassetsdetail ON lc_stockarchives.CompanyCode = lc_in...
-[2026-03-19 14:52:11] [238/344] 处理问题 #238
-[2026-03-19 14:52:11]   db_id: ccks_stock
-[2026-03-19 14:52:11]   question: Display the subscription time of listed companies in Jiangsu Province in chronol...
-[2026-03-19 14:52:16]   成功! 耗时: 4.60s
-[2026-03-19 14:52:16]   SQL: SELECT 
-    lci.InitialInfoPublDate AS SubscriptionTime, 
-    lci.ChiName AS CompanyName, 
-    SUBST...
-[2026-03-19 14:52:17] [239/344] 处理问题 #239
-[2026-03-19 14:52:17]   db_id: ccks_macro
-[2026-03-19 14:52:17]   question: Can you show the index value changes for the "furniture manufacturing industry" ...
-[2026-03-19 14:52:22]   成功! 耗时: 5.27s
-[2026-03-19 14:52:22]   SQL: SELECT 
-    p1.IndexValue AS CurrentYearValue, 
-    p2.IndexValue AS PreviousYearSameMonthValue
-FROM...
-[2026-03-19 14:52:22] [240/344] 处理问题 #240
-[2026-03-19 14:52:22]   db_id: ccks_fund
-[2026-03-19 14:52:22]   question: The fund manager holding Hai Liang Convertible Bonds....
-[2026-03-19 14:52:27]   成功! 耗时: 4.31s
-[2026-03-19 14:52:27]   SQL: SELECT fma.ChineseName, fma.TotalFundNV, fa.ChiName, fa.FundType
-FROM mf_fmscaleanalysisn fma
-JOIN m...
-[2026-03-19 14:52:27]   已保存中间结果 (240/344)
-[2026-03-19 14:52:27] [241/344] 处理问题 #241
-[2026-03-19 14:52:27]   db_id: ccks_fund
-[2026-03-19 14:52:27]   question: What are the funds with a benchmark growth rate greater than 0 and their investm...
-[2026-03-19 14:52:31]   成功! 耗时: 4.28s
-[2026-03-19 14:52:31]   SQL: SELECT mf.NVDailyGrowthRate, mf.SecuAbbr, mf.SecuCode, mf.NVDailyGrowthRate AS InvestmentScopeToday
-...
-[2026-03-19 14:52:32] [242/344] 处理问题 #242
-[2026-03-19 14:52:32]   db_id: ccks_fund
-[2026-03-19 14:52:32]   question: What is the company's organizational form of Changxin Fund?...
-[2026-03-19 14:52:36]   成功! 耗时: 3.83s
-[2026-03-19 14:52:36]   SQL: SELECT OrganizationForm
-FROM mf_investadvisoroutline
-WHERE ChiName = 'Changxin Fund';...
-[2026-03-19 14:52:36] [243/344] 处理问题 #243
-[2026-03-19 14:52:36]   db_id: ccks_stock
-[2026-03-19 14:52:36]   question: What is the initial shareholding of the Chairman of Lifu Pharmaceutical?...
-[2026-03-19 14:52:40]   成功! 耗时: 4.13s
-[2026-03-19 14:52:40]   SQL: SELECT lfh.ShareAmountBeginning
-FROM lc_executivesholdings lfh
-JOIN lc_sharetrustee lst ON lfh.Compa...
-[2026-03-19 14:52:41] [244/344] 处理问题 #244
-[2026-03-19 14:52:41]   db_id: ccks_fund
-[2026-03-19 14:52:41]   question: Show us the data on the ten-year return rate and the ten-year annualized return ...
-[2026-03-19 14:52:45]   成功! 耗时: 3.71s
-[2026-03-19 14:52:45]   SQL: SELECT 
-    SecuCode, 
-    SecuAbbr, 
-    RRInTenYear AS TenYearReturnRate, 
-    AnnualizedRRInTenYe...
-[2026-03-19 14:52:45] [245/344] 处理问题 #245
-[2026-03-19 14:52:45]   db_id: ccks_fund
-[2026-03-19 14:52:45]   question: How many male and female fund managers are there?...
-[2026-03-19 14:52:49]   成功! 耗时: 4.25s
-[2026-03-19 14:52:49]   SQL: SELECT SUM(CASE WHEN Gender = 'Male' THEN 1 ELSE 0 END) AS MaleCount,
-       SUM(CASE WHEN Gender = ...
-[2026-03-19 14:52:50] [246/344] 处理问题 #246
-[2026-03-19 14:52:50]   db_id: ccks_fund
-[2026-03-19 14:52:50]   question: Which funds are the top 11 funds with the highest benchmark growth rate since th...
-[2026-03-19 14:52:53]   成功! 耗时: 3.61s
-[2026-03-19 14:52:53]   SQL: SELECT DISTINCT m ChiName
-FROM mf_benchmarkgrowthrate m
-WHERE m.BenchGRForThisQuarter IS NOT NULL
-OR...
-[2026-03-19 14:52:54] [247/344] 处理问题 #247
-[2026-03-19 14:52:54]   db_id: ccks_stock
-[2026-03-19 14:52:54]   question: List the top three shareholders with the highest number of actual shares in BoRu...
-[2026-03-19 14:52:58]   成功! 耗时: 3.89s
-[2026-03-19 14:52:58]   SQL: SELECT SHName, HoldingSum
-FROM lc_relatedsh
-WHERE ChiName = 'BoRuiChuanBo'
-ORDER BY HoldingSum DESC
-...
-[2026-03-19 14:52:58] [248/344] 处理问题 #248
-[2026-03-19 14:52:58]   db_id: ccks_stock
-[2026-03-19 14:52:58]   question: What is the purpose and target of the issuance of stock 002805?...
-[2026-03-19 14:53:03]   成功! 耗时: 4.79s
-[2026-03-19 14:53:03]   SQL: SELECT 
-    a.SecuCode,
-    a.CompanyCode,
-    a.ChiName,
-    a.PlanaObject,
-    a.PlannedPlaProceed...
-[2026-03-19 14:53:04] [249/344] 处理问题 #249
-[2026-03-19 14:53:04]   db_id: ccks_macro
-[2026-03-19 14:53:04]   question: I want to know the top 11 records of the highest number of bond issuances in the...
-[2026-03-19 14:53:08]   成功! 耗时: 4.03s
-[2026-03-19 14:53:08]   SQL: SELECT Time, BondIssue
-FROM ed_otherdepositorycorpbs
-WHERE EndDate = '1999-12-31' AND SubjectName LI...
-[2026-03-19 14:53:08] [250/344] 处理问题 #250
-[2026-03-19 14:53:08]   db_id: ccks_macro
-[2026-03-19 14:53:08]   question: Please look at the record of money gold in the central bank's balance sheet....
-[2026-03-19 14:53:12]   成功! 耗时: 3.82s
-[2026-03-19 14:53:12]   SQL: SELECT ed_moneyauthoritybs.EndDate, ed_moneyauthoritybs.MoneyAndGold
-FROM ed_moneyauthoritybs
-WHERE ...
-[2026-03-19 14:53:12]   已保存中间结果 (250/344)
-[2026-03-19 14:53:13] [251/344] 处理问题 #251
-[2026-03-19 14:53:13]   db_id: ccks_stock
-[2026-03-19 14:53:13]   question: What is the A-share securities code of Industrial Securities?...
-[2026-03-19 14:53:16]   成功! 耗时: 3.63s
-[2026-03-19 14:53:16]   SQL: SELECT AStockCode
-FROM lc_stockarchives
-WHERE ChiName = '工业证券';...
-[2026-03-19 14:53:17] [252/344] 处理问题 #252
-[2026-03-19 14:53:17]   db_id: ccks_macro
-[2026-03-19 14:53:17]   question: Since 2009, which records in the balance sheet of other depositary companies hav...
-[2026-03-19 14:53:20]   成功! 耗时: 3.82s
-[2026-03-19 14:53:20]   SQL: SELECT EndDate, TotalLiability
-FROM ed_otherdepositorycorpbs
-WHERE TotalLiability >= 50 AND EndDate ...
-[2026-03-19 14:53:21] [253/344] 处理问题 #253
-[2026-03-19 14:53:21]   db_id: ccks_fund
-[2026-03-19 14:53:21]   question: Show the return rate since the establishment of the fund....
-[2026-03-19 14:53:25]   成功! 耗时: 3.71s
-[2026-03-19 14:53:25]   SQL: SELECT AnnualizedRRSinceStart
-FROM mf_netvalueperformancehis
-WHERE SecuCode = 'your_fund_code_here';...
-[2026-03-19 14:53:25] [254/344] 处理问题 #254
-[2026-03-19 14:53:25]   db_id: ccks_stock
-[2026-03-19 14:53:25]   question: What are the shareholder names and shareholding quantities of Baichuan Shares in...
-[2026-03-19 14:53:29]   成功! 耗时: 3.95s
-[2026-03-19 14:53:29]   SQL: SELECT SHName, HoldingSum
-FROM lc_relatedsh
-WHERE CompanyName = 'Baichuan' AND EndDate BETWEEN '2020...
-[2026-03-19 14:53:30] [255/344] 处理问题 #255
-[2026-03-19 14:53:30]   db_id: ccks_fund
-[2026-03-19 14:53:30]   question: What is the most common operating form of funds in bond funds?...
-[2026-03-19 14:53:34]   成功! 耗时: 3.86s
-[2026-03-19 14:53:34]   SQL: SELECT Type
-FROM mf_fundarchives
-WHERE SecuCategory = 'Bond'
-GROUP BY Type
-ORDER BY COUNT(*) DESC
-LI...
-[2026-03-19 14:53:34] [256/344] 处理问题 #256
-[2026-03-19 14:53:34]   db_id: ccks_fund
-[2026-03-19 14:53:34]   question: What is the objective of ChinaAMC Resources Fund?...
-[2026-03-19 14:53:38]   成功! 耗时: 3.72s
-[2026-03-19 14:53:38]   SQL: SELECT InvestTarget
-FROM mf_fundarchives
-WHERE ChiName = 'ChinaAMC Resources Fund';...
-[2026-03-19 14:53:38] [257/344] 处理问题 #257
-[2026-03-19 14:53:38]   db_id: ccks_stock
-[2026-03-19 14:53:38]   question: What is the proportion of freely tradable shares of Chongqing Jian Gong held by ...
-[2026-03-19 14:53:43]   成功! 耗时: 4.87s
-[2026-03-19 14:53:43]   SQL: SELECT 
-    (t2.AccuMarketableAShares * t1.FinanceProductsHoldPropA / 100) AS ProportionOfFreely Tra...
-[2026-03-19 14:53:44] [258/344] 处理问题 #258
-[2026-03-19 14:53:44]   db_id: ccks_macro
-[2026-03-19 14:53:44]   question: What was the amount of monthly industrial value added for "National" "State-owne...
-[2026-03-19 14:53:48]   成功! 耗时: 4.00s
-[2026-03-19 14:53:48]   SQL: SELECT ReportPeriod, IndustrialValueAdded
-FROM ed_industryproduction
-WHERE ReportArea = 'National' A...
-[2026-03-19 14:53:48] [259/344] 处理问题 #259
-[2026-03-19 14:53:48]   db_id: ccks_fund
-[2026-03-19 14:53:48]   question: The number of fund managers whose average return rate in the "近1年" time interval...
-[2026-03-19 14:53:52]   成功! 耗时: 4.30s
-[2026-03-19 14:53:52]   SQL: SELECT 
-    ae.HighestEducationLevel, 
-    COUNT(DISTINCT fm.PersonalCode) AS NumberOfManagers
-FROM ...
-[2026-03-19 14:53:53] [260/344] 处理问题 #260
-[2026-03-19 14:53:53]   db_id: ccks_fund
-[2026-03-19 14:53:53]   question: Please find the number and management scale information of bond funds. The scree...
-[2026-03-19 14:53:58]   成功! 耗时: 4.62s
-[2026-03-19 14:53:58]   SQL: SELECT 
-    COUNT(mf_fmscaleanalysisn.InnerCode) AS BondFundCount,
-    mf_fmscaleanalysisn.TotalFund...
-[2026-03-19 14:53:58]   已保存中间结果 (260/344)
-[2026-03-19 14:53:58] [261/344] 处理问题 #261
-[2026-03-19 14:53:58]   db_id: ccks_macro
-[2026-03-19 14:53:58]   question: I want to know the amount of our foreign currency deposits two years ago....
-[2026-03-19 14:54:02]   成功! 耗时: 3.75s
-[2026-03-19 14:54:02]   SQL: SELECT SUM(Forex) AS TotalForeignCurrencyDeposits
-FROM ed_moneyauthoritybs
-WHERE EndDate = DATE('now...
-[2026-03-19 14:54:02] [262/344] 处理问题 #262
-[2026-03-19 14:54:02]   db_id: ccks_stock
-[2026-03-19 14:54:02]   question: How many companies have a proportion of circulating A-shares that exceeds 80% of...
-[2026-03-19 14:54:06]   成功! 耗时: 3.64s
-[2026-03-19 14:54:06]   SQL: SELECT COUNT(DISTINCT CompanyCode) AS CompanyCount
-FROM lc_sharesfloatingschedule
-WHERE Proportion2 ...
-[2026-03-19 14:54:06] [263/344] 处理问题 #263
-[2026-03-19 14:54:06]   db_id: ccks_stock
-[2026-03-19 14:54:06]   question: Provide the law firm and accounting firm of JiKai Corporation's IPO....
-[2026-03-19 14:54:10]   成功! 耗时: 3.79s
-[2026-03-19 14:54:10]   SQL: SELECT DISTINCT LawFirm, AccountingFirm
-FROM lc_ipodeclaration
-WHERE ChiName = 'JiKai Corporation';...
-[2026-03-19 14:54:11] [264/344] 处理问题 #264
-[2026-03-19 14:54:11]   db_id: ccks_macro
-[2026-03-19 14:54:11]   question: Please help me find the data records for the total retail sales of consumer good...
-[2026-03-19 14:54:14]   成功! 耗时: 3.47s
-[2026-03-19 14:54:14]   SQL: SELECT *
-FROM ed_retailvalueofscgoods
-WHERE EndDate IS NOT NULL
-ORDER BY EndDate;...
-[2026-03-19 14:54:15] [265/344] 处理问题 #265
-[2026-03-19 14:54:15]   db_id: ccks_fund
-[2026-03-19 14:54:15]   question: Hi, search for the start and end values of the rate division standard range for ...
-[2026-03-19 14:54:18]   成功! 耗时: 3.69s
-[2026-03-19 14:54:18]   SQL: SELECT StDivStand1, EnDivStand1
-FROM mf_chargeratenew
-WHERE SecuAbbr = 'Taipingdale Zhongzheng 500' ...
-[2026-03-19 14:54:19] [266/344] 处理问题 #266
-[2026-03-19 14:54:19]   db_id: ccks_fund
-[2026-03-19 14:54:19]   question: Please check the minimum redemption amount and the number of days for redemption...
-[2026-03-19 14:54:23]   成功! 耗时: 4.05s
-[2026-03-19 14:54:23]   SQL: SELECT 
-    LowestSumRedemption AS MinimumRedemptionAmount, 
-    DeliveryDays AS NumberOfDaysForRede...
-[2026-03-19 14:54:23] [267/344] 处理问题 #267
-[2026-03-19 14:54:23]   db_id: ccks_fund
-[2026-03-19 14:54:23]   question: List the fund names and fund risk levels managed by the fund manager with the hi...
-[2026-03-19 14:54:28]   成功! 耗时: 4.91s
-[2026-03-19 14:54:28]   SQL: SELECT DISTINCT f.ChiName AS FundName, rl.RiskLevel
-FROM mf_fundarchives f
-JOIN mf_fundrisklevel rl ...
-[2026-03-19 14:54:29] [268/344] 处理问题 #268
-[2026-03-19 14:54:29]   db_id: ccks_fund
-[2026-03-19 14:54:29]   question: What are the funds that have been performing poorly since establishment? List th...
-[2026-03-19 14:54:33]   成功! 耗时: 3.81s
-[2026-03-19 14:54:33]   SQL: SELECT 
-    SecuCode AS FundCode, 
-    ChiName AS FundName 
-FROM 
-    mf_netvalueperformancehis 
-WHE...
-[2026-03-19 14:54:33] [269/344] 处理问题 #269
-[2026-03-19 14:54:33]   db_id: ccks_stock
-[2026-03-19 14:54:33]   question: List the underwriting volume of the intermediaries in the stock issuance of Yue ...
-[2026-03-19 14:54:37]   成功! 耗时: 3.97s
-[2026-03-19 14:54:37]   SQL: SELECT SUM(UnderwritingVol) AS Total_Underwriting_Volume
-FROM lc_issueandlistagent
-WHERE ChiName = '...
-[2026-03-19 14:54:38] [270/344] 处理问题 #270
-[2026-03-19 14:54:38]   db_id: ccks_fund
-[2026-03-19 14:54:38]   question: List the ten-year annualized return rate information of the funds....
-[2026-03-19 14:54:41]   成功! 耗时: 3.71s
-[2026-03-19 14:54:41]   SQL: SELECT SecuCode, AnnualizedRRInTenYear
-FROM mf_netvalueperformancehis
-ORDER BY AnnualizedRRInTenYear...
-[2026-03-19 14:54:41]   已保存中间结果 (270/344)
-[2026-03-19 14:54:42] [271/344] 处理问题 #271
-[2026-03-19 14:54:42]   db_id: ccks_fund
-[2026-03-19 14:54:42]   question: Let me search for the weekly growth rate records of "Huaan 180 ETF" in the past ...
-[2026-03-19 14:54:46]   成功! 耗时: 3.61s
-[2026-03-19 14:54:46]   SQL: SELECT NVWeeklyGrowthRate
-FROM mf_netvalue
-WHERE ChiName = 'Huaan 180 ETF'
-  AND EndDate >= DATE('no...
-[2026-03-19 14:54:46] [272/344] 处理问题 #272
-[2026-03-19 14:54:46]   db_id: ccks_fund
-[2026-03-19 14:54:46]   question: What are the funds and fund managers with a negative benchmark growth rate on th...
-[2026-03-19 14:54:50]   成功! 耗时: 4.44s
-[2026-03-19 14:54:50]   SQL: SELECT DISTINCT f.FundTypeName, fm.ChineseName, b.DailyBenchGR
-FROM mf_fmretandscalerank fm
-JOIN mf_...
-[2026-03-19 14:54:51] [273/344] 处理问题 #273
-[2026-03-19 14:54:51]   db_id: ccks_stock
-[2026-03-19 14:54:51]   question: What are the specific codes for stocks related to artificial intelligence that c...
-[2026-03-19 14:54:55]   成功! 耗时: 4.23s
-[2026-03-19 14:54:55]   SQL: SELECT DISTINCT lsr.CompanyCode, lsr.SecuCode
-FROM lc_relatedsh lsr
-JOIN lc_exgindustry lei ON lsr.C...
-[2026-03-19 14:54:56] [274/344] 处理问题 #274
-[2026-03-19 14:54:56]   db_id: ccks_fund
-[2026-03-19 14:54:56]   question: Help me to simultaneously find out the fund management situation of Chen Long an...
-[2026-03-19 14:55:01]   成功! 耗时: 5.00s
-[2026-03-19 14:55:01]   SQL: SELECT 
-    m.Manager AS FundManager,
-    COUNT(m.InnerCode) AS NumberOfEquityFunds,
-    SUM(CASE WH...
-[2026-03-19 14:55:01] [275/344] 处理问题 #275
-[2026-03-19 14:55:01]   db_id: ccks_stock
-[2026-03-19 14:55:01]   question: What is the stock repurchase situation of 600418 in the past year? List the tota...
-[2026-03-19 14:55:05]   成功! 耗时: 3.92s
-[2026-03-19 14:55:05]   SQL: SELECT SUM(BuybackSum) AS TotalRepurchaseQuantity, SUM(BuybackMoney) AS TotalRepurchasePrice
-FROM lc...
-[2026-03-19 14:55:06] [276/344] 处理问题 #276
-[2026-03-19 14:55:06]   db_id: ccks_stock
-[2026-03-19 14:55:06]   question: Which concept sectors does stock 000021 belong to?...
-[2026-03-19 14:55:09]   成功! 耗时: 3.49s
-[2026-03-19 14:55:09]   SQL: SELECT DISTINCT ConceptName
-FROM lc_coconcept
-WHERE SecuCode = '000021';...
-[2026-03-19 14:55:10] [277/344] 处理问题 #277
-[2026-03-19 14:55:10]   db_id: ccks_stock
-[2026-03-19 14:55:10]   question: What are the companies with non-restricted circulating A-share capital not excee...
-[2026-03-19 14:55:13]   成功! 耗时: 3.76s
-[2026-03-19 14:55:13]   SQL: SELECT DISTINCT ChiName, ChiNameAbbr
-FROM lc_sharestru
-WHERE NonRestrictedShares <= 50000000 AND Res...
-[2026-03-19 14:55:14] [278/344] 处理问题 #278
-[2026-03-19 14:55:14]   db_id: ccks_stock
-[2026-03-19 14:55:14]   question: Which listed companies are in the top 11 in terms of the proportion of shares re...
-[2026-03-19 14:55:18]   成功! 耗时: 4.00s
-[2026-03-19 14:55:18]   SQL: SELECT DISTINCT T1.ChiName
-FROM lc_buyback AS T1
-JOIN lc_shnumber AS T2 ON T1.CompanyCode = T2.Compa...
-[2026-03-19 14:55:18] [279/344] 处理问题 #279
-[2026-03-19 14:55:18]   db_id: ccks_fund
-[2026-03-19 14:55:18]   question: Is there any data on the benchmark growth rate of the 162415 monthly fund?...
-[2026-03-19 14:55:22]   成功! 耗时: 3.41s
-[2026-03-19 14:55:22]   SQL: SELECT MonthlyBenchGR
-FROM mf_benchmarkgrowthrate
-WHERE SecuCode = '162415';...
-[2026-03-19 14:55:22] [280/344] 处理问题 #280
-[2026-03-19 14:55:22]   db_id: ccks_fund
-[2026-03-19 14:55:22]   question: Display the names and profiles of fund managers whose fund performance is greate...
-[2026-03-19 14:55:27]   成功! 耗时: 4.32s
-[2026-03-19 14:55:27]   SQL: SELECT p.ChineseName, p.Background
-FROM mf_personalinfo p
-JOIN mf_fmscaleanalysisn f ON p.PersonalCo...
-[2026-03-19 14:55:27]   已保存中间结果 (280/344)
-[2026-03-19 14:55:27] [281/344] 处理问题 #281
-[2026-03-19 14:55:27]   db_id: ccks_stock
-[2026-03-19 14:55:27]   question: Please help me check the industry of Shen Keji....
-[2026-03-19 14:55:31]   成功! 耗时: 3.72s
-[2026-03-19 14:55:31]   SQL: SELECT T2.FirstIndustryName, T2.SecondIndustryName
-FROM lc_freefloat AS T1
-JOIN lc_exgindustry AS T2...
-[2026-03-19 14:55:31] [282/344] 处理问题 #282
-[2026-03-19 14:55:31]   db_id: ccks_fund
-[2026-03-19 14:55:31]   question: Calculate the average daily return rate of products according to the operating f...
-[2026-03-19 14:55:35]   成功! 耗时: 4.02s
-[2026-03-19 14:55:35]   SQL: SELECT AVG(NVDailyGrowthRate) AS AverageDailyReturnRate
-FROM mf_netvalueperformancehis
-JOIN mf_fmret...
-[2026-03-19 14:55:36] [283/344] 处理问题 #283
-[2026-03-19 14:55:36]   db_id: ccks_fund
-[2026-03-19 14:55:36]   question: Please provide me with the five-year annualized return rate data for funds....
-[2026-03-19 14:55:40]   成功! 耗时: 3.70s
-[2026-03-19 14:55:40]   SQL: SELECT 
-    SecuCode, 
-    AnnualizedRRInFiveYear AS FiveYearAnnualizedReturnRate 
-FROM 
-    mf_netv...
-[2026-03-19 14:55:40] [284/344] 处理问题 #284
-[2026-03-19 14:55:40]   db_id: ccks_stock
-[2026-03-19 14:55:40]   question: List the stock codes of the "Metaverse" sector, along with the names and telepho...
-[2026-03-19 14:55:44]   成功! 耗时: 4.32s
-[2026-03-19 14:55:44]   SQL: SELECT DISTINCT s.SecuCode, a.ChiName, a.SecretaryBDTel
-FROM lc_stockarchives a
-JOIN lc_exgindustry ...
-[2026-03-19 14:55:45] [285/344] 处理问题 #285
-[2026-03-19 14:55:45]   db_id: ccks_fund
-[2026-03-19 14:55:45]   question: Fund manager's name and date of employment for funds with a beta coefficient exc...
-[2026-03-19 14:55:49]   成功! 耗时: 4.39s
-[2026-03-19 14:55:49]   SQL: SELECT DISTINCT mf_fundmanagernew.Name, mf_fundmanagernew.AccessionDate
-FROM mf_fundmanagernew
-JOIN ...
-[2026-03-19 14:55:50] [286/344] 处理问题 #286
-[2026-03-19 14:55:50]   db_id: ccks_fund
-[2026-03-19 14:55:50]   question: How many conventional funds are there in LOF funds?...
-[2026-03-19 14:55:54]   成功! 耗时: 3.75s
-[2026-03-19 14:55:54]   SQL: SELECT COUNT(*) AS ConventionalFundCount
-FROM mf_fundarchives
-WHERE FundType = 'LOF' AND FundNature ...
-[2026-03-19 14:55:54] [287/344] 处理问题 #287
-[2026-03-19 14:55:54]   db_id: ccks_stock
-[2026-03-19 14:55:54]   question: What was the main operating income of 000822 in january 2018 and what was the ye...
-[2026-03-19 14:55:59]   成功! 耗时: 4.78s
-[2026-03-19 14:55:59]   SQL: SELECT 
-    m.MainOperIncome AS MainOperatingIncome2018Jan,
-    (m.MainOperIncome - l.MainOperIncome...
-[2026-03-19 14:55:59] [288/344] 处理问题 #288
-[2026-03-19 14:55:59]   db_id: ccks_fund
-[2026-03-19 14:55:59]   question: Is China Merchants Growth an initiating fund?...
-[2026-03-19 14:56:03]   成功! 耗时: 3.64s
-[2026-03-19 14:56:03]   SQL: SELECT IFInitiatingFund 
-FROM mf_fundarchives 
-WHERE ChiName = '中国民生增长';...
-[2026-03-19 14:56:03] [289/344] 处理问题 #289
-[2026-03-19 14:56:03]   db_id: ccks_stock
-[2026-03-19 14:56:03]   question: How many listed companies are there in Shanghai?...
-[2026-03-19 14:56:07]   成功! 耗时: 3.56s
-[2026-03-19 14:56:07]   SQL: SELECT COUNT(DISTINCT ChiName) AS ListedCompanyCount
-FROM lc_stockarchives
-WHERE State = '上海';...
-[2026-03-19 14:56:08] [290/344] 处理问题 #290
-[2026-03-19 14:56:08]   db_id: ccks_stock
-[2026-03-19 14:56:08]   question: Last year, among the investors of this stock 600000, which shareholders' investm...
-[2026-03-19 14:56:12]   成功! 耗时: 4.53s
-[2026-03-19 14:56:12]   SQL: SELECT DISTINCT InvestorName
-FROM lc_shnumber
-JOIN lc_relatedsh ON lc_shnumber.SecuCode = lc_related...
-[2026-03-19 14:56:12]   已保存中间结果 (290/344)
-[2026-03-19 14:56:13] [291/344] 处理问题 #291
-[2026-03-19 14:56:13]   db_id: ccks_stock
-[2026-03-19 14:56:13]   question: What are the underwriting volume, underwriting amount, and underwriting proporti...
-[2026-03-19 14:56:17]   成功! 耗时: 4.37s
-[2026-03-19 14:56:17]   SQL: SELECT 
-    la.FullName AS InstitutionName,
-    la.UnderwritingVol AS UnderwritingVolume,
-    la.Und...
-[2026-03-19 14:56:17] [292/344] 处理问题 #292
-[2026-03-19 14:56:17]   db_id: ccks_stock
-[2026-03-19 14:56:17]   question: Find the names of the shareholders and the number of shares frozen and pledged f...
-[2026-03-19 14:56:21]   成功! 耗时: 3.94s
-[2026-03-19 14:56:21]   SQL: SELECT 
-    FPSHName AS ShareholderName, 
-    InvolvedSum AS FrozenAndPledgedShares
-FROM 
-    lc_sha...
-[2026-03-19 14:56:22] [293/344] 处理问题 #293
-[2026-03-19 14:56:22]   db_id: ccks_stock
-[2026-03-19 14:56:22]   question: What are the shareholder names and shareholder holding percentages for Nantian I...
-[2026-03-19 14:56:26]   成功! 耗时: 4.18s
-[2026-03-19 14:56:26]   SQL: SELECT 
-    lc_relatedsh.SHName, 
-    lc_relatedsh.HoldingPCT
-FROM 
-    lc_relatedsh
-JOIN 
-    lc_sh...
-[2026-03-19 14:56:27] [294/344] 处理问题 #294
-[2026-03-19 14:56:27]   db_id: ccks_stock
-[2026-03-19 14:56:27]   question: Find the data of freely tradable A-shares below 1 million in monthly stock marke...
-[2026-03-19 14:56:31]   成功! 耗时: 4.01s
-[2026-03-19 14:56:31]   SQL: SELECT 
-    m.*
-FROM 
-    qt_monthdata m
-JOIN 
-    lc_freefloat f ON m.CompanyCode = f.CompanyCode
-W...
-[2026-03-19 14:56:31] [295/344] 处理问题 #295
-[2026-03-19 14:56:31]   db_id: ccks_stock
-[2026-03-19 14:56:31]   question: Law firm and signature lawyer information for Fujian Jinsen IPO....
-[2026-03-19 14:56:35]   成功! 耗时: 4.09s
-[2026-03-19 14:56:35]   SQL: SELECT 
-    l.LawFirm, 
-    l.SignatureLaw, 
-    i.SecuCode, 
-    i.ChiName, 
-    i.EndDate
-FROM 
-  ...
-[2026-03-19 14:56:36] [296/344] 处理问题 #296
-[2026-03-19 14:56:36]   db_id: ccks_stock
-[2026-03-19 14:56:36]   question: In the past two years, how many companies has China Eximbank managed frozen pled...
-[2026-03-19 14:56:40]   成功! 耗时: 4.08s
-[2026-03-19 14:56:40]   SQL: SELECT COUNT(DISTINCT T1.CompanyCode) AS CompanyCount
-FROM lc_relatedsh T1
-JOIN lc_business T2 ON T1...
-[2026-03-19 14:56:40] [297/344] 处理问题 #297
-[2026-03-19 14:56:40]   db_id: ccks_stock
-[2026-03-19 14:56:40]   question: How many companies have a free float ratio of 100%, grouped by primary industry?...
-[2026-03-19 14:56:44]   成功! 耗时: 3.98s
-[2026-03-19 14:56:44]   SQL: SELECT COUNT(DISTINCT T1.CompanyCode) AS CompanyCount
-FROM lc_freefloat T1
-JOIN lc_sharesfloatingsch...
-[2026-03-19 14:56:45] [298/344] 处理问题 #298
-[2026-03-19 14:56:45]   db_id: ccks_fund
-[2026-03-19 14:56:45]   question: Is Bosera Gold a QDII fund?...
-[2026-03-19 14:56:49]   成功! 耗时: 3.89s
-[2026-03-19 14:56:49]   SQL: SELECT COUNT(*) AS QDII_Fund_Count
-FROM mf_fundarchives
-WHERE FundType = 'QDII' AND ChiName = 'Boser...
-[2026-03-19 14:56:49] [299/344] 处理问题 #299
-[2026-03-19 14:56:49]   db_id: ccks_macro
-[2026-03-19 14:56:49]   question: Recently we have been compiling customs import and export statistics. Help me se...
-[2026-03-19 14:56:53]   成功! 耗时: 3.93s
-[2026-03-19 14:56:53]   SQL: SELECT ed_exportimport.EndDate
-FROM ed_exportimport
-WHERE ed_exportimport.ImValueOfGoods < 20000
-AND...
-[2026-03-19 14:56:54] [300/344] 处理问题 #300
-[2026-03-19 14:56:54]   db_id: ccks_stock
-[2026-03-19 14:56:54]   question: Has 000728 issued dividends in the past two years? I want to know the dividend b...
-[2026-03-19 14:56:58]   成功! 耗时: 4.23s
-[2026-03-19 14:56:58]   SQL: SELECT 
-    DividendImplementDate, 
-    DiviBase, 
-    BonusShareRatio, 
-    TranAddShareRaio AS Sha...
-[2026-03-19 14:56:58]   已保存中间结果 (300/344)
-[2026-03-19 14:56:58] [301/344] 处理问题 #301
-[2026-03-19 14:56:58]   db_id: ccks_macro
-[2026-03-19 14:56:58]   question: What is the amount of foreign assets in the balance sheet of other depository co...
-[2026-03-19 14:57:02]   成功! 耗时: 3.70s
-[2026-03-19 14:57:02]   SQL: SELECT SUM(OtherForeignAssets) AS TotalForeignAssets
-FROM ed_otherdepositorycorpbs
-WHERE EndDate = '...
-[2026-03-19 14:57:03] [302/344] 处理问题 #302
-[2026-03-19 14:57:03]   db_id: ccks_macro
-[2026-03-19 14:57:03]   question: Please check the minimum ratio of "Excess Reserve Requirement Ratio" in "Deposit...
-[2026-03-19 14:57:06]   成功! 耗时: 3.88s
-[2026-03-19 14:57:06]   SQL: SELECT MIN(RatioFloor) AS MinExcessReserveRequirementRatio
-FROM fm_depositreserveratio
-WHERE DRRType...
-[2026-03-19 14:57:07] [303/344] 处理问题 #303
-[2026-03-19 14:57:07]   db_id: ccks_stock
-[2026-03-19 14:57:07]   question: What is the company with the highest percentage of unrestricted circulating A sh...
-[2026-03-19 14:57:11]   成功! 耗时: 4.33s
-[2026-03-19 14:57:11]   SQL: SELECT T1.ChiName
-FROM lc_stockholdingst AS T1
-JOIN lc_freefloat AS T2 ON T1.CompanyCode = T2.Compan...
-[2026-03-19 14:57:12] [304/344] 处理问题 #304
-[2026-03-19 14:57:12]   db_id: ccks_fund
-[2026-03-19 14:57:12]   question: Which funds have a benchmark growth rate exceeding 5% for the current week?...
-[2026-03-19 14:57:15]   成功! 耗时: 3.48s
-[2026-03-19 14:57:15]   SQL: SELECT DISTINCT ChiName, ChiNameAbbr, SecuCode
-FROM mf_benchmarkgrowthrate
-WHERE BenchGRForThisWeek ...
-[2026-03-19 14:57:16] [305/344] 处理问题 #305
-[2026-03-19 14:57:16]   db_id: ccks_fund
-[2026-03-19 14:57:16]   question: The fund manager with the longest tenure in managing funds....
-[2026-03-19 14:57:20]   成功! 耗时: 4.53s
-[2026-03-19 14:57:20]   SQL: SELECT T1.Name, T1.AccessionDate, T1.ManagementTime
-FROM mf_fundmanagernew AS T1
-JOIN (
-    SELECT P...
-[2026-03-19 14:57:21] [306/344] 处理问题 #306
-[2026-03-19 14:57:21]   db_id: ccks_stock
-[2026-03-19 14:57:21]   question: Which listed companies have a General Manager surnamed Liu?...
-[2026-03-19 14:57:24]   成功! 耗时: 3.53s
-[2026-03-19 14:57:24]   SQL: SELECT DISTINCT ChiName
-FROM lc_stockarchives
-WHERE GeneralManager LIKE '刘%';...
-[2026-03-19 14:57:25] [307/344] 处理问题 #307
-[2026-03-19 14:57:25]   db_id: ccks_stock
-[2026-03-19 14:57:25]   question: Total number of shareholders of DongE EJiao in january 2019...
-[2026-03-19 14:57:29]   成功! 耗时: 3.91s
-[2026-03-19 14:57:29]   SQL: SELECT COUNT(DISTINCT SHNum) AS TotalShareholders
-FROM lc_shnumber
-WHERE ChiName = 'DongE EJiao' AND...
-[2026-03-19 14:57:29] [308/344] 处理问题 #308
-[2026-03-19 14:57:29]   db_id: ccks_fund
-[2026-03-19 14:57:29]   question: What is the number of funds with different operating forms in Mutual Recognition...
-[2026-03-19 14:57:33]   成功! 耗时: 3.75s
-[2026-03-19 14:57:33]   SQL: SELECT COUNT(DISTINCT Type) AS NumberOfFunds
-FROM mf_fundarchives
-WHERE Type LIKE 'Mutual Recognitio...
-[2026-03-19 14:57:34] [309/344] 处理问题 #309
-[2026-03-19 14:57:34]   db_id: ccks_fund
-[2026-03-19 14:57:34]   question: Total number of funds under Zhang Kun...
-[2026-03-19 14:57:37]   成功! 耗时: 3.78s
-[2026-03-19 14:57:37]   SQL: SELECT COUNT(*) AS TotalFunds
-FROM mf_fmscaleanalysisn
-WHERE ChineseName = 'Zhang Kun';...
-[2026-03-19 14:57:38] [310/344] 处理问题 #310
-[2026-03-19 14:57:38]   db_id: ccks_fund
-[2026-03-19 14:57:38]   question: Give the information of funds and their respective growth rates whose benchmark ...
-[2026-03-19 14:57:42]   成功! 耗时: 3.97s
-[2026-03-19 14:57:42]   SQL: SELECT 
-    m ChiName, 
-    m.NVDailyGrowthRate AS GrowthRate, 
-    b.BenchGRForThisQuarter AS Bench...
-[2026-03-19 14:57:42]   已保存中间结果 (310/344)
-[2026-03-19 14:57:42] [311/344] 处理问题 #311
-[2026-03-19 14:57:42]   db_id: ccks_stock
-[2026-03-19 14:57:42]   question: Please help me look up all the names of listed companies in the textile industry...
-[2026-03-19 14:57:46]   成功! 耗时: 3.53s
-[2026-03-19 14:57:46]   SQL: SELECT DISTINCT ChiName
-FROM lc_business
-WHERE IndustryName = '纺织业';...
-[2026-03-19 14:57:46] [312/344] 处理问题 #312
-[2026-03-19 14:57:46]   db_id: ccks_fund
-[2026-03-19 14:57:46]   question: Wang Gong bought 160133. He wants to know the starting value and the ending valu...
-[2026-03-19 14:57:50]   成功! 耗时: 3.92s
-[2026-03-19 14:57:50]   SQL: SELECT StDivStand1, EnDivStand1
-FROM mf_chargeratenew
-WHERE ChiName = 'Daily Redemption Fee - Onshor...
-[2026-03-19 14:57:51] [313/344] 处理问题 #313
-[2026-03-19 14:57:51]   db_id: ccks_stock
-[2026-03-19 14:57:51]   question: The company name, legal representative, and general manager of the top 21 compan...
-[2026-03-19 14:57:55]   成功! 耗时: 4.22s
-[2026-03-19 14:57:55]   SQL: SELECT 
-    s.ChiName AS CompanyName,
-    l.LegalRepr AS LegalRepresentative,
-    l.GeneralManager A...
-[2026-03-19 14:57:55] [314/344] 处理问题 #314
-[2026-03-19 14:57:55]   db_id: ccks_macro
-[2026-03-19 14:57:55]   question: In 1999, what was the annual "accumulated" industrial production value of "state...
-[2026-03-19 14:57:59]   成功! 耗时: 3.89s
-[2026-03-19 14:57:59]   SQL: SELECT SUM(StateOwnedControlledComAP + CollectiveComAP) AS AccumulatedIndustrialProductionValue
-FROM...
-[2026-03-19 14:58:00] [315/344] 处理问题 #315
-[2026-03-19 14:58:00]   db_id: ccks_macro
-[2026-03-19 14:58:00]   question: Search for the trading exchanges where "Corporate Bond Pledge Repurchase" is ava...
-[2026-03-19 14:58:04]   成功! 耗时: 4.30s
-[2026-03-19 14:58:04]   SQL: SELECT DISTINCT T1.TradingExchange
-FROM ed_tradingexchange AS T1
-JOIN ed_fees AS T2 ON T1.id = T2.Tr...
-[2026-03-19 14:58:05] [316/344] 处理问题 #316
-[2026-03-19 14:58:05]   db_id: ccks_stock
-[2026-03-19 14:58:05]   question: Who is the signing lawyer for Chongqing Bank's IPO?...
-[2026-03-19 14:58:09]   成功! 耗时: 3.89s
-[2026-03-19 14:58:09]   SQL: SELECT T1.SignatureLaw
-FROM lc_ipodeclaration AS T1
-JOIN lc_stockarchives AS T2 ON T1.CompanyCode = ...
-[2026-03-19 14:58:09] [317/344] 处理问题 #317
-[2026-03-19 14:58:09]   db_id: ccks_stock
-[2026-03-19 14:58:09]   question: Hey Siri, help me list the stock codes of the liquor sector....
-[2026-03-19 14:58:13]   成功! 耗时: 3.72s
-[2026-03-19 14:58:13]   SQL: SELECT DISTINCT SecuCode
-FROM lc_business
-WHERE CSRCIndustryName = 'liquor';...
-[2026-03-19 14:58:13] [318/344] 处理问题 #318
-[2026-03-19 14:58:13]   db_id: ccks_fund
-[2026-03-19 14:58:13]   question: The bond fund has a lower yield. Take a look at the one-year return rate for "Hu...
-[2026-03-19 14:58:18]   成功! 耗时: 4.26s
-[2026-03-19 14:58:18]   SQL: SELECT ffr.FundReturn, ffr.FundTypeName
-FROM mf_fundreturnrank ffr
-JOIN mf_netvalue fnv ON ffr.Inner...
-[2026-03-19 14:58:18] [319/344] 处理问题 #319
-[2026-03-19 14:58:18]   db_id: ccks_stock
-[2026-03-19 14:58:18]   question: Which provinces did companies with a total R&D investment of over 1 billion yuan...
-[2026-03-19 14:58:22]   成功! 耗时: 4.32s
-[2026-03-19 14:58:22]   SQL: SELECT DISTINCT State
-FROM lc_stockarchives
-JOIN lc_intassetsdetail ON lc_stockarchives.CompanyCode ...
-[2026-03-19 14:58:23] [320/344] 处理问题 #320
-[2026-03-19 14:58:23]   db_id: ccks_fund
-[2026-03-19 14:58:23]   question: The investment style of the top ten managers and managed funds in terms of bench...
-[2026-03-19 14:58:29]   成功! 耗时: 5.90s
-[2026-03-19 14:58:29]   SQL: SELECT 
-    ma.InvestAdvisorCode,
-    ma.ChineseName,
-    fm.ChineseName AS FundManagerName,
-    fm....
-[2026-03-19 14:58:29]   已保存中间结果 (320/344)
-[2026-03-19 14:58:29] [321/344] 处理问题 #321
-[2026-03-19 14:58:29]   db_id: ccks_macro
-[2026-03-19 14:58:29]   question: What is the highest payment ratio for "Securities Trading Stamp Tax" of "A-share...
-[2026-03-19 14:58:34]   成功! 耗时: 4.29s
-[2026-03-19 14:58:34]   SQL: SELECT MAX(T1.RatioCeiling) AS HighestPaymentRatio
-FROM ed_taxrate T1
-JOIN ed_taxrate T2 ON T1.ItemN...
-[2026-03-19 14:58:34] [322/344] 处理问题 #322
-[2026-03-19 14:58:34]   db_id: ccks_stock
-[2026-03-19 14:58:34]   question: The proportion of non-restrictive shares of China Aviation Heavy Industry held b...
-[2026-03-19 14:58:39]   成功! 耗时: 4.86s
-[2026-03-19 14:58:39]   SQL: SELECT 
-    lcs.EndDate, 
-    lcs.NonRestrictedShares * lcs.Ashares / lcs.TotalShares AS NonRestrict...
-[2026-03-19 14:58:39] [323/344] 处理问题 #323
-[2026-03-19 14:58:39]   db_id: ccks_fund
-[2026-03-19 14:58:39]   question: List the funds and fund managers that hold 21 National Development 06....
-[2026-03-19 14:58:44]   成功! 耗时: 4.48s
-[2026-03-19 14:58:44]   SQL: SELECT DISTINCT m.SecuCode AS FundCode, m.ChiName AS FundName, fm.ChineseName AS FundManagerName
-FRO...
-[2026-03-19 14:58:44] [324/344] 处理问题 #324
-[2026-03-19 14:58:44]   db_id: ccks_stock
-[2026-03-19 14:58:44]   question: List the names of executives who hold the position of "CFO" or "Finance Manager"...
-[2026-03-19 14:58:48]   成功! 耗时: 3.81s
-[2026-03-19 14:58:48]   SQL: SELECT e.LeaderName, s.ChiName
-FROM lc_executivesholdings e
-JOIN lc_stockarchives s ON e.CompanyCode...
-[2026-03-19 14:58:49] [325/344] 处理问题 #325
-[2026-03-19 14:58:49]   db_id: ccks_fund
-[2026-03-19 14:58:49]   question: Which Chinese fund managers have started working in the industry after 2016?...
-[2026-03-19 14:58:53]   成功! 耗时: 4.17s
-[2026-03-19 14:58:53]   SQL: SELECT DISTINCT mf_personalinfo.ChineseName
-FROM mf_fundmanagernew
-JOIN mf_personalinfo ON mf_fundma...
-[2026-03-19 14:58:53] [326/344] 处理问题 #326
-[2026-03-19 14:58:53]   db_id: ccks_fund
-[2026-03-19 14:58:53]   question: Please find the top ten managers, fund managers, and their specific scale in ter...
-[2026-03-19 14:58:58]   成功! 耗时: 4.77s
-[2026-03-19 14:58:58]   SQL: SELECT 
-    mfm.cn,
-    mfm.cn_name AS ManagerName,
-    mfs.total_aum AS TotalManagementFundSize
-FRO...
-[2026-03-19 14:58:59] [327/344] 处理问题 #327
-[2026-03-19 14:58:59]   db_id: ccks_stock
-[2026-03-19 14:58:59]   question: Please help me check the amount of share buybacks of Aokema in the first quarter...
-[2026-03-19 14:59:03]   成功! 耗时: 4.06s
-[2026-03-19 14:59:03]   SQL: SELECT SUM(BuybackSum) AS TotalBuybackShares
-FROM lc_buyback
-WHERE ChiName = 'Aokema'
-AND AdvanceDat...
-[2026-03-19 14:59:03] [328/344] 处理问题 #328
-[2026-03-19 14:59:03]   db_id: ccks_macro
-[2026-03-19 14:59:03]   question: In the past three years, what are the amounts of industrial value added and tota...
-[2026-03-19 14:59:07]   成功! 耗时: 3.88s
-[2026-03-19 14:59:07]   SQL: SELECT 
-    ReportPeriod AS AnnualPeriod,
-    IndustrialValueAdded,
-    IndustrialOutputValueAP
-FROM...
-[2026-03-19 14:59:08] [329/344] 处理问题 #329
-[2026-03-19 14:59:08]   db_id: ccks_fund
-[2026-03-19 14:59:08]   question: How many fund managers have an annualized Treynor ratio above 1, grouped by the ...
-[2026-03-19 14:59:12]   成功! 耗时: 4.15s
-[2026-03-19 14:59:12]   SQL: SELECT COUNT(DISTINCT fm_personalcode) AS ManagerCount, 
-       ed_level 
-FROM mf_fundmanagernew 
+JOIN lc_...
+[2026-03-20 02:45:19] 
+[23/344] 处理问题 #23
+[2026-03-20 02:45:19]   schema: ccks_macro
+[2026-03-20 02:45:19]   question: What is the gross domestic product of China in recent years?...
+[2026-03-20 02:45:19]   尝试模型 [1/82]: qwen/deepseek-v3
+[2026-03-20 02:45:23]     成功! 耗时: 4.14s
+[2026-03-20 02:45:23]     SQL: SELECT EndDate, GDP 
+FROM ed_grossdomesticproduct 
+WHERE Province = 'China' 
+ORDER BY EndDate DESC;...
+[2026-03-20 02:45:23] 
+[24/344] 处理问题 #24
+[2026-03-20 02:45:23]   schema: ccks_fund
+[2026-03-20 02:45:23]   question: What is the benchmark growth rate of ChinaAMC ETF for governance fund since this...
+[2026-03-20 02:45:23]   尝试模型 [1/82]: qwen/deepseek-r1-distill-qwen-14b
+[2026-03-20 02:45:48]     成功! 耗时: 24.58s
+[2026-03-20 02:45:48]     SQL: SELECT BenchGRForThisMonth FROM mf_benchmarkgrowthrate WHERE ChiName LIKE '%ChinaAMC%' AND ChiName L...
+[2026-03-20 02:45:48] 
+[25/344] 处理问题 #25
+[2026-03-20 02:45:48]   schema: ccks_fund
+[2026-03-20 02:45:48]   question: Find the name of the fund with the highest return among funds with an index cycl...
+[2026-03-20 02:45:48]   尝试模型 [1/82]: qwen/MiniMax-M2.1
+[2026-03-20 02:45:58]     成功! 耗时: 9.62s
+[2026-03-20 02:45:58]     SQL: SELECT SecuAbbr 
+FROM mf_fundreturnrank 
+WHERE IndexCycle = 'one month' 
+ORDER BY FundReturn DESC 
+L...
+[2026-03-20 02:45:58] 
+[26/344] 处理问题 #26
+[2026-03-20 02:45:58]   schema: ccks_fund
+[2026-03-20 02:45:58]   question: What is the number of funds corresponding to the grouping statistics by risk lev...
+[2026-03-20 02:45:58]   尝试模型 [1/82]: qwen/qwen-plus-character
+[2026-03-20 02:46:04]     成功! 耗时: 5.41s
+[2026-03-20 02:46:04]     SQL: SELECT mf_fmretscaleanalysis.FundTypeName, COUNT(*) AS NumberOfFunds 
+FROM mf_fmretscaleanalysis 
 JO...
-[2026-03-19 14:59:12] [330/344] 处理问题 #330
-[2026-03-19 14:59:12]   db_id: ccks_stock
-[2026-03-19 14:59:12]   question: What was the proportion of stock dividends given by Northeast Securities last ye...
-[2026-03-19 14:59:18]   成功! 耗时: 5.45s
-[2026-03-19 14:59:18]   SQL: SELECT 
-    SUM(CASE WHEN ChiName = '东北证券' THEN BonusShareRatio ELSE 0 END) * 100 / COUNT(*) AS Prop...
-[2026-03-19 14:59:18]   已保存中间结果 (330/344)
-[2026-03-19 14:59:18] [331/344] 处理问题 #331
-[2026-03-19 14:59:18]   db_id: ccks_stock
-[2026-03-19 14:59:18]   question: List the corporate legal representative and general manager of Hang Seng Electro...
-[2026-03-19 14:59:22]   成功! 耗时: 3.88s
-[2026-03-19 14:59:22]   SQL: SELECT T1.LegalRepr, T1.GeneralManager
-FROM lc_stockarchives AS T1
-JOIN lc_issueandlistagent AS T2 O...
-[2026-03-19 14:59:23] [332/344] 处理问题 #332
-[2026-03-19 14:59:23]   db_id: ccks_macro
-[2026-03-19 14:59:23]   question: Please help me check the quantities of our bonds and central bank bonds separate...
-[2026-03-19 14:59:27]   成功! 耗时: 3.97s
-[2026-03-19 14:59:27]   SQL: SELECT SUM(CentralBankBonds) AS CentralBankBondsQuantity, 
-       SUM(Bonds) AS BondsQuantity
-FROM e...
-[2026-03-19 14:59:27] [333/344] 处理问题 #333
-[2026-03-19 14:59:27]   db_id: ccks_macro
-[2026-03-19 14:59:27]   question: Can we list the GDP and the corresponding YoY amount for each province and city ...
-[2026-03-19 14:59:32]   成功! 耗时: 4.37s
-[2026-03-19 14:59:32]   SQL: SELECT 
-    ed_grossdomesticproduct.Province, 
-    ed_grossdomesticproduct.Year, 
-    ed_grossdomest...
-[2026-03-19 14:59:32] [334/344] 处理问题 #334
-[2026-03-19 14:59:32]   db_id: ccks_fund
-[2026-03-19 14:59:32]   question: How many ETFs are there in conventional funds?...
-[2026-03-19 14:59:37]   成功! 耗时: 4.56s
-[2026-03-19 14:59:37]   SQL: SELECT COUNT(*) AS ETFCount
-FROM mf_advisorscalerank
-WHERE FundTypeName = 'ETF';...
-[2026-03-19 14:59:37] [335/344] 处理问题 #335
-[2026-03-19 14:59:37]   db_id: ccks_stock
-[2026-03-19 14:59:37]   question: Which companies have operating costs exceeding 100 million yuan? List the names ...
-[2026-03-19 14:59:41]   成功! 耗时: 3.72s
-[2026-03-19 14:59:41]   SQL: SELECT DISTINCT ChiName
-FROM lc_mainoperincome
-WHERE MainOperCost > 100000000;...
-[2026-03-19 14:59:41] [336/344] 处理问题 #336
-[2026-03-19 14:59:41]   db_id: ccks_stock
-[2026-03-19 14:59:41]   question: What are the main businesses of Nanhua Biological and Zhejiang University Net-ne...
-[2026-03-19 14:59:45]   成功! 耗时: 4.04s
-[2026-03-19 14:59:45]   SQL: SELECT DISTINCT lcb.MainBusiness
-FROM lc_business lcb
-JOIN lc_mainoperincome lmoi ON lcb.CompanyCode...
-[2026-03-19 14:59:46] [337/344] 处理问题 #337
-[2026-03-19 14:59:46]   db_id: ccks_fund
-[2026-03-19 14:59:46]   question: Help me check the registration information of China-Europe Fund, including the r...
-[2026-03-19 14:59:50]   成功! 耗时: 3.86s
-[2026-03-19 14:59:50]   SQL: SELECT RegAddr, RegCapital
-FROM mf_investadvisoroutline
-WHERE TrusteeName = 'China-Europe Fund';...
-[2026-03-19 14:59:50] [338/344] 处理问题 #338
-[2026-03-19 14:59:50]   db_id: ccks_fund
-[2026-03-19 14:59:50]   question: What is the manager with the highest number of managed QDII funds and the specif...
-[2026-03-19 14:59:57]   成功! 耗时: 7.15s
-[2026-03-19 14:59:57]   SQL: SELECT T2.ChiName, T2.NumOfManager
-FROM mf_advisorscalerank AS T1
-JOIN mf_fcnumofmanager AS T2 ON T1...
-[2026-03-19 14:59:58] [339/344] 处理问题 #339
-[2026-03-19 14:59:58]   db_id: ccks_macro
-[2026-03-19 14:59:58]   question: Before 1999, Liaoning province used to be a major heavy industrial province. Ple...
-[2026-03-19 15:00:02]   成功! 耗时: 4.41s
-[2026-03-19 15:00:02]   SQL: SELECT 
-    ed_grossdomesticproduct.GDPPerCapita, 
-    ed_grossdomesticproduct.PrimaryIndustryGDP
+[2026-03-20 02:46:04] 
+[27/344] 处理问题 #27
+[2026-03-20 02:46:04]   schema: ccks_macro
+[2026-03-20 02:46:04]   question: What are the base code, minimum value, and maximum value of the "Transaction Com...
+[2026-03-20 02:46:04]   尝试模型 [1/82]: qwen/qwen-plus-2025-12-01
+[2026-03-20 02:46:08]     成功! 耗时: 3.87s
+[2026-03-20 02:46:08]     SQL: SELECT BasisCode, RatioFloor, RatioCeiling 
+FROM ed_taxrate 
+WHERE ItemName = 'Transaction Commissio...
+[2026-03-20 02:46:08] 
+[28/344] 处理问题 #28
+[2026-03-20 02:46:08]   schema: ccks_fund
+[2026-03-20 02:46:08]   question: Please briefly describe the awards received by our "E Fund Ruiheng" fund....
+[2026-03-20 02:46:08]   尝试模型 [1/82]: qwen/qwen2.5-32b-instruct
+[2026-03-20 02:46:12]     成功! 耗时: 4.10s
+[2026-03-20 02:46:12]     SQL: SELECT AwardName, AppraisalOrg, Year 
+FROM mf_awards 
+WHERE Fund = 'E Fund Ruiheng'...
+[2026-03-20 02:46:13] 
+[29/344] 处理问题 #29
+[2026-03-20 02:46:13]   schema: ccks_macro
+[2026-03-20 02:46:13]   question: Please display the social retail value of our joint venture units and individual...
+[2026-03-20 02:46:13]   尝试模型 [1/82]: qwen/qwen-math-plus-0919
+[2026-03-20 02:46:18]     失败: API错误: 500 - {"detail":"处理失败: API返回错误状态码: 400, {\"error\":{\"message\":\"<400> InternalError.Algo.In
+[2026-03-20 02:46:18]   尝试模型 [2/82]: qwen/qwen-max-0919
+[2026-03-20 02:46:22]     成功! 耗时: 4.48s
+[2026-03-20 02:46:22]     SQL: SELECT JointVentures, SelfEmployed FROM ed_retailvalueofscgoods...
+[2026-03-20 02:46:23] 
+[30/344] 处理问题 #30
+[2026-03-20 02:46:23]   schema: ccks_fund
+[2026-03-20 02:46:23]   question: What is the organization form of China Asset Management Co., Ltd.?...
+[2026-03-20 02:46:23]   尝试模型 [1/81]: qwen/qwen-mt-plus
+[2026-03-20 02:46:26]     成功! 耗时: 3.13s
+[2026-03-20 02:46:26]     SQL: SELECT DISTINCT ChiNameAbbr AS "组织形式" 
+FROM mf_fundmanagernew 
+WHERE ChiName = '华夏基金管理有限公司';...
+[2026-03-20 02:46:26]   已保存中间结果 (30/344)
+[2026-03-20 02:46:26]   当前统计: 成功 30, 失败 0
+[2026-03-20 02:46:26]   可用模型: 81/90
+[2026-03-20 02:46:26] 
+[31/344] 处理问题 #31
+[2026-03-20 02:46:26]   schema: ccks_stock
+[2026-03-20 02:46:26]   question: How many companies had main operating income exceeding 100,000,000 in 2019?...
+[2026-03-20 02:46:26]   尝试模型 [1/81]: qwen/qwen-coder-turbo
+[2026-03-20 02:46:30]     成功! 耗时: 4.04s
+[2026-03-20 02:46:30]     SQL: SELECT COUNT(*) 
+FROM lc_mainoperincome 
+WHERE MainOperIncome > 100000000 AND EndDate LIKE '2019%'...
+[2026-03-20 02:46:31] 
+[32/344] 处理问题 #32
+[2026-03-20 02:46:31]   schema: ccks_stock
+[2026-03-20 02:46:31]   question: What is the lower and upper limit of the issuance volume corresponding to stock ...
+[2026-03-20 02:46:31]   尝试模型 [1/81]: qwen/deepseek-r1
+[2026-03-20 02:46:49]     成功! 耗时: 18.34s
+[2026-03-20 02:46:49]     SQL: SELECT IssueVolFloor, IssueVolCeiling
+FROM lc_ashareseasonednewissue
+WHERE SecuCode = '002305';...
+[2026-03-20 02:46:49] 
+[33/344] 处理问题 #33
+[2026-03-20 02:46:49]   schema: ccks_fund
+[2026-03-20 02:46:49]   question: Please help display the rate of return since the beginning of the week and since...
+[2026-03-20 02:46:49]   尝试模型 [1/81]: qwen/qwen-math-turbo-0919
+[2026-03-20 02:46:54]     失败: API错误: 500 - {"detail":"处理失败: API返回错误状态码: 400, {\"error\":{\"message\":\"<400> InternalError.Algo.In
+[2026-03-20 02:46:54]   尝试模型 [2/81]: qwen/qwen1.5-14b-chat
+[2026-03-20 02:46:59]     失败: API错误: 500 - {"detail":"处理失败: API返回错误状态码: 400, {\"error\":{\"message\":\"<400> InternalError.Algo.In
+[2026-03-20 02:46:59]   尝试模型 [3/81]: qwen/qwen2.5-coder-14b-instruct
+[2026-03-20 02:47:05]     成功! 耗时: 6.22s
+[2026-03-20 02:47:05]     SQL: SELECT 
+    mf_netvalueperformancehis.SecuAbbr AS FundName,
+    mf_netvalueperformancehis.RRInSelect...
+[2026-03-20 02:47:06] 
+[34/344] 处理问题 #34
+[2026-03-20 02:47:06]   schema: ccks_fund
+[2026-03-20 02:47:06]   question: Look and see if there are any funds holding position in '21 in and out 06'. What...
+[2026-03-20 02:47:06]   尝试模型 [1/79]: qwen/qwen-vl-plus-2025-08-15
+[2026-03-20 02:47:10]     成功! 耗时: 4.36s
+[2026-03-20 02:47:10]     SQL: SELECT 
+    mf_fcnumofmanager.FundTypeName
+FROM 
+    mf_awards
+JOIN 
+    mf_fcnumofmanager ON mf_awa...
+[2026-03-20 02:47:10] 
+[35/344] 处理问题 #35
+[2026-03-20 02:47:10]   schema: ccks_stock
+[2026-03-20 02:47:10]   question: The total share capital change of 000422 and 600168...
+[2026-03-20 02:47:10]   尝试模型 [1/79]: qwen/qwen-vl-plus-2025-01-25
+[2026-03-20 02:47:15]     成功! 耗时: 4.21s
+[2026-03-20 02:47:15]     SQL: SELECT SUM(lc_sharetransfer.InvolvedSum)
+FROM lc_sharetransfer 
+INNER JOIN qt_tradingcapitalflow ON ...
+[2026-03-20 02:47:15] 
+[36/344] 处理问题 #36
+[2026-03-20 02:47:15]   schema: ccks_fund
+[2026-03-20 02:47:15]   question: The number of fund managers with more than 5 current funds, grouped and counted ...
+[2026-03-20 02:47:15]   尝试模型 [1/79]: qwen/qwen2-57b-a14b-instruct
+[2026-03-20 02:47:20]     失败: API错误: 500 - {"detail":"处理失败: API返回错误状态码: 400, {\"error\":{\"message\":\"<400> InternalError.Algo.In
+[2026-03-20 02:47:20]   尝试模型 [2/79]: qwen/qwen-plus-2025-01-25
+[2026-03-20 02:47:26]     成功! 耗时: 5.95s
+[2026-03-20 02:47:26]     SQL: SELECT mf_fmscaleanalysisn.ChineseName, COUNT(mf_fmretscaleanalysis.PersonalCode) AS ManagerCount
 FR...
-[2026-03-19 15:00:03] [340/344] 处理问题 #340
-[2026-03-19 15:00:03]   db_id: ccks_fund
-[2026-03-19 15:00:03]   question: Can you show me the data of the five-year annualized return rate of the fund?...
-[2026-03-19 15:00:07]   成功! 耗时: 3.78s
-[2026-03-19 15:00:07]   SQL: SELECT SecuCode, AnnualizedRRInFiveYear
-FROM mf_netvalueperformancehis
-WHERE AnnualizedRRInFiveYear ...
-[2026-03-19 15:00:07]   已保存中间结果 (340/344)
-[2026-03-19 15:00:07] [341/344] 处理问题 #341
-[2026-03-19 15:00:07]   db_id: ccks_stock
-[2026-03-19 15:00:07]   question: Display the names of the equity transferors, the number of shares held after tra...
-[2026-03-19 15:00:12]   成功! 耗时: 4.55s
-[2026-03-19 15:00:12]   SQL: SELECT 
-    st.TransfererName AS EquityTransferorName,
-    st.SumAfterTran AS NumberOfSharesHeldAfte...
-[2026-03-19 15:00:12] [342/344] 处理问题 #342
-[2026-03-19 15:00:12]   db_id: ccks_fund
-[2026-03-19 15:00:12]   question: The benchmark growth rate of the fund 160125 since the beginning of this week....
-[2026-03-19 15:00:16]   成功! 耗时: 3.89s
-[2026-03-19 15:00:16]   SQL: SELECT BenchGRForThisWeek
+[2026-03-20 02:47:27] 
+[37/344] 处理问题 #37
+[2026-03-20 02:47:27]   schema: ccks_fund
+[2026-03-20 02:47:27]   question: How many fund managers in total have a highest education level of Doctor or Post...
+[2026-03-20 02:47:27]   尝试模型 [1/78]: qwen/qwen-mt-lite
+[2026-03-20 02:47:30]     成功! 耗时: 3.01s
+[2026-03-20 02:47:30]     SQL: SELECT COUNT(*) FROM `mf_fmretscaleanalysis` WHERE `FundTypeName` = '博士' OR `FundTypeName` = '博士后';...
+[2026-03-20 02:47:30] 
+[38/344] 处理问题 #38
+[2026-03-20 02:47:30]   schema: ccks_fund
+[2026-03-20 02:47:30]   question: Please recommend a fund with a daily return rate and a weekly return rate both e...
+[2026-03-20 02:47:30]   尝试模型 [1/78]: qwen/gui-plus
+[2026-03-20 02:47:35]     失败: API错误: 500 - {"detail":"处理失败: API返回错误状态码: 400, {\"error\":{\"message\":\"<400> InternalError.Algo.In
+[2026-03-20 02:47:35]   尝试模型 [2/78]: qwen/qwen-math-plus
+[2026-03-20 02:47:40]     失败: API错误: 500 - {"detail":"处理失败: API返回错误状态码: 400, {\"error\":{\"message\":\"<400> InternalError.Algo.In
+[2026-03-20 02:47:40]   尝试模型 [3/78]: qwen/qwen2-vl-72b-instruct
+[2026-03-20 02:47:45]     失败: API错误: 500 - {"detail":"处理失败: API返回错误状态码: 400, {\"error\":{\"message\":\"<400> InternalError.Algo.In
+[2026-03-20 02:47:45]   尝试模型 [4/78]: qwen/qwen2.5-coder-7b-instruct
+[2026-03-20 02:47:50]     成功! 耗时: 5.13s
+[2026-03-20 02:47:50]     SQL: SELECT mf_fundreturnrank.SecuAbbr, mf_fundreturnrank.ChineseName 
+FROM mf_fundreturnrank 
+JOIN mf_ne...
+[2026-03-20 02:47:50] 
+[39/344] 处理问题 #39
+[2026-03-20 02:47:50]   schema: ccks_stock
+[2026-03-20 02:47:50]   question: What are the names and investment amounts of investors in stock 600000 whose inv...
+[2026-03-20 02:47:50]   尝试模型 [1/75]: qwen/qwen-plus-0112
+[2026-03-20 02:47:55]     成功! 耗时: 4.25s
+[2026-03-20 02:47:55]     SQL: SELECT SHName, SHInvestSum 
+FROM lc_relatedsh 
+WHERE SecuCode = '600000' AND SHInvestSum > 10000000...
+[2026-03-20 02:47:55] 
+[40/344] 处理问题 #40
+[2026-03-20 02:47:55]   schema: ccks_fund
+[2026-03-20 02:47:55]   question: What are the names of fund managers whose security codes start with 15 and have ...
+[2026-03-20 02:47:55]   尝试模型 [1/75]: qwen/qwen2.5-14b-instruct-1m
+[2026-03-20 02:48:00]     成功! 耗时: 4.69s
+[2026-03-20 02:48:00]     SQL: SELECT Name 
+FROM mf_fundmanagernew 
+WHERE SecuCode LIKE '15%' AND Performance > 0.7;...
+[2026-03-20 02:48:00]   已保存中间结果 (40/344)
+[2026-03-20 02:48:00]   当前统计: 成功 40, 失败 0
+[2026-03-20 02:48:00]   可用模型: 75/90
+[2026-03-20 02:48:00] 
+[41/344] 处理问题 #41
+[2026-03-20 02:48:00]   schema: ccks_fund
+[2026-03-20 02:48:00]   question: View the benchmark growth rate for each fund and their year-to-date benchmark gr...
+[2026-03-20 02:48:00]   尝试模型 [1/75]: qwen/qwen3-vl-flash-2025-10-15
+[2026-03-20 02:48:04]     成功! 耗时: 4.15s
+[2026-03-20 02:48:04]     SQL: SELECT 
+    mf_fundmanagernew.ChiName,
+    mf_benchmarkgrowthrate.BenchGRForThisYear AS YearToDateBe...
+[2026-03-20 02:48:04] 
+[42/344] 处理问题 #42
+[2026-03-20 02:48:04]   schema: ccks_stock
+[2026-03-20 02:48:04]   question: What is the number of listed companies in recent years whose main operating prof...
+[2026-03-20 02:48:04]   尝试模型 [1/75]: qwen/qwen3-vl-flash-2026-01-22
+[2026-03-20 02:48:08]     成功! 耗时: 3.47s
+[2026-03-20 02:48:08]     SQL: SELECT COUNT(*) 
+FROM lc_business 
+WHERE CAST(REPLACE(MainBusiness, '万元', '') AS REAL) < 10 
+  AND I...
+[2026-03-20 02:48:08] 
+[43/344] 处理问题 #43
+[2026-03-20 02:48:08]   schema: ccks_fund
+[2026-03-20 02:48:08]   question: What are the top ten funds ranked by benchmark growth rate over the past ten yea...
+[2026-03-20 02:48:08]   尝试模型 [1/75]: qwen/qwen-plus-2025-09-11
+[2026-03-20 02:48:12]     成功! 耗时: 3.45s
+[2026-03-20 02:48:12]     SQL: SELECT ChiName, BenchGRFor10Year
 FROM mf_benchmarkgrowthrate
-WHERE InnerCode = 160125
-AND Date('now') - Dat...
-[2026-03-19 15:00:17] [343/344] 处理问题 #343
-[2026-03-19 15:00:17]   db_id: ccks_fund
-[2026-03-19 15:00:17]   question: What is the ranking and specific values of the top ten funds with the highest be...
-[2026-03-19 15:00:21]   成功! 耗时: 4.50s
-[2026-03-19 15:00:21]   SQL: SELECT 
-    frr.InnerCode,
-    frr.SecuAbbr,
-    frr.FundReturn,
-    frr.FundAnnReturn,
-    frr.Fund...
-[2026-03-19 15:00:22] [344/344] 处理问题 #344
-[2026-03-19 15:00:22]   db_id: ccks_stock
-[2026-03-19 15:00:22]   question: Introduction of Shandong Haihua...
-[2026-03-19 15:00:25]   成功! 耗时: 3.87s
-[2026-03-19 15:00:25]   SQL: SELECT 
-    ChiName AS CompanyName, 
-    ChiNameAbbr AS AbbreviatedName, 
-    SecuCode AS StockCode ...
-[2026-03-19 15:00:26] ============================================================
-[2026-03-19 15:00:26] 批量任务完成!
-[2026-03-19 15:00:26] 总数: 344, 成功: 344, 失败: 0
-[2026-03-19 15:00:26] 结果已保存到: D:\projects\QueryForge\scripts\db2\results.json
-[2026-03-19 15:00:26] ============================================================
+ORDER BY BenchGRFor10Year DESC
+LIMIT 10...
+[2026-03-20 02:48:12] 
+[44/344] 处理问题 #44
+[2026-03-20 02:48:12]   schema: ccks_macro
+[2026-03-20 02:48:12]   question: What is the charging basis of "Handling fee" for "convertible bonds"? What are t...
+[2026-03-20 02:48:12]   尝试模型 [1/75]: qwen/qwen2.5-3b-instruct
+[2026-03-20 02:48:21]     成功! 耗时: 8.93s
+[2026-03-20 02:48:21]     SQL: SELECT ed_taxrate.ItemName, MIN(ed_taxrate.RatioFloor), MAX(ed_taxrate.RatioCeiling)
+FROM ed_taxrate...
+[2026-03-20 02:48:21] 
+[45/344] 处理问题 #45
+[2026-03-20 02:48:21]   schema: ccks_fund
+[2026-03-20 02:48:21]   question: What is the benchmark growth rate of the China Europe New Trend A fund since thi...
+[2026-03-20 02:48:21]   尝试模型 [1/75]: qwen/qwen2.5-72b-instruct
+[2026-03-20 02:48:36]     成功! 耗时: 15.29s
+[2026-03-20 02:48:36]     SQL: SELECT BenchGRForThisWeek 
+FROM mf_benchmarkgrowthrate 
+WHERE ChiName = '中国欧洲新趋势A'...
+[2026-03-20 02:48:37] 
+[46/344] 处理问题 #46
+[2026-03-20 02:48:37]   schema: ccks_fund
+[2026-03-20 02:48:37]   question: Display the names of fund managers and their background introductions with a net...
+[2026-03-20 02:48:37]   尝试模型 [1/75]: qwen/qwq-32b-preview
+[2026-03-20 02:48:41]     成功! 耗时: 4.26s
+[2026-03-20 02:48:41]     SQL: SELECT mf_fundarchives.Manager, mf_personalinfo.Background
+FROM mf_fundarchives
+JOIN mf_personalinfo...
+[2026-03-20 02:48:41] 
+[47/344] 处理问题 #47
+[2026-03-20 02:48:41]   schema: ccks_fund
+[2026-03-20 02:48:41]   question: What are the 10 funds with the highest monthly benchmark growth rate and their f...
+[2026-03-20 02:48:41]   尝试模型 [1/75]: qwen/qwen-long
+[2026-03-20 02:48:46]     成功! 耗时: 4.63s
+[2026-03-20 02:48:46]     SQL: SELECT 
+    b.ChiName,
+    r.FundTypeName
+FROM 
+    mf_benchmarkgrowthrate b
+JOIN 
+    mf_fmretandsc...
+[2026-03-20 02:48:46] 
+[48/344] 处理问题 #48
+[2026-03-20 02:48:46]   schema: ccks_fund
+[2026-03-20 02:48:46]   question: Look up the return rate data since the establishment of the fund....
+[2026-03-20 02:48:46]   尝试模型 [1/75]: qwen/tongyi-xiaomi-analysis-pro
+[2026-03-20 02:48:51]     失败: API错误: 500 - {"detail":"处理失败: API返回错误状态码: 400, {\"error\":{\"message\":\"Range of max_tokens should 
+[2026-03-20 02:48:51]   尝试模型 [2/75]: qwen/qwen-math-plus-0816
+[2026-03-20 02:48:57]     失败: API错误: 500 - {"detail":"处理失败: API返回错误状态码: 400, {\"error\":{\"message\":\"<400> InternalError.Algo.In
+[2026-03-20 02:48:57]   尝试模型 [3/75]: qwen/deepseek-r1-distill-qwen-32b
+[2026-03-20 02:49:21]     成功! 耗时: 24.91s
+[2026-03-20 02:49:21]     SQL: SELECT mf_netvalueperformancehis.RRSinceStart, mf_netvalueperformancehis.AnnualizedRRSinceStart, mf_...
+[2026-03-20 02:49:22] 
+[49/344] 处理问题 #49
+[2026-03-20 02:49:22]   schema: ccks_fund
+[2026-03-20 02:49:22]   question: Which fund management company has a general manager with the last name Liu?...
+[2026-03-20 02:49:22]   尝试模型 [1/73]: qwen/qwen1.5-7b-chat
+[2026-03-20 02:49:27]     失败: API错误: 500 - {"detail":"处理失败: API返回错误状态码: 400, {\"error\":{\"message\":\"<400> InternalError.Algo.In
+[2026-03-20 02:49:27]   尝试模型 [2/73]: qwen/deepseek-v3.1
+[2026-03-20 02:49:31]     成功! 耗时: 3.98s
+[2026-03-20 02:49:31]     SQL: SELECT DISTINCT mf_investadvisoroutline.InvestAdvisorName 
+FROM mf_investadvisoroutline 
+WHERE mf_in...
+[2026-03-20 02:49:31] 
+[50/344] 处理问题 #50
+[2026-03-20 02:49:31]   schema: ccks_fund
+[2026-03-20 02:49:31]   question: What are the fund manager names and tenure for funds with a risk level of "中"?...
+[2026-03-20 02:49:31]   尝试模型 [1/72]: qwen/qwen-vl-plus-0102
+[2026-03-20 02:49:36]     失败: API错误: 500 - {"detail":"处理失败: API返回错误状态码: 400, {\"error\":{\"message\":\"<400> InternalError.Algo.In
+[2026-03-20 02:49:36]   尝试模型 [2/72]: qwen/qwen2.5-vl-7b-instruct
+[2026-03-20 02:49:41]     成功! 耗时: 5.23s
+[2026-03-20 02:49:41]     SQL: SELECT mf_fundmanagernew.Name AS FundManagerName, 
+       mf_fundmanagernew.ManagementTime AS Tenure...
+[2026-03-20 02:49:41]   已保存中间结果 (50/344)
+[2026-03-20 02:49:41]   当前统计: 成功 50, 失败 0
+[2026-03-20 02:49:41]   可用模型: 71/90
+[2026-03-20 02:49:42] 
+[51/344] 处理问题 #51
+[2026-03-20 02:49:42]   schema: ccks_fund
+[2026-03-20 02:49:42]   question: Calculate which investment type has the lowest average annualized return rate si...
+[2026-03-20 02:49:42]   尝试模型 [1/71]: qwen/qwen-mt-flash
+[2026-03-20 02:49:45]     成功! 耗时: 3.00s
+[2026-03-20 02:49:45]     SQL: SELECT FundTypeName, AVG(AnnAbnReturn) AS AvgAnnualizedReturn
+FROM mf_fmretscaleanalysis
+GROUP BY Fu...
+[2026-03-20 02:49:45] 
+[52/344] 处理问题 #52
+[2026-03-20 02:49:45]   schema: ccks_stock
+[2026-03-20 02:49:45]   question: Please help me to find the names of the listed companies in the "lithium battery...
+[2026-03-20 02:49:45]   尝试模型 [1/71]: qwen/qwen2.5-14b-instruct
+[2026-03-20 02:49:50]     成功! 耗时: 5.28s
+[2026-03-20 02:49:50]     SQL: SELECT 
+    lc_issueandlistagent.ChiName, 
+    lc_issueandlistagent.LegalPersonRepr, 
+    lc_issuean...
+[2026-03-20 02:49:51] 
+[53/344] 处理问题 #53
+[2026-03-20 02:49:51]   schema: ccks_fund
+[2026-03-20 02:49:51]   question: Which bond funds were listed on the Shenzhen Stock Exchange in the fourth quarte...
+[2026-03-20 02:49:51]   尝试模型 [1/71]: qwen/deepseek-r1-distill-qwen-7b
+[2026-03-20 02:49:59]     成功! 耗时: 8.53s
+[2026-03-20 02:49:59]     SQL: SELECT 
+  mf_frdportifoliodetail.BondAbbr AS BondAbbr,
+  mf_frdportifoliodetail.BondCode AS BondCode...
+[2026-03-20 02:49:59] 
+[54/344] 处理问题 #54
+[2026-03-20 02:49:59]   schema: ccks_stock
+[2026-03-20 02:49:59]   question: I heard that many listed companies conducted share repurchases last year, please...
+[2026-03-20 02:49:59]   尝试模型 [1/71]: qwen/qwen2.5-vl-3b-instruct
+[2026-03-20 02:50:03]     成功! 耗时: 4.05s
+[2026-03-20 02:50:03]     SQL: SELECT DISTINCT lc_stockholdingst.ChiName 
+FROM lc_stockholdingst 
+JOIN lc_sharesfloatingschedule ON...
+[2026-03-20 02:50:04] 
+[55/344] 处理问题 #55
+[2026-03-20 02:50:04]   schema: ccks_stock
+[2026-03-20 02:50:04]   question: Actual controller of Dongfang Electronics...
+[2026-03-20 02:50:04]   尝试模型 [1/71]: qwen/qwen2-72b-instruct
+[2026-03-20 02:50:09]     失败: API错误: 500 - {"detail":"处理失败: API返回错误状态码: 400, {\"error\":{\"message\":\"<400> InternalError.Algo.In
+[2026-03-20 02:50:09]   尝试模型 [2/71]: qwen/qwen-vl-max-1230
+[2026-03-20 02:50:14]     失败: API错误: 500 - {"detail":"处理失败: API返回错误状态码: 400, {\"error\":{\"message\":\"<400> InternalError.Algo.In
+[2026-03-20 02:50:14]   尝试模型 [3/71]: qwen/tongyi-intent-detect-v3
+[2026-03-20 02:50:17]     成功! 耗时: 3.49s
+[2026-03-20 02:50:17]     SQL: SELECT * FROM lc_actualcontroller WHERE ChiName = 'Dongfang Electronics'...
+[2026-03-20 02:50:18] 
+[56/344] 处理问题 #56
+[2026-03-20 02:50:18]   schema: ccks_fund
+[2026-03-20 02:50:18]   question: How many fund managers have entered the securities industry in the past year?...
+[2026-03-20 02:50:18]   尝试模型 [1/69]: qwen/qwen-vl-plus-2025-05-07
+[2026-03-20 02:50:22]     成功! 耗时: 4.11s
+[2026-03-20 02:50:22]     SQL: SELECT COUNT(DISTINCT mf_personalinfo.PersonalCode) 
+FROM mf_personalinfo 
+JOIN mf_fmretscaleanalysi...
+[2026-03-20 02:50:22] 
+[57/344] 处理问题 #57
+[2026-03-20 02:50:22]   schema: ccks_fund
+[2026-03-20 02:50:22]   question: How many LOF funds have had a non-negative benchmark growth rate since the begin...
+[2026-03-20 02:50:22]   尝试模型 [1/69]: qwen/qwen2.5-math-7b-instruct
+[2026-03-20 02:50:27]     失败: API错误: 500 - {"detail":"处理失败: API返回错误状态码: 400, {\"error\":{\"message\":\"<400> InternalError.Algo.In
+[2026-03-20 02:50:27]   尝试模型 [2/69]: qwen/qwen1.5-110b-chat
+[2026-03-20 02:51:32]     失败: API错误: 500 - {"detail":"处理失败: API返回错误状态码: 500, {\"error\":{\"message\":\"Response timeout.\",\"type\
+[2026-03-20 02:51:32]   尝试模型 [3/69]: qwen/qwen-math-turbo
+[2026-03-20 02:51:37]     失败: API错误: 500 - {"detail":"处理失败: API返回错误状态码: 400, {\"error\":{\"message\":\"<400> InternalError.Algo.In
+[2026-03-20 02:51:37]   尝试模型 [4/69]: qwen/qwen-vl-max-1119
+[2026-03-20 02:51:43]     失败: API错误: 500 - {"detail":"处理失败: API返回错误状态码: 400, {\"error\":{\"message\":\"<400> InternalError.Algo.In
+[2026-03-20 02:51:43]   尝试模型 [5/69]: qwen/qwen-vl-max-2025-04-02
+[2026-03-20 02:51:47]     成功! 耗时: 4.84s
+[2026-03-20 02:51:47]     SQL: SELECT COUNT(DISTINCT mf_fundarchives.InnerCode) AS LOF_Funds_Count
+FROM mf_fundarchives
+JOIN mf_ben...
+[2026-03-20 02:51:48] 
+[58/344] 处理问题 #58
+[2026-03-20 02:51:48]   schema: ccks_fund
+[2026-03-20 02:51:48]   question: What is the average value of the cumulative net asset value per unit of this fun...
+[2026-03-20 02:51:48]   尝试模型 [1/65]: qwen/qwen-coder-plus-latest
+[2026-03-20 02:51:52]     成功! 耗时: 4.26s
+[2026-03-20 02:51:52]     SQL: SELECT AVG(AccumulatedUnitNV) FROM mf_netvalue WHERE SecuCode = '163412' AND strftime('%Y', EndDate)...
+[2026-03-20 02:51:52] 
+[59/344] 处理问题 #59
+[2026-03-20 02:51:52]   schema: ccks_fund
+[2026-03-20 02:51:52]   question: Which fund has the highest one-year benchmark growth rate?...
+[2026-03-20 02:51:52]   尝试模型 [1/65]: qwen/qwen-long-2025-01-25
+[2026-03-20 02:51:57]     成功! 耗时: 5.11s
+[2026-03-20 02:51:57]     SQL: SELECT mf_benchmarkgrowthrate.ChiName, mf_benchmarkgrowthrate.BenchGRFor1Year 
+FROM mf_benchmarkgrow...
+[2026-03-20 02:51:58] 
+[60/344] 处理问题 #60
+[2026-03-20 02:51:58]   schema: ccks_stock
+[2026-03-20 02:51:58]   question: Display the number of shares and the percentage of total shares involved in 3001...
+[2026-03-20 02:51:58]   尝试模型 [1/65]: qwen/qwen-long-latest
+[2026-03-20 02:52:02]     成功! 耗时: 3.84s
+[2026-03-20 02:52:02]     SQL: SELECT InvolvedSum, PCTOfTotalShares 
+FROM lc_sharefp 
+WHERE SecuCode = '300100';...
+[2026-03-20 02:52:02]   已保存中间结果 (60/344)
+[2026-03-20 02:52:02]   当前统计: 成功 60, 失败 0
+[2026-03-20 02:52:02]   可用模型: 65/90
+[2026-03-20 02:52:02] 
+[61/344] 处理问题 #61
+[2026-03-20 02:52:02]   schema: ccks_macro
+[2026-03-20 02:52:02]   question: What are the amounts of imported goods and exported goods over the years? Please...
+[2026-03-20 02:52:02]   尝试模型 [1/65]: qwen/qwen-turbo-2025-07-15
+[2026-03-20 02:52:06]     成功! 耗时: 3.71s
+[2026-03-20 02:52:06]     SQL: SELECT 
+    e.EndDate AS Year,
+    SUM(CASE WHEN e.OperateType = 'Import' THEN e.ExImValue ELSE 0 EN...
+[2026-03-20 02:52:06] 
+[62/344] 处理问题 #62
+[2026-03-20 02:52:06]   schema: ccks_macro
+[2026-03-20 02:52:06]   question: What is the amount of claims on non-financial institutions when domestic loans i...
+[2026-03-20 02:52:06]   尝试模型 [1/65]: qwen/qwen-turbo-2025-04-28
+[2026-03-20 02:52:09]     成功! 耗时: 3.47s
+[2026-03-20 02:52:09]     SQL: SELECT ed_otherdepositorycorpbs.ClaimsOnOtherNFInstitute 
+FROM ed_otherdepositorycorpbs 
+JOIN ed_chi...
+[2026-03-20 02:52:10] 
+[63/344] 处理问题 #63
+[2026-03-20 02:52:10]   schema: ccks_stock
+[2026-03-20 02:52:10]   question: What are the names of the shareholders in the allotment of 000659?...
+[2026-03-20 02:52:10]   尝试模型 [1/65]: qwen/qwen-turbo-2025-02-11
+[2026-03-20 02:52:13]     成功! 耗时: 3.87s
+[2026-03-20 02:52:13]     SQL: SELECT DISTINCT FPSHName 
+FROM lc_sharefp 
+WHERE SecuCode = '000659' AND FPSHName IS NOT NULL;...
+[2026-03-20 02:52:14] 
+[64/344] 处理问题 #64
+[2026-03-20 02:52:14]   schema: ccks_macro
+[2026-03-20 02:52:14]   question: Show the amounts of corporate savings, financial deposits, and government loans ...
+[2026-03-20 02:52:14]   尝试模型 [1/65]: qwen/qwen-plus-2025-07-28
+[2026-03-20 02:52:17]     成功! 耗时: 3.62s
+[2026-03-20 02:52:17]     SQL: SELECT CorporateSavings, FinanceDeposits, LoanToGov 
+FROM ed_chinafibalancesheetrmb...
+[2026-03-20 02:52:18] 
+[65/344] 处理问题 #65
+[2026-03-20 02:52:18]   schema: ccks_fund
+[2026-03-20 02:52:18]   question: What is the average rate of return for funds with the operating form "ETF" in th...
+[2026-03-20 02:52:18]   尝试模型 [1/65]: qwen/qwen-plus-latest
+[2026-03-20 02:52:22]     成功! 耗时: 3.90s
+[2026-03-20 02:52:22]     SQL: SELECT AVG(t1.WeightedAvgReturn) 
+FROM mf_fmretscaleanalysis t1 
+WHERE t1.FundTypeName = 'ETF';...
+[2026-03-20 02:52:22] 
+[66/344] 处理问题 #66
+[2026-03-20 02:52:22]   schema: ccks_fund
+[2026-03-20 02:52:22]   question: Look at funds and managers whose benchmark growth rate has been positive since t...
+[2026-03-20 02:52:22]   尝试模型 [1/65]: doubao/doubao-1-5-pro-32k-character-250715
+[2026-03-20 02:52:26]     成功! 耗时: 4.11s
+[2026-03-20 02:52:26]     SQL: SELECT mf_benchmarkgrowthrate.ChiName, mf_fundmanagernew.Name
+FROM mf_benchmarkgrowthrate
+JOIN mf_fu...
+[2026-03-20 02:52:26] 
+[67/344] 处理问题 #67
+[2026-03-20 02:52:26]   schema: ccks_stock
+[2026-03-20 02:52:26]   question: How many listed companies are there respectively in Shanghai and Beijing?...
+[2026-03-20 02:52:26]   尝试模型 [1/65]: doubao/doubao-1-5-lite-32k-250115
+[2026-03-20 02:52:30]     成功! 耗时: 3.62s
+[2026-03-20 02:52:30]     SQL: SELECT City, COUNT(*) 
+FROM lc_stockarchives 
+WHERE City IN ('上海', '北京') 
+GROUP BY City;...
+[2026-03-20 02:52:30] 
+[68/344] 处理问题 #68
+[2026-03-20 02:52:30]   schema: ccks_fund
+[2026-03-20 02:52:30]   question: Which funds have received awards from the awarding institution "14561"?...
+[2026-03-20 02:52:30]   尝试模型 [1/65]: doubao/doubao-1-5-pro-32k-250115
+[2026-03-20 02:52:35]     成功! 耗时: 4.53s
+[2026-03-20 02:52:35]     SQL: SELECT DISTINCT Fund 
+FROM mf_awards 
+WHERE AppraisalOrgCode = 14561;...
+[2026-03-20 02:52:35] 
+[69/344] 处理问题 #69
+[2026-03-20 02:52:35]   schema: ccks_stock
+[2026-03-20 02:52:35]   question: Please help me find out which companies in Hubei Province have a total number of...
+[2026-03-20 02:52:35]   尝试模型 [1/65]: doubao/doubao-seed-1-6-250615

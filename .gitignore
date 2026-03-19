@@ -5,8 +5,13 @@ __pycache__
 *.zip
 *.log
 *.db
+*.db-shm
+*.db-wal
+*.jsonl
 .env
 
 db/temp
 db/vectors
 models/embeddings
+
+/scripts/temp

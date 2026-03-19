@@ -53,7 +53,7 @@ class LLMLogStats(BaseModel):
 
 
 @router.get("/list", response_model=LLMLogListResponse)
-async def get_llm_logs(
+def get_llm_logs(
         limit: int = Query(20, ge=1, le=100),
         offset: int = Query(0, ge=0),
         status: Optional[str] = None,
@@ -86,7 +86,7 @@ async def get_llm_logs(
 
 
 @router.get("/stats", response_model=LLMLogStats)
-async def get_llm_stats(
+def get_llm_stats(
         user=Depends(get_current_user)
 ):
     """获取LLM调用统计"""
@@ -127,7 +127,7 @@ async def get_llm_stats(
 
 
 @router.get("/{log_id}", response_model=LLMLogItem)
-async def get_llm_log(
+def get_llm_log(
         log_id: int,
         user=Depends(get_current_user)
 ):
@@ -157,7 +157,7 @@ async def get_llm_log(
 
 
 @router.delete("/{log_id}")
-async def delete_llm_log(
+def delete_llm_log(
         log_id: int,
         user=Depends(get_current_user)
 ):

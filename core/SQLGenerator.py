@@ -13,27 +13,15 @@ class SqlGenerator:
         "sqlserver": ""
     }
 
-    def __init__(self):
-        pass
-
     def _get_quote(self, db_type: str) -> str:
         """获取指定数据库类型的引用符"""
         return self.DB_TYPE_QUOTES.get(db_type.lower(), "")
-
-    def _quote_identifier(self, identifier: str, db_type: str) -> str:
-        """为标识符添加引号"""
-        quote = self._get_quote(db_type)
-        if quote:
-            return f"{quote}{identifier}{quote}"
-        return identifier
 
     def generate_sql_prompt(
             self,
             query: str,
             schema_csv: str = "",
-            sample_values: str = "",
-            table_relations: str = "",
-            domain_knowledge: str = "",
+            extra_knowledge: str = "",
             history_queries: List[Dict[str, str]] = None,
             db_type: str = "sqlite"
     ) -> str:
@@ -42,29 +30,18 @@ class SqlGenerator:
         Args:
             query: 用户查询文本
             schema_csv: 表结构（从数据库动态获取）
-            sample_values: 字段示例值文本
-            table_relations: 表间关系文本
+            extra_knowledge: 领域知识内容（已合并到补充知识）
             history_queries: 历史成功查询 [{query, sql}]
-            domain_knowledge: 领域知识内容
             db_type: 数据库类型 (mysql, sqlite, postgresql, oracle, sqlserver)
         """
         quote = self._get_quote(db_type)
         pre_rules = (
             "1. 只生成SELECT查询语句，不要包含INSERT、UPDATE、DELETE等操作\n"
             f"2. 使用{repr(quote) if quote else '无'}引用符包围表名和列名\n"
-            "3. 如果需要连接多个表，请使用适当的JOIN\n"
+            "3. 如果需要连接多个表，请使用适当的JOIN,连接字段类型一般情况要保持一致\n"
             "4. 添加适当的WHERE条件来过滤数据\n"
-            "5. 只返回SQL语句，不要包含其他解释文字\n"
-            "6. 确保所有列名和表名都在提供的表结构中存在\n"
+            "5. 确保所有列名和表名都在提供的表结构中存在\n"
         )
-
-        sample_values_section = ""
-        if sample_values:
-            sample_values_section = f"以下是一些字段的常见值，请在WHERE条件中使用这些值：\n{sample_values}\n"
-
-        table_relations_section = ""
-        if table_relations:
-            table_relations_section = f"以下是表之间的关联关系，可用于JOIN操作：\n{table_relations}\n"
 
         history_section = ""
         if history_queries:
@@ -72,22 +49,22 @@ class SqlGenerator:
             for i, h in enumerate(history_queries[:3]):
                 history_section += f"{i + 1}. Q: {h['query']}\n   A: {h['sql'][:200]}...\n\n"
 
-        domain_section = ""
-        if domain_knowledge:
-            domain_section = f"{domain_knowledge}"
-
         db_name = db_type.upper() if db_type else "MySQL"
-        prompt = (
-            f"你是一个专业的SQL生成助手。请根据用户的自然语言查询、表结构(csv)、领域知识和规则，生成正确的{db_name}查询语句。\n"
-            f"【用户问题】\n{query}\n"
-            f"【表结构】\n{schema_csv}\n"
-            f"【字段示例值】\n{sample_values_section}"
-            f"【表间关系】\n{table_relations_section}"
-            f"【领域知识】\n{domain_section}"
-            f"【历史成功查询参考】\n{history_section}"
-            f"【前置限制】\n{pre_rules}"
-            "\n请严格按照上述要求生成SQL语句，只返回SQL语句，不要包含其他解释文字："
-        )
+        prompt_parts = [
+            f"你是一个专业的SQL生成助手。请根据用户的自然语言查询、表结构(csv)、领域知识和规则，生成正确的{db_name}查询语句。",
+            f"【用户问题】\n{query}",
+            f"【表结构】\n{schema_csv}",
+        ]
+
+        if extra_knowledge:
+            prompt_parts.append(f"【补充知识】\n{extra_knowledge.strip()}")
+        if history_section:
+            prompt_parts.append(f"【历史成功查询参考】\n{history_section}")
+
+        prompt_parts.append(f"【前置限制】\n{pre_rules}")
+        prompt_parts.append("请严格按照上述要求生成SQL语句，只返回SQL语句，不要包含其他解释文字：")
+
+        prompt = '\n\n'.join(prompt_parts)
         return prompt
 
     def validate_sql(self, sql: str) -> Tuple[bool, Optional[str], Optional[List[str]]]:

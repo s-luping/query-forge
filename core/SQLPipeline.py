@@ -27,9 +27,7 @@ class SQLPipeline:
     可选依赖（缺失不影响流程）：
         - vector_store: 向量存储（失败时降级到数据库查询）
         - schema_name: 模式名
-        - domain_knowledge: 领域知识
-        - sample_values: 字段示例值
-        - table_relations: 表间关系
+        - extra_knowledge: 补充知识
         - history_queries: 历史成功查询
     """
 
@@ -97,7 +95,8 @@ class SQLPipeline:
                 'column_name': s.column_name,
                 'column_description': s.column_description,
                 'column_type': s.column_type,
-                'sample_values': s.sample_values
+                'column_key': s.column_key,
+                'foreign_key': s.foreign_key
             } for s in items]
         finally:
             db.close()
@@ -122,7 +121,8 @@ class SQLPipeline:
                 'column_name': s.column_name,
                 'column_description': s.column_description,
                 'column_type': s.column_type,
-                'sample_values': s.sample_values
+                'column_key': s.column_key,
+                'foreign_key': s.foreign_key
             } for s in items]
         finally:
             db.close()
@@ -264,7 +264,8 @@ class SQLPipeline:
                 'column_name': f.get('column_name'),
                 'column_type': f.get('column_type'),
                 'column_description': f.get('column_description'),
-                'sample_values': f.get('sample_values', '')
+                'column_key': f.get('column_key', ''),
+                'foreign_key': f.get('foreign_key', '')
             }
             if f.get('sample_values'):
                 samples = [v.strip() for v in f['sample_values'].split(',') if v.strip()][:5]
@@ -280,7 +281,9 @@ class SQLPipeline:
                     "table": f.get("table_name"),
                     "column": f.get("column_name"),
                     "type": f.get("column_type"),
-                    "desc": f.get("column_description", "")[:50] if f.get("column_description") else ""
+                    "desc": f.get("column_description", "")[:50] if f.get("column_description") else "",
+                    "column_key": f.get("column_key", ""),
+                    "foreign_key": f.get("foreign_key", "")
                 }
                 for f in complete_fields[:15]
             ]
@@ -289,29 +292,22 @@ class SQLPipeline:
         return {
             'recalled_fields': recalled_fields,
             'tables': table_names,
-            'all_fields': all_fields
+            'all_fields': all_fields,
+            'schema_name': schema_name
         }
 
-    def step4_add_context_info(self, merged_info: Dict, query: str,
-                               domain_knowledge: str = "", history_queries: List[Dict] = None,
-                               sample_values: str = "", table_relations: str = "") -> Dict:
+    def step4_add_context_info(self, merged_info: Dict, query: str, extra_knowledge: str = "", history_queries: List[Dict] = None) -> Dict:
         """步骤4: 添加上下文信息（可选参数不影响流程）"""
         merged_info['context'] = {
             'query': query,
-            'domain_knowledge': domain_knowledge or "",
-            'history_queries': history_queries or [],
-            'sample_values': sample_values or "",
-            'table_relations': table_relations or ""
+            'extra_knowledge': extra_knowledge,
+            'history_queries': history_queries or []
         }
         
         self._log_step("STEP4_CONTEXT", {
             "query": query,
-            "has_domain_knowledge": bool(domain_knowledge),
-            "domain_knowledge_length": len(domain_knowledge) if domain_knowledge else 0,
-            "has_sample_values": bool(sample_values),
-            "sample_values_length": len(sample_values) if sample_values else 0,
-            "has_table_relations": bool(table_relations),
-            "table_relations_length": len(table_relations) if table_relations else 0,
+            "has_extra_knowledge": bool(extra_knowledge),
+            "extra_knowledge_length": len(extra_knowledge) if extra_knowledge else 0,
             "history_queries_count": len(history_queries) if history_queries else 0
         })
         
@@ -320,26 +316,20 @@ class SQLPipeline:
     def step5_generate_sql(self, merged_info: Dict, db_type: str = "sqlite") -> Dict:
         """步骤5: 生成SQL（必要）"""
         schema_csv = self._generate_schema_csv(merged_info)
-        sample_values = self._generate_sample_values(merged_info)
-
-        extra_sample_values = merged_info['context'].get('sample_values', '')
-        if extra_sample_values:
-            sample_values = f"{sample_values}\n{extra_sample_values}" if sample_values else extra_sample_values
+        extra_knowledge = merged_info['context'].get('extra_knowledge', '')
 
         prompt = self.sql_generator.generate_sql_prompt(
             query=merged_info['context']['query'],
             schema_csv=schema_csv,
-            sample_values=sample_values,
-            table_relations=merged_info['context'].get('table_relations', ''),
-            history_queries=merged_info['context']['history_queries'],
-            domain_knowledge=merged_info['context']['domain_knowledge'],
+            extra_knowledge=extra_knowledge,
+            history_queries=merged_info['context'].get('history_queries', []),
             db_type=db_type
         )
 
         self._log_step("STEP5_PROMPT", {
             "db_type": db_type,
             "schema_csv_lines": len(schema_csv.split('\n')),
-            "sample_values_lines": len(sample_values.split('\n')) if sample_values else 0,
+            "extra_knowledge_length": len(extra_knowledge) if extra_knowledge else 0,
             "prompt_length": len(prompt)
         })
 
@@ -368,39 +358,33 @@ class SQLPipeline:
         return is_valid, error_msg, columns
 
     def _generate_schema_csv(self, merged_info: Dict) -> str:
-        lines = ["表名,字段名,字段类型,字段描述"]
+        lines = ["表名,字段名,字段类型,字段描述,主键,外键"]
         tables = merged_info.get('tables', [])
         all_fields = merged_info.get('all_fields', {})
+        schema_name = merged_info.get('schema_name')
 
         for table in tables:
             table_fields = [(key, field) for key, field in all_fields.items() if field.get('table_name') == table]
             for key, field in table_fields:
                 lines.append(f"{table},{field.get('column_name', '')},"
-                           f"{field.get('column_type', '')},{field.get('column_description', '')}")
+                           f"{field.get('column_type', '')},"
+                           f"{field.get('column_description', '')},"
+                           f"{field.get('column_key', '')},"
+                           f"{field.get('foreign_key', '')}")
+
         return '\n'.join(lines)
 
-    def _generate_sample_values(self, merged_info: Dict) -> str:
-        lines = []
-        all_fields = merged_info.get('all_fields', {})
-        for key, field in all_fields.items():
-            samples = field.get('sample_values_list', [])
-            if samples:
-                lines.append(f"{field.get('table_name')}.{field.get('column_name')}: {', '.join(str(s) for s in samples[:5])}")
-        return '\n'.join(lines[:20])
-
     def run_pipeline(self, query: str, schema_name: Optional[str] = None,
-                     domain_knowledge: str = "", history_queries: List[Dict] = None,
-                     sample_values: str = "", table_relations: str = "",
+                     extra_knowledge: str = "",
+                     history_queries: List[Dict] = None,
                      db_type: str = "sqlite") -> Dict:
         """运行SQL生成流程
         
         Args:
             query: 用户问题（必要）
             schema_name: 模式名（可选）
-            domain_knowledge: 领域知识（可选）
-            history_queries: 历史成功查询（可选）
-            sample_values: 字段示例值（可选）
-            table_relations: 表间关系（可选）
+            extra_knowledge: 补充知识（字段值样例、表间关系、领域知识）
+            history_queries: 历史成功查询
             db_type: 数据库类型（默认sqlite）
             
         Returns:
@@ -413,10 +397,7 @@ class SQLPipeline:
         keywords = self.step1_extract_keywords(query)
         recalled_fields = self.step2_recall_fields(keywords, schema_name)
         merged_info = self.step3_aggregate_tables(recalled_fields, schema_name)
-        merged_info = self.step4_add_context_info(
-            merged_info, query, domain_knowledge, history_queries,
-            sample_values, table_relations
-        )
+        merged_info = self.step4_add_context_info(merged_info, query, extra_knowledge, history_queries)
         llm_result = self.step5_generate_sql(merged_info, db_type)
         sql = llm_result.get('sql', '')
         is_valid, error_msg, columns = self.step6_validate_sql(sql)
@@ -460,7 +441,8 @@ def build_vector_index(user_id: int, schema_name: Optional[str] = None) -> Dict:
             'column_name': s.column_name,
             'column_description': s.column_description,
             'column_type': s.column_type,
-            'sample_values': s.sample_values
+            'column_key': s.column_key,
+            'foreign_key': s.foreign_key
         } for s in schemas]
 
         return store.build_from_schemas(schema_list, schema_name)

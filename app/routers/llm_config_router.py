@@ -89,14 +89,14 @@ class TestConnectionRequest(BaseModel):
 
 
 @router.get("/providers", response_model=List[ProviderInfo])
-async def get_providers():
+def get_providers():
     """获取支持的模型提供商列表"""
     providers = LLMClient.get_supported_providers()
     return [ProviderInfo(**p) for p in providers]
 
 
 @router.get("/list", response_model=LLMConfigListResponse)
-async def get_configs(
+def get_configs(
         user=Depends(get_current_user)
 ):
     """获取用户的LLM配置列表"""
@@ -138,7 +138,7 @@ async def get_configs(
 
 
 @router.post("/create")
-async def create_config(
+def create_config(
         request: LLMConfigCreate,
         user=Depends(get_current_user)
 ):
@@ -150,11 +150,12 @@ async def create_config(
         try:
             existing = db.query(LLMConfig).filter(
                 LLMConfig.user_id == user_id,
-                LLMConfig.provider == request.provider
+                LLMConfig.provider == request.provider,
+                LLMConfig.model == request.model
             ).first()
 
             if existing:
-                raise HTTPException(status_code=400, detail="该模型提供商已存在配置，请使用编辑功能")
+                raise HTTPException(status_code=400, detail="该供应商+模型已存在配置，请使用编辑功能")
 
             if request.is_default:
                 db.query(LLMConfig).filter(
@@ -189,7 +190,7 @@ async def create_config(
 
 
 @router.put("/{config_id}")
-async def update_config(
+def update_config(
         config_id: int,
         request: LLMConfigUpdate,
         user=Depends(get_current_user)
@@ -209,6 +210,14 @@ async def update_config(
                 raise HTTPException(status_code=404, detail="配置不存在")
 
             if request.model is not None:
+                existing = db.query(LLMConfig).filter(
+                    LLMConfig.user_id == user_id,
+                    LLMConfig.provider == config.provider,
+                    LLMConfig.model == request.model,
+                    LLMConfig.id != config_id
+                ).first()
+                if existing:
+                    raise HTTPException(status_code=400, detail="该供应商+模型已存在配置")
                 config.model = request.model
             if request.api_key is not None:
                 config.api_key = request.api_key
@@ -247,7 +256,7 @@ async def update_config(
 
 
 @router.delete("/{config_id}")
-async def delete_config(
+def delete_config(
         config_id: int,
         user=Depends(get_current_user)
 ):
@@ -280,7 +289,7 @@ async def delete_config(
 
 
 @router.post("/test")
-async def test_connection(
+def test_connection(
         request: TestConnectionRequest,
         user=Depends(get_current_user)
 ):
@@ -326,7 +335,7 @@ async def test_connection(
 
 
 @router.post("/set-default/{config_id}")
-async def set_default_config(
+def set_default_config(
         config_id: int,
         user=Depends(get_current_user)
 ):
@@ -365,7 +374,7 @@ async def set_default_config(
 
 
 @router.get("/default")
-async def get_default_config(
+def get_default_config(
         user=Depends(get_current_user)
 ):
     """获取用户的默认配置"""

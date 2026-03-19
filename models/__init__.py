@@ -36,10 +36,10 @@ def _create_engine_with_wal(db_path: str):
 
 
 app_engine = _create_engine_with_wal(APP_DB_PATH)
-history_engine = _create_engine_with_wal(HISTORY_DB_PATH)
+llm_engine = _create_engine_with_wal(LLM_DB_PATH)
 schema_engine = _create_engine_with_wal(SCHEMA_DB_PATH)
 extra_engine = _create_engine_with_wal(EXTRA_DB_PATH)
-llm_engine = _create_engine_with_wal(LLM_DB_PATH)
+history_engine = _create_engine_with_wal(HISTORY_DB_PATH)
 
 AppSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=app_engine)
 HistorySessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=history_engine)
@@ -58,7 +58,6 @@ def init_database():
     User.__table__.create(bind=app_engine, checkfirst=True)
     LLMConfig.__table__.create(bind=app_engine, checkfirst=True)
 
-    _migrate_llm_config_table()
 
     logger.info(f"应用数据库表创建/检查完成: {APP_DB_PATH}")
     print(f"应用数据库表创建/检查完成: {APP_DB_PATH}")
@@ -68,31 +67,6 @@ def init_database():
     init_extra_database()
     init_llm_database()
     create_default_admin()
-
-
-def _migrate_llm_config_table():
-    """迁移llm_configs表，添加新字段"""
-    try:
-        with app_engine.connect() as conn:
-            result = conn.execute(text("PRAGMA table_info(llm_configs)"))
-            columns = [row[1] for row in result.fetchall()]
-
-            if 'max_tokens' not in columns:
-                conn.execute(text("ALTER TABLE llm_configs ADD COLUMN max_tokens INTEGER DEFAULT 8000"))
-                logger.info("llm_configs表添加max_tokens字段")
-
-            if 'temperature' not in columns:
-                conn.execute(text("ALTER TABLE llm_configs ADD COLUMN temperature REAL DEFAULT 0.7"))
-                logger.info("llm_configs表添加temperature字段")
-
-            if 'timeout' not in columns:
-                conn.execute(text("ALTER TABLE llm_configs ADD COLUMN timeout INTEGER DEFAULT 300"))
-                logger.info("llm_configs表添加timeout字段")
-
-            conn.commit()
-    except Exception as e:
-        logger.warning(f"llm_configs表迁移检查: {e}")
-
 
 def _ensure_db_dirs():
     """确保数据库目录存在"""

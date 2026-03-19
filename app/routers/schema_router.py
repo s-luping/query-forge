@@ -19,6 +19,8 @@ import threading
 from datetime import datetime
 from typing import List, Optional, Dict, Any
 
+_vector_build_lock = threading.Lock()
+
 from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Form
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -55,6 +57,7 @@ class SchemaItem(BaseModel):
     column_type: Optional[str]
     column_description: Optional[str]
     column_key: Optional[str]
+    foreign_key: Optional[str] = None
     is_nullable: Optional[bool] = True
     default_value: Optional[str] = None
     sample_values: Optional[str] = None
@@ -117,13 +120,15 @@ def _auto_build_vector_index(user_id: int, schema_name: str, schema_field_count:
         return None
 
     def _build_in_background():
-        try:
-            from core.SQLPipeline import build_vector_index
-            result = build_vector_index(user_id, schema_name)
-            if result.get('success'):
-                logger.info(f"Schema {schema_name} 向量索引构建完成（字段数: {schema_field_count}）")
-        except Exception as e:
-            logger.warning(f"后台构建向量索引失败: {e}")
+        with _vector_build_lock:
+            try:
+                logger.info(f"开始构建向量索引: {schema_name}")
+                from core.SQLPipeline import build_vector_index
+                result = build_vector_index(user_id, schema_name)
+                if result.get('success'):
+                    logger.info(f"Schema {schema_name} 向量索引构建完成（字段数: {schema_field_count}）")
+            except Exception as e:
+                logger.warning(f"后台构建向量索引失败: {e}")
 
     thread = threading.Thread(target=_build_in_background, daemon=True)
     thread.start()
@@ -144,19 +149,38 @@ def parse_spider_json(json_data: Dict[str, Any], user_id: int, default_schema: s
     - foreign_keys: [[源列索引, 目标列索引], ...]
     """
     results = []
-    
+    relations = []
+
     schema_name = json_data.get('db_id', default_schema or 'default')
-    
+
     table_names_original = json_data.get('table_names_original', [])
     table_names = json_data.get('table_names', table_names_original)
     column_names_original = json_data.get('column_names_original', [])
     column_names = json_data.get('column_names', column_names_original)
     column_types = json_data.get('column_types', [])
     primary_keys = json_data.get('primary_keys', [])
-    
+    foreign_keys = json_data.get('foreign_keys', [])
+
     table_desc_map = {}
     for i, tname in enumerate(table_names_original):
         table_desc_map[i] = table_names[i] if i < len(table_names) else tname
+
+    col_idx_map = {}
+    for i, col_info in enumerate(column_names_original):
+        if isinstance(col_info, list) and len(col_info) >= 2:
+            col_idx_map[i] = (col_info[0], col_info[1])
+
+    fk_map = {}
+    for fk in foreign_keys:
+        if isinstance(fk, list) and len(fk) >= 2:
+            src_idx, tgt_idx = fk[0], fk[1]
+            src_table_idx, src_col = col_idx_map.get(src_idx, (None, None))
+            tgt_table_idx, tgt_col = col_idx_map.get(tgt_idx, (None, None))
+            if src_table_idx is not None and tgt_table_idx is not None:
+                src_table = table_names_original[src_table_idx] if src_table_idx < len(table_names_original) else f"table_{src_table_idx}"
+                tgt_table = table_names_original[tgt_table_idx] if tgt_table_idx < len(table_names_original) else f"table_{tgt_table_idx}"
+                fk_key = f"{src_table}.{src_col}"
+                fk_map[fk_key] = f"{tgt_table}.{tgt_col}"
     
     col_idx = 0
     for i, col_info in enumerate(column_names_original):
@@ -199,18 +223,19 @@ def parse_spider_json(json_data: Dict[str, Any], user_id: int, default_schema: s
             'column_type': column_type,
             'column_description': column_description if column_description != column_name else '',
             'column_key': 'PRI' if is_pk else '',
+            'foreign_key': fk_map.get(f"{table_name}.{column_name}", ''),
             'is_nullable': True,
             'default_value': None,
             'sample_values': None
         })
-    
+
     return results
 
 
 def parse_json_schema(json_text: str, user_id: int, default_schema: str = None) -> List[dict]:
     """
     解析 JSON 格式的 schema（支持 Spider 格式和自定义格式，支持多数据库）
-    
+
     如果 JSON 中包含 db_id 或 schema_name，则使用该值作为 schema_name
     如果是数组，则解析所有数据库定义
     """
@@ -218,22 +243,25 @@ def parse_json_schema(json_text: str, user_id: int, default_schema: str = None) 
         data = json.loads(json_text)
     except json.JSONDecodeError as e:
         raise DDLParseError(f"JSON 格式错误: {e}")
-    
+
+    all_results = []
+
     if isinstance(data, list):
-        results = []
         for item in data:
             if 'table_names_original' in item or 'column_names_original' in item:
-                results.extend(parse_spider_json(item, user_id, default_schema))
+                results = parse_spider_json(item, user_id, default_schema)
+                all_results.extend(results)
             elif 'tables' in item:
-                results.extend(parse_custom_json(item, user_id, default_schema))
-        return results
-    
+                results = parse_custom_json(item, user_id, default_schema)
+                all_results.extend(results)
+        return all_results
+
     if 'table_names_original' in data or 'column_names_original' in data:
         return parse_spider_json(data, user_id, default_schema)
-    
+
     if 'tables' in data:
         return parse_custom_json(data, user_id, default_schema)
-    
+
     raise DDLParseError("无法识别的 JSON 格式，请使用 Spider 格式或自定义格式")
 
 
@@ -491,6 +519,15 @@ def parse_single_table_mysql(table_ddl: str, schema_name: str, user_id: int) -> 
         pk_str = pk_match.group(1)
         primary_keys = [pk.strip().strip('`') for pk in pk_str.split(',')]
 
+    fk_pattern = r'FOREIGN\s+KEY\s*\(`?([^`)]+)`?\)\s*REFERENCES\s+`?([^`\s(]+)`?\s*\(`?([^`)]+)`?\)'
+    fk_matches = re.finditer(fk_pattern, table_struct, re.IGNORECASE)
+    fk_map = {}
+    for fk in fk_matches:
+        col_name = fk.group(1).strip('`')
+        ref_table = fk.group(2).strip('`')
+        ref_col = fk.group(3).strip('`')
+        fk_map[col_name] = f"{ref_table}.{ref_col}"
+
     for line in table_struct.split('\n'):
         line = line.strip()
         if not line:
@@ -543,6 +580,7 @@ def parse_single_table_mysql(table_ddl: str, schema_name: str, user_id: int) -> 
             'column_type': column_type,
             'column_description': column_desc,
             'column_key': column_key,
+            'foreign_key': fk_map.get(column_name, ''),
             'is_nullable': is_nullable,
             'default_value': default_value,
             'sample_values': None
@@ -1032,7 +1070,7 @@ def parse_single_table_data_warehouse(table_ddl: str, schema_name: str, user_id:
 
 
 def _save_parsed_results(parsed_results: List[dict], user_id: int, db: Session) -> tuple:
-    """保存解析结果到数据库（批量优化）"""
+    """保存解析结果到数据库（批量优化，7个字段相同才算重复）"""
     if not parsed_results:
         return 0, 0, []
 
@@ -1045,17 +1083,23 @@ def _save_parsed_results(parsed_results: List[dict], user_id: int, db: Session) 
     for schema_name in schema_names_all:
         existing = db.query(
             Schema.table_name,
-            Schema.column_name
+            Schema.column_name,
+            Schema.column_type,
+            Schema.column_key,
+            Schema.foreign_key
         ).filter(
             Schema.user_id == user_id,
             Schema.schema_name == schema_name
         ).all()
-        for t, c in existing:
-            existing_keys.add((schema_name, t, c))
+        for record in existing:
+            key = (schema_name, record.table_name, record.column_name, 
+                   record.column_type, record.column_key, record.foreign_key)
+            existing_keys.add(key)
 
     to_add = []
     for result in parsed_results:
-        key = (result['schema_name'], result['table_name'], result['column_name'])
+        key = (result['schema_name'], result['table_name'], result['column_name'],
+               result.get('column_type'), result.get('column_key'), result.get('foreign_key'))
         if key in existing_keys:
             duplicate_count += 1
         else:
@@ -1071,7 +1115,7 @@ def _save_parsed_results(parsed_results: List[dict], user_id: int, db: Session) 
 
 
 @router.post("/parse", response_model=SchemaListResponse)
-async def parse_ddl_text(
+def parse_ddl_text(
         request: DDLParseRequest,
         user=Depends(get_current_user)
 ):
@@ -1131,7 +1175,7 @@ async def parse_ddl_text(
 
 
 @router.post("/parse-json", response_model=SchemaListResponse)
-async def parse_json_text(
+def parse_json_text(
         request: JSONParseRequest,
         user=Depends(get_current_user)
 ):
@@ -1148,11 +1192,15 @@ async def parse_json_text(
 
             new_count, duplicate_count, schema_names = _save_parsed_results(parsed_results, user_id, db)
 
+            fk_count = sum(1 for r in parsed_results if r.get('foreign_key'))
+
             message = f"成功插入 {new_count} 条记录"
             if duplicate_count > 0:
                 message += f"，跳过 {duplicate_count} 条重复记录"
             if schema_names:
                 message += f"，涉及 Schema: {', '.join(schema_names)}"
+            if fk_count > 0:
+                message += f"，外键 {fk_count} 条"
 
             items = db.query(Schema).filter(
                 Schema.user_id == user_id,
@@ -1218,11 +1266,15 @@ async def upload_ddl_file(
         try:
             new_count, duplicate_count, schema_names = _save_parsed_results(parsed_results, user_id, db)
 
+            fk_count = sum(1 for r in parsed_results if r.get('foreign_key'))
+
             message = f"成功插入 {new_count} 条记录"
             if duplicate_count > 0:
                 message += f"，跳过 {duplicate_count} 条重复记录"
             if schema_names:
                 message += f"，涉及 Schema: {', '.join(schema_names)}"
+            if fk_count > 0:
+                message += f"，外键 {fk_count} 条"
 
             items = db.query(Schema).filter(
                 Schema.user_id == user_id,
@@ -1260,7 +1312,7 @@ async def upload_ddl_file(
 
 
 @router.get("/list", response_model=SchemaListResponse)
-async def get_schema_list(
+def get_schema_list(
         schema_name: Optional[str] = None,
         table_name: Optional[str] = None,
         limit: int = 100,
@@ -1313,7 +1365,7 @@ class IndexInfoResponse(BaseModel):
 
 
 @router.post("/build-vector-index")
-async def build_vector_index(
+def build_vector_index(
     request: BuildIndexRequest,
     user=Depends(get_current_user)
 ):
@@ -1338,7 +1390,7 @@ async def build_vector_index(
 
 
 @router.get("/vector-index-info", response_model=IndexInfoResponse)
-async def get_vector_index_info(
+def get_vector_index_info(
     schema_name: Optional[str] = None,
     user=Depends(get_current_user)
 ):
@@ -1360,7 +1412,7 @@ async def get_vector_index_info(
 
 
 @router.put("/{schema_id}/sample-values")
-async def update_sample_values(
+def update_sample_values(
         schema_id: int,
         request: UpdateSampleValuesRequest,
         user=Depends(get_current_user)
@@ -1394,7 +1446,7 @@ async def update_sample_values(
 
 
 @router.get("/stats")
-async def get_schema_stats(
+def get_schema_stats(
         user=Depends(get_current_user)
 ):
     """获取用户 Schema 统计数据"""
@@ -1427,7 +1479,7 @@ async def get_schema_stats(
 
 
 @router.get("/check", response_model=SchemaCheckResponse)
-async def check_schema(
+def check_schema(
         user=Depends(get_current_user)
 ):
     """检查用户是否有 Schema 数据"""
@@ -1456,7 +1508,7 @@ async def check_schema(
 
 
 @router.get("/export")
-async def export_schema(
+def export_schema(
         schema_name: Optional[str] = None,
         table_name: Optional[str] = None,
         user=Depends(get_current_user)
@@ -1515,7 +1567,7 @@ async def export_schema(
 
 
 @router.get("/schemas")
-async def get_schemas(
+def get_schemas(
         user=Depends(get_current_user)
 ):
     """获取用户所有的 schema 名称列表"""
@@ -1538,7 +1590,7 @@ async def get_schemas(
 
 
 @router.get("/tables")
-async def get_tables(
+def get_tables(
         schema_name: Optional[str] = None,
         user=Depends(get_current_user)
 ):
@@ -1572,7 +1624,7 @@ async def get_tables(
 
 
 @router.delete("/schema/{schema_name}")
-async def delete_schema(
+def delete_schema(
         schema_name: str,
         user=Depends(get_current_user)
 ):
@@ -1599,7 +1651,7 @@ async def delete_schema(
 
 
 @router.delete("/table")
-async def delete_table(
+def delete_table(
         schema_name: str,
         table_name: str,
         user=Depends(get_current_user)
@@ -1628,7 +1680,7 @@ async def delete_table(
 
 
 @router.delete("/{schema_id}")
-async def delete_schema_item(
+def delete_schema_item(
         schema_id: int,
         user=Depends(get_current_user)
 ):
@@ -1661,7 +1713,7 @@ async def delete_schema_item(
 
 
 @router.get("/supported-db-types")
-async def get_supported_db_types():
+def get_supported_db_types():
     """获取支持的数据库类型列表"""
     return {
         "db_types": SUPPORTED_DB_TYPES,

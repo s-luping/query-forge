@@ -118,7 +118,7 @@ def get_successful_queries(user_id: int, limit: int = 5) -> List[Dict[str, str]]
 
 
 @router.get("/", response_model=HistoricalSQLResponse)
-async def get_sql_history(
+def get_sql_history(
         limit: int = Query(20, ge=1, le=100),
         offset: int = Query(0, ge=0),
         user=Depends(get_current_user)
@@ -141,7 +141,7 @@ async def get_sql_history(
 
 
 @router.post("/rate")
-async def rate_sql_history(
+def rate_sql_history(
         request: RatingRequest,
         user=Depends(get_current_user)
 ):
@@ -170,7 +170,7 @@ async def rate_sql_history(
 
 
 @router.delete("/{history_id}")
-async def delete_sql_history(
+def delete_sql_history(
         history_id: int,
         user=Depends(get_current_user)
 ):

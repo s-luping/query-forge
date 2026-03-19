@@ -69,8 +69,10 @@ def main():
 
     output_path = script_dir / 'pred.jsonl'
     with open(output_path, 'w', encoding='utf-8') as f:
-        for sub_db, queries in all_results.items():
-            line = json.dumps({sub_db: queries}, ensure_ascii=False)
+        for sub_db in sorted(all_results.keys()):
+            queries = all_results[sub_db]
+            sorted_queries = dict(sorted(queries.items()))
+            line = json.dumps({sub_db: sorted_queries}, ensure_ascii=False)
             f.write(line + '\n')
 
     print(f"\n生成完成: {output_path}")
