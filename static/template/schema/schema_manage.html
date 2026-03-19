@@ -608,6 +608,12 @@
                 return;
             }
 
+            const btn = event.target.closest('button');
+            const originalText = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 解析中...';
+            disableAllParseButtons();
+
             try {
                 const response = await apiRequest('/api/schema/parse', {
                     method: 'POST',
@@ -631,6 +637,10 @@
                 }
             } catch (e) {
                 alert('解析失败：' + e.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+                enableAllParseButtons();
             }
         }
 
@@ -642,6 +652,12 @@
                 alert('请输入 JSON 内容');
                 return;
             }
+
+            const btn = event.target.closest('button');
+            const originalText = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 解析中...';
+            disableAllParseButtons();
 
             try {
                 const response = await apiRequest('/api/schema/parse-json', {
@@ -665,6 +681,10 @@
                 }
             } catch (e) {
                 alert('解析失败：' + e.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+                enableAllParseButtons();
             }
         }
 
@@ -683,6 +703,12 @@
             formData.append('schema_name', schemaName);
             formData.append('db_type', dbType);
             formData.append('file', file);
+
+            const btn = document.getElementById('uploadBtn');
+            const originalText = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 上传解析中...';
+            disableAllParseButtons();
 
             try {
                 const token = document.cookie.split('; ').find(row => row.startsWith('token='))?.split('=')[1];
@@ -709,7 +735,32 @@
                 }
             } catch (e) {
                 alert('解析失败：' + e.message);
+            } finally {
+                btn.innerHTML = originalText;
+                enableAllParseButtons();
             }
+        }
+
+        function disableAllParseButtons() {
+            document.querySelectorAll('#ddlInput button, #jsonInput button, #fileInput button').forEach(b => {
+                b.disabled = true;
+            });
+            const fileInput = document.getElementById('ddlFile');
+            const fileDropZone = document.getElementById('fileDropZone');
+            if (fileInput) fileInput.disabled = true;
+            if (fileDropZone) fileDropZone.style.pointerEvents = 'none';
+        }
+
+        function enableAllParseButtons() {
+            document.querySelectorAll('#ddlInput button, #jsonInput button, #fileInput button').forEach(b => {
+                b.disabled = false;
+            });
+            const fileInput = document.getElementById('ddlFile');
+            const fileDropZone = document.getElementById('fileDropZone');
+            if (fileInput) fileInput.disabled = false;
+            if (fileDropZone) fileDropZone.style.pointerEvents = 'auto';
+            const uploadBtn = document.getElementById('uploadBtn');
+            if (uploadBtn) uploadBtn.disabled = !document.getElementById('ddlFile').files[0];
         }
 
         async function deleteSchema(id) {

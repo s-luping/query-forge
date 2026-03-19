@@ -207,7 +207,7 @@ class SQLPipeline:
                         "keyword_text": keyword_text,
                         "recalled_count": len(results),
                         "recalled_fields": [
-                            {"table": f.get("table_name"), "column": f.get("column_name")}
+                            {"table": f.get("table_name"), "column": f.get("field_name")}
                             for f in results[:10]
                         ]
                     })

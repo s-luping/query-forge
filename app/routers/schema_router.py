@@ -107,19 +107,19 @@ SUPPORTED_DB_TYPES = [
 ]
 
 
-def _auto_build_vector_index(user_id: int, schema_name: str, total_field_count: int) -> Optional[str]:
+def _auto_build_vector_index(user_id: int, schema_name: str, schema_field_count: int) -> Optional[str]:
     from core.SQLPipeline import build_vector_index
     from core.VectorStore import SchemaVectorStore
 
     threshold = SchemaVectorStore.VECTOR_INDEX_THRESHOLD
-    if total_field_count < threshold:
-        logger.info(f"字段数量 {total_field_count} 未达到阈值 {threshold}，跳过自动索引构建")
+    if schema_field_count < threshold:
+        logger.info(f"Schema {schema_name} 字段数量 {schema_field_count} 未达到阈值 {threshold}，跳过自动索引构建")
         return None
 
     try:
         result = build_vector_index(user_id, schema_name)
         if result.get('success'):
-            return f"已自动创建向量索引（字段数: {total_field_count}）"
+            return f"Schema {schema_name} 已自动创建向量索引（字段数: {schema_field_count}）"
         return None
     except Exception as e:
         logger.warning(f"自动构建向量索引失败: {e}")
@@ -1084,15 +1084,18 @@ async def parse_ddl_text(
                 Schema.schema_name.in_(schema_names) if schema_names else Schema.schema_name == request.schema_name
             ).all()
 
-            total_field_count = db.query(Schema).filter(
-                Schema.user_id == user_id
-            ).count()
-
+            index_messages = []
             for schema_name in schema_names:
-                index_message = _auto_build_vector_index(user_id, schema_name, total_field_count)
+                schema_field_count = db.query(Schema).filter(
+                    Schema.user_id == user_id,
+                    Schema.schema_name == schema_name
+                ).count()
+                index_message = _auto_build_vector_index(user_id, schema_name, schema_field_count)
                 if index_message:
-                    message += f"。{index_message}"
-                    break
+                    index_messages.append(index_message)
+            
+            if index_messages:
+                message += "。" + "；".join(index_messages)
 
             return SchemaListResponse(
                 items=[SchemaItem.model_validate(item) for item in items],
@@ -1140,15 +1143,18 @@ async def parse_json_text(
                 Schema.schema_name.in_(schema_names) if schema_names else Schema.schema_name == request.schema_name
             ).all()
 
-            total_field_count = db.query(Schema).filter(
-                Schema.user_id == user_id
-            ).count()
-
+            index_messages = []
             for schema_name in schema_names:
-                index_message = _auto_build_vector_index(user_id, schema_name, total_field_count)
+                schema_field_count = db.query(Schema).filter(
+                    Schema.user_id == user_id,
+                    Schema.schema_name == schema_name
+                ).count()
+                index_message = _auto_build_vector_index(user_id, schema_name, schema_field_count)
                 if index_message:
-                    message += f"。{index_message}"
-                    break
+                    index_messages.append(index_message)
+            
+            if index_messages:
+                message += "。" + "；".join(index_messages)
 
             return SchemaListResponse(
                 items=[SchemaItem.model_validate(item) for item in items],
@@ -1158,8 +1164,8 @@ async def parse_json_text(
         finally:
             db.close()
 
-    except DDLParseError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    except JSONDecodeError as e:
+        raise HTTPException(status_code=400, detail=f"JSON 解析错误: {str(e)}")
     except HTTPException:
         raise
     except Exception as e:
@@ -1207,15 +1213,18 @@ async def upload_ddl_file(
                 Schema.schema_name.in_(schema_names) if schema_names else Schema.schema_name == schema_name
             ).all()
 
-            total_field_count = db.query(Schema).filter(
-                Schema.user_id == user_id
-            ).count()
-
+            index_messages = []
             for sn in schema_names:
-                index_message = _auto_build_vector_index(user_id, sn, total_field_count)
+                schema_field_count = db.query(Schema).filter(
+                    Schema.user_id == user_id,
+                    Schema.schema_name == sn
+                ).count()
+                index_message = _auto_build_vector_index(user_id, sn, schema_field_count)
                 if index_message:
-                    message += f"。{index_message}"
-                    break
+                    index_messages.append(index_message)
+            
+            if index_messages:
+                message += "。" + "；".join(index_messages)
 
             return SchemaListResponse(
                 items=[SchemaItem.model_validate(item) for item in items],

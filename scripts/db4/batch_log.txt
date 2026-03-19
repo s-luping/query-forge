@@ -1,0 +1,2019 @@
+[2026-03-19 01:18:40] ============================================================
+[2026-03-19 01:18:40] 开始批量SQL生成任务
+[2026-03-19 01:18:40] ============================================================
+[2026-03-19 01:18:40] 共加载 300 条问题
+[2026-03-19 01:19:42] ============================================================
+[2026-03-19 01:19:42] 开始批量SQL生成任务
+[2026-03-19 01:19:42] ============================================================
+[2026-03-19 01:19:42] 共加载 300 条问题
+[2026-03-19 01:19:44] 登录成功
+[2026-03-19 01:19:44] [1/300] 处理问题 #1
+[2026-03-19 01:19:44]   db_id: thrombosis_prediction
+[2026-03-19 01:19:44]   question: What are the patient's diagnosis for those who has lower red blood blood cell? S...
+[2026-03-19 01:21:47]   异常: HTTPConnectionPool(host='localhost', port=8188): Read timed out. (read timeout=120)
+[2026-03-19 01:21:47] [2/300] 处理问题 #2
+[2026-03-19 01:21:47]   db_id: financial
+[2026-03-19 01:21:47]   question: What year was account owner number 130 born?...
+[2026-03-19 01:26:16] ============================================================
+[2026-03-19 01:26:16] 开始批量SQL生成任务
+[2026-03-19 01:26:16] ============================================================
+[2026-03-19 01:26:16] 共加载 300 条问题
+[2026-03-19 01:26:18] 登录成功
+[2026-03-19 01:26:18] [1/300] 处理问题 #1
+[2026-03-19 01:26:18]   db_id: thrombosis_prediction
+[2026-03-19 01:26:18]   question: What are the patient's diagnosis for those who has lower red blood blood cell? S...
+[2026-03-19 01:26:31]   成功! 耗时: 12.30s
+[2026-03-19 01:26:31]   SQL: SELECT 
+    Patient.ID,
+    Patient.Description AS Age,
+    Examination.Diagnosis
+FROM 
+    Patient
+...
+[2026-03-19 01:26:31] [2/300] 处理问题 #2
+[2026-03-19 01:26:31]   db_id: financial
+[2026-03-19 01:26:31]   question: What year was account owner number 130 born?...
+[2026-03-19 01:26:38]   成功! 耗时: 7.17s
+[2026-03-19 01:26:38]   SQL: SELECT strftime('%Y', birth_date) AS birth_year
+FROM client
+JOIN disp ON client.client_id = disp.cli...
+[2026-03-19 01:26:39] [3/300] 处理问题 #3
+[2026-03-19 01:26:39]   db_id: california_schools
+[2026-03-19 01:26:39]   question: What is the monthly average number of schools that opened in Alameda County unde...
+[2026-03-19 01:26:50]   成功! 耗时: 10.88s
+[2026-03-19 01:26:50]   SQL: SELECT 
+    strftime('%Y-%m', OpenDate) AS Month,
+    COUNT(*) AS AverageSchoolsOpened
+FROM 
+    sch...
+[2026-03-19 01:26:50] [4/300] 处理问题 #4
+[2026-03-19 01:26:50]   db_id: debit_card_specializing
+[2026-03-19 01:26:50]   question: Which of the three segments—SME, LAM and KAM—has the biggest and lowest percenta...
+[2026-03-19 01:26:55]   成功! 耗时: 4.99s
+[2026-03-19 01:26:55]   SQL: SELECT 
+    Segment,
+    (CAST(SUM(CASE WHEN Year = 2013 THEN Consumption ELSE 0 END) AS REAL) / NUL...
+[2026-03-19 01:26:56] [5/300] 处理问题 #5
+[2026-03-19 01:26:56]   db_id: card_games
+[2026-03-19 01:26:56]   question: What percentage of Japanese translated sets are expansion sets?...
+[2026-03-19 01:27:00]   成功! 耗时: 4.63s
+[2026-03-19 01:27:00]   SQL: SELECT 
+    CAST(SUM(CASE WHEN s.isExpansion = 1 THEN 1 ELSE 0 END) AS REAL) / COUNT(*) * 100 AS per...
+[2026-03-19 01:27:01] [6/300] 处理问题 #6
+[2026-03-19 01:27:01]   db_id: card_games
+[2026-03-19 01:27:01]   question: Name the card and artist with the most ruling information. Also state if the car...
+[2026-03-19 01:27:05]   成功! 耗时: 4.32s
+[2026-03-19 01:27:05]   SQL: SELECT 
+    name AS card_name,
+    artist,
+    isPromo AS is_promotional_printing,
+    COUNT(rulings...
+[2026-03-19 01:27:06] [7/300] 处理问题 #7
+[2026-03-19 01:27:06]   db_id: toxicology
+[2026-03-19 01:27:06]   question: Among the molecules which contain "c" element, which of them are not carcinogeni...
+[2026-03-19 01:27:09]   成功! 耗时: 3.50s
+[2026-03-19 01:27:09]   SQL: SELECT DISTINCT molecule_id
+FROM atom
+WHERE element LIKE '%c%'
+  AND molecule_id NOT IN (
+    SELECT...
+[2026-03-19 01:27:10] [8/300] 处理问题 #8
+[2026-03-19 01:27:10]   db_id: toxicology
+[2026-03-19 01:27:10]   question: In the molecule containing sodium atoms, how many are non-carcinogenic?...
+[2026-03-19 01:27:14]   成功! 耗时: 3.98s
+[2026-03-19 01:27:14]   SQL: SELECT COUNT(DISTINCT m.molecule_id) AS non_carcinogenic_count
+FROM molecule m
+JOIN atom a ON m.mole...
+[2026-03-19 01:27:14] [9/300] 处理问题 #9
+[2026-03-19 01:27:14]   db_id: debit_card_specializing
+[2026-03-19 01:27:14]   question: Which customers, paying in CZK, consumed the most gas in 2011?...
+[2026-03-19 01:27:18]   成功! 耗时: 4.16s
+[2026-03-19 01:27:18]   SQL: SELECT c.CustomerID, SUM(t.Amount) AS TotalGasConsumed
+FROM transactions_1k t
+JOIN customers c ON t....
+[2026-03-19 01:27:19] [10/300] 处理问题 #10
+[2026-03-19 01:27:19]   db_id: financial
+[2026-03-19 01:27:19]   question: What is the number of committed crimes in 1995 in the district of the account wi...
+[2026-03-19 01:27:23]   成功! 耗时: 3.76s
+[2026-03-19 01:27:23]   SQL: SELECT district.A15 AS committed_crimes_1995
+FROM account
+JOIN district ON account.district_id = dis...
+[2026-03-19 01:27:23]   已保存中间结果 (10/300)
+[2026-03-19 01:27:23] [11/300] 处理问题 #11
+[2026-03-19 01:27:23]   db_id: thrombosis_prediction
+[2026-03-19 01:27:23]   question: How many patients have a normal anti-SSB and are diagnosed with SLE in the exami...
+[2026-03-19 01:27:27]   成功! 耗时: 4.04s
+[2026-03-19 01:27:27]   SQL: SELECT COUNT(DISTINCT Patient.ID) AS PatientCount
+FROM Patient
+JOIN Examination ON Patient.ID = Exam...
+[2026-03-19 01:27:28] [12/300] 处理问题 #12
+[2026-03-19 01:27:28]   db_id: debit_card_specializing
+[2026-03-19 01:27:28]   question: For the customer who paid 634.8 in 2012/8/25, what was the consumption decrease ...
+[2026-03-19 01:27:33]   成功! 耗时: 5.67s
+[2026-03-19 01:27:33]   SQL: SELECT 
+    (2013_consumption - 2012_consumption) / 2012_consumption AS consumption_decrease_rate
+FR...
+[2026-03-19 01:27:34] [13/300] 处理问题 #13
+[2026-03-19 01:27:34]   db_id: european_football_2
+[2026-03-19 01:27:34]   question: How many players had the highest potential score for crossing that preferred to ...
+[2026-03-19 01:27:49]   成功! 耗时: 14.87s
+[2026-03-19 01:27:49]   SQL: SELECT COUNT(DISTINCT player_api_id) AS player_count
+FROM Player_Attributes
+WHERE preferred_foot = '...
+[2026-03-19 01:27:49] [14/300] 处理问题 #14
+[2026-03-19 01:27:49]   db_id: financial
+[2026-03-19 01:27:49]   question: In the branch where the second-highest number of crimes were committed in 1995 o...
+[2026-03-19 01:27:54]   成功! 耗时: 4.64s
+[2026-03-19 01:27:54]   SQL: SELECT COUNT(DISTINCT c.client_id) AS male_clients_count
+FROM client c
+JOIN account a ON c.client_id...
+[2026-03-19 01:27:54] [15/300] 处理问题 #15
+[2026-03-19 01:27:54]   db_id: thrombosis_prediction
+[2026-03-19 01:27:54]   question: How many female patients born in 1964 were admitted to the hospital? List them b...
+[2026-03-19 01:27:58]   成功! 耗时: 4.02s
+[2026-03-19 01:27:58]   SQL: SELECT ID
+FROM Patient
+WHERE SEX = 'female'
+  AND Birthday BETWEEN '1964-01-01' AND '1964-12-31'
+  A...
+[2026-03-19 01:27:59] [16/300] 处理问题 #16
+[2026-03-19 01:27:59]   db_id: superhero
+[2026-03-19 01:27:59]   question: In superheroes with missing weight data, calculate the difference between the nu...
+[2026-03-19 01:28:03]   成功! 耗时: 3.72s
+[2026-03-19 01:28:03]   SQL: SELECT 
+    (COUNT(CASE WHEN eye_colour_id = 1 THEN 1 END) - COUNT(CASE WHEN eye_colour_id IS NULL T...
+[2026-03-19 01:28:03] [17/300] 处理问题 #17
+[2026-03-19 01:28:03]   db_id: california_schools
+[2026-03-19 01:28:03]   question: In chartered schools with charter number 00D2, what are the names of all the adm...
+[2026-03-19 01:28:08]   成功! 耗时: 4.73s
+[2026-03-19 01:28:08]   SQL: SELECT 
+    School AS SchoolName,
+    City AS SchoolCity,
+    AdmFName1 || ' ' || AdmLName1 AS Admin...
+[2026-03-19 01:28:08] [18/300] 处理问题 #18
+[2026-03-19 01:28:08]   db_id: california_schools
+[2026-03-19 01:28:08]   question: How many chartered schools located in the city of Hickman are owned by the Eleme...
+[2026-03-19 01:28:12]   成功! 耗时: 3.77s
+[2026-03-19 01:28:12]   SQL: SELECT COUNT(*) AS CharteredSchoolCount
+FROM schools
+WHERE City = 'Hickman'
+  AND District = 'Elemen...
+[2026-03-19 01:28:13] [19/300] 处理问题 #19
+[2026-03-19 01:28:13]   db_id: financial
+[2026-03-19 01:28:13]   question: Who are the account holder identification numbers whose who have transactions on...
+[2026-03-19 01:28:18]   成功! 耗时: 5.43s
+[2026-03-19 01:28:18]   SQL: SELECT DISTINCT t.account_id AS account_holder_identification_number
+FROM trans t
+JOIN card c ON t.a...
+[2026-03-19 01:28:19] [20/300] 处理问题 #20
+[2026-03-19 01:28:19]   db_id: toxicology
+[2026-03-19 01:28:19]   question: List out the atom id that belongs to the TR346 molecule and how many bond type c...
+[2026-03-19 01:28:23]   成功! 耗时: 4.44s
+[2026-03-19 01:28:23]   SQL: SELECT 
+    atom.atom_id,
+    COUNT(DISTINCT bond.bond_type) AS bond_type_count
+FROM 
+    molecule
+J...
+[2026-03-19 01:28:23]   已保存中间结果 (20/300)
+[2026-03-19 01:28:24] [21/300] 处理问题 #21
+[2026-03-19 01:28:24]   db_id: toxicology
+[2026-03-19 01:28:24]   question: Which carcinogenic molecule have the highest number of atoms consisted in it?...
+[2026-03-19 01:28:27]   成功! 耗时: 3.89s
+[2026-03-19 01:28:27]   SQL: SELECT m.label AS carcinogenic_molecule, COUNT(a.atom_id) AS total_atoms
+FROM molecule m
+JOIN atom a...
+[2026-03-19 01:28:28] [22/300] 处理问题 #22
+[2026-03-19 01:28:28]   db_id: european_football_2
+[2026-03-19 01:28:28]   question: List the players' api id who had the highest above average overall ratings in 20...
+[2026-03-19 01:28:32]   成功! 耗时: 4.32s
+[2026-03-19 01:28:32]   SQL: SELECT DISTINCT player_api_id
+FROM Player_Attributes
+WHERE overall_rating > (
+    SELECT AVG(overall...
+[2026-03-19 01:28:33] [23/300] 处理问题 #23
+[2026-03-19 01:28:33]   db_id: thrombosis_prediction
+[2026-03-19 01:28:33]   question: How many male patients who underwent testing between 1995 and 1997 and were subs...
+[2026-03-19 01:28:38]   成功! 耗时: 4.79s
+[2026-03-19 01:28:38]   SQL: SELECT COUNT(DISTINCT Patient.ID) AS MalePatientsWithoutHospitalStay
+FROM Patient
+JOIN Examination O...
+[2026-03-19 01:28:38] [24/300] 处理问题 #24
+[2026-03-19 01:28:38]   db_id: california_schools
+[2026-03-19 01:28:38]   question: Which different county has the most number of closed schools? Please provide the...
+[2026-03-19 01:28:42]   成功! 耗时: 3.98s
+[2026-03-19 01:28:42]   SQL: SELECT 
+    County,
+    School,
+    ClosedDate
+FROM 
+    schools
+WHERE 
+    StatusType = 'Closed'
+GR...
+[2026-03-19 01:28:43] [25/300] 处理问题 #25
+[2026-03-19 01:28:43]   db_id: thrombosis_prediction
+[2026-03-19 01:28:43]   question: How many female patients who came at the hospital in 1997 was immediately follow...
+[2026-03-19 01:28:47]   成功! 耗时: 4.42s
+[2026-03-19 01:28:47]   SQL: SELECT COUNT(DISTINCT Patient.ID) AS FemalePatientsFollowedIn1997
+FROM Patient
+JOIN Examination ON P...
+[2026-03-19 01:28:48] [26/300] 处理问题 #26
+[2026-03-19 01:28:48]   db_id: toxicology
+[2026-03-19 01:28:48]   question: Identify whether the chemical compound that contains Calcium is carcinogenic....
+[2026-03-19 01:28:51]   成功! 耗时: 3.15s
+[2026-03-19 01:28:51]   SQL: SELECT *
+FROM ChemicalCompounds
+WHERE ContainsCalcium = 1 AND IsCarcinogenic = 1;...
+[2026-03-19 01:28:51] [27/300] 处理问题 #27
+[2026-03-19 01:28:51]   db_id: student_club
+[2026-03-19 01:28:51]   question: Indicate the top source of funds received in September 2019 based on their amoun...
+[2026-03-19 01:28:55]   成功! 耗时: 3.50s
+[2026-03-19 01:28:55]   SQL: SELECT source, SUM(amount) AS total_amount
+FROM income
+WHERE date_received LIKE '2019-09-%'
+GROUP BY...
+[2026-03-19 01:28:55] [28/300] 处理问题 #28
+[2026-03-19 01:28:55]   db_id: thrombosis_prediction
+[2026-03-19 01:28:55]   question: For laboratory examinations take in 1984, list all patients below 50 years old w...
+[2026-03-19 01:29:00]   成功! 耗时: 4.97s
+[2026-03-19 01:29:00]   SQL: SELECT DISTINCT Patient.ID, Patient.SEX, Patient.Birthday
+FROM Patient
+JOIN Laboratory ON Patient.ID...
+[2026-03-19 01:29:01] [29/300] 处理问题 #29
+[2026-03-19 01:29:01]   db_id: thrombosis_prediction
+[2026-03-19 01:29:01]   question: How many patients accepted to the hospital have a normal level of white blood ce...
+[2026-03-19 01:29:05]   成功! 耗时: 3.87s
+[2026-03-19 01:29:05]   SQL: SELECT COUNT(DISTINCT Patient.ID) AS Total_Patients
+FROM Patient
+JOIN Laboratory ON Patient.ID = Lab...
+[2026-03-19 01:29:05] [30/300] 处理问题 #30
+[2026-03-19 01:29:05]   db_id: debit_card_specializing
+[2026-03-19 01:29:05]   question: What percentage of KAM customers pay in euros?...
+[2026-03-19 01:29:09]   成功! 耗时: 3.82s
+[2026-03-19 01:29:09]   SQL: SELECT 
+    (CAST(SUM(CASE WHEN Currency = 'EUR' THEN 1 ELSE 0 END) AS REAL) / COUNT(*)) * 100 AS Pe...
+[2026-03-19 01:29:09]   已保存中间结果 (30/300)
+[2026-03-19 01:29:09] [31/300] 处理问题 #31
+[2026-03-19 01:29:09]   db_id: superhero
+[2026-03-19 01:29:09]   question: Calculate the average height for each superhero....
+[2026-03-19 01:29:12]   成功! 耗时: 3.04s
+[2026-03-19 01:29:12]   SQL: SELECT superhero_name, AVG(height_cm) AS average_height_cm
+FROM superhero
+GROUP BY superhero_name;...
+[2026-03-19 01:29:13] [32/300] 处理问题 #32
+[2026-03-19 01:29:13]   db_id: toxicology
+[2026-03-19 01:29:13]   question: How many molecules without sulphur element is not having double bond?...
+[2026-03-19 01:29:18]   成功! 耗时: 5.08s
+[2026-03-19 01:29:18]   SQL: SELECT COUNT(DISTINCT molecule_id) AS count_molecules_without_sulfur_and_double_bond
+FROM atom
+WHERE...
+[2026-03-19 01:29:18] [33/300] 处理问题 #33
+[2026-03-19 01:29:18]   db_id: formula_1
+[2026-03-19 01:29:18]   question: How much faster in percentage is the champion than the driver who finished the r...
+[2026-03-19 01:29:29]   成功! 耗时: 10.19s
+[2026-03-19 01:29:29]   SQL: SELECT 
+    (CAST((last_driver.milliseconds - champion.milliseconds) AS REAL) / last_driver.millisec...
+[2026-03-19 01:29:29] [34/300] 处理问题 #34
+[2026-03-19 01:29:29]   db_id: thrombosis_prediction
+[2026-03-19 01:29:29]   question: Lists all patients by ID who were diagnosed with Behcet's and had their exams be...
+[2026-03-19 01:29:33]   成功! 耗时: 4.22s
+[2026-03-19 01:29:33]   SQL: SELECT DISTINCT Patient.ID
+FROM Patient
+JOIN Examination ON Patient.ID = Examination.ID
+WHERE Patien...
+[2026-03-19 01:29:34] [35/300] 处理问题 #35
+[2026-03-19 01:29:34]   db_id: card_games
+[2026-03-19 01:29:34]   question: How many card border with black color ? List out the card id....
+[2026-03-19 01:29:37]   成功! 耗时: 3.16s
+[2026-03-19 01:29:37]   SQL: SELECT id
+FROM cards
+WHERE borderColor = 'black';...
+[2026-03-19 01:29:38] [36/300] 处理问题 #36
+[2026-03-19 01:29:38]   db_id: california_schools
+[2026-03-19 01:29:38]   question: List the names of schools with more than 30 difference in enrollements between K...
+[2026-03-19 01:29:43]   成功! 耗时: 5.12s
+[2026-03-19 01:29:43]   SQL: SELECT 
+    frpm.School Name AS SchoolName,
+    schools.Street || ', ' || schools.City || ', ' || sc...
+[2026-03-19 01:29:43] [37/300] 处理问题 #37
+[2026-03-19 01:29:43]   db_id: toxicology
+[2026-03-19 01:29:43]   question: What percentage of carcinogenic-type molecules does not contain fluorine?...
+[2026-03-19 01:29:47]   成功! 耗时: 3.84s
+[2026-03-19 01:29:47]   SQL: SELECT 
+    CAST(SUM(CASE WHEN bond_type != 'fluorine' THEN 1 ELSE 0 END) AS FLOAT) / COUNT(*) * 100...
+[2026-03-19 01:29:48] [38/300] 处理问题 #38
+[2026-03-19 01:29:48]   db_id: thrombosis_prediction
+[2026-03-19 01:29:48]   question: What is the anti Cardiolipin antibody concentration of the female patient with t...
+[2026-03-19 01:29:53]   成功! 耗时: 5.03s
+[2026-03-19 01:29:53]   SQL: SELECT e.aCL_IgG, e.aCL_IgM, e.aCL_IgA
+FROM Patient p
+JOIN Laboratory l ON p.ID = l.ID
+JOIN Examinat...
+[2026-03-19 01:29:53] [39/300] 处理问题 #39
+[2026-03-19 01:29:53]   db_id: debit_card_specializing
+[2026-03-19 01:29:53]   question: How much more was customer 7 consuming in April 2013 than customer 5?...
+[2026-03-19 01:29:57]   成功! 耗时: 4.41s
+[2026-03-19 01:29:57]   SQL: SELECT 
+    (SUM(CASE WHEN yearmonth.CustomerID = 7 THEN Consumption ELSE 0 END) - 
+     SUM(CASE WH...
+[2026-03-19 01:29:58] [40/300] 处理问题 #40
+[2026-03-19 01:29:58]   db_id: codebase_community
+[2026-03-19 01:29:58]   question: State the detailed content of the comment which was created on 7/19/2010 7:25:47...
+[2026-03-19 01:30:05]   成功! 耗时: 7.21s
+[2026-03-19 01:30:05]   SQL: SELECT Text 
+FROM comments 
+WHERE CreationDate = '2010-07-19 19:25:47';...
+[2026-03-19 01:30:05]   已保存中间结果 (40/300)
+[2026-03-19 01:30:06] [41/300] 处理问题 #41
+[2026-03-19 01:30:06]   db_id: student_club
+[2026-03-19 01:30:06]   question: What is the average attendance of meetings in 2020?...
+[2026-03-19 01:30:09]   成功! 耗时: 3.68s
+[2026-03-19 01:30:09]   SQL: SELECT AVG(COUNT(*)) AS average_attendance
+FROM attendance
+JOIN budget ON attendance.link_to_event =...
+[2026-03-19 01:30:10] [42/300] 处理问题 #42
+[2026-03-19 01:30:10]   db_id: toxicology
+[2026-03-19 01:30:10]   question: How many atoms with iodine and with sulfur type elements are there in single bon...
+[2026-03-19 01:30:15]   成功! 耗时: 5.23s
+[2026-03-19 01:30:15]   SQL: SELECT COUNT(DISTINCT bond_id) AS atom_count
+FROM bond
+WHERE bond_type = 'single'
+  AND EXISTS (
+   ...
+[2026-03-19 01:30:16] [43/300] 处理问题 #43
+[2026-03-19 01:30:16]   db_id: toxicology
+[2026-03-19 01:30:16]   question: Which molecules have triple bonds and list all the elements they contain....
+[2026-03-19 01:30:19]   成功! 耗时: 3.65s
+[2026-03-19 01:30:19]   SQL: SELECT DISTINCT Molecules.MoleculeName, Elements.ElementSymbol
+FROM Molecules
+JOIN Bonds ON Molecule...
+[2026-03-19 01:30:20] [44/300] 处理问题 #44
+[2026-03-19 01:30:20]   db_id: codebase_community
+[2026-03-19 01:30:20]   question: What is the sum of favourite count gained by user ID 686 in 2011?...
+[2026-03-19 01:30:24]   成功! 耗时: 3.74s
+[2026-03-19 01:30:24]   SQL: SELECT SUM(FavoriteCount) AS TotalFavoriteCount
+FROM posts
+WHERE OwnerUserId = 686
+  AND strftime('%...
+[2026-03-19 01:30:24] [45/300] 处理问题 #45
+[2026-03-19 01:30:24]   db_id: debit_card_specializing
+[2026-03-19 01:30:24]   question: What is the biggest monthly consumption of the customers who use euro as their c...
+[2026-03-19 01:30:28]   成功! 耗时: 3.91s
+[2026-03-19 01:30:28]   SQL: SELECT MAX(yearmonth.Consumption) AS BiggestMonthlyConsumption
+FROM yearmonth
+JOIN customers ON year...
+[2026-03-19 01:30:28] [46/300] 处理问题 #46
+[2026-03-19 01:30:28]   db_id: debit_card_specializing
+[2026-03-19 01:30:28]   question: Please list the product description of the products consumed in September, 2013....
+[2026-03-19 01:30:32]   成功! 耗时: 3.64s
+[2026-03-19 01:30:32]   SQL: SELECT p.Description
+FROM transactions_1k t
+JOIN products p ON t.ProductID = p.ProductID
+WHERE t.Dat...
+[2026-03-19 01:30:33] [47/300] 处理问题 #47
+[2026-03-19 01:30:33]   db_id: codebase_community
+[2026-03-19 01:30:33]   question: Which is the most valuable post in 2010? Please give its id and the owner's disp...
+[2026-03-19 01:30:37]   成功! 耗时: 4.15s
+[2026-03-19 01:30:37]   SQL: SELECT p.Id, p.OwnerDisplayName
+FROM posts p
+WHERE p.CreationDate >= '2010-01-01' AND p.CreationDate...
+[2026-03-19 01:30:37] [48/300] 处理问题 #48
+[2026-03-19 01:30:37]   db_id: financial
+[2026-03-19 01:30:37]   question: Please list the account types that are not eligible for loans, and the average i...
+[2026-03-19 01:30:43]   成功! 耗时: 5.36s
+[2026-03-19 01:30:43]   SQL: SELECT DISTINCT a.type AS account_type, AVG(d.income) AS average_income
+FROM disp d
+JOIN account a O...
+[2026-03-19 01:30:43] [49/300] 处理问题 #49
+[2026-03-19 01:30:43]   db_id: codebase_community
+[2026-03-19 01:30:43]   question: Based on posts posted by Community, calculate the percentage of posts that use t...
+[2026-03-19 01:30:47]   成功! 耗时: 4.03s
+[2026-03-19 01:30:47]   SQL: SELECT 
+    CAST(SUM(CASE WHEN posts.Tags LIKE '%r%' THEN 1 ELSE 0 END) AS FLOAT) / COUNT(*) * 100 A...
+[2026-03-19 01:30:48] [50/300] 处理问题 #50
+[2026-03-19 01:30:48]   db_id: codebase_community
+[2026-03-19 01:30:48]   question: What is the detailed content of the comment of the post which was created on 7/1...
+[2026-03-19 01:30:52]   成功! 耗时: 3.96s
+[2026-03-19 01:30:52]   SQL: SELECT c.Text AS CommentContent
+FROM posts p
+JOIN comments c ON p.Id = c.PostId
+WHERE p.CreationDate...
+[2026-03-19 01:30:52]   已保存中间结果 (50/300)
+[2026-03-19 01:30:52] [51/300] 处理问题 #51
+[2026-03-19 01:30:52]   db_id: thrombosis_prediction
+[2026-03-19 01:30:52]   question: How long did it take after patient number 821298 arrived at the hospital for the...
+[2026-03-19 01:30:57]   成功! 耗时: 4.61s
+[2026-03-19 01:30:57]   SQL: SELECT 
+    (strftime('%s', e.Examination_Date) - strftime('%s', p."First Date")) AS Time_Difference...
+[2026-03-19 01:30:57] [52/300] 处理问题 #52
+[2026-03-19 01:30:57]   db_id: card_games
+[2026-03-19 01:30:57]   question: What is the  unconverted mana do all the cards created by Rob Alexander cost in ...
+[2026-03-19 01:31:01]   成功! 耗时: 3.77s
+[2026-03-19 01:31:01]   SQL: SELECT SUM(convertedManaCost) AS total_unconverted_mana_cost
+FROM cards
+WHERE artist = 'Rob Alexande...
+[2026-03-19 01:31:01] [53/300] 处理问题 #53
+[2026-03-19 01:31:01]   db_id: california_schools
+[2026-03-19 01:31:01]   question: What is the grade span offered in the school with the highest longitude?...
+[2026-03-19 01:31:05]   成功! 耗时: 3.49s
+[2026-03-19 01:31:05]   SQL: SELECT GSoffered 
+FROM schools 
+WHERE Longitude = (SELECT MAX(Longitude) FROM schools);...
+[2026-03-19 01:31:05] [54/300] 处理问题 #54
+[2026-03-19 01:31:05]   db_id: formula_1
+[2026-03-19 01:31:05]   question: How many driver participated in race ID number 18?...
+[2026-03-19 01:31:09]   成功! 耗时: 3.51s
+[2026-03-19 01:31:09]   SQL: SELECT COUNT(DISTINCT results.driverId) AS driver_count
+FROM results
+WHERE results.raceId = 18;...
+[2026-03-19 01:31:09] [55/300] 处理问题 #55
+[2026-03-19 01:31:09]   db_id: european_football_2
+[2026-03-19 01:31:09]   question: Locate players with vision scores of 90 and above, state the country of these pl...
+[2026-03-19 01:31:14]   成功! 耗时: 4.24s
+[2026-03-19 01:31:14]   SQL: SELECT DISTINCT p.player_name, p.player_api_id, p.player_fifa_api_id, p.birthday, p.height, p.weight...
+[2026-03-19 01:31:14] [56/300] 处理问题 #56
+[2026-03-19 01:31:14]   db_id: financial
+[2026-03-19 01:31:14]   question: What percentage of male clients request for weekly statements to be issued?...
+[2026-03-19 01:31:19]   成功! 耗时: 4.75s
+[2026-03-19 01:31:19]   SQL: SELECT 
+    COUNT(CASE WHEN c.gender = 'M' AND a.frequency = 'WEEKLY' THEN 1 END) * 100.0 / COUNT(CA...
+[2026-03-19 01:31:19] [57/300] 处理问题 #57
+[2026-03-19 01:31:19]   db_id: codebase_community
+[2026-03-19 01:31:19]   question: Please list the users' display names whose posts had over 20000 views in 2011....
+[2026-03-19 01:31:23]   成功! 耗时: 3.79s
+[2026-03-19 01:31:23]   SQL: SELECT DISTINCT p.OwnerDisplayName
+FROM posts p
+WHERE p.ViewCount > 20000
+  AND strftime('%Y', p.Cre...
+[2026-03-19 01:31:24] [58/300] 处理问题 #58
+[2026-03-19 01:31:24]   db_id: financial
+[2026-03-19 01:31:24]   question: Calculate the percentage of account from 'Decin' district for all accounts are o...
+[2026-03-19 01:31:28]   成功! 耗时: 4.38s
+[2026-03-19 01:31:28]   SQL: SELECT 
+    COUNT(CASE WHEN d.A2 = 'Decin' THEN 1 END) * 100.0 / COUNT(*) AS percentage
+FROM 
+    ac...
+[2026-03-19 01:31:29] [59/300] 处理问题 #59
+[2026-03-19 01:31:29]   db_id: thrombosis_prediction
+[2026-03-19 01:31:29]   question: For patient born between Year 1930 to 1940, how many percent of them were inpati...
+[2026-03-19 01:31:33]   成功! 耗时: 4.44s
+[2026-03-19 01:31:33]   SQL: SELECT 
+    COUNT(CASE WHEN Admission = 'Inpatient' THEN 1 END) * 1.0 / COUNT(*) * 100 AS Inpatient_...
+[2026-03-19 01:31:34] [60/300] 处理问题 #60
+[2026-03-19 01:31:34]   db_id: card_games
+[2026-03-19 01:31:34]   question: Is the set of cards with Adarkar Valkyrie only available outside the United Stat...
+[2026-03-19 01:31:38]   成功! 耗时: 4.04s
+[2026-03-19 01:31:38]   SQL: SELECT DISTINCT s.name AS set_name, s.isForeignOnly
+FROM sets s
+JOIN cards c ON s.code = c.setCode
+W...
+[2026-03-19 01:31:38]   已保存中间结果 (60/300)
+[2026-03-19 01:31:38] [61/300] 处理问题 #61
+[2026-03-19 01:31:38]   db_id: thrombosis_prediction
+[2026-03-19 01:31:38]   question: What is the average age of the male patient with high cholesterol?...
+[2026-03-19 01:31:43]   成功! 耗时: 4.62s
+[2026-03-19 01:31:43]   SQL: SELECT AVG(CAST((julianday('now') - julianday(Patient.Birthday)) / 365.25 AS INTEGER)) AS Average_Ag...
+[2026-03-19 01:31:43] [62/300] 处理问题 #62
+[2026-03-19 01:31:43]   db_id: thrombosis_prediction
+[2026-03-19 01:31:43]   question: Sort in descending order all patients by birthday for male patient with albumin ...
+[2026-03-19 01:31:47]   成功! 耗时: 4.23s
+[2026-03-19 01:31:47]   SQL: SELECT Patient.ID, Patient.SEX, Patient.Birthday
+FROM Patient
+JOIN Laboratory ON Patient.ID = Labora...
+[2026-03-19 01:31:48] [63/300] 处理问题 #63
+[2026-03-19 01:31:48]   db_id: codebase_community
+[2026-03-19 01:31:48]   question: Provide the badge names received in 2011 for the user whose location is in the N...
+[2026-03-19 01:31:52]   成功! 耗时: 3.97s
+[2026-03-19 01:31:52]   SQL: SELECT DISTINCT b.Name AS BadgeName
+FROM badges b
+JOIN users u ON b.UserId = u.Id
+WHERE u.Location =...
+[2026-03-19 01:31:52] [64/300] 处理问题 #64
+[2026-03-19 01:31:52]   db_id: thrombosis_prediction
+[2026-03-19 01:31:52]   question: How many underage patients were examined during the course of the three-year per...
+[2026-03-19 01:31:56]   成功! 耗时: 4.03s
+[2026-03-19 01:31:56]   SQL: SELECT COUNT(Patient.ID) AS UnderagePatientsCount
+FROM Patient
+WHERE Patient.Birthday >= '1980-01-01...
+[2026-03-19 01:31:57] [65/300] 处理问题 #65
+[2026-03-19 01:31:57]   db_id: toxicology
+[2026-03-19 01:31:57]   question: Write down the atom IDs of the first and second atoms of triple bond type molecu...
+[2026-03-19 01:32:01]   成功! 耗时: 4.43s
+[2026-03-19 01:32:01]   SQL: SELECT DISTINCT a1.atom_id AS first_atom_id, a2.atom_id AS second_atom_id
+FROM connected c1
+JOIN ato...
+[2026-03-19 01:32:02] [66/300] 处理问题 #66
+[2026-03-19 01:32:02]   db_id: financial
+[2026-03-19 01:32:02]   question: For the branch which located in the south Bohemia with biggest number of inhabit...
+[2026-03-19 01:32:08]   成功! 耗时: 5.58s
+[2026-03-19 01:32:08]   SQL: SELECT 
+    SUM(CASE WHEN c.gender = 'male' THEN 1 ELSE 0 END) * 1.0 / COUNT(*) AS male_client_perce...
+[2026-03-19 01:32:08] [67/300] 处理问题 #67
+[2026-03-19 01:32:08]   db_id: california_schools
+[2026-03-19 01:32:08]   question: What is the Percent (%) Eligible Free (K-12) in the school administered by an ad...
+[2026-03-19 01:32:13]   成功! 耗时: 4.60s
+[2026-03-19 01:32:13]   SQL: SELECT frpm.Percent (%) Eligible Free (K-12), schools.NCESDist AS DistrictCode
+FROM schools
+JOIN frp...
+[2026-03-19 01:32:13] [68/300] 处理问题 #68
+[2026-03-19 01:32:13]   db_id: toxicology
+[2026-03-19 01:32:13]   question: What is the molecule of atom id "TR000_2" and atom id 2 "TR000_4"?...
+[2026-03-19 01:32:17]   成功! 耗时: 4.14s
+[2026-03-19 01:32:17]   SQL: SELECT m.molecule_id, m.label
+FROM molecule m
+JOIN atom a1 ON m.molecule_id = a1.molecule_id
+JOIN at...
+[2026-03-19 01:32:18] [69/300] 处理问题 #69
+[2026-03-19 01:32:18]   db_id: card_games
+[2026-03-19 01:32:18]   question: Which of the cards that are a promotional painting have multiple faces on the sa...
+[2026-03-19 01:32:22]   成功! 耗时: 3.95s
+[2026-03-19 01:32:22]   SQL: SELECT name
+FROM cards
+WHERE isPromo = 1
+  AND layout IN ('split', 'transform', 'flip', 'meld', 'adv...
+[2026-03-19 01:32:22] [70/300] 处理问题 #70
+[2026-03-19 01:32:22]   db_id: thrombosis_prediction
+[2026-03-19 01:32:22]   question: How many patients with a abnormal C-reactive protein don't have their data recor...
+[2026-03-19 01:32:26]   成功! 耗时: 3.98s
+[2026-03-19 01:32:26]   SQL: SELECT COUNT(DISTINCT Patient.ID) AS CountOfPatients
+FROM Patient
+LEFT JOIN Laboratory ON Patient.ID...
+[2026-03-19 01:32:26]   已保存中间结果 (70/300)
+[2026-03-19 01:32:27] [71/300] 处理问题 #71
+[2026-03-19 01:32:27]   db_id: student_club
+[2026-03-19 01:32:27]   question: Calculate the difference in the percentage of members in New Jersey and Vermont....
+[2026-03-19 01:32:32]   成功! 耗时: 5.79s
+[2026-03-19 01:32:32]   SQL: SELECT 
+    (COUNT(CASE WHEN m.zip = 89076 THEN 1 END) * 1.0 / COUNT(m.member_id)) * 100 AS new_jers...
+[2026-03-19 01:32:33] [72/300] 处理问题 #72
+[2026-03-19 01:32:33]   db_id: financial
+[2026-03-19 01:32:33]   question: How many percent of 'Gold' cards were issued prior to 1998?...
+[2026-03-19 01:32:37]   成功! 耗时: 4.40s
+[2026-03-19 01:32:37]   SQL: SELECT 
+    CAST(SUM(CASE WHEN issued < '1998-01-01' THEN 1 ELSE 0 END) AS REAL) / COUNT(*) * 100 AS...
+[2026-03-19 01:32:38] [73/300] 处理问题 #73
+[2026-03-19 01:32:38]   db_id: thrombosis_prediction
+[2026-03-19 01:32:38]   question: How many patients have a normal anti-DNA level, yet their data are not recorded....
+[2026-03-19 01:32:42]   成功! 耗时: 4.38s
+[2026-03-19 01:32:42]   SQL: SELECT COUNT(DISTINCT Patient.ID) AS CountOfPatients
+FROM Patient
+LEFT JOIN Examination ON Patient.I...
+[2026-03-19 01:32:43] [74/300] 处理问题 #74
+[2026-03-19 01:32:43]   db_id: thrombosis_prediction
+[2026-03-19 01:32:43]   question: For the patient with an abnormal alkaliphophatase level, how many of them are ad...
+[2026-03-19 01:32:47]   成功! 耗时: 3.93s
+[2026-03-19 01:32:47]   SQL: SELECT COUNT(DISTINCT Patient.ID) AS CountOfPatientsAdmitted
+FROM Patient
+JOIN Laboratory ON Patient...
+[2026-03-19 01:32:47] [75/300] 处理问题 #75
+[2026-03-19 01:32:47]   db_id: formula_1
+[2026-03-19 01:32:47]   question: Which drivers born after 1975 have been ranked 2? Please give their forenames an...
+[2026-03-19 01:32:51]   成功! 耗时: 3.97s
+[2026-03-19 01:32:51]   SQL: SELECT d.forename, d.surname
+FROM drivers d
+JOIN driverStandings ds ON d.driverId = ds.driverId
+WHER...
+[2026-03-19 01:32:52] [76/300] 处理问题 #76
+[2026-03-19 01:32:52]   db_id: codebase_community
+[2026-03-19 01:32:52]   question: List the post IDs and badge names of the user Samuel in 2013....
+[2026-03-19 01:32:56]   成功! 耗时: 4.19s
+[2026-03-19 01:32:56]   SQL: SELECT p.Id AS PostId, b.Name AS BadgeName
+FROM posts p
+JOIN users u ON p.OwnerUserId = u.Id
+JOIN ba...
+[2026-03-19 01:32:56] [77/300] 处理问题 #77
+[2026-03-19 01:32:56]   db_id: toxicology
+[2026-03-19 01:32:56]   question: Please list top five molecules that have double bonds in alphabetical order....
+[2026-03-19 01:33:00]   成功! 耗时: 3.16s
+[2026-03-19 01:33:00]   SQL: SELECT molecule_name
+FROM molecules
+WHERE contains_double_bond = 1
+ORDER BY molecule_name ASC
+LIMIT ...
+[2026-03-19 01:33:00] [78/300] 处理问题 #78
+[2026-03-19 01:33:00]   db_id: codebase_community
+[2026-03-19 01:33:00]   question: What is the title of the post with the oldest post link?...
+[2026-03-19 01:33:04]   成功! 耗时: 3.63s
+[2026-03-19 01:33:04]   SQL: SELECT p.Title 
+FROM postLinks pl 
+JOIN posts p ON pl.PostId = p.Id 
+ORDER BY pl.CreationDate ASC 
+L...
+[2026-03-19 01:33:04] [79/300] 处理问题 #79
+[2026-03-19 01:33:04]   db_id: codebase_community
+[2026-03-19 01:33:04]   question: How many posts by Matt Parker have more than 4 votes?...
+[2026-03-19 01:33:08]   成功! 耗时: 3.77s
+[2026-03-19 01:33:08]   SQL: SELECT COUNT(*) AS PostCount
+FROM posts p
+JOIN users u ON p.OwnerUserId = u.Id
+WHERE u.DisplayName =...
+[2026-03-19 01:33:08] [80/300] 处理问题 #80
+[2026-03-19 01:33:08]   db_id: toxicology
+[2026-03-19 01:33:08]   question: Calculate the percentage of molecules containing carcinogenic compounds that ele...
+[2026-03-19 01:33:13]   成功! 耗时: 4.57s
+[2026-03-19 01:33:13]   SQL: SELECT 
+    COUNT(DISTINCT atom.molecule_id) * 100.0 / (SELECT COUNT(DISTINCT molecule_id) FROM atom...
+[2026-03-19 01:33:13]   已保存中间结果 (80/300)
+[2026-03-19 01:33:14] [81/300] 处理问题 #81
+[2026-03-19 01:33:14]   db_id: card_games
+[2026-03-19 01:33:14]   question: What percentage of legendary frame effect cards that are only available in onlin...
+[2026-03-19 01:33:18]   成功! 耗时: 4.32s
+[2026-03-19 01:33:18]   SQL: SELECT 
+    COUNT(*) * 100.0 / (
+        SELECT COUNT(*)
+        FROM cards
+        WHERE frameEffec...
+[2026-03-19 01:33:18] [82/300] 处理问题 #82
+[2026-03-19 01:33:18]   db_id: financial
+[2026-03-19 01:33:18]   question: For the client whose loan was approved first in 1993/7/5, what is the increase r...
+[2026-03-19 01:33:24]   成功! 耗时: 5.43s
+[2026-03-19 01:33:24]   SQL: SELECT 
+    (t2.balance - t1.balance) * 1.0 / t1.balance AS increase_rate
+FROM 
+    trans t1
+JOIN 
+ ...
+[2026-03-19 01:33:24] [83/300] 处理问题 #83
+[2026-03-19 01:33:24]   db_id: thrombosis_prediction
+[2026-03-19 01:33:24]   question: Provide IDs for male patients with ALT glutamic pylvic transaminase (GPT) that h...
+[2026-03-19 01:33:29]   成功! 耗时: 4.96s
+[2026-03-19 01:33:29]   SQL: SELECT DISTINCT Patient.ID
+FROM Patient
+JOIN Laboratory ON Patient.ID = Laboratory.ID
+WHERE Patient....
+[2026-03-19 01:33:30] [84/300] 处理问题 #84
+[2026-03-19 01:33:30]   db_id: toxicology
+[2026-03-19 01:33:30]   question: Is the molecule with the most double bonds carcinogenic?...
+[2026-03-19 01:33:34]   成功! 耗时: 4.29s
+[2026-03-19 01:33:34]   SQL: SELECT m.label, COUNT(b.bond_id) AS double_bonds_count, a.carcinogenic
+FROM molecule m
+JOIN bond b O...
+[2026-03-19 01:33:35] [85/300] 处理问题 #85
+[2026-03-19 01:33:35]   db_id: european_football_2
+[2026-03-19 01:33:35]   question: State the name of players who came from Belgium....
+[2026-03-19 01:33:41]   成功! 耗时: 6.75s
+[2026-03-19 01:33:41]   SQL: SELECT DISTINCT p.player_name
+FROM Player p
+JOIN Match m ON p.player_api_id IN (
+    m.home_player_1...
+[2026-03-19 01:33:42] [86/300] 处理问题 #86
+[2026-03-19 01:33:42]   db_id: debit_card_specializing
+[2026-03-19 01:33:42]   question: For the customer who paid 124.05 in 2012/8/24, how much did he/she spend during ...
+[2026-03-19 01:33:47]   成功! 耗时: 5.42s
+[2026-03-19 01:33:47]   SQL: SELECT 
+    t.Date AS TransactionDate,
+    SUM(t.Amount * t.Price) AS TotalSpentInJanuary2012
+FROM 
+...
+[2026-03-19 01:33:48] [87/300] 处理问题 #87
+[2026-03-19 01:33:48]   db_id: thrombosis_prediction
+[2026-03-19 01:33:48]   question: Provide all ID, sex and birthday of patients whose urea nitrogen (UN) just withi...
+[2026-03-19 01:33:52]   成功! 耗时: 4.26s
+[2026-03-19 01:33:52]   SQL: SELECT 
+    Patient.ID,
+    Patient.SEX,
+    Patient.Birthday
+FROM 
+    Patient
+JOIN 
+    Laboratory...
+[2026-03-19 01:33:52] [88/300] 处理问题 #88
+[2026-03-19 01:33:52]   db_id: formula_1
+[2026-03-19 01:33:52]   question: How many British drivers who were born in 1980?...
+[2026-03-19 01:33:56]   成功! 耗时: 3.80s
+[2026-03-19 01:33:56]   SQL: SELECT COUNT(DISTINCT drivers.driverId) AS BritishDriversBornIn1980
+FROM drivers
+WHERE drivers.natio...
+[2026-03-19 01:33:57] [89/300] 处理问题 #89
+[2026-03-19 01:33:57]   db_id: thrombosis_prediction
+[2026-03-19 01:33:57]   question: For all patients with triglyceride (TG) level beyond the normal range, how many ...
+[2026-03-19 01:34:01]   成功! 耗时: 4.35s
+[2026-03-19 01:34:01]   SQL: SELECT COUNT(*) AS Count
+FROM Patient
+JOIN Laboratory ON Patient.ID = Laboratory.ID
+WHERE Laboratory...
+[2026-03-19 01:34:02] [90/300] 处理问题 #90
+[2026-03-19 01:34:02]   db_id: card_games
+[2026-03-19 01:34:02]   question: Lists by ID all Creature-type cards with legal status....
+[2026-03-19 01:34:05]   成功! 耗时: 3.47s
+[2026-03-19 01:34:05]   SQL: SELECT id, name, type
+FROM cards
+WHERE type LIKE '%Creature%'
+  AND availability = 'legal';...
+[2026-03-19 01:34:05]   已保存中间结果 (90/300)
+[2026-03-19 01:34:06] [91/300] 处理问题 #91
+[2026-03-19 01:34:06]   db_id: thrombosis_prediction
+[2026-03-19 01:34:06]   question: List all patients who were born in 1937 whose total cholesterol was beyond the n...
+[2026-03-19 01:34:10]   成功! 耗时: 4.45s
+[2026-03-19 01:34:10]   SQL: SELECT DISTINCT Patient.ID, Patient.SEX, Patient.Birthday
+FROM Patient
+JOIN Laboratory ON Patient.ID...
+[2026-03-19 01:34:11] [92/300] 处理问题 #92
+[2026-03-19 01:34:11]   db_id: student_club
+[2026-03-19 01:34:11]   question: List the name of students that have attended more than 7 events....
+[2026-03-19 01:34:14]   成功! 耗时: 3.80s
+[2026-03-19 01:34:14]   SQL: SELECT m.first_name || ' ' || m.last_name AS student_name
+FROM member m
+JOIN event e ON m.member_id ...
+[2026-03-19 01:34:15] [93/300] 处理问题 #93
+[2026-03-19 01:34:15]   db_id: codebase_community
+[2026-03-19 01:34:15]   question: Calculate the average view count of each post tagged as 'humor' and list the tit...
+[2026-03-19 01:34:19]   成功! 耗时: 4.10s
+[2026-03-19 01:34:19]   SQL: SELECT 
+    p.Title,
+    c.Text AS Comment,
+    AVG(p.ViewCount) AS AverageViewCount
+FROM 
+    posts...
+[2026-03-19 01:34:19] [94/300] 处理问题 #94
+[2026-03-19 01:34:19]   db_id: financial
+[2026-03-19 01:34:19]   question: Among the accounts who have loan validity more than 12 months, list out the acco...
+[2026-03-19 01:34:25]   成功! 耗时: 5.42s
+[2026-03-19 01:34:25]   SQL: SELECT DISTINCT l.account_id
+FROM loan l
+JOIN account a ON l.account_id = a.account_id
+WHERE l.durat...
+[2026-03-19 01:34:25] [95/300] 处理问题 #95
+[2026-03-19 01:34:25]   db_id: toxicology
+[2026-03-19 01:34:25]   question: How many carcinogenic molecules that consisted of Nitrogen?...
+[2026-03-19 01:34:29]   成功! 耗时: 3.34s
+[2026-03-19 01:34:29]   SQL: SELECT COUNT(*) AS CarcinogenicMoleculesWithNitrogen
+FROM Molecules
+WHERE ContainsNitrogen = 1 AND I...
+[2026-03-19 01:34:29] [96/300] 处理问题 #96
+[2026-03-19 01:34:29]   db_id: debit_card_specializing
+[2026-03-19 01:34:29]   question: Which client segment consumed the least in September 2013?...
+[2026-03-19 01:34:33]   成功! 耗时: 4.07s
+[2026-03-19 01:34:33]   SQL: SELECT c.Segment AS ClientSegment, SUM(s.Amount) AS TotalConsumption
+FROM sales s
+JOIN customers c O...
+[2026-03-19 01:34:34] [97/300] 处理问题 #97
+[2026-03-19 01:34:34]   db_id: codebase_community
+[2026-03-19 01:34:34]   question: Among the users who have more than 100 upvotes, how many of them have more then ...
+[2026-03-19 01:34:37]   成功! 耗时: 3.51s
+[2026-03-19 01:34:37]   SQL: SELECT COUNT(*) AS UserCount
+FROM users
+WHERE UpVotes > 100 AND DownVotes > 1;...
+[2026-03-19 01:34:38] [98/300] 处理问题 #98
+[2026-03-19 01:34:38]   db_id: superhero
+[2026-03-19 01:34:38]   question: Please list the full names of all the superheroes with over 15 super powers....
+[2026-03-19 01:34:41]   成功! 耗时: 3.40s
+[2026-03-19 01:34:41]   SQL: SELECT full_name
+FROM superhero
+WHERE id IN (
+    SELECT superhero_id
+    FROM superhero_power
+    G...
+[2026-03-19 01:34:42] [99/300] 处理问题 #99
+[2026-03-19 01:34:42]   db_id: card_games
+[2026-03-19 01:34:42]   question: Calculate the percentage of cards in Spanish. List them by name....
+[2026-03-19 01:34:46]   成功! 耗时: 4.20s
+[2026-03-19 01:34:46]   SQL: SELECT 
+    name,
+    (CAST(COUNT(*) AS REAL) / (SELECT COUNT(*) FROM cards)) * 100 AS percentage_in...
+[2026-03-19 01:34:46] [100/300] 处理问题 #100
+[2026-03-19 01:34:46]   db_id: financial
+[2026-03-19 01:34:46]   question: What is the disposition id of the client who made 5100 USD transaction in 1998/9...
+[2026-03-19 01:34:51]   成功! 耗时: 4.14s
+[2026-03-19 01:34:51]   SQL: SELECT disp.disp_id
+FROM trans
+JOIN account ON trans.account_id = account.account_id
+JOIN disp ON ac...
+[2026-03-19 01:34:51]   已保存中间结果 (100/300)
+[2026-03-19 01:34:51] [101/300] 处理问题 #101
+[2026-03-19 01:34:51]   db_id: toxicology
+[2026-03-19 01:34:51]   question: How many double bonds does TR006 have and is it carcinogenic?...
+[2026-03-19 01:34:55]   成功! 耗时: 3.52s
+[2026-03-19 01:34:55]   SQL: SELECT 
+    TR006.double_bonds,
+    TR006.carcinogenic
+FROM 
+    TR006
+WHERE 
+    TR006.id = 'TR006'...
+[2026-03-19 01:34:55] [102/300] 处理问题 #102
+[2026-03-19 01:34:55]   db_id: thrombosis_prediction
+[2026-03-19 01:34:55]   question: What is the age gap between the youngest and oldest patient with a normal trigly...
+[2026-03-19 01:35:00]   成功! 耗时: 5.32s
+[2026-03-19 01:35:00]   SQL: SELECT MAX(Patient.Age) - MIN(Patient.Age) AS AgeGap
+FROM (
+    SELECT (strftime('%Y', 'now') - strf...
+[2026-03-19 01:35:01] [103/300] 处理问题 #103
+[2026-03-19 01:35:01]   db_id: thrombosis_prediction
+[2026-03-19 01:35:01]   question: For the patient who first came to the hospital on 1991/6/13 who was diagnosed wi...
+[2026-03-19 01:35:05]   成功! 耗时: 4.31s
+[2026-03-19 01:35:05]   SQL: SELECT COUNT(*) AS Total_Lab_Tests
+FROM Laboratory
+JOIN Patient ON Laboratory.ID = Patient.ID
+WHERE ...
+[2026-03-19 01:35:06] [104/300] 处理问题 #104
+[2026-03-19 01:35:06]   db_id: student_club
+[2026-03-19 01:35:06]   question: Did Maya Mclean attend the 'Women's Soccer' event?...
+[2026-03-19 01:35:10]   成功! 耗时: 3.86s
+[2026-03-19 01:35:10]   SQL: SELECT 
+    event.event_name,
+    attendance.link_to_member
+FROM 
+    event
+JOIN 
+    attendance
+ON ...
+[2026-03-19 01:35:10] [105/300] 处理问题 #105
+[2026-03-19 01:35:10]   db_id: european_football_2
+[2026-03-19 01:35:10]   question: What are the speed in which attacks are put together of the top 4 teams with the...
+[2026-03-19 01:35:14]   成功! 耗时: 3.59s
+[2026-03-19 01:35:14]   SQL: SELECT buildUpPlaySpeed
+FROM Team_Attributes
+ORDER BY buildUpPlaySpeed DESC
+LIMIT 4;...
+[2026-03-19 01:35:14] [106/300] 处理问题 #106
+[2026-03-19 01:35:14]   db_id: codebase_community
+[2026-03-19 01:35:14]   question: Among the tags with tag ID below 15, how many of them have 20 count of posts and...
+[2026-03-19 01:35:18]   成功! 耗时: 3.43s
+[2026-03-19 01:35:18]   SQL: SELECT COUNT(*) AS TagCount
+FROM tags
+WHERE Id < 15 AND Count <= 20;...
+[2026-03-19 01:35:18] [107/300] 处理问题 #107
+[2026-03-19 01:35:18]   db_id: formula_1
+[2026-03-19 01:35:18]   question: How many French drivers who obtain the laptime less than 02:00.00?...
+[2026-03-19 01:35:22]   成功! 耗时: 4.19s
+[2026-03-19 01:35:22]   SQL: SELECT COUNT(DISTINCT l.driverId) AS FrenchDriversWithLapTimeLessThan02_00
+FROM lapTimes l
+JOIN driv...
+[2026-03-19 01:35:23] [108/300] 处理问题 #108
+[2026-03-19 01:35:23]   db_id: toxicology
+[2026-03-19 01:35:23]   question: How many triple type bonds are there?...
+[2026-03-19 01:35:26]   成功! 耗时: 3.06s
+[2026-03-19 01:35:26]   SQL: SELECT COUNT(*) AS triple_type_bonds
+FROM bond
+WHERE bond_type = 'triple';...
+[2026-03-19 01:35:26] [109/300] 处理问题 #109
+[2026-03-19 01:35:26]   db_id: thrombosis_prediction
+[2026-03-19 01:35:26]   question: Please list the IDs of the patients who had the examination done after 1997/1/1 ...
+[2026-03-19 01:35:30]   成功! 耗时: 4.08s
+[2026-03-19 01:35:30]   SQL: SELECT DISTINCT Patient.ID
+FROM Patient
+JOIN Examination ON Patient.ID = Examination.ID
+JOIN Laborat...
+[2026-03-19 01:35:31] [110/300] 处理问题 #110
+[2026-03-19 01:35:31]   db_id: debit_card_specializing
+[2026-03-19 01:35:31]   question: Please list the countries of the gas stations with transactions taken place in J...
+[2026-03-19 01:35:35]   成功! 耗时: 3.98s
+[2026-03-19 01:35:35]   SQL: SELECT DISTINCT gasstations.Country
+FROM gasstations
+JOIN transactions_1k ON gasstations.GasStationI...
+[2026-03-19 01:35:35]   已保存中间结果 (110/300)
+[2026-03-19 01:35:35] [111/300] 处理问题 #111
+[2026-03-19 01:35:35]   db_id: card_games
+[2026-03-19 01:35:35]   question: How many cards have infinite power?...
+[2026-03-19 01:35:39]   成功! 耗时: 3.39s
+[2026-03-19 01:35:39]   SQL: SELECT COUNT(*) AS infinite_power_cards
+FROM cards
+WHERE power = '∞';...
+[2026-03-19 01:35:39] [112/300] 处理问题 #112
+[2026-03-19 01:35:39]   db_id: european_football_2
+[2026-03-19 01:35:39]   question: Which country's players have the heaviest average weights?...
+[2026-03-19 01:35:47]   成功! 耗时: 7.52s
+[2026-03-19 01:35:47]   SQL: SELECT 
+    L.country_id AS country_id,
+    AVG(P.weight) AS average_weight
+FROM 
+    Player P
+JOIN ...
+[2026-03-19 01:35:47] [113/300] 处理问题 #113
+[2026-03-19 01:35:47]   db_id: card_games
+[2026-03-19 01:35:47]   question: How many cards designed by UDON and available in mtgo print type has a starting ...
+[2026-03-19 01:35:51]   成功! 耗时: 3.68s
+[2026-03-19 01:35:51]   SQL: SELECT COUNT(*) AS card_count
+FROM cards
+WHERE availability = 'mtgo'
+  AND artist = 'UDON'
+  AND han...
+[2026-03-19 01:35:52] [114/300] 处理问题 #114
+[2026-03-19 01:35:52]   db_id: formula_1
+[2026-03-19 01:35:52]   question: Who was the player that got the lap time of 0:01:27 in the race No. 161? Show hi...
+[2026-03-19 01:35:55]   成功! 耗时: 3.90s
+[2026-03-19 01:35:55]   SQL: SELECT d.url
+FROM lapTimes l
+JOIN drivers d ON l.driverId = d.driverId
+WHERE l.raceId = 161
+AND l.ti...
+[2026-03-19 01:35:56] [115/300] 处理问题 #115
+[2026-03-19 01:35:56]   db_id: codebase_community
+[2026-03-19 01:35:56]   question: In posts with 1 comment, how many of the comments have 0 score?...
+[2026-03-19 01:36:00]   成功! 耗时: 3.71s
+[2026-03-19 01:36:00]   SQL: SELECT COUNT(*) AS CommentCountWithZeroScore
+FROM comments
+JOIN posts ON comments.PostId = posts.Id
+...
+[2026-03-19 01:36:00] [116/300] 处理问题 #116
+[2026-03-19 01:36:00]   db_id: thrombosis_prediction
+[2026-03-19 01:36:00]   question: For all patients who are older than 55 years old, what is the percentage of fema...
+[2026-03-19 01:36:05]   成功! 耗时: 4.74s
+[2026-03-19 01:36:05]   SQL: SELECT 
+    COUNT(CASE WHEN p.SEX = 'female' AND l.PT != 'normal' THEN 1 END) * 100.0 / COUNT(*) AS ...
+[2026-03-19 01:36:05] [117/300] 处理问题 #117
+[2026-03-19 01:36:05]   db_id: thrombosis_prediction
+[2026-03-19 01:36:05]   question: What percentage of male patients who first presented to the hospital in 1981 wer...
+[2026-03-19 01:36:10]   成功! 耗时: 4.52s
+[2026-03-19 01:36:10]   SQL: SELECT 
+    COUNT(CASE WHEN Diagnosis = 'BEHCET' THEN 1 END) * 100.0 / COUNT(*) AS Percentage_Behcet...
+[2026-03-19 01:36:10] [118/300] 处理问题 #118
+[2026-03-19 01:36:10]   db_id: financial
+[2026-03-19 01:36:10]   question: Provide the IDs and age of the client with high level credit card, which is elig...
+[2026-03-19 01:36:15]   成功! 耗时: 4.75s
+[2026-03-19 01:36:15]   SQL: SELECT DISTINCT c.client_id, strftime('%Y', 'now') - strftime('%Y', c.birth_date) AS age
+FROM client...
+[2026-03-19 01:36:16] [119/300] 处理问题 #119
+[2026-03-19 01:36:16]   db_id: european_football_2
+[2026-03-19 01:36:16]   question: What is the ADO Den Haag team freedom of movement in the 1st two thirds of the p...
+[2026-03-19 01:36:21]   成功! 耗时: 4.99s
+[2026-03-19 01:36:21]   SQL: SELECT 
+    T.team_long_name AS team_name,
+    TA.chanceCreationPassing AS freedom_of_movement
+FROM ...
+[2026-03-19 01:36:21] [120/300] 处理问题 #120
+[2026-03-19 01:36:21]   db_id: european_football_2
+[2026-03-19 01:36:21]   question: What is the height of the tallest player? Indicate his name....
+[2026-03-19 01:36:25]   成功! 耗时: 3.53s
+[2026-03-19 01:36:25]   SQL: SELECT p.player_name, p.height
+FROM Player p
+ORDER BY p.height DESC
+LIMIT 1;...
+[2026-03-19 01:36:25]   已保存中间结果 (120/300)
+[2026-03-19 01:36:25] [121/300] 处理问题 #121
+[2026-03-19 01:36:25]   db_id: financial
+[2026-03-19 01:36:25]   question: How much is the average amount in credit card made by account holders in a month...
+[2026-03-19 01:36:29]   成功! 耗时: 4.03s
+[2026-03-19 01:36:29]   SQL: SELECT AVG(t.amount) AS average_amount
+FROM trans t
+JOIN card c ON t.account_id = c.account_id
+WHERE...
+[2026-03-19 01:36:30] [122/300] 处理问题 #122
+[2026-03-19 01:36:30]   db_id: financial
+[2026-03-19 01:36:30]   question: The average unemployment ratio of 1995 and 1996, which one has higher percentage...
+[2026-03-19 01:36:33]   成功! 耗时: 3.70s
+[2026-03-19 01:36:33]   SQL: SELECT 
+    AVG(A12) AS avg_unemployment_1995,
+    AVG(A13) AS avg_unemployment_1996
+FROM district;...
+[2026-03-19 01:36:34] [123/300] 处理问题 #123
+[2026-03-19 01:36:34]   db_id: financial
+[2026-03-19 01:36:34]   question: How often does account number 3 request an account statement to be released? Wha...
+[2026-03-19 01:36:38]   成功! 耗时: 3.89s
+[2026-03-19 01:36:38]   SQL: SELECT 
+    COUNT(*) AS request_count,
+    k_symbol AS aim_of_debiting
+FROM 
+    trans
+WHERE 
+    ac...
+[2026-03-19 01:36:38] [124/300] 处理问题 #124
+[2026-03-19 01:36:38]   db_id: toxicology
+[2026-03-19 01:36:38]   question: What type of label is not on molecules with atoms with tin?...
+[2026-03-19 01:36:43]   成功! 耗时: 4.76s
+[2026-03-19 01:36:43]   SQL: SELECT DISTINCT molecule.label
+FROM molecule
+LEFT JOIN bond ON molecule.molecule_id = bond.molecule_...
+[2026-03-19 01:36:44] [125/300] 处理问题 #125
+[2026-03-19 01:36:44]   db_id: student_club
+[2026-03-19 01:36:44]   question: Provide the number of events attended by Luisa Guidi. What is her major?...
+[2026-03-19 01:36:48]   成功! 耗时: 3.95s
+[2026-03-19 01:36:48]   SQL: SELECT COUNT(e.event_id) AS event_count, s.major
+FROM students s
+LEFT JOIN student_event_attendance ...
+[2026-03-19 01:36:48] [126/300] 处理问题 #126
+[2026-03-19 01:36:48]   db_id: thrombosis_prediction
+[2026-03-19 01:36:48]   question: When is the birthday of the oldest patient whose blood glucose is abnormal?...
+[2026-03-19 01:36:52]   成功! 耗时: 4.27s
+[2026-03-19 01:36:52]   SQL: SELECT P.Birthday
+FROM Patient P
+JOIN Laboratory L ON P.ID = L.ID
+WHERE L.GLU > 125 -- 假设血糖异常的阈值为125...
+[2026-03-19 01:36:53] [127/300] 处理问题 #127
+[2026-03-19 01:36:53]   db_id: financial
+[2026-03-19 01:36:53]   question: What is the gender of the oldest client who opened his/her account in the highes...
+[2026-03-19 01:36:59]   成功! 耗时: 6.05s
+[2026-03-19 01:36:59]   SQL: SELECT c.gender
+FROM client c
+JOIN account a ON c.client_id = a.account_id
+JOIN (
+    SELECT distric...
+[2026-03-19 01:36:59] [128/300] 处理问题 #128
+[2026-03-19 01:36:59]   db_id: codebase_community
+[2026-03-19 01:36:59]   question: How long did it take the user, known by his or her display name 'Zolomon' to get...
+[2026-03-19 01:37:03]   成功! 耗时: 4.10s
+[2026-03-19 01:37:03]   SQL: SELECT 
+    (julianday(b.Date) - julianday(u.CreationDate)) AS DaysToBadge
+FROM 
+    badges b
+JOIN 
+...
+[2026-03-19 01:37:04] [129/300] 处理问题 #129
+[2026-03-19 01:37:04]   db_id: codebase_community
+[2026-03-19 01:37:04]   question: What is the percentage of posts whose owners had a reputation of over 1000 in 20...
+[2026-03-19 01:37:09]   成功! 耗时: 4.67s
+[2026-03-19 01:37:09]   SQL: SELECT 
+    CAST(SUM(CASE WHEN u.Reputation > 1000 THEN 1 ELSE 0 END) AS FLOAT) / COUNT(*) * 100 AS ...
+[2026-03-19 01:37:09] [130/300] 处理问题 #130
+[2026-03-19 01:37:09]   db_id: formula_1
+[2026-03-19 01:37:09]   question: List out top 10 Spanish drivers who were born before 1982 and have the latest la...
+[2026-03-19 01:37:15]   成功! 耗时: 5.40s
+[2026-03-19 01:37:15]   SQL: SELECT 
+    d.driverId,
+    d.forename || ' ' || d.surname AS driver_name,
+    d.dob,
+    l.time AS ...
+[2026-03-19 01:37:15]   已保存中间结果 (130/300)
+[2026-03-19 01:37:15] [131/300] 处理问题 #131
+[2026-03-19 01:37:15]   db_id: card_games
+[2026-03-19 01:37:15]   question: What is the type of the card "Ancestor's Chosen" as originally printed?...
+[2026-03-19 01:37:18]   成功! 耗时: 3.39s
+[2026-03-19 01:37:18]   SQL: SELECT originalType 
+FROM cards 
+WHERE name = 'Ancestor''s Chosen';...
+[2026-03-19 01:37:19] [132/300] 处理问题 #132
+[2026-03-19 01:37:19]   db_id: california_schools
+[2026-03-19 01:37:19]   question: When did the first-through-twelfth-grade school with the largest enrollment open...
+[2026-03-19 01:37:23]   成功! 耗时: 4.20s
+[2026-03-19 01:37:23]   SQL: SELECT s.OpenDate
+FROM schools s
+JOIN satscores ss ON s.CDSCode = ss.cds
+WHERE ss.enroll12 = (
+    S...
+[2026-03-19 01:37:24] [133/300] 处理问题 #133
+[2026-03-19 01:37:24]   db_id: financial
+[2026-03-19 01:37:24]   question: What is the sum that client number 4's account has following transaction 851? Wh...
+[2026-03-19 01:37:28]   成功! 耗时: 4.78s
+[2026-03-19 01:37:28]   SQL: SELECT 
+    SUM(t.amount) AS total_sum,
+    c.gender
+FROM 
+    trans t
+JOIN 
+    account a ON t.acco...
+[2026-03-19 01:37:29] [134/300] 处理问题 #134
+[2026-03-19 01:37:29]   db_id: thrombosis_prediction
+[2026-03-19 01:37:29]   question: For patients with alkaliphophatase (ALP) within normal range, were they treated ...
+[2026-03-19 01:37:33]   成功! 耗时: 4.56s
+[2026-03-19 01:37:33]   SQL: SELECT 
+    Patient.ID,
+    Patient.Admission,
+    Laboratory.ALP
+FROM 
+    Patient
+JOIN 
+    Labora...
+[2026-03-19 01:37:34] [135/300] 处理问题 #135
+[2026-03-19 01:37:34]   db_id: thrombosis_prediction
+[2026-03-19 01:37:34]   question: Among the patients followed at the outpatient clinic, how many of them have a no...
+[2026-03-19 01:37:38]   成功! 耗时: 4.21s
+[2026-03-19 01:37:38]   SQL: SELECT COUNT(DISTINCT Patient.ID) AS Normal_ALP_Patients
+FROM Patient
+JOIN Laboratory ON Patient.ID ...
+[2026-03-19 01:37:39] [136/300] 处理问题 #136
+[2026-03-19 01:37:39]   db_id: debit_card_specializing
+[2026-03-19 01:37:39]   question: What is the amount spent by customer "38508" at the gas stations? How much had t...
+[2026-03-19 01:37:43]   成功! 耗时: 4.17s
+[2026-03-19 01:37:43]   SQL: SELECT 
+    SUM(t.Amount) AS TotalAmountSpent,
+    SUM(CASE WHEN strftime('%Y-%m', t.Date) = '2012-0...
+[2026-03-19 01:37:43] [137/300] 处理问题 #137
+[2026-03-19 01:37:43]   db_id: thrombosis_prediction
+[2026-03-19 01:37:43]   question: Among the male patients who have a normal level of white blood cells, how many o...
+[2026-03-19 01:37:48]   成功! 耗时: 5.09s
+[2026-03-19 01:37:48]   SQL: SELECT COUNT(DISTINCT Patient.ID) AS Count_Male_Patients_With_Normal_WBC_And_Abnormal_Fibrinogen
+FRO...
+[2026-03-19 01:37:49] [138/300] 处理问题 #138
+[2026-03-19 01:37:49]   db_id: formula_1
+[2026-03-19 01:37:49]   question: Paul di Resta was in the No. 853 race, what percent faster did he finish in the ...
+[2026-03-19 01:37:56]   成功! 耗时: 6.72s
+[2026-03-19 01:37:56]   SQL: SELECT 
+    (CAST(r1.fastestLapSpeed AS REAL) - CAST(r2.fastestLapSpeed AS REAL)) / CAST(r2.fastestL...
+[2026-03-19 01:37:56] [139/300] 处理问题 #139
+[2026-03-19 01:37:56]   db_id: toxicology
+[2026-03-19 01:37:56]   question: Identify all connected atoms with a triple bond....
+[2026-03-19 01:38:00]   成功! 耗时: 3.44s
+[2026-03-19 01:38:00]   SQL: SELECT DISTINCT connected.atom_id, connected.atom_id2
+FROM connected
+JOIN bond ON connected.bond_id ...
+[2026-03-19 01:38:00] [140/300] 处理问题 #140
+[2026-03-19 01:38:00]   db_id: thrombosis_prediction
+[2026-03-19 01:38:00]   question: For the examinations done after 1997/1/1, how many of them have the result of an...
+[2026-03-19 01:38:04]   成功! 耗时: 3.83s
+[2026-03-19 01:38:04]   SQL: SELECT COUNT(*) AS CountOfExaminations
+FROM Examination
+WHERE ExaminationDate > '1997-01-01'
+  AND A...
+[2026-03-19 01:38:04]   已保存中间结果 (140/300)
+[2026-03-19 01:38:04] [141/300] 处理问题 #141
+[2026-03-19 01:38:04]   db_id: california_schools
+[2026-03-19 01:38:04]   question: How many schools in merged Alameda have number of test takers less than 100?...
+[2026-03-19 01:38:08]   成功! 耗时: 4.00s
+[2026-03-19 01:38:08]   SQL: SELECT COUNT(*) AS SchoolCount
+FROM schools
+JOIN satscores ON schools.CDSCode = satscores.cds
+WHERE ...
+[2026-03-19 01:38:09] [142/300] 处理问题 #142
+[2026-03-19 01:38:09]   db_id: formula_1
+[2026-03-19 01:38:09]   question: Find the full name, Wiki Pedia page link, and date of birth of German drivers bo...
+[2026-03-19 01:38:14]   成功! 耗时: 4.62s
+[2026-03-19 01:38:14]   SQL: SELECT 
+    drivers.forename || ' ' || drivers.surname AS full_name,
+    drivers.url AS wiki_page_li...
+[2026-03-19 01:38:14] [143/300] 处理问题 #143
+[2026-03-19 01:38:14]   db_id: codebase_community
+[2026-03-19 01:38:14]   question: Describe the post title which got positive comments and display names of the use...
+[2026-03-19 01:38:18]   成功! 耗时: 3.81s
+[2026-03-19 01:38:18]   SQL: SELECT 
+    p.Title AS PostTitle,
+    c.UserDisplayName AS CommenterDisplayName
+FROM 
+    posts p
+JO...
+[2026-03-19 01:38:18] [144/300] 处理问题 #144
+[2026-03-19 01:38:18]   db_id: formula_1
+[2026-03-19 01:38:18]   question: Calculate the percentage whereby Hamilton was not at the 1st track of the the f1...
+[2026-03-19 01:38:23]   成功! 耗时: 4.79s
+[2026-03-19 01:38:23]   SQL: SELECT 
+    CAST(SUM(CASE WHEN r.position = 1 THEN 0 ELSE 1 END) AS REAL) / COUNT(*) * 100 AS percen...
+[2026-03-19 01:38:24] [145/300] 处理问题 #145
+[2026-03-19 01:38:24]   db_id: european_football_2
+[2026-03-19 01:38:24]   question: Among the players with an overall rating between 60 to 65, how many players whos...
+[2026-03-19 01:38:28]   成功! 耗时: 4.36s
+[2026-03-19 01:38:28]   SQL: SELECT COUNT(DISTINCT Player_Attributes.player_api_id) AS player_count
+FROM Player_Attributes
+WHERE ...
+[2026-03-19 01:38:29] [146/300] 处理问题 #146
+[2026-03-19 01:38:29]   db_id: financial
+[2026-03-19 01:38:29]   question: How many loan accounts are for pre-payment of duration of 24 months with weekly ...
+[2026-03-19 01:38:31]   失败: 500
+[2026-03-19 01:38:31] [147/300] 处理问题 #147
+[2026-03-19 01:38:31]   db_id: formula_1
+[2026-03-19 01:38:31]   question: Among all the lap records set on various circuits, what is the time for the fast...
+[2026-03-19 01:38:34]   失败: 500
+[2026-03-19 01:38:34] [148/300] 处理问题 #148
+[2026-03-19 01:38:34]   db_id: european_football_2
+[2026-03-19 01:38:34]   question: Among the players born before the year 1986, how many of them would remain in hi...
+[2026-03-19 01:38:37]   失败: 500
+[2026-03-19 01:38:37] [149/300] 处理问题 #149
+[2026-03-19 01:38:37]   db_id: european_football_2
+[2026-03-19 01:38:37]   question: When was the first time did Kevin Constant have his highest crossing score? Give...
+[2026-03-19 01:38:40]   失败: 500
+[2026-03-19 01:38:40] [150/300] 处理问题 #150
+[2026-03-19 01:38:40]   db_id: financial
+[2026-03-19 01:38:40]   question: Which districts have transactions greater than USS$10,000 in 1997?...
+[2026-03-19 01:38:42]   失败: 500
+[2026-03-19 01:38:42]   已保存中间结果 (150/300)
+[2026-03-19 01:38:43] [151/300] 处理问题 #151
+[2026-03-19 01:38:43]   db_id: card_games
+[2026-03-19 01:38:43]   question: cards are not directly linked to language but through table 'set'. you need to a...
+[2026-03-19 01:38:45]   失败: 500
+[2026-03-19 01:38:46] [152/300] 处理问题 #152
+[2026-03-19 01:38:46]   db_id: formula_1
+[2026-03-19 01:38:46]   question: From 2000 to 2005, what percentage of drivers who were born before 1985 and the ...
+[2026-03-19 01:38:48]   失败: 500
+[2026-03-19 01:38:49] [153/300] 处理问题 #153
+[2026-03-19 01:38:49]   db_id: financial
+[2026-03-19 01:38:49]   question: Among the accounts who have approved loan date in 1997, list out the accounts th...
+[2026-03-19 01:38:51]   失败: 500
+[2026-03-19 01:38:51] [154/300] 处理问题 #154
+[2026-03-19 01:38:51]   db_id: student_club
+[2026-03-19 01:38:51]   question: Give the full name and contact number of members who had to spend more than aver...
+[2026-03-19 01:38:54]   失败: 500
+[2026-03-19 01:38:54] [155/300] 处理问题 #155
+[2026-03-19 01:38:54]   db_id: codebase_community
+[2026-03-19 01:38:54]   question: Please list the display names of all the users whose accounts were created in th...
+[2026-03-19 01:38:56]   失败: 500
+[2026-03-19 01:38:57] [156/300] 处理问题 #156
+[2026-03-19 01:38:57]   db_id: toxicology
+[2026-03-19 01:38:57]   question: Chlorine is in what type of bond?...
+[2026-03-19 01:38:59]   失败: 500
+[2026-03-19 01:38:59] [157/300] 处理问题 #157
+[2026-03-19 01:38:59]   db_id: superhero
+[2026-03-19 01:38:59]   question: How many superheroes didn't have any publisher?...
+[2026-03-19 01:39:02]   失败: 500
+[2026-03-19 01:39:02] [158/300] 处理问题 #158
+[2026-03-19 01:39:02]   db_id: codebase_community
+[2026-03-19 01:39:02]   question: What is the average number of badges obtained by a user with over 200 views?...
+[2026-03-19 01:39:04]   失败: 500
+[2026-03-19 01:39:05] [159/300] 处理问题 #159
+[2026-03-19 01:39:05]   db_id: formula_1
+[2026-03-19 01:39:05]   question: In terms of number of points acquired, how many victories did the driver who ran...
+[2026-03-19 01:39:07]   失败: 500
+[2026-03-19 01:39:08] [160/300] 处理问题 #160
+[2026-03-19 01:39:08]   db_id: card_games
+[2026-03-19 01:39:08]   question: In duels, what are the top 10 cards with the highest uncoverted mana cost?...
+[2026-03-19 01:39:10]   失败: 500
+[2026-03-19 01:39:10]   已保存中间结果 (160/300)
+[2026-03-19 01:39:11] [161/300] 处理问题 #161
+[2026-03-19 01:39:11]   db_id: financial
+[2026-03-19 01:39:11]   question: What is the average number of crimes committed in 1995 in regions where the numb...
+[2026-03-19 01:39:13]   失败: 500
+[2026-03-19 01:39:13] [162/300] 处理问题 #162
+[2026-03-19 01:39:13]   db_id: financial
+[2026-03-19 01:39:13]   question: For loans contracts which are still running where client are in debt, list the d...
+[2026-03-19 01:39:16]   失败: 500
+[2026-03-19 01:39:16] [163/300] 处理问题 #163
+[2026-03-19 01:39:16]   db_id: toxicology
+[2026-03-19 01:39:16]   question: Does bond id TR001_1_8 have both element of chlorine and carbon?...
+[2026-03-19 01:39:18]   失败: 500
+[2026-03-19 01:39:19] [164/300] 处理问题 #164
+[2026-03-19 01:39:19]   db_id: formula_1
+[2026-03-19 01:39:19]   question: How many wins was achieved by the oldest racer? Indicate his/her full name....
+[2026-03-19 01:39:21]   失败: 500
+[2026-03-19 01:39:22] [165/300] 处理问题 #165
+[2026-03-19 01:39:22]   db_id: financial
+[2026-03-19 01:39:22]   question: List the account IDs with monthly issuance of statements....
+[2026-03-19 01:39:24]   失败: 500
+[2026-03-19 01:39:25] [166/300] 处理问题 #166
+[2026-03-19 01:39:25]   db_id: thrombosis_prediction
+[2026-03-19 01:39:25]   question: What is the most common sign of patients with SLE disease?...
+[2026-03-19 01:39:27]   失败: 500
+[2026-03-19 01:39:28] [167/300] 处理问题 #167
+[2026-03-19 01:39:28]   db_id: codebase_community
+[2026-03-19 01:39:28]   question: Count the number of posts with a tag specified as 'careers'....
+[2026-03-19 01:39:30]   失败: 500
+[2026-03-19 01:39:30] [168/300] 处理问题 #168
+[2026-03-19 01:39:30]   db_id: student_club
+[2026-03-19 01:39:30]   question: Please provide links to events for members who have paid more than 50 dollar....
+[2026-03-19 01:39:33]   失败: 500
+[2026-03-19 01:39:33] [169/300] 处理问题 #169
+[2026-03-19 01:39:33]   db_id: california_schools
+[2026-03-19 01:39:33]   question: What is the highest eligible free rate for K-12 students in the schools in Alame...
+[2026-03-19 01:39:35]   失败: 500
+[2026-03-19 01:39:36] [170/300] 处理问题 #170
+[2026-03-19 01:39:36]   db_id: card_games
+[2026-03-19 01:39:36]   question: Which card name in the set 'Journey into Nyx Hero's Path' has the highest conver...
+[2026-03-19 01:39:38]   失败: 500
+[2026-03-19 01:39:38]   已保存中间结果 (170/300)
+[2026-03-19 01:39:39] [171/300] 处理问题 #171
+[2026-03-19 01:39:39]   db_id: toxicology
+[2026-03-19 01:39:39]   question: What is the percentage of carcinogenic molecules in triple type bonds?...
+[2026-03-19 01:39:41]   失败: 500
+[2026-03-19 01:39:41] [172/300] 处理问题 #172
+[2026-03-19 01:39:41]   db_id: thrombosis_prediction
+[2026-03-19 01:39:41]   question: List all patients with their sex and date of birthday, whose AST glutamic oxaloa...
+[2026-03-19 01:39:44]   失败: 500
+[2026-03-19 01:39:44] [173/300] 处理问题 #173
+[2026-03-19 01:39:44]   db_id: california_schools
+[2026-03-19 01:39:44]   question: What is the average score in writing for the schools that were opened after 1991...
+[2026-03-19 01:39:47]   失败: 500
+[2026-03-19 01:39:47] [174/300] 处理问题 #174
+[2026-03-19 01:39:47]   db_id: debit_card_specializing
+[2026-03-19 01:39:47]   question: Is it true that more SMEs pay in Czech koruna than in euros? If so, how many mor...
+[2026-03-19 01:39:49]   失败: 500
+[2026-03-19 01:39:50] [175/300] 处理问题 #175
+[2026-03-19 01:39:50]   db_id: toxicology
+[2026-03-19 01:39:50]   question: What is the composition of element chlorine in percentage among the single bond ...
+[2026-03-19 01:39:52]   失败: 500
+[2026-03-19 01:39:52] [176/300] 处理问题 #176
+[2026-03-19 01:39:52]   db_id: superhero
+[2026-03-19 01:39:52]   question: Provide the eye colours of the heroes whose skin colours are gold....
+[2026-03-19 01:39:54]   失败: 500
+[2026-03-19 01:39:55] [177/300] 处理问题 #177
+[2026-03-19 01:39:55]   db_id: superhero
+[2026-03-19 01:39:55]   question: Who is the dumbest superhero?...
+[2026-03-19 01:39:57]   失败: 500
+[2026-03-19 01:39:57] [178/300] 处理问题 #178
+[2026-03-19 01:39:57]   db_id: european_football_2
+[2026-03-19 01:39:57]   question: State the name of the most strongest player....
+[2026-03-19 01:40:00]   失败: 500
+[2026-03-19 01:40:00] [179/300] 处理问题 #179
+[2026-03-19 01:40:00]   db_id: financial
+[2026-03-19 01:40:00]   question: How many male customers who were born between 1974 and 1976 have made a payment ...
+[2026-03-19 01:40:03]   失败: 500
+[2026-03-19 01:40:03] [180/300] 处理问题 #180
+[2026-03-19 01:40:03]   db_id: california_schools
+[2026-03-19 01:40:03]   question: What is the phone number and extension number for the school that had the 333rd ...
+[2026-03-19 01:40:05]   失败: 500
+[2026-03-19 01:40:05]   已保存中间结果 (180/300)
+[2026-03-19 01:40:06] [181/300] 处理问题 #181
+[2026-03-19 01:40:06]   db_id: formula_1
+[2026-03-19 01:40:06]   question: For the driver who had the Q2 time as 0:01:40 in the qualifying race No. 355, wh...
+[2026-03-19 01:40:08]   失败: 500
+[2026-03-19 01:40:09] [182/300] 处理问题 #182
+[2026-03-19 01:40:09]   db_id: card_games
+[2026-03-19 01:40:09]   question: How many cards available in paper have a positive starting maximum hand size?...
+[2026-03-19 01:40:11]   失败: 500
+[2026-03-19 01:40:12] [183/300] 处理问题 #183
+[2026-03-19 01:40:12]   db_id: california_schools
+[2026-03-19 01:40:12]   question: What is the school type of the school with the highest latitude? Indicate the na...
+[2026-03-19 01:40:14]   失败: 500
+[2026-03-19 01:40:14] [184/300] 处理问题 #184
+[2026-03-19 01:40:14]   db_id: california_schools
+[2026-03-19 01:40:14]   question: In which city can you find the school in the state of California with the lowest...
+[2026-03-19 01:40:17]   失败: 500
+[2026-03-19 01:40:17] [185/300] 处理问题 #185
+[2026-03-19 01:40:17]   db_id: codebase_community
+[2026-03-19 01:40:17]   question: How many posts with votes that were created in 2011 have a bounty of 50?...
+[2026-03-19 01:40:20]   失败: 500
+[2026-03-19 01:40:20] [186/300] 处理问题 #186
+[2026-03-19 01:40:20]   db_id: card_games
+[2026-03-19 01:40:20]   question: Find all cards illustrated by Stephen Daniel and describe the text of the ruling...
+[2026-03-19 01:40:23]   失败: 500
+[2026-03-19 01:40:23] [187/300] 处理问题 #187
+[2026-03-19 01:40:23]   db_id: superhero
+[2026-03-19 01:40:23]   question: Among the superheroes with height from 170 to 190, list the names of the superhe...
+[2026-03-19 01:40:25]   失败: 500
+[2026-03-19 01:40:26] [188/300] 处理问题 #188
+[2026-03-19 01:40:26]   db_id: california_schools
+[2026-03-19 01:40:26]   question: What is the ratio in percentage of Santa Clara County schools that are locally f...
+[2026-03-19 01:40:28]   失败: 500
+[2026-03-19 01:40:28] [189/300] 处理问题 #189
+[2026-03-19 01:40:28]   db_id: thrombosis_prediction
+[2026-03-19 01:40:28]   question: How many patients who underwent testing in 1997 had protein levels outside the n...
+[2026-03-19 01:40:31]   失败: 500
+[2026-03-19 01:40:31] [190/300] 处理问题 #190
+[2026-03-19 01:40:31]   db_id: european_football_2
+[2026-03-19 01:40:31]   question: How many players whose first names are Adam and weigh more than 170?...
+[2026-03-19 01:40:34]   失败: 500
+[2026-03-19 01:40:34]   已保存中间结果 (190/300)
+[2026-03-19 01:40:34] [191/300] 处理问题 #191
+[2026-03-19 01:40:34]   db_id: codebase_community
+[2026-03-19 01:40:34]   question: How many comments were added to the post with the highest score?...
+[2026-03-19 01:40:37]   失败: 500
+[2026-03-19 01:40:37] [192/300] 处理问题 #192
+[2026-03-19 01:40:37]   db_id: european_football_2
+[2026-03-19 01:40:37]   question: List down the name of players who are 35 years old and above....
+[2026-03-19 01:40:39]   失败: 500
+[2026-03-19 01:40:40] [193/300] 处理问题 #193
+[2026-03-19 01:40:40]   db_id: thrombosis_prediction
+[2026-03-19 01:40:40]   question: What is the percentage of female patient were born after 1930?...
+[2026-03-19 01:40:42]   失败: 500
+[2026-03-19 01:40:43] [194/300] 处理问题 #194
+[2026-03-19 01:40:43]   db_id: codebase_community
+[2026-03-19 01:40:43]   question: Which user created post ID 1 and what is the reputation of this user?...
+[2026-03-19 01:40:45]   失败: 500
+[2026-03-19 01:40:46] [195/300] 处理问题 #195
+[2026-03-19 01:40:46]   db_id: toxicology
+[2026-03-19 01:40:46]   question: List the atom ID of the carcinogenic molecule that contains oxygen?...
+[2026-03-19 01:40:48]   失败: 500
+[2026-03-19 01:40:48] [196/300] 处理问题 #196
+[2026-03-19 01:40:48]   db_id: debit_card_specializing
+[2026-03-19 01:40:48]   question: There's one customer spent 214582.17 in the June of 2013, which currency did he/...
+[2026-03-19 01:40:50]   失败: 500
+[2026-03-19 01:40:51] [197/300] 处理问题 #197
+[2026-03-19 01:40:51]   db_id: financial
+[2026-03-19 01:40:51]   question: In 1996, which districts have the highest unemployment rate? List their branch l...
+[2026-03-19 01:40:53]   失败: 500
+[2026-03-19 01:40:54] [198/300] 处理问题 #198
+[2026-03-19 01:40:54]   db_id: formula_1
+[2026-03-19 01:40:54]   question: In which Formula_1 race was the lap record for the Austrian Grand Prix Circuit s...
+[2026-03-19 01:40:56]   失败: 500
+[2026-03-19 01:40:56] [199/300] 处理问题 #199
+[2026-03-19 01:40:56]   db_id: formula_1
+[2026-03-19 01:40:56]   question: Among the drivers that finished the race in the 2008 Chinese Grand Prix, how man...
+[2026-03-19 01:40:59]   失败: 500
+[2026-03-19 01:40:59] [200/300] 处理问题 #200
+[2026-03-19 01:40:59]   db_id: student_club
+[2026-03-19 01:40:59]   question: In the events with more than forty incomes, list the city and country in which t...
+[2026-03-19 01:41:01]   失败: 500
+[2026-03-19 01:41:01]   已保存中间结果 (200/300)
+[2026-03-19 01:41:02] [201/300] 处理问题 #201
+[2026-03-19 01:41:02]   db_id: thrombosis_prediction
+[2026-03-19 01:41:02]   question: The oldest SJS patient's medical laboratory work was completed on what date, and...
+[2026-03-19 01:41:04]   失败: 500
+[2026-03-19 01:41:05] [202/300] 处理问题 #202
+[2026-03-19 01:41:05]   db_id: financial
+[2026-03-19 01:41:05]   question: How many credit card withdrawals were recorded after 1995?...
+[2026-03-19 01:41:07]   失败: 500
+[2026-03-19 01:41:08] [203/300] 处理问题 #203
+[2026-03-19 01:41:08]   db_id: formula_1
+[2026-03-19 01:41:08]   question: How many British drivers were born after 1980?...
+[2026-03-19 01:41:10]   失败: 500
+[2026-03-19 01:41:10] [204/300] 处理问题 #204
+[2026-03-19 01:41:10]   db_id: thrombosis_prediction
+[2026-03-19 01:41:10]   question: List and group all patients by sex for total bilirubin (T-BIL) level not within ...
+[2026-03-19 01:41:13]   失败: 500
+[2026-03-19 01:41:13] [205/300] 处理问题 #205
+[2026-03-19 01:41:13]   db_id: debit_card_specializing
+[2026-03-19 01:41:13]   question: What is the highest monthly consumption in the year 2012?...
+[2026-03-19 01:41:15]   失败: 500
+[2026-03-19 01:41:16] [206/300] 处理问题 #206
+[2026-03-19 01:41:16]   db_id: thrombosis_prediction
+[2026-03-19 01:41:16]   question: For patient born between 1936-1956, how many male patients have creatinine phosp...
+[2026-03-19 01:41:18]   失败: 500
+[2026-03-19 01:41:19] [207/300] 处理问题 #207
+[2026-03-19 01:41:19]   db_id: codebase_community
+[2026-03-19 01:41:19]   question: State all the tags used by Mark Meckes in his posts that doesn't have comments....
+[2026-03-19 01:41:21]   失败: 500
+[2026-03-19 01:41:21] [208/300] 处理问题 #208
+[2026-03-19 01:41:21]   db_id: thrombosis_prediction
+[2026-03-19 01:41:21]   question: For the patient with the highest lactate dehydrogenase in the normal range, when...
+[2026-03-19 01:41:24]   失败: 500
+[2026-03-19 01:41:24] [209/300] 处理问题 #209
+[2026-03-19 01:41:24]   db_id: toxicology
+[2026-03-19 01:41:24]   question: Determine the bond type that is formed in the chemical compound containing eleme...
+[2026-03-19 01:41:26]   失败: 500
+[2026-03-19 01:41:27] [210/300] 处理问题 #210
+[2026-03-19 01:41:27]   db_id: codebase_community
+[2026-03-19 01:41:27]   question: List out all post that are related to post ID 61217 and what is the popularity o...
+[2026-03-19 01:41:29]   失败: 500
+[2026-03-19 01:41:29]   已保存中间结果 (210/300)
+[2026-03-19 01:41:30] [211/300] 处理问题 #211
+[2026-03-19 01:41:30]   db_id: thrombosis_prediction
+[2026-03-19 01:41:30]   question: What percentage of patients with a proteinuria level within the normal range hav...
+[2026-03-19 01:41:32]   失败: 500
+[2026-03-19 01:41:33] [212/300] 处理问题 #212
+[2026-03-19 01:41:33]   db_id: european_football_2
+[2026-03-19 01:41:33]   question: Which home team had lost the fewest matches in the 2016 season?...
+[2026-03-19 01:41:35]   失败: 500
+[2026-03-19 01:41:35] [213/300] 处理问题 #213
+[2026-03-19 01:41:35]   db_id: student_club
+[2026-03-19 01:41:35]   question: Among the budgets for Advertising, list out top three which have the most budget...
+[2026-03-19 01:41:37]   失败: 500
+[2026-03-19 01:41:38] [214/300] 处理问题 #214
+[2026-03-19 01:41:38]   db_id: card_games
+[2026-03-19 01:41:38]   question: What are the cards in set 10E with converted mana of 5 have translation and what...
+[2026-03-19 01:41:40]   失败: 500
+[2026-03-19 01:41:41] [215/300] 处理问题 #215
+[2026-03-19 01:41:41]   db_id: toxicology
+[2026-03-19 01:41:41]   question: Calculate the percentage of carcinogenic molecules which contain the Chlorine el...
+[2026-03-19 01:41:43]   失败: 500
+[2026-03-19 01:41:43] [216/300] 处理问题 #216
+[2026-03-19 01:41:43]   db_id: financial
+[2026-03-19 01:41:43]   question: List out the accounts who have the earliest trading date in 1995 ?...
+[2026-03-19 01:41:46]   失败: 500
+[2026-03-19 01:41:46] [217/300] 处理问题 #217
+[2026-03-19 01:41:46]   db_id: thrombosis_prediction
+[2026-03-19 01:41:46]   question: Please list the ID of the patient whose RF is normal and who is older than 60....
+[2026-03-19 01:41:49]   失败: 500
+[2026-03-19 01:41:49] [218/300] 处理问题 #218
+[2026-03-19 01:41:49]   db_id: european_football_2
+[2026-03-19 01:41:49]   question: What is the average heights of Italy players?...
+[2026-03-19 01:41:51]   失败: 500
+[2026-03-19 01:41:52] [219/300] 处理问题 #219
+[2026-03-19 01:41:52]   db_id: thrombosis_prediction
+[2026-03-19 01:41:52]   question: For the patient who was diagnosed SLE on 1997/1/27, what was his/her original di...
+[2026-03-19 01:41:54]   失败: 500
+[2026-03-19 01:41:55] [220/300] 处理问题 #220
+[2026-03-19 01:41:55]   db_id: toxicology
+[2026-03-19 01:41:55]   question: What are the bonds that have phosphorus and nitrogen as their atom elements?...
+[2026-03-19 01:41:57]   失败: 500
+[2026-03-19 01:41:57]   已保存中间结果 (220/300)
+[2026-03-19 01:41:57] [221/300] 处理问题 #221
+[2026-03-19 01:41:57]   db_id: european_football_2
+[2026-03-19 01:41:57]   question: Among the players whose preferred foot was the left foot when attacking, how man...
+[2026-03-19 01:42:00]   失败: 500
+[2026-03-19 01:42:00] [222/300] 处理问题 #222
+[2026-03-19 01:42:00]   db_id: european_football_2
+[2026-03-19 01:42:00]   question: List the long name of teams with above-average build-up play passing in 2012....
+[2026-03-19 01:42:03]   失败: 500
+[2026-03-19 01:42:03] [223/300] 处理问题 #223
+[2026-03-19 01:42:03]   db_id: card_games
+[2026-03-19 01:42:03]   question: What are the card numbers that don't have multiple faces on a single card and ha...
+[2026-03-19 01:42:05]   失败: 500
+[2026-03-19 01:42:06] [224/300] 处理问题 #224
+[2026-03-19 01:42:06]   db_id: european_football_2
+[2026-03-19 01:42:06]   question: List all the football player with the highest balance score and potential score ...
+[2026-03-19 01:42:08]   失败: 500
+[2026-03-19 01:42:09] [225/300] 处理问题 #225
+[2026-03-19 01:42:09]   db_id: european_football_2
+[2026-03-19 01:42:09]   question: How many players were born after 1990?...
+[2026-03-19 01:42:11]   失败: 500
+[2026-03-19 01:42:12] [226/300] 处理问题 #226
+[2026-03-19 01:42:12]   db_id: thrombosis_prediction
+[2026-03-19 01:42:12]   question: What is the average index of the lactate dehydrogenase (LDH) for all patients wi...
+[2026-03-19 01:42:14]   失败: 500
+[2026-03-19 01:42:15] [227/300] 处理问题 #227
+[2026-03-19 01:42:15]   db_id: thrombosis_prediction
+[2026-03-19 01:42:15]   question: What are the symptoms observed by the youngest patient to ever did a medical exa...
+[2026-03-19 01:42:17]   失败: 500
+[2026-03-19 01:42:17] [228/300] 处理问题 #228
+[2026-03-19 01:42:17]   db_id: california_schools
+[2026-03-19 01:42:17]   question: What is the total amount of Community College District closure in 1989 in the ci...
+[2026-03-19 01:42:20]   失败: 500
+[2026-03-19 01:42:20] [229/300] 处理问题 #229
+[2026-03-19 01:42:20]   db_id: thrombosis_prediction
+[2026-03-19 01:42:20]   question: What is the ratio of male to female patients among all those with abnormal uric ...
+[2026-03-19 01:42:23]   失败: 500
+[2026-03-19 01:42:23] [230/300] 处理问题 #230
+[2026-03-19 01:42:23]   db_id: debit_card_specializing
+[2026-03-19 01:42:23]   question: What is the difference in the annual average consumption of the customers with t...
+[2026-03-19 01:42:25]   失败: 500
+[2026-03-19 01:42:25]   已保存中间结果 (230/300)
+[2026-03-19 01:42:26] [231/300] 处理问题 #231
+[2026-03-19 01:42:26]   db_id: thrombosis_prediction
+[2026-03-19 01:42:26]   question: Among the patients who have an abnormal level of glutamic oxaloacetic transamina...
+[2026-03-19 01:42:28]   失败: 500
+[2026-03-19 01:42:29] [232/300] 处理问题 #232
+[2026-03-19 01:42:29]   db_id: superhero
+[2026-03-19 01:42:29]   question: Among the male superheroes, list the super hero names of superheroes with weight...
+[2026-03-19 01:42:31]   失败: 500
+[2026-03-19 01:42:31] [233/300] 处理问题 #233
+[2026-03-19 01:42:31]   db_id: california_schools
+[2026-03-19 01:42:31]   question: Under whose administration is the school with the highest number of students sco...
+[2026-03-19 01:42:34]   失败: 500
+[2026-03-19 01:42:34] [234/300] 处理问题 #234
+[2026-03-19 01:42:34]   db_id: toxicology
+[2026-03-19 01:42:34]   question: How many bonds which involved atom 12 does molecule TR009 have?...
+[2026-03-19 01:42:36]   失败: 500
+[2026-03-19 01:42:37] [235/300] 处理问题 #235
+[2026-03-19 01:42:37]   db_id: thrombosis_prediction
+[2026-03-19 01:42:37]   question: How many patients hadn't undergone a medical examination until at least a year f...
+[2026-03-19 01:42:39]   失败: 500
+[2026-03-19 01:42:39] [236/300] 处理问题 #236
+[2026-03-19 01:42:39]   db_id: card_games
+[2026-03-19 01:42:39]   question: How many cards are having future frame version and what are the legality status ...
+[2026-03-19 01:42:42]   失败: 500
+[2026-03-19 01:42:42] [237/300] 处理问题 #237
+[2026-03-19 01:42:42]   db_id: financial
+[2026-03-19 01:42:42]   question: Please provide a list of clients who were born between 1983 and 1987 and whose a...
+[2026-03-19 01:42:45]   失败: 500
+[2026-03-19 01:42:45] [238/300] 处理问题 #238
+[2026-03-19 01:42:45]   db_id: thrombosis_prediction
+[2026-03-19 01:42:45]   question: For in-patient age 50 and above, what is their average anti-cardiolipin antibody...
+[2026-03-19 01:42:47]   失败: 500
+[2026-03-19 01:42:48] [239/300] 处理问题 #239
+[2026-03-19 01:42:48]   db_id: superhero
+[2026-03-19 01:42:48]   question: What is the average of superheroes with no skin colour?...
+[2026-03-19 01:42:50]   失败: 500
+[2026-03-19 01:42:51] [240/300] 处理问题 #240
+[2026-03-19 01:42:51]   db_id: superhero
+[2026-03-19 01:42:51]   question: What is the percentage of superheroes who act in their own self-interest or make...
+[2026-03-19 01:42:56]   成功! 耗时: 5.52s
+[2026-03-19 01:42:56]   SQL: SELECT 
+    COUNT(*) AS total_superheroes,
+    SUM(CASE WHEN alignment_id IN (1, 2) THEN 1 ELSE 0 EN...
+[2026-03-19 01:42:56]   已保存中间结果 (240/300)
+[2026-03-19 01:42:57] [241/300] 处理问题 #241
+[2026-03-19 01:42:57]   db_id: thrombosis_prediction
+[2026-03-19 01:42:57]   question: Among the patients whose creatinine level is abnormal, how many of them aren't 7...
+[2026-03-19 01:43:01]   成功! 耗时: 4.47s
+[2026-03-19 01:43:01]   SQL: SELECT COUNT(DISTINCT Patient.ID) AS Count_Patients
+FROM Patient
+JOIN Laboratory ON Patient.ID = Lab...
+[2026-03-19 01:43:02] [242/300] 处理问题 #242
+[2026-03-19 01:43:02]   db_id: thrombosis_prediction
+[2026-03-19 01:43:02]   question: What is the average age of patients as of year 1999 examined in the laboratory f...
+[2026-03-19 01:43:06]   成功! 耗时: 4.49s
+[2026-03-19 01:43:06]   SQL: SELECT AVG(CAST(strftime('%Y', '1999-01-01') - strftime('%Y', Birthday) AS INTEGER)) AS Average_Age
+...
+[2026-03-19 01:43:07] [243/300] 处理问题 #243
+[2026-03-19 01:43:07]   db_id: card_games
+[2026-03-19 01:43:07]   question: Please list the names of the cards that have a text box....
+[2026-03-19 01:43:10]   成功! 耗时: 3.20s
+[2026-03-19 01:43:10]   SQL: SELECT name 
+FROM cards 
+WHERE text IS NOT NULL;...
+[2026-03-19 01:43:10] [244/300] 处理问题 #244
+[2026-03-19 01:43:10]   db_id: card_games
+[2026-03-19 01:43:10]   question: What's the unconverted mana cost of the card "Ancestor's Chosen"?...
+[2026-03-19 01:43:14]   成功! 耗时: 3.39s
+[2026-03-19 01:43:14]   SQL: SELECT manaCost 
+FROM cards 
+WHERE name = 'Ancestor\'s Chosen';...
+[2026-03-19 01:43:14] [245/300] 处理问题 #245
+[2026-03-19 01:43:14]   db_id: codebase_community
+[2026-03-19 01:43:14]   question: Identify the number of posts that offer a bounty amount over 30....
+[2026-03-19 01:43:18]   成功! 耗时: 3.94s
+[2026-03-19 01:43:18]   SQL: SELECT COUNT(*) AS BountyPostsCount
+FROM votes
+WHERE BountyAmount > 30;...
+[2026-03-19 01:43:19] [246/300] 处理问题 #246
+[2026-03-19 01:43:19]   db_id: financial
+[2026-03-19 01:43:19]   question: How many accounts in Beroun were opened after 1996?...
+[2026-03-19 01:43:23]   成功! 耗时: 4.03s
+[2026-03-19 01:43:23]   SQL: SELECT COUNT(DISTINCT account.account_id) AS account_count
+FROM account
+JOIN district ON account.dis...
+[2026-03-19 01:43:23] [247/300] 处理问题 #247
+[2026-03-19 01:43:23]   db_id: card_games
+[2026-03-19 01:43:23]   question: What's the code for the set which was released on 2017/7/14?...
+[2026-03-19 01:43:27]   成功! 耗时: 3.43s
+[2026-03-19 01:43:27]   SQL: SELECT setCode 
+FROM sets 
+WHERE releaseDate = '2017-07-14';...
+[2026-03-19 01:43:27] [248/300] 处理问题 #248
+[2026-03-19 01:43:27]   db_id: toxicology
+[2026-03-19 01:43:27]   question: How many atoms belong to the molecule labeled with carcinogenic compounds?...
+[2026-03-19 01:43:31]   成功! 耗时: 3.43s
+[2026-03-19 01:43:31]   SQL: SELECT COUNT(DISTINCT atom.atom_id) AS atom_count
+FROM molecule
+JOIN atom ON molecule.molecule_id = ...
+[2026-03-19 01:43:31] [249/300] 处理问题 #249
+[2026-03-19 01:43:31]   db_id: financial
+[2026-03-19 01:43:31]   question: Please list the accounts whose district is Tabor that are eligible for loans....
+[2026-03-19 01:43:35]   成功! 耗时: 3.82s
+[2026-03-19 01:43:35]   SQL: SELECT DISTINCT account.account_id
+FROM account
+JOIN district ON account.district_id = district.dist...
+[2026-03-19 01:43:35] [250/300] 处理问题 #250
+[2026-03-19 01:43:35]   db_id: thrombosis_prediction
+[2026-03-19 01:43:35]   question: How many patients have a normal level of anti-ribonuclear protein and have been ...
+[2026-03-19 01:43:39]   成功! 耗时: 3.85s
+[2026-03-19 01:43:39]   SQL: SELECT COUNT(DISTINCT Patient.ID) AS PatientCount
+FROM Patient
+JOIN Laboratory ON Patient.ID = Labor...
+[2026-03-19 01:43:39]   已保存中间结果 (250/300)
+[2026-03-19 01:43:40] [251/300] 处理问题 #251
+[2026-03-19 01:43:40]   db_id: formula_1
+[2026-03-19 01:43:40]   question: How old is the youngest Japanese driver? What is his name?...
+[2026-03-19 01:43:44]   成功! 耗时: 4.16s
+[2026-03-19 01:43:44]   SQL: SELECT 
+    drivers.forename || ' ' || drivers.surname AS name,
+    (strftime('%Y', 'now') - strftim...
+[2026-03-19 01:43:44] [252/300] 处理问题 #252
+[2026-03-19 01:43:44]   db_id: thrombosis_prediction
+[2026-03-19 01:43:44]   question: Please list the top three patients' birthdays with the highest glutamic pylvic t...
+[2026-03-19 01:43:49]   成功! 耗时: 4.61s
+[2026-03-19 01:43:49]   SQL: SELECT 
+    p.Birthday,
+    l.GPT
+FROM 
+    Patient p
+JOIN 
+    Laboratory l
+ON 
+    p.ID = l.ID
+WHE...
+[2026-03-19 01:43:49] [253/300] 处理问题 #253
+[2026-03-19 01:43:49]   db_id: toxicology
+[2026-03-19 01:43:49]   question: List the elements of all the triple bonds....
+[2026-03-19 01:43:52]   成功! 耗时: 2.95s
+[2026-03-19 01:43:52]   SQL: SELECT element
+FROM bonds
+WHERE bond_type = 'triple';...
+[2026-03-19 01:43:53] [254/300] 处理问题 #254
+[2026-03-19 01:43:53]   db_id: european_football_2
+[2026-03-19 01:43:53]   question: At present, calculate for the player's age who have a sprint speed of no less th...
+[2026-03-19 01:43:58]   成功! 耗时: 5.02s
+[2026-03-19 01:43:58]   SQL: SELECT 
+    P.player_name,
+    (strftime('%Y', 'now') - strftime('%Y', PA.birthday)) AS age
+FROM 
+  ...
+[2026-03-19 01:43:58] [255/300] 处理问题 #255
+[2026-03-19 01:43:58]   db_id: toxicology
+[2026-03-19 01:43:58]   question: How many atoms belong to the molecule that element is hydrogen and labeled with ...
+[2026-03-19 01:44:02]   成功! 耗时: 3.64s
+[2026-03-19 01:44:02]   SQL: SELECT COUNT(DISTINCT atom.atom_id) AS atom_count
+FROM molecule
+JOIN atom ON molecule.molecule_id = ...
+[2026-03-19 01:44:03] [256/300] 处理问题 #256
+[2026-03-19 01:44:03]   db_id: thrombosis_prediction
+[2026-03-19 01:44:03]   question: Provide ID, sex and age of patient who has blood glucose (GLU) not within normal...
+[2026-03-19 01:44:08]   成功! 耗时: 5.02s
+[2026-03-19 01:44:08]   SQL: SELECT 
+    Patient.ID,
+    Patient.SEX,
+    strftime('%Y', 'now') - strftime('%Y', Patient.Birthday...
+[2026-03-19 01:44:08] [257/300] 处理问题 #257
+[2026-03-19 01:44:08]   db_id: student_club
+[2026-03-19 01:44:08]   question: Which members who were approved from 1/10/2019 to 11/19/2019? Please identify th...
+[2026-03-19 01:44:14]   成功! 耗时: 5.45s
+[2026-03-19 01:44:14]   SQL: SELECT 
+    m.member_id,
+    m.first_name,
+    m.last_name,
+    a.link_to_event AS event_link
+FROM 
+...
+[2026-03-19 01:44:14] [258/300] 处理问题 #258
+[2026-03-19 01:44:14]   db_id: financial
+[2026-03-19 01:44:14]   question: List out the account numbers of female clients who are oldest and has lowest ave...
+[2026-03-19 01:44:23]   成功! 耗时: 8.55s
+[2026-03-19 01:44:23]   SQL: WITH FemaleClients AS (
+    SELECT DISTINCT c.client_id, d.account_id
+    FROM disp d
+    JOIN clien...
+[2026-03-19 01:44:23] [259/300] 处理问题 #259
+[2026-03-19 01:44:23]   db_id: thrombosis_prediction
+[2026-03-19 01:44:23]   question: Are there more in-patient or outpatient who were male? What is the deviation in ...
+[2026-03-19 01:44:29]   成功! 耗时: 5.95s
+[2026-03-19 01:44:29]   SQL: SELECT 
+    CASE 
+        WHEN in_patient_count > out_patient_count THEN 'In-patient'
+        ELSE '...
+[2026-03-19 01:44:30] [260/300] 处理问题 #260
+[2026-03-19 01:44:30]   db_id: toxicology
+[2026-03-19 01:44:30]   question: Among all chemical compounds identified in the database, what percent of compoun...
+[2026-03-19 01:44:33]   成功! 耗时: 3.71s
+[2026-03-19 01:44:33]   SQL: SELECT 
+    (CAST(SUM(CASE WHEN bond_type = 'triple' THEN 1 ELSE 0 END) AS REAL) / COUNT(*)) * 100 A...
+[2026-03-19 01:44:33]   已保存中间结果 (260/300)
+[2026-03-19 01:44:34] [261/300] 处理问题 #261
+[2026-03-19 01:44:34]   db_id: codebase_community
+[2026-03-19 01:44:34]   question: What is the average number of posts voted by the oldest users?...
+[2026-03-19 01:44:38]   成功! 耗时: 4.51s
+[2026-03-19 01:44:38]   SQL: SELECT AVG(votes_count) AS average_posts_voted_by_oldest_users
+FROM (
+    SELECT u.Id, COUNT(DISTINC...
+[2026-03-19 01:44:39] [262/300] 处理问题 #262
+[2026-03-19 01:44:39]   db_id: formula_1
+[2026-03-19 01:44:39]   question: What is the full name and date of birth of Austrian drivers born between 1981 an...
+[2026-03-19 01:44:43]   成功! 耗时: 4.48s
+[2026-03-19 01:44:43]   SQL: SELECT 
+    drivers.forename || ' ' || drivers.surname AS full_name,
+    drivers.dob AS date_of_birt...
+[2026-03-19 01:44:44] [263/300] 处理问题 #263
+[2026-03-19 01:44:44]   db_id: codebase_community
+[2026-03-19 01:44:44]   question: Calculate the ratio of votes in 2010 and 2011....
+[2026-03-19 01:44:48]   成功! 耗时: 4.58s
+[2026-03-19 01:44:48]   SQL: SELECT 
+    CAST(SUM(CASE WHEN strftime('%Y', CreationDate) = '2010' THEN 1 ELSE 0 END) AS REAL) / 
+...
+[2026-03-19 01:44:49] [264/300] 处理问题 #264
+[2026-03-19 01:44:49]   db_id: thrombosis_prediction
+[2026-03-19 01:44:49]   question: For the patients who have an abnormal level of anti-DNA, please list the disease...
+[2026-03-19 01:44:53]   成功! 耗时: 3.97s
+[2026-03-19 01:44:53]   SQL: SELECT DISTINCT p.ID, p.Diagnosis
+FROM Patient p
+JOIN Examination e ON p.ID = e.ID
+JOIN Laboratory l...
+[2026-03-19 01:44:53] [265/300] 处理问题 #265
+[2026-03-19 01:44:53]   db_id: card_games
+[2026-03-19 01:44:53]   question: For all cards illustrated by Jim Pavelec. and describe the text of the ruling of...
+[2026-03-19 01:45:03]   成功! 耗时: 9.99s
+[2026-03-19 01:45:03]   SQL: SELECT 
+    id,
+    artist,
+    text AS ruling_text,
+    CASE 
+        WHEN availability IS NULL OR ...
+[2026-03-19 01:45:04] [266/300] 处理问题 #266
+[2026-03-19 01:45:04]   db_id: debit_card_specializing
+[2026-03-19 01:45:04]   question: Among the transactions made in the gas stations in the Czech Republic, how many ...
+[2026-03-19 01:45:08]   成功! 耗时: 3.93s
+[2026-03-19 01:45:08]   SQL: SELECT COUNT(*) AS TransactionCount
+FROM transactions_1k
+JOIN gasstations ON transactions_1k.GasStat...
+[2026-03-19 01:45:08] [267/300] 处理问题 #267
+[2026-03-19 01:45:08]   db_id: thrombosis_prediction
+[2026-03-19 01:45:08]   question: Name the ID and age of patient with two or more laboratory examinations which sh...
+[2026-03-19 01:45:13]   成功! 耗时: 4.54s
+[2026-03-19 01:45:13]   SQL: SELECT DISTINCT p.ID, strftime('%Y', 'now') - strftime('%Y', p.Birthday) AS Age
+FROM Patient p
+JOIN ...
+[2026-03-19 01:45:13] [268/300] 处理问题 #268
+[2026-03-19 01:45:13]   db_id: thrombosis_prediction
+[2026-03-19 01:45:13]   question: Provide list of patients and their diagnosis with triglyceride (TG) index greate...
+[2026-03-19 01:45:18]   成功! 耗时: 4.94s
+[2026-03-19 01:45:18]   SQL: SELECT 
+    Patient.ID AS PatientID,
+    Patient.SEX AS Sex,
+    Patient.Birthday AS Birthday,
+    P...
+[2026-03-19 01:45:19] [269/300] 处理问题 #269
+[2026-03-19 01:45:19]   db_id: thrombosis_prediction
+[2026-03-19 01:45:19]   question: State the ID and age of patient with positive degree of coagulation....
+[2026-03-19 01:45:23]   成功! 耗时: 4.13s
+[2026-03-19 01:45:23]   SQL: SELECT 
+    Patient.ID,
+    strftime('%Y', 'now') - strftime('%Y', Patient.Birthday) AS Age
+FROM 
+  ...
+[2026-03-19 01:45:23] [270/300] 处理问题 #270
+[2026-03-19 01:45:23]   db_id: formula_1
+[2026-03-19 01:45:23]   question: List out top 3 German drivers who were born from 1980-1990 and have the earliest...
+[2026-03-19 01:45:29]   成功! 耗时: 5.37s
+[2026-03-19 01:45:29]   SQL: SELECT 
+    d.driverId,
+    d.forename || ' ' || d.surname AS driver_name,
+    MIN(l.time) AS earlie...
+[2026-03-19 01:45:29]   已保存中间结果 (270/300)
+[2026-03-19 01:45:29] [271/300] 处理问题 #271
+[2026-03-19 01:45:29]   db_id: financial
+[2026-03-19 01:45:29]   question: How much, in total, did client number 617 pay for all of the transactions in 199...
+[2026-03-19 01:45:33]   成功! 耗时: 4.12s
+[2026-03-19 01:45:33]   SQL: SELECT SUM(t.amount) AS total_payment
+FROM trans t
+JOIN client c ON t.account_id = c.client_id
+WHERE...
+[2026-03-19 01:45:34] [272/300] 处理问题 #272
+[2026-03-19 01:45:34]   db_id: financial
+[2026-03-19 01:45:34]   question: State different accounts who have account opening date before 1997 and own an am...
+[2026-03-19 01:45:39]   成功! 耗时: 4.77s
+[2026-03-19 01:45:39]   SQL: SELECT DISTINCT account.account_id AS AccountID
+FROM account
+JOIN disp ON account.account_id = disp....
+[2026-03-19 01:45:39] [273/300] 处理问题 #273
+[2026-03-19 01:45:39]   db_id: debit_card_specializing
+[2026-03-19 01:45:39]   question: What is the ratio of customers who pay in EUR against customers who pay in CZK?...
+[2026-03-19 01:45:44]   成功! 耗时: 4.69s
+[2026-03-19 01:45:44]   SQL: SELECT 
+    COUNT(CASE WHEN Currency = 'EUR' THEN 1 END) AS EUR_Count,
+    COUNT(CASE WHEN Currency ...
+[2026-03-19 01:45:44] [274/300] 处理问题 #274
+[2026-03-19 01:45:44]   db_id: toxicology
+[2026-03-19 01:45:44]   question: Which non-carcinogenic molecules consisted more than 5 atoms?...
+[2026-03-19 01:45:47]   成功! 耗时: 3.01s
+[2026-03-19 01:45:47]   SQL: SELECT *
+FROM molecules
+WHERE carcinogenic = 'No' AND atom_count > 5;...
+[2026-03-19 01:45:48] [275/300] 处理问题 #275
+[2026-03-19 01:45:48]   db_id: california_schools
+[2026-03-19 01:45:48]   question: What is the complete address of the school with the lowest excellence rate? Indi...
+[2026-03-19 01:45:52]   成功! 耗时: 4.37s
+[2026-03-19 01:45:52]   SQL: SELECT 
+    s.Street,
+    s.City,
+    s.Zip,
+    s.State
+FROM 
+    schools s
+JOIN 
+    satscores ss ...
+[2026-03-19 01:45:53] [276/300] 处理问题 #276
+[2026-03-19 01:45:53]   db_id: codebase_community
+[2026-03-19 01:45:53]   question: What is the percentage difference of student badges given during 2010 and 2011?...
+[2026-03-19 01:45:58]   成功! 耗时: 5.68s
+[2026-03-19 01:45:58]   SQL: SELECT 
+    (CAST(SUM(CASE WHEN strftime('%Y', badges.Date) = '2011' THEN 1 ELSE 0 END) AS REAL) - 
+...
+[2026-03-19 01:45:59] [277/300] 处理问题 #277
+[2026-03-19 01:45:59]   db_id: thrombosis_prediction
+[2026-03-19 01:45:59]   question: How many patients born after 1980/1/1 have an abnormal fibrinogen level?...
+[2026-03-19 01:46:03]   成功! 耗时: 4.25s
+[2026-03-19 01:46:03]   SQL: SELECT COUNT(DISTINCT Patient.ID) AS PatientCount
+FROM Patient
+JOIN Laboratory ON Patient.ID = Labor...
+[2026-03-19 01:46:04] [278/300] 处理问题 #278
+[2026-03-19 01:46:04]   db_id: card_games
+[2026-03-19 01:46:04]   question: What is percentage of the cards with a converted Mana Cost of 10 in set of Abyss...
+[2026-03-19 01:46:08]   成功! 耗时: 4.31s
+[2026-03-19 01:46:08]   SQL: SELECT 
+    COUNT(*) * 100.0 / (SELECT totalSetSize FROM sets WHERE name = 'Abyssal Horror') AS perc...
+[2026-03-19 01:46:09] [279/300] 处理问题 #279
+[2026-03-19 01:46:09]   db_id: toxicology
+[2026-03-19 01:46:09]   question: List all carcinogenic molecules and their elements....
+[2026-03-19 01:46:12]   成功! 耗时: 3.54s
+[2026-03-19 01:46:12]   SQL: SELECT cm.molecule_name, ce.element_name
+FROM carcinogenic_molecules cm
+JOIN molecule_elements me ON...
+[2026-03-19 01:46:13] [280/300] 处理问题 #280
+[2026-03-19 01:46:13]   db_id: european_football_2
+[2026-03-19 01:46:13]   question: Please provide top five football players' IDs who are among the lowest potential...
+[2026-03-19 01:46:16]   成功! 耗时: 3.71s
+[2026-03-19 01:46:16]   SQL: SELECT DISTINCT player_fifa_api_id
+FROM Player_Attributes
+WHERE preferred_foot = 'right'
+ORDER BY po...
+[2026-03-19 01:46:16]   已保存中间结果 (280/300)
+[2026-03-19 01:46:17] [281/300] 处理问题 #281
+[2026-03-19 01:46:17]   db_id: debit_card_specializing
+[2026-03-19 01:46:17]   question: What is the percentage of "premium" against the overall segment in Country = "SV...
+[2026-03-19 01:46:21]   成功! 耗时: 3.79s
+[2026-03-19 01:46:21]   SQL: SELECT 
+    (CAST(SUM(CASE WHEN Segment = 'premium' THEN 1 ELSE 0 END) AS REAL) / COUNT(*)) * 100 AS...
+[2026-03-19 01:46:21] [282/300] 处理问题 #282
+[2026-03-19 01:46:21]   db_id: california_schools
+[2026-03-19 01:46:21]   question: Which cities have the top 5 lowest enrollment number for students in grades 1 th...
+[2026-03-19 01:46:25]   成功! 耗时: 4.14s
+[2026-03-19 01:46:25]   SQL: SELECT 
+    s.City,
+    ss.enroll12 AS Enrollment
+FROM 
+    schools s
+JOIN 
+    satscores ss
+ON 
+   ...
+[2026-03-19 01:46:26] [283/300] 处理问题 #283
+[2026-03-19 01:46:26]   db_id: thrombosis_prediction
+[2026-03-19 01:46:26]   question: How many patients with a normal anti-SSA came to the hospital before 2000?...
+[2026-03-19 01:46:30]   成功! 耗时: 3.99s
+[2026-03-19 01:46:30]   SQL: SELECT COUNT(DISTINCT Patient.ID) AS Count_Patients
+FROM Patient
+JOIN Laboratory ON Patient.ID = Lab...
+[2026-03-19 01:46:30] [284/300] 处理问题 #284
+[2026-03-19 01:46:30]   db_id: financial
+[2026-03-19 01:46:30]   question: List all ID and district for clients that can only have the right to issue perma...
+[2026-03-19 01:46:35]   成功! 耗时: 5.21s
+[2026-03-19 01:46:35]   SQL: SELECT DISTINCT c.client_id, d.A2 AS district
+FROM client c
+JOIN disp d ON c.client_id = d.client_id...
+[2026-03-19 01:46:36] [285/300] 处理问题 #285
+[2026-03-19 01:46:36]   db_id: thrombosis_prediction
+[2026-03-19 01:46:36]   question: List all patients who first came to the hospital after year 1992 with prothrombi...
+[2026-03-19 01:46:41]   成功! 耗时: 4.64s
+[2026-03-19 01:46:41]   SQL: SELECT DISTINCT Patient.ID, Patient.SEX, Patient.Birthday, Patient.Description, Patient.First_Date, ...
+[2026-03-19 01:46:41] [286/300] 处理问题 #286
+[2026-03-19 01:46:41]   db_id: codebase_community
+[2026-03-19 01:46:41]   question: Which users have posted the most comments. List out the user's badge?...
+[2026-03-19 01:46:46]   成功! 耗时: 4.49s
+[2026-03-19 01:46:46]   SQL: SELECT u.Id AS UserId, u.DisplayName, u.BadgeCount
+FROM users u
+JOIN (
+    SELECT c.UserId, COUNT(c....
+[2026-03-19 01:46:46] [287/300] 处理问题 #287
+[2026-03-19 01:46:46]   db_id: california_schools
+[2026-03-19 01:46:46]   question: Which state special schools have the highest number of enrollees from grades 1 t...
+[2026-03-19 01:46:51]   成功! 耗时: 4.69s
+[2026-03-19 01:46:51]   SQL: SELECT 
+    s.State,
+    SUM(frpm."Enrollment (K-12)") AS Total_Enrollment
+FROM 
+    schools s
+JOIN ...
+[2026-03-19 01:46:51] [288/300] 处理问题 #288
+[2026-03-19 01:46:51]   db_id: toxicology
+[2026-03-19 01:46:51]   question: List down two molecule id of triple bond non carcinogenic molecules with element...
+[2026-03-19 01:46:56]   成功! 耗时: 4.33s
+[2026-03-19 01:46:56]   SQL: SELECT DISTINCT m.molecule_id
+FROM molecule m
+JOIN atom a ON m.molecule_id = a.molecule_id
+JOIN bond...
+[2026-03-19 01:46:56] [289/300] 处理问题 #289
+[2026-03-19 01:46:56]   db_id: codebase_community
+[2026-03-19 01:46:56]   question: Among posts by Harvey Motulsky and Noah Snyder, which one has higher popularity?...
+[2026-03-19 01:47:01]   成功! 耗时: 4.46s
+[2026-03-19 01:47:01]   SQL: SELECT 
+    p.OwnerDisplayName AS Author,
+    MAX(p.ViewCount) AS Popularity
+FROM 
+    posts p
+JOIN ...
+[2026-03-19 01:47:01] [290/300] 处理问题 #290
+[2026-03-19 01:47:01]   db_id: formula_1
+[2026-03-19 01:47:01]   question: For the driver who had the Q2 time as 0:01:15 in race No. 347, where is he from?...
+[2026-03-19 01:47:05]   成功! 耗时: 3.90s
+[2026-03-19 01:47:05]   SQL: SELECT d.nationality
+FROM qualifying q
+JOIN drivers d ON q.driverId = d.driverId
+WHERE q.raceId = 34...
+[2026-03-19 01:47:05]   已保存中间结果 (290/300)
+[2026-03-19 01:47:05] [291/300] 处理问题 #291
+[2026-03-19 01:47:05]   db_id: thrombosis_prediction
+[2026-03-19 01:47:05]   question: What is the percentage of patient who has a abnormal level of glutamic oxaloacet...
+[2026-03-19 01:47:11]   成功! 耗时: 5.06s
+[2026-03-19 01:47:11]   SQL: SELECT 
+    COUNT(DISTINCT p.ID) * 100.0 / (SELECT COUNT(DISTINCT p.ID) FROM Patient p WHERE p.Diagn...
+[2026-03-19 01:47:11] [292/300] 处理问题 #292
+[2026-03-19 01:47:11]   db_id: codebase_community
+[2026-03-19 01:47:11]   question: How many posts did Jay Stevens have in 2010?...
+[2026-03-19 01:47:15]   成功! 耗时: 3.96s
+[2026-03-19 01:47:15]   SQL: SELECT COUNT(p.Id) AS PostCount
+FROM posts p
+JOIN users u ON p.OwnerUserId = u.Id
+WHERE u.DisplayNam...
+[2026-03-19 01:47:15] [293/300] 处理问题 #293
+[2026-03-19 01:47:15]   db_id: european_football_2
+[2026-03-19 01:47:15]   question: What is the average overall rating of the players born before the year 1986?...
+[2026-03-19 01:47:19]   成功! 耗时: 3.97s
+[2026-03-19 01:47:19]   SQL: SELECT AVG(overall_rating) AS average_overall_rating
+FROM Player_Attributes
+JOIN Player ON Player_At...
+[2026-03-19 01:47:20] [294/300] 处理问题 #294
+[2026-03-19 01:47:20]   db_id: thrombosis_prediction
+[2026-03-19 01:47:20]   question: What is the ratio of outpatient to inpatient followed up treatment among all the...
+[2026-03-19 01:47:24]   成功! 耗时: 4.42s
+[2026-03-19 01:47:24]   SQL: SELECT 
+    CAST(SUM(CASE WHEN Admission = 'Outpatient' THEN 1 ELSE 0 END) AS REAL) / 
+    NULLIF(SU...
+[2026-03-19 01:47:25] [295/300] 处理问题 #295
+[2026-03-19 01:47:25]   db_id: codebase_community
+[2026-03-19 01:47:25]   question: What is the date when the youngest user made his or her first post?...
+[2026-03-19 01:47:29]   成功! 耗时: 3.80s
+[2026-03-19 01:47:29]   SQL: SELECT MIN(posts.CreationDate) AS FirstPostDate
+FROM posts
+JOIN users ON posts.OwnerUserId = users.I...
+[2026-03-19 01:47:29] [296/300] 处理问题 #296
+[2026-03-19 01:47:29]   db_id: california_schools
+[2026-03-19 01:47:29]   question: What is the eligible free rate of the 10th and 11th schools with the highest enr...
+[2026-03-19 01:47:34]   成功! 耗时: 4.95s
+[2026-03-19 01:47:34]   SQL: SELECT 
+    frpm.School Name,
+    frpm.Percent (%) Eligible Free (K-12) AS Eligible_Free_Rate
+FROM 
+...
+[2026-03-19 01:47:35] [297/300] 处理问题 #297
+[2026-03-19 01:47:35]   db_id: toxicology
+[2026-03-19 01:47:35]   question: Among the atoms that contain element carbon, which one does not contain compound...
+[2026-03-19 01:47:38]   成功! 耗时: 3.65s
+[2026-03-19 01:47:38]   SQL: SELECT atom_id
+FROM atom
+WHERE element = 'carbon'
+  AND NOT EXISTS (
+    SELECT 1
+    FROM molecule
+...
+[2026-03-19 01:47:39] [298/300] 处理问题 #298
+[2026-03-19 01:47:39]   db_id: formula_1
+[2026-03-19 01:47:39]   question: From race no. 50 to 100, how many finishers have been disqualified?...
+[2026-03-19 01:47:42]   成功! 耗时: 3.57s
+[2026-03-19 01:47:42]   SQL: SELECT COUNT(*) AS disqualified_count
+FROM results
+WHERE raceId BETWEEN 50 AND 100
+  AND statusId IS...
+[2026-03-19 01:47:43] [299/300] 处理问题 #299
+[2026-03-19 01:47:43]   db_id: formula_1
+[2026-03-19 01:47:43]   question: Among all European Grand Prix races, what is the percentage of the races were ho...
+[2026-03-19 01:48:16]   成功! 耗时: 33.58s
+[2026-03-19 01:48:16]   SQL: SELECT 
+    (CAST(COUNT(CASE WHEN races.name = 'German Grand Prix' THEN 1 END) AS REAL) / COUNT(*)) ...
+[2026-03-19 01:48:17] [300/300] 处理问题 #300
+[2026-03-19 01:48:17]   db_id: thrombosis_prediction
+[2026-03-19 01:48:17]   question: For all patients with normal uric acid (UA), what is the average UA index based ...
+[2026-03-19 01:48:21]   成功! 耗时: 4.52s
+[2026-03-19 01:48:21]   SQL: SELECT AVG(Laboratory.UA) AS Average_UA_Index
+FROM Patient
+JOIN Laboratory ON Patient.ID = Laborator...
+[2026-03-19 01:48:21]   已保存中间结果 (300/300)
+[2026-03-19 01:48:22] ============================================================
+[2026-03-19 01:48:22] 批量任务完成!
+[2026-03-19 01:48:22] 总数: 300, 成功: 206, 失败: 94
+[2026-03-19 01:48:22] 结果已保存到: D:\projects\QueryForge\scripts\results.json
+[2026-03-19 01:48:22] ============================================================

@@ -1,0 +1,5014 @@
+[
+    {
+        "instance_id": "1",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What are Juan Matthews recurring product purchases over past 7 months?"
+    },
+    {
+        "instance_id": "2",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "in q2 this year, how much did we pay Joshua Young?"
+    },
+    {
+        "instance_id": "3",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What was our total spend for Packing services for goods in in january last year"
+    },
+    {
+        "instance_id": "4",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much we received from Transportation?"
+    },
+    {
+        "instance_id": "5",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "what products are selling less than last month"
+    },
+    {
+        "instance_id": "6",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What is my highest sales for Tonya West in the Last quarter?"
+    },
+    {
+        "instance_id": "7",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much revenue came through Alejandro Nguyen YTD?"
+    },
+    {
+        "instance_id": "8",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "In the This month to date, what has been my mean revenue from Catherine Porter?"
+    },
+    {
+        "instance_id": "9",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Who has the lowest money outstanding?"
+    },
+    {
+        "instance_id": "10",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much money have we paid to Timothy Ward Last fiscal year?"
+    },
+    {
+        "instance_id": "11",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Show the minimum, average, maximum order quantity of all invoices."
+    },
+    {
+        "instance_id": "12",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What is the product name of the most frequently ordered item on invoices?"
+    },
+    {
+        "instance_id": "13",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much total income did we receive from credit card transactions Last fiscal year?"
+    },
+    {
+        "instance_id": "14",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much we received from Providing independent operation of railroad terminals?"
+    },
+    {
+        "instance_id": "15",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What acount had our biggest expense This year?"
+    },
+    {
+        "instance_id": "16",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Total sales for each product"
+    },
+    {
+        "instance_id": "17",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much money have we paid to David Benjamin This quarter?"
+    },
+    {
+        "instance_id": "18",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "When was the last time we sold Parking lot and driveway washing"
+    },
+    {
+        "instance_id": "19",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What are my AR this month and last month?"
+    },
+    {
+        "instance_id": "20",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What are the customers with the [number] cheapest invoices?"
+    },
+    {
+        "instance_id": "21",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What was our biggest expense Last 30 days?"
+    },
+    {
+        "instance_id": "22",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What were our total Nursing and health services expenses Last fiscal year?"
+    },
+    {
+        "instance_id": "23",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What were my outgoings during the in january last year?"
+    },
+    {
+        "instance_id": "24",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "give me the list of accounts where my revenue increased by more than [percentage]% in this month as compared to last month"
+    },
+    {
+        "instance_id": "25",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Who has the lowest money outstanding?"
+    },
+    {
+        "instance_id": "26",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "This year, what was our smallest expense?"
+    },
+    {
+        "instance_id": "27",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Show the minimum, average, maximum order quantity of all invoices."
+    },
+    {
+        "instance_id": "28",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "List the top [number] customers by total gross sales."
+    },
+    {
+        "instance_id": "29",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What is my average invoice from Zachary Gonzalez DDS?"
+    },
+    {
+        "instance_id": "30",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "what was our top [number] selling products and their sales This quarter to date"
+    },
+    {
+        "instance_id": "31",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What were my outgoings during the in jan last year?"
+    },
+    {
+        "instance_id": "32",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much money did we make This year?"
+    },
+    {
+        "instance_id": "33",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Show me total sales by month"
+    },
+    {
+        "instance_id": "34",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much we received from Social Service?"
+    },
+    {
+        "instance_id": "35",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What are Justin Patel recurring product purchases over past 7 months?"
+    },
+    {
+        "instance_id": "36",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What was our biggest expense MTD?"
+    },
+    {
+        "instance_id": "37",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What was my expense by products This year to date"
+    },
+    {
+        "instance_id": "38",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much revenue came through Andrew Blankenship Last month"
+    },
+    {
+        "instance_id": "39",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What our monthly spend on Juan Norris"
+    },
+    {
+        "instance_id": "40",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "what customers are buying less than last month"
+    },
+    {
+        "instance_id": "41",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much did we pay Richard Castro the This month to date?"
+    },
+    {
+        "instance_id": "42",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What were my outgoings during the in q2 this year?"
+    },
+    {
+        "instance_id": "43",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Who has the lowest money outstanding?"
+    },
+    {
+        "instance_id": "44",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What was our total income from David Gibson in MTD?"
+    },
+    {
+        "instance_id": "45",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What was our smallest expense Last quarter?"
+    },
+    {
+        "instance_id": "46",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What was our total spend for Zachary Pierce in the in q4 last year?"
+    },
+    {
+        "instance_id": "47",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What are my expenses for the This month?"
+    },
+    {
+        "instance_id": "48",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "This month to date, what was our smallest expense?"
+    },
+    {
+        "instance_id": "49",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much money did we make YTD?"
+    },
+    {
+        "instance_id": "50",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much did we spend on Home-care Service in q3 this year?"
+    },
+    {
+        "instance_id": "51",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much did we pay Julie Payne the This week to date?"
+    },
+    {
+        "instance_id": "52",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much did we spend on Other food services Last fiscal year?"
+    },
+    {
+        "instance_id": "53",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What was our total spend for Basic office and secretarial skills training in This week to date"
+    },
+    {
+        "instance_id": "54",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much did we earn from Raven Wilson This fiscal year to date?"
+    },
+    {
+        "instance_id": "55",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much did we spend on Process management This week to date?"
+    },
+    {
+        "instance_id": "56",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much did we spend on Application service provider services in q3 this year?"
+    },
+    {
+        "instance_id": "57",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "This week, what was our smallest expense?"
+    },
+    {
+        "instance_id": "58",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much have we been spending on Development of other voice and speech recognition products This fiscal year to date ?"
+    },
+    {
+        "instance_id": "59",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What are my expenses This quarter?"
+    },
+    {
+        "instance_id": "60",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What was our biggest expense Last quarter?"
+    },
+    {
+        "instance_id": "61",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Find all the customer names that do not have invoice totals larger than [number]."
+    },
+    {
+        "instance_id": "62",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Check the sales receipts record and compute the average quantities ordered with the payment method [payment_method]."
+    },
+    {
+        "instance_id": "63",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What are the customers with the [number] costly invoices?"
+    },
+    {
+        "instance_id": "64",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much money did we make This month to date?"
+    },
+    {
+        "instance_id": "65",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What was our smallest expense This year to date?"
+    },
+    {
+        "instance_id": "66",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What is my average invoice from Michelle Leach?"
+    },
+    {
+        "instance_id": "67",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What was our total spend for Joshua Mitchell in the Last 12 months?"
+    },
+    {
+        "instance_id": "68",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Find all the customer names that do not have invoice totals larger than [number]."
+    },
+    {
+        "instance_id": "69",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "List the top [number] customers by total gross sales."
+    },
+    {
+        "instance_id": "70",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "what customers are buying less than last month"
+    },
+    {
+        "instance_id": "71",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much total income did we receive from credit card transactions YTD?"
+    },
+    {
+        "instance_id": "72",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Who has the lowest money outstanding?"
+    },
+    {
+        "instance_id": "73",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much did we earn from Philip Torres This fiscal year?"
+    },
+    {
+        "instance_id": "74",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "show me my product level revenue for this month vs last month"
+    },
+    {
+        "instance_id": "75",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much money have we paid to Victoria Bass Last 12 months?"
+    },
+    {
+        "instance_id": "76",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much has Gene Ford been paying us each month?"
+    },
+    {
+        "instance_id": "77",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Show me total sales by month"
+    },
+    {
+        "instance_id": "78",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much did Lori Miller spend on Accounts Receivable (A/R) in january during last year?"
+    },
+    {
+        "instance_id": "79",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Show the invoice number and the number of items for each invoice."
+    },
+    {
+        "instance_id": "80",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What was our smallest expense today?"
+    },
+    {
+        "instance_id": "81",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "This week to date, what was our largest expense?"
+    },
+    {
+        "instance_id": "82",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Total sales for each product"
+    },
+    {
+        "instance_id": "83",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much total income did we receive from credit card transactions This year to date?"
+    },
+    {
+        "instance_id": "84",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "what products are selling less than last month"
+    },
+    {
+        "instance_id": "85",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Check the sales receipts record and compute the average quantities ordered with the payment method [payment_method]."
+    },
+    {
+        "instance_id": "86",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much total income did we receive from credit card transactions This month?"
+    },
+    {
+        "instance_id": "87",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What are my AR this month and last month?"
+    },
+    {
+        "instance_id": "88",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "This quarter, what was our largest expense?"
+    },
+    {
+        "instance_id": "89",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What was our total spend for Offering multi-strategy funds in Last 30 days"
+    },
+    {
+        "instance_id": "90",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What acount had our biggest expense Last 12 months?"
+    },
+    {
+        "instance_id": "91",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What our monthly spend on Edward Hendricks"
+    },
+    {
+        "instance_id": "92",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much has Nathan Howard been paying us each month?"
+    },
+    {
+        "instance_id": "93",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What is my average invoice from Ashley Ford?"
+    },
+    {
+        "instance_id": "94",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What were my outgoings during the in jan this year?"
+    },
+    {
+        "instance_id": "95",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What was our smallest expense in jan last year?"
+    },
+    {
+        "instance_id": "96",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What are my max sales by vendor?"
+    },
+    {
+        "instance_id": "97",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Show me total sales by month"
+    },
+    {
+        "instance_id": "98",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Show me total sales by month"
+    },
+    {
+        "instance_id": "99",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "In the This year, what has been my first revenue from Jaclyn Torres?"
+    },
+    {
+        "instance_id": "100",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "List the top [number] customers by total gross sales."
+    },
+    {
+        "instance_id": "101",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What is my average invoice from Emily Bennett?"
+    },
+    {
+        "instance_id": "102",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "When was the last time we sold Medical services"
+    },
+    {
+        "instance_id": "103",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much has Logan Foster been paying us each month?"
+    },
+    {
+        "instance_id": "104",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "This month, how much did we pay Katrina Hancock?"
+    },
+    {
+        "instance_id": "105",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much we received from Discounts given?"
+    },
+    {
+        "instance_id": "106",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Compare sales by customer This fiscal year"
+    },
+    {
+        "instance_id": "107",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Show the invoice number and the number of items for each invoice."
+    },
+    {
+        "instance_id": "108",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What are my total sales by AI Courses?"
+    },
+    {
+        "instance_id": "109",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What is my average sales for Amy Olson in the This year?"
+    },
+    {
+        "instance_id": "110",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What is the product name of the most frequently ordered item on invoices?"
+    },
+    {
+        "instance_id": "111",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What were our total Tanker rental or leasing expenses This year?"
+    },
+    {
+        "instance_id": "112",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much did we earn from Jillian Johnson Last month?"
+    },
+    {
+        "instance_id": "113",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much money have we paid to Kevin Moreno YTD?"
+    },
+    {
+        "instance_id": "114",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How many credit card transactions occurred in jan this year?"
+    },
+    {
+        "instance_id": "115",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What are my expenses for the Last 12 months?"
+    },
+    {
+        "instance_id": "116",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What acount had our biggest expense MTD?"
+    },
+    {
+        "instance_id": "117",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "show me my product level revenue for this month vs last month"
+    },
+    {
+        "instance_id": "118",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much did Caitlyn Ford spend on Loan Payable in january during last year?"
+    },
+    {
+        "instance_id": "119",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "what was our top [number] selling products and their sales yesterday"
+    },
+    {
+        "instance_id": "120",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much money did we make in jan this year?"
+    },
+    {
+        "instance_id": "121",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much revenue came through Kimberly Lutz Last 8 days?"
+    },
+    {
+        "instance_id": "122",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much total income did we receive from credit card transactions Last fiscal year?"
+    },
+    {
+        "instance_id": "123",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What was our biggest expense Last 30 days?"
+    },
+    {
+        "instance_id": "124",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much has Alexis Huff been paying us each month?"
+    },
+    {
+        "instance_id": "125",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Check the sales receipts record and compute the average quantities ordered with the payment method [payment_method]."
+    },
+    {
+        "instance_id": "126",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "When was the last time we sold Industrial manufacturing"
+    },
+    {
+        "instance_id": "127",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "what products are selling less than last month"
+    },
+    {
+        "instance_id": "128",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What are my expenses This week to date?"
+    },
+    {
+        "instance_id": "129",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What was our biggest expense This week to date?"
+    },
+    {
+        "instance_id": "130",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What are the customers with the [number] cheapest invoices?"
+    },
+    {
+        "instance_id": "131",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "in jan last year, how much did we pay Rebecca Short?"
+    },
+    {
+        "instance_id": "132",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What was my expense by products YTD"
+    },
+    {
+        "instance_id": "133",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much did we spend on Wholesaling railroad equipment and supplies This week?"
+    },
+    {
+        "instance_id": "134",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "what was our top [number] selling products and their sales in january this year"
+    },
+    {
+        "instance_id": "135",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Last month, what was our smallest expense?"
+    },
+    {
+        "instance_id": "136",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What was our total income from Travis Anderson in This month to date?"
+    },
+    {
+        "instance_id": "137",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What was our total spend for James Wallace in the This year?"
+    },
+    {
+        "instance_id": "138",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What's the profit This fiscal year to date?"
+    },
+    {
+        "instance_id": "139",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What were our total Baby furniture expenses Last year?"
+    },
+    {
+        "instance_id": "140",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "in january last year, how much did we pay Jennifer Nunez?"
+    },
+    {
+        "instance_id": "141",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What acount had our biggest expense YTD?"
+    },
+    {
+        "instance_id": "142",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "List the top [number] customers by total gross sales."
+    },
+    {
+        "instance_id": "143",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much we received from Hydrogen manufacturing?"
+    },
+    {
+        "instance_id": "144",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "This fiscal year to date, what was our largest expense?"
+    },
+    {
+        "instance_id": "145",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How many credit card transactions occurred in jan last year?"
+    },
+    {
+        "instance_id": "146",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What was our smallest expense in q4 last year?"
+    },
+    {
+        "instance_id": "147",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "When was the last time we sold Window washing"
+    },
+    {
+        "instance_id": "148",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What was our biggest expense This month to date?"
+    },
+    {
+        "instance_id": "149",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How many credit card transactions occurred in january last year?"
+    },
+    {
+        "instance_id": "150",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What acount had our biggest expense This month to date?"
+    },
+    {
+        "instance_id": "151",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "This month, how much did we pay Carla Sutton?"
+    },
+    {
+        "instance_id": "152",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "show me expenses for Construction management of multifamily building in yesterday"
+    },
+    {
+        "instance_id": "153",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "This month to date, what was our smallest expense?"
+    },
+    {
+        "instance_id": "154",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What was our total spend for Misty Hunter in the This quarter to date?"
+    },
+    {
+        "instance_id": "155",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What our monthly spend on Elizabeth Zhang"
+    },
+    {
+        "instance_id": "156",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What are my expenses This fiscal year?"
+    },
+    {
+        "instance_id": "157",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What was our smallest expense today?"
+    },
+    {
+        "instance_id": "158",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What is my last sales for Jeffrey Mcmahon in the in january this year?"
+    },
+    {
+        "instance_id": "159",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What are the customers with the [number] costly invoices?"
+    },
+    {
+        "instance_id": "160",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much money have we paid to Brandon Rodriguez This month?"
+    },
+    {
+        "instance_id": "161",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What is my average invoice from Ronald Reynolds?"
+    },
+    {
+        "instance_id": "162",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "List the top [number] customers by total gross sales."
+    },
+    {
+        "instance_id": "163",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What is my max sales for Jody Poole in the This month to date?"
+    },
+    {
+        "instance_id": "164",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What was our smallest expense in q2 this year?"
+    },
+    {
+        "instance_id": "165",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much did we earn from Gabriel Arroyo in jan last year?"
+    },
+    {
+        "instance_id": "166",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What are my expenses This week?"
+    },
+    {
+        "instance_id": "167",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How are my sales year to date compared to last year?"
+    },
+    {
+        "instance_id": "168",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "what was our top [number] selling products and their sales This month to date"
+    },
+    {
+        "instance_id": "169",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What are the customers with the [number] cheapest invoices?"
+    },
+    {
+        "instance_id": "170",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much money did we make This quarter to date?"
+    },
+    {
+        "instance_id": "171",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What's the profit This quarter to date?"
+    },
+    {
+        "instance_id": "172",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Total sales for each product"
+    },
+    {
+        "instance_id": "173",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much did Lisa Good spend on Accounts Receivable (A/R) in january during last year?"
+    },
+    {
+        "instance_id": "174",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "what products are selling less than last month"
+    },
+    {
+        "instance_id": "175",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much has Monica Gonzalez been paying us each month?"
+    },
+    {
+        "instance_id": "176",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How are my sales year to date compared to last year?"
+    },
+    {
+        "instance_id": "177",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much revenue came through Lisa Nelson in q3 this year?"
+    },
+    {
+        "instance_id": "178",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What are the customers with the [number] costly invoices?"
+    },
+    {
+        "instance_id": "179",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Show the minimum, average, maximum order quantity of all invoices."
+    },
+    {
+        "instance_id": "180",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "what products are selling less than last month"
+    },
+    {
+        "instance_id": "181",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much money have we paid to Timothy Davis Last 8 days?"
+    },
+    {
+        "instance_id": "182",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "show me my product level revenue for this month vs last month"
+    },
+    {
+        "instance_id": "183",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "what was our top [number] selling products and their sales This year to date"
+    },
+    {
+        "instance_id": "184",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much did we earn from Alexis Acosta in january this year?"
+    },
+    {
+        "instance_id": "185",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How are my sales year to date compared to last year?"
+    },
+    {
+        "instance_id": "186",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much did we pay Teresa Kennedy the This quarter?"
+    },
+    {
+        "instance_id": "187",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much did we pay Allison Smith the in q3 this year?"
+    },
+    {
+        "instance_id": "188",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "in q4 last year, how much did we pay Heather Valentine?"
+    },
+    {
+        "instance_id": "189",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What was our smallest expense Last 12 months?"
+    },
+    {
+        "instance_id": "190",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "show me my product level revenue for this month vs last month"
+    },
+    {
+        "instance_id": "191",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What's the profit Last month?"
+    },
+    {
+        "instance_id": "192",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What is my average invoice from Sarah Hammond?"
+    },
+    {
+        "instance_id": "193",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Total sales for each product"
+    },
+    {
+        "instance_id": "194",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Show the invoice number and the number of items for each invoice."
+    },
+    {
+        "instance_id": "195",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Who has the lowest money outstanding?"
+    },
+    {
+        "instance_id": "196",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What was our smallest expense in jan this year?"
+    },
+    {
+        "instance_id": "197",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much have we been spending on Baby clothing and footwear in jan this year ?"
+    },
+    {
+        "instance_id": "198",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What are the customers with the [number] costly invoices?"
+    },
+    {
+        "instance_id": "199",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What were my outgoings during the Last quarter?"
+    },
+    {
+        "instance_id": "200",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What our monthly spend on Debra Gardner"
+    },
+    {
+        "instance_id": "201",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What was our total income from Christopher Henry in This year to date?"
+    },
+    {
+        "instance_id": "202",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "give me the list of accounts where my revenue increased by more than [percentage]% in this month as compared to last month"
+    },
+    {
+        "instance_id": "203",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "what customers are buying less than last month"
+    },
+    {
+        "instance_id": "204",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What was our biggest expense in jan this year?"
+    },
+    {
+        "instance_id": "205",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What are Curtis Patel recurring product purchases over past 7 months?"
+    },
+    {
+        "instance_id": "206",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What was our smallest expense Last 30 days?"
+    },
+    {
+        "instance_id": "207",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "what customers are buying less than last month"
+    },
+    {
+        "instance_id": "208",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much has Gary Chase III been paying us every month"
+    },
+    {
+        "instance_id": "209",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much have we been spending on Providing dealing services MTD ?"
+    },
+    {
+        "instance_id": "210",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much did Brooke Love spend on Other Income in january during last year?"
+    },
+    {
+        "instance_id": "211",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much has Joel Bell been paying us each month?"
+    },
+    {
+        "instance_id": "212",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What are Steven Sellers recurring product purchases over past 7 months?"
+    },
+    {
+        "instance_id": "213",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What are my total sales by Financial Planning?"
+    },
+    {
+        "instance_id": "214",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much has Cody Fields DDS been paying us each month?"
+    },
+    {
+        "instance_id": "215",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What were our total Breeding services expenses Last fiscal year?"
+    },
+    {
+        "instance_id": "216",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much has Cesar Garcia been paying us every month"
+    },
+    {
+        "instance_id": "217",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much did we pay Elizabeth Liu the This fiscal year to date?"
+    },
+    {
+        "instance_id": "218",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What are my expenses This month?"
+    },
+    {
+        "instance_id": "219",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much did we earn from Brian Brennan This month to date?"
+    },
+    {
+        "instance_id": "220",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What was our smallest expense Last fiscal year?"
+    },
+    {
+        "instance_id": "221",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "show me expenses for Taxes & Licenses in in january last year"
+    },
+    {
+        "instance_id": "222",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much has Shelly Lambert been paying us every month"
+    },
+    {
+        "instance_id": "223",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "what products are selling less than last month"
+    },
+    {
+        "instance_id": "224",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much did we spend on Retailing youth furniture in q3 this year?"
+    },
+    {
+        "instance_id": "225",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much did we spend on Providing railroad switching services This fiscal year to date?"
+    },
+    {
+        "instance_id": "226",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much did we earn from Megan Trevino in q3 this year?"
+    },
+    {
+        "instance_id": "227",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What are my expenses Last quarter?"
+    },
+    {
+        "instance_id": "228",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What was our biggest expense Last fiscal year?"
+    },
+    {
+        "instance_id": "229",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "in january this year, what was our largest expense?"
+    },
+    {
+        "instance_id": "230",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What was our total spend for Helium manufacturing in in january last year"
+    },
+    {
+        "instance_id": "231",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What was our smallest expense This fiscal year to date?"
+    },
+    {
+        "instance_id": "232",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much has Erin Bradshaw been paying us each month?"
+    },
+    {
+        "instance_id": "233",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "what products are selling less than last month"
+    },
+    {
+        "instance_id": "234",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What acount had our biggest expense in q4 last year?"
+    },
+    {
+        "instance_id": "235",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How are my sales year to date compared to last year?"
+    },
+    {
+        "instance_id": "236",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What are my total sales by Musicians?"
+    },
+    {
+        "instance_id": "237",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Return the most common payment method used for transactions."
+    },
+    {
+        "instance_id": "238",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What are the customers with the [number] cheapest invoices?"
+    },
+    {
+        "instance_id": "239",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much did we earn from Craig Smith This week to date?"
+    },
+    {
+        "instance_id": "240",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Check the sales receipts record and compute the average quantities ordered with the payment method [payment_method]."
+    },
+    {
+        "instance_id": "241",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much did Derrick Richard spend on Providing courses in computer programming in january during last year?"
+    },
+    {
+        "instance_id": "242",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What are my total sales by Chimney sweep services?"
+    },
+    {
+        "instance_id": "243",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What are my expenses for the in jan last year?"
+    },
+    {
+        "instance_id": "244",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much did Nancy Davis spend on Accounts Receivable (A/R) in january during last year?"
+    },
+    {
+        "instance_id": "245",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What are my expenses Last year?"
+    },
+    {
+        "instance_id": "246",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much did we spend on Retailing home office furniture Last year?"
+    },
+    {
+        "instance_id": "247",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What are the customers with the [number] cheapest invoices?"
+    },
+    {
+        "instance_id": "248",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How many credit card transactions occurred Last year?"
+    },
+    {
+        "instance_id": "249",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much has Natasha Todd been paying us every month"
+    },
+    {
+        "instance_id": "250",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "what products are selling less than last month"
+    },
+    {
+        "instance_id": "251",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much did we pay Katie Sanchez the in january this year?"
+    },
+    {
+        "instance_id": "252",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What was our smallest expense This year to date?"
+    },
+    {
+        "instance_id": "253",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much money have we paid to James Carr This quarter to date?"
+    },
+    {
+        "instance_id": "254",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "what was our top [number] selling products and their sales in jan this year"
+    },
+    {
+        "instance_id": "255",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What our monthly spend on Marissa Schmidt"
+    },
+    {
+        "instance_id": "256",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Show me total sales by month"
+    },
+    {
+        "instance_id": "257",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much total income did we receive from credit card transactions Last year?"
+    },
+    {
+        "instance_id": "258",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What was my expense by products This year"
+    },
+    {
+        "instance_id": "259",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What was our total spend for Abigail Mack in the in january this year?"
+    },
+    {
+        "instance_id": "260",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What is the product name of the most frequently ordered item on invoices?"
+    },
+    {
+        "instance_id": "261",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What are the customers with the [number] cheapest invoices?"
+    },
+    {
+        "instance_id": "262",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "what was our top [number] selling products and their sales This week to date"
+    },
+    {
+        "instance_id": "263",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Return the most common payment method used for transactions."
+    },
+    {
+        "instance_id": "264",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "today, how much did we pay Christopher Church?"
+    },
+    {
+        "instance_id": "265",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "List the top [number] customers by total gross sales."
+    },
+    {
+        "instance_id": "266",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What was our smallest expense MTD?"
+    },
+    {
+        "instance_id": "267",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What were my outgoings during the This month to date?"
+    },
+    {
+        "instance_id": "268",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much money did we make This month?"
+    },
+    {
+        "instance_id": "269",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "in january last year, what was our largest expense?"
+    },
+    {
+        "instance_id": "270",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much did Jill Austin spend on Constructing multifamily residential in january during last year?"
+    },
+    {
+        "instance_id": "271",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What was my expense by products This month"
+    },
+    {
+        "instance_id": "272",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What our monthly spend on William Trevino"
+    },
+    {
+        "instance_id": "273",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What's the profit This week to date?"
+    },
+    {
+        "instance_id": "274",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much did we spend on Private parcel mailing centers today?"
+    },
+    {
+        "instance_id": "275",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much did we spend on Development of software products for PCs Last year?"
+    },
+    {
+        "instance_id": "276",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much did we spend on Providing shunting trailers in rail terminals Last month?"
+    },
+    {
+        "instance_id": "277",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What was our smallest expense Last quarter?"
+    },
+    {
+        "instance_id": "278",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much total income did we receive from credit card transactions This fiscal year to date?"
+    },
+    {
+        "instance_id": "279",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What are my AR this month and last month?"
+    },
+    {
+        "instance_id": "280",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much did we earn from Nathan Martinez This month to date?"
+    },
+    {
+        "instance_id": "281",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Check the sales receipts record and compute the average quantities ordered with the payment method [payment_method]."
+    },
+    {
+        "instance_id": "282",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Who has the lowest money outstanding?"
+    },
+    {
+        "instance_id": "283",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much revenue came through Tyler Sherman in q2 this year?"
+    },
+    {
+        "instance_id": "284",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Total sales for each product"
+    },
+    {
+        "instance_id": "285",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "List the top [number] customers by total gross sales."
+    },
+    {
+        "instance_id": "286",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What is my mean sales for Crystal Henderson in the Last 12 months?"
+    },
+    {
+        "instance_id": "287",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "what was our top [number] selling products and their sales in january this year"
+    },
+    {
+        "instance_id": "288",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Total sales for each product"
+    },
+    {
+        "instance_id": "289",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Return the most common payment method used for transactions."
+    },
+    {
+        "instance_id": "290",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "what was our top [number] selling products and their sales Last 8 days"
+    },
+    {
+        "instance_id": "291",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "show me expenses for Retailing Chairs in Last year"
+    },
+    {
+        "instance_id": "292",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What is my average invoice from Alexandria Gomez?"
+    },
+    {
+        "instance_id": "293",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much did we spend on Baby furniture YTD?"
+    },
+    {
+        "instance_id": "294",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "give me the list of accounts where my revenue increased by more than [percentage]% in this month as compared to last month"
+    },
+    {
+        "instance_id": "295",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much did we earn from Kevin Gordon MTD?"
+    },
+    {
+        "instance_id": "296",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What are my total sales by Sleepers?"
+    },
+    {
+        "instance_id": "297",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What was our total spend for Robert Gibbs in the in q4 last year?"
+    },
+    {
+        "instance_id": "298",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What our monthly spend on Kimberly Davis"
+    },
+    {
+        "instance_id": "299",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How many credit card transactions occurred in jan this year?"
+    },
+    {
+        "instance_id": "300",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What were our total Towboat and tugboat rental or leasing expenses Last year?"
+    },
+    {
+        "instance_id": "301",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Find all the customer names that do not have invoice totals larger than [number]."
+    },
+    {
+        "instance_id": "302",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Return the most common payment method used for transactions."
+    },
+    {
+        "instance_id": "303",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What is my max sales for Christina Moran in the This fiscal year to date?"
+    },
+    {
+        "instance_id": "304",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Last quarter, how much did we pay Trevor Williams?"
+    },
+    {
+        "instance_id": "305",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "today, what was our smallest expense?"
+    },
+    {
+        "instance_id": "306",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What are my expenses Last fiscal year?"
+    },
+    {
+        "instance_id": "307",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What are the customers with the [number] cheapest invoices?"
+    },
+    {
+        "instance_id": "308",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much has Colleen Robles been paying us every month"
+    },
+    {
+        "instance_id": "309",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Who has the lowest money outstanding?"
+    },
+    {
+        "instance_id": "310",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What was our total spend for Miranda Baker in the YTD?"
+    },
+    {
+        "instance_id": "311",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What was our total spend for Julie Nguyen in the This week to date?"
+    },
+    {
+        "instance_id": "312",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "When was the last time we sold Railroad switching"
+    },
+    {
+        "instance_id": "313",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What was my expense by products This month to date"
+    },
+    {
+        "instance_id": "314",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much did we pay Patty Martin the This week to date?"
+    },
+    {
+        "instance_id": "315",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much have we been spending on Baby accessories in january last year ?"
+    },
+    {
+        "instance_id": "316",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Last fiscal year, how much did we pay Richard Castro?"
+    },
+    {
+        "instance_id": "317",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "YTD, how much did we pay Matthew Serrano?"
+    },
+    {
+        "instance_id": "318",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "in q4 last year, what was our smallest expense?"
+    },
+    {
+        "instance_id": "319",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What were my outgoings during the today?"
+    },
+    {
+        "instance_id": "320",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What was my expense by products Last 30 days"
+    },
+    {
+        "instance_id": "321",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What was our total income from Yvonne King in YTD?"
+    },
+    {
+        "instance_id": "322",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much has Alexis Sims been paying us every month"
+    },
+    {
+        "instance_id": "323",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Show the invoice number and the number of items for each invoice."
+    },
+    {
+        "instance_id": "324",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "List the top [number] customers by total gross sales."
+    },
+    {
+        "instance_id": "325",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much money did we make yesterday?"
+    },
+    {
+        "instance_id": "326",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "show me my product level revenue for this month vs last month"
+    },
+    {
+        "instance_id": "327",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much total income did we receive from credit card transactions Last 8 days?"
+    },
+    {
+        "instance_id": "328",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "show me my product level revenue for this month vs last month"
+    },
+    {
+        "instance_id": "329",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What was our biggest expense MTD?"
+    },
+    {
+        "instance_id": "330",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How are my sales year to date compared to last year?"
+    },
+    {
+        "instance_id": "331",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much total income did we receive from credit card transactions Last 12 months?"
+    },
+    {
+        "instance_id": "332",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What was my expense by products This month"
+    },
+    {
+        "instance_id": "333",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much money have we paid to Carla Dunn This week?"
+    },
+    {
+        "instance_id": "334",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Last year, how much did we pay Raymond Campbell?"
+    },
+    {
+        "instance_id": "335",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What are the customers with the [number] costly invoices?"
+    },
+    {
+        "instance_id": "336",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "give me the list of accounts where my revenue increased by more than [percentage]% in this month as compared to last month"
+    },
+    {
+        "instance_id": "337",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "This quarter, what was our smallest expense?"
+    },
+    {
+        "instance_id": "338",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What were our total Wholesaling aircraft engines and parts expenses This quarter?"
+    },
+    {
+        "instance_id": "339",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much has Erin Marshall been paying us each month?"
+    },
+    {
+        "instance_id": "340",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What was our smallest expense in jan this year?"
+    },
+    {
+        "instance_id": "341",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What are my expenses Last fiscal year?"
+    },
+    {
+        "instance_id": "342",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What was our total spend for Development of software products for mobile devices in Last year"
+    },
+    {
+        "instance_id": "343",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What were our total Maintenance and repair work expenses This year?"
+    },
+    {
+        "instance_id": "344",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "what products are selling less than last month"
+    },
+    {
+        "instance_id": "345",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What are the customers with the [number] costly invoices?"
+    },
+    {
+        "instance_id": "346",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much has Daniel Murray been paying us each month?"
+    },
+    {
+        "instance_id": "347",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much money have we paid to Jeremiah Hall This quarter to date?"
+    },
+    {
+        "instance_id": "348",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What was our biggest expense in q2 this year?"
+    },
+    {
+        "instance_id": "349",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What's the profit in jan this year?"
+    },
+    {
+        "instance_id": "350",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What are Rachael Ortega recurring product purchases over past 7 months?"
+    },
+    {
+        "instance_id": "351",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What is my average invoice from Phillip Carter?"
+    },
+    {
+        "instance_id": "352",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What are Rachel Mcdaniel recurring product purchases over past 7 months?"
+    },
+    {
+        "instance_id": "353",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "what products are selling less than last month"
+    },
+    {
+        "instance_id": "354",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "This quarter to date, how much did we pay Jessica Moore?"
+    },
+    {
+        "instance_id": "355",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much revenue came through Olivia Smith in january this year"
+    },
+    {
+        "instance_id": "356",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What acount had our biggest expense This fiscal year to date?"
+    },
+    {
+        "instance_id": "357",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What was our biggest expense MTD?"
+    },
+    {
+        "instance_id": "358",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "When was the last time we sold Contract"
+    },
+    {
+        "instance_id": "359",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much money did we make Last 12 months?"
+    },
+    {
+        "instance_id": "360",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What are my expenses Last fiscal year?"
+    },
+    {
+        "instance_id": "361",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Find all the customer names that do not have invoice totals larger than [number]."
+    },
+    {
+        "instance_id": "362",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What is my average invoice from Yvonne Leonard DDS?"
+    },
+    {
+        "instance_id": "363",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Show the minimum, average, maximum order quantity of all invoices."
+    },
+    {
+        "instance_id": "364",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What are the customers with the [number] costly invoices?"
+    },
+    {
+        "instance_id": "365",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much has Deanna Hawkins been paying us each month?"
+    },
+    {
+        "instance_id": "366",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much total income did we receive from credit card transactions This quarter to date?"
+    },
+    {
+        "instance_id": "367",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What are my expenses This quarter to date?"
+    },
+    {
+        "instance_id": "368",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Find all the customer names that do not have invoice totals larger than [number]."
+    },
+    {
+        "instance_id": "369",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Find all the customer names that do not have invoice totals larger than [number]."
+    },
+    {
+        "instance_id": "370",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much we received from Constructing townhouses?"
+    },
+    {
+        "instance_id": "371",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "When was the last time we sold Sleepers"
+    },
+    {
+        "instance_id": "372",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What are my AR this month and last month?"
+    },
+    {
+        "instance_id": "373",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What was my expense by products This quarter to date"
+    },
+    {
+        "instance_id": "374",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "what products are selling less than last month"
+    },
+    {
+        "instance_id": "375",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What are my last sales by vendor?"
+    },
+    {
+        "instance_id": "376",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "in q2 this year, what was our smallest expense?"
+    },
+    {
+        "instance_id": "377",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What are my average sales by vendor?"
+    },
+    {
+        "instance_id": "378",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much revenue came through Sherry Walsh today?"
+    },
+    {
+        "instance_id": "379",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much did Michael Ramirez spend on Arizona Dept. of Revenue Payable in january during last year?"
+    },
+    {
+        "instance_id": "380",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Who has the lowest money outstanding?"
+    },
+    {
+        "instance_id": "381",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much has Jerry Wong been paying us every month"
+    },
+    {
+        "instance_id": "382",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much money have we paid to Angela Bauer yesterday?"
+    },
+    {
+        "instance_id": "383",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What are Carrie Kaiser recurring product purchases over past 7 months?"
+    },
+    {
+        "instance_id": "384",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "This quarter to date, what was our largest expense?"
+    },
+    {
+        "instance_id": "385",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "in january this year, what was our largest expense?"
+    },
+    {
+        "instance_id": "386",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "give me the list of accounts where my revenue increased by more than [percentage]% in this month as compared to last month"
+    },
+    {
+        "instance_id": "387",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much we received from Computer software and software application training?"
+    },
+    {
+        "instance_id": "388",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "When was the last time we sold Packaging and labeling"
+    },
+    {
+        "instance_id": "389",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much did we pay Alice Horton the Last month?"
+    },
+    {
+        "instance_id": "390",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Last quarter, what was our largest expense?"
+    },
+    {
+        "instance_id": "391",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much have we been spending on Local area network management training This quarter ?"
+    },
+    {
+        "instance_id": "392",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What was our biggest expense Last 8 days?"
+    },
+    {
+        "instance_id": "393",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Return the most common payment method used for transactions."
+    },
+    {
+        "instance_id": "394",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What was our total income from Marcia Carroll in This year?"
+    },
+    {
+        "instance_id": "395",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "give me the list of accounts where my revenue increased by more than [percentage]% in this month as compared to last month"
+    },
+    {
+        "instance_id": "396",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How are my sales year to date compared to last year?"
+    },
+    {
+        "instance_id": "397",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What was my expense by products This week"
+    },
+    {
+        "instance_id": "398",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Last 8 days, how much did we pay Barbara Harris?"
+    },
+    {
+        "instance_id": "399",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much has Douglas Roberts been paying us each month?"
+    },
+    {
+        "instance_id": "400",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What were my outgoings during the This fiscal year to date?"
+    },
+    {
+        "instance_id": "401",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What our monthly spend on Thomas Smith"
+    },
+    {
+        "instance_id": "402",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Find all the customer names that do not have invoice totals larger than [number]."
+    },
+    {
+        "instance_id": "403",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much have we been spending on Fluorocarbon gases manufacturing This fiscal year to date ?"
+    },
+    {
+        "instance_id": "404",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What was my expense by products yesterday"
+    },
+    {
+        "instance_id": "405",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "what was our top [number] selling products and their sales This fiscal year"
+    },
+    {
+        "instance_id": "406",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much money did we make Last 12 months?"
+    },
+    {
+        "instance_id": "407",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "This quarter, what was our largest expense?"
+    },
+    {
+        "instance_id": "408",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much money did we make Last month?"
+    },
+    {
+        "instance_id": "409",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "show me my product level revenue for this month vs last month"
+    },
+    {
+        "instance_id": "410",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "MTD, what was our largest expense?"
+    },
+    {
+        "instance_id": "411",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "give me the list of accounts where my revenue increased by more than [percentage]% in this month as compared to last month"
+    },
+    {
+        "instance_id": "412",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Check the sales receipts record and compute the average quantities ordered with the payment method [payment_method]."
+    },
+    {
+        "instance_id": "413",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much has Casey Rivera been paying us every month"
+    },
+    {
+        "instance_id": "414",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Find all the customer names that do not have invoice totals larger than [number]."
+    },
+    {
+        "instance_id": "415",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "what customers are buying less than last month"
+    },
+    {
+        "instance_id": "416",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much money did we make YTD?"
+    },
+    {
+        "instance_id": "417",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "When was the last time we sold Biomass electricity"
+    },
+    {
+        "instance_id": "418",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What's the profit This year to date?"
+    },
+    {
+        "instance_id": "419",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much money did we make YTD?"
+    },
+    {
+        "instance_id": "420",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What are Melinda Moore recurring product purchases over past 7 months?"
+    },
+    {
+        "instance_id": "421",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "what customers are buying less than last month"
+    },
+    {
+        "instance_id": "422",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much did we spend on Development of software products for PCs YTD?"
+    },
+    {
+        "instance_id": "423",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much total income did we receive from credit card transactions in q3 this year?"
+    },
+    {
+        "instance_id": "424",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What was our biggest expense This week?"
+    },
+    {
+        "instance_id": "425",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Show the minimum, average, maximum order quantity of all invoices."
+    },
+    {
+        "instance_id": "426",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What was my expense by products in january this year"
+    },
+    {
+        "instance_id": "427",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much did we pay John White the Last month?"
+    },
+    {
+        "instance_id": "428",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much total income did we receive from credit card transactions This week?"
+    },
+    {
+        "instance_id": "429",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Find all the customer names that do not have invoice totals larger than [number]."
+    },
+    {
+        "instance_id": "430",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Find all the customer names that do not have invoice totals larger than [number]."
+    },
+    {
+        "instance_id": "431",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What are the customers with the [number] costly invoices?"
+    },
+    {
+        "instance_id": "432",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Who has the lowest money outstanding?"
+    },
+    {
+        "instance_id": "433",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What our monthly spend on Stacey Lopez"
+    },
+    {
+        "instance_id": "434",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Return the most common payment method used for transactions."
+    },
+    {
+        "instance_id": "435",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "show me expenses for Retailing entertainment furniture in in jan this year"
+    },
+    {
+        "instance_id": "436",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Return the most common payment method used for transactions."
+    },
+    {
+        "instance_id": "437",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much we received from Providing courses through business schools?"
+    },
+    {
+        "instance_id": "438",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much has Morgan Lang been paying us each month?"
+    },
+    {
+        "instance_id": "439",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much did we pay Michael Diaz the in jan last year?"
+    },
+    {
+        "instance_id": "440",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much money did we make This quarter?"
+    },
+    {
+        "instance_id": "441",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much did we pay Amy Robinson the in q4 last year?"
+    },
+    {
+        "instance_id": "442",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What our monthly spend on Scott Garza"
+    },
+    {
+        "instance_id": "443",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much money did we make YTD?"
+    },
+    {
+        "instance_id": "444",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much has Noah Williams been paying us every month"
+    },
+    {
+        "instance_id": "445",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "show me my product level revenue for this month vs last month"
+    },
+    {
+        "instance_id": "446",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What were our total Offering equity long-only expenses Last quarter?"
+    },
+    {
+        "instance_id": "447",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What was our smallest expense in q2 this year?"
+    },
+    {
+        "instance_id": "448",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much total income did we receive from credit card transactions YTD?"
+    },
+    {
+        "instance_id": "449",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much did we earn from Derek Hill in q2 this year?"
+    },
+    {
+        "instance_id": "450",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What acount had our biggest expense This quarter to date?"
+    },
+    {
+        "instance_id": "451",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What was our biggest expense yesterday?"
+    },
+    {
+        "instance_id": "452",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much money have we paid to Michael Ferguson This quarter?"
+    },
+    {
+        "instance_id": "453",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much did Blake Owens spend on Accounts Receivable (A/R) in january during last year?"
+    },
+    {
+        "instance_id": "454",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much did we earn from Dana Wiggins in january last year?"
+    },
+    {
+        "instance_id": "455",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What our monthly spend on Cynthia Jones"
+    },
+    {
+        "instance_id": "456",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Last fiscal year, what was our smallest expense?"
+    },
+    {
+        "instance_id": "457",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "In the in q2 this year, what has been my highest revenue from Randy Joseph?"
+    },
+    {
+        "instance_id": "458",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much did we earn from Matthew Hubbard Last fiscal year?"
+    },
+    {
+        "instance_id": "459",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much money did we make in q3 this year?"
+    },
+    {
+        "instance_id": "460",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much money did we make in jan this year?"
+    },
+    {
+        "instance_id": "461",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What our monthly spend on Caleb Simmons"
+    },
+    {
+        "instance_id": "462",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much has Richard Alexander been paying us every month"
+    },
+    {
+        "instance_id": "463",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Return the most common payment method used for transactions."
+    },
+    {
+        "instance_id": "464",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much did we spend on Food & drink Last fiscal year?"
+    },
+    {
+        "instance_id": "465",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "List the top [number] customers by total gross sales."
+    },
+    {
+        "instance_id": "466",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What are my AR this month and last month?"
+    },
+    {
+        "instance_id": "467",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much have we been spending on Ventilation cleaning This year ?"
+    },
+    {
+        "instance_id": "468",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What is my average invoice from Candice Ellis?"
+    },
+    {
+        "instance_id": "469",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What were my outgoings during the YTD?"
+    },
+    {
+        "instance_id": "470",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much revenue came through Gina Webb This week"
+    },
+    {
+        "instance_id": "471",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Compare sales by customer in january this year"
+    },
+    {
+        "instance_id": "472",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Last 8 days, how much did we pay Megan Ward?"
+    },
+    {
+        "instance_id": "473",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "show me expenses for Private mailbox rental services in Last quarter"
+    },
+    {
+        "instance_id": "474",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "what products are selling less than last month"
+    },
+    {
+        "instance_id": "475",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What was our total spend for Hydroelectric power generation in This quarter"
+    },
+    {
+        "instance_id": "476",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "This fiscal year, what was our largest expense?"
+    },
+    {
+        "instance_id": "477",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Total sales for each product"
+    },
+    {
+        "instance_id": "478",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much money have we paid to Kelli Berry Last month?"
+    },
+    {
+        "instance_id": "479",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What was my expense by products This month to date"
+    },
+    {
+        "instance_id": "480",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What's the profit in q3 this year?"
+    },
+    {
+        "instance_id": "481",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much has Steven Hernandez been paying us every month"
+    },
+    {
+        "instance_id": "482",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What is my average sales for Dustin Gonzalez in the Last year?"
+    },
+    {
+        "instance_id": "483",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Check the sales receipts record and compute the average quantities ordered with the payment method [payment_method]."
+    },
+    {
+        "instance_id": "484",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "what products are selling less than last month"
+    },
+    {
+        "instance_id": "485",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Return the most common payment method used for transactions."
+    },
+    {
+        "instance_id": "486",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What is my average invoice from Maria Hopkins?"
+    },
+    {
+        "instance_id": "487",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "what was our top [number] selling products and their sales YTD"
+    },
+    {
+        "instance_id": "488",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What are my total sales by Commodity Markets?"
+    },
+    {
+        "instance_id": "489",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What were my outgoings during the Last fiscal year?"
+    },
+    {
+        "instance_id": "490",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How many credit card transactions occurred This quarter?"
+    },
+    {
+        "instance_id": "491",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How are my sales year to date compared to last year?"
+    },
+    {
+        "instance_id": "492",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Total sales for each product"
+    },
+    {
+        "instance_id": "493",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "show me my product level revenue for this month vs last month"
+    },
+    {
+        "instance_id": "494",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What was our smallest expense This quarter?"
+    },
+    {
+        "instance_id": "495",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What was our total spend for Private parcel mailing services in This year"
+    },
+    {
+        "instance_id": "496",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Show the minimum, average, maximum order quantity of all invoices."
+    },
+    {
+        "instance_id": "497",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What was our total spend for Ruben Hughes in the This year to date?"
+    },
+    {
+        "instance_id": "498",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much did Raymond Gilmore spend on Uncategorized Income in january during last year?"
+    },
+    {
+        "instance_id": "499",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Compare sales by customer This quarter"
+    },
+    {
+        "instance_id": "500",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Show the invoice number and the number of items for each invoice."
+    },
+    {
+        "instance_id": "501",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much did we spend on Purchases This month?"
+    },
+    {
+        "instance_id": "502",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much has James Torres MD been paying us each month?"
+    },
+    {
+        "instance_id": "503",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "In the in q3 this year, what has been my average revenue from Blake Arnold?"
+    },
+    {
+        "instance_id": "504",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What was our total spend for Private parcel mailing centers in This week to date"
+    },
+    {
+        "instance_id": "505",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Total sales for each product"
+    },
+    {
+        "instance_id": "506",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What was our smallest expense Last fiscal year?"
+    },
+    {
+        "instance_id": "507",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much money did we make yesterday?"
+    },
+    {
+        "instance_id": "508",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What are my AR this month and last month?"
+    },
+    {
+        "instance_id": "509",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "This week to date, what was our largest expense?"
+    },
+    {
+        "instance_id": "510",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How many credit card transactions occurred in q4 last year?"
+    },
+    {
+        "instance_id": "511",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What was my expense by products in q4 last year"
+    },
+    {
+        "instance_id": "512",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Check the sales receipts record and compute the average quantities ordered with the payment method [payment_method]."
+    },
+    {
+        "instance_id": "513",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What are my total sales by Chairs?"
+    },
+    {
+        "instance_id": "514",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "This month to date, what was our smallest expense?"
+    },
+    {
+        "instance_id": "515",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much money have we paid to Kristen Flores This fiscal year?"
+    },
+    {
+        "instance_id": "516",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What are my expenses for the Last 12 months?"
+    },
+    {
+        "instance_id": "517",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "show me my product level revenue for this month vs last month"
+    },
+    {
+        "instance_id": "518",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What is my average invoice from Kara Robbins?"
+    },
+    {
+        "instance_id": "519",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What were my outgoings during the yesterday?"
+    },
+    {
+        "instance_id": "520",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What are my AR this month and last month?"
+    },
+    {
+        "instance_id": "521",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What was our total income from Karen Jarvis in in jan this year?"
+    },
+    {
+        "instance_id": "522",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What are Kristen Combs recurring product purchases over past 7 months?"
+    },
+    {
+        "instance_id": "523",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "what customers are buying less than last month"
+    },
+    {
+        "instance_id": "524",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much money have we paid to Lindsay Flores yesterday?"
+    },
+    {
+        "instance_id": "525",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What was our biggest expense today?"
+    },
+    {
+        "instance_id": "526",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much money did we make This fiscal year to date?"
+    },
+    {
+        "instance_id": "527",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Find all the customer names that do not have invoice totals larger than [number]."
+    },
+    {
+        "instance_id": "528",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "show me expenses for Wholesaling boats (except pleasure) in This month"
+    },
+    {
+        "instance_id": "529",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Find all the customer names that do not have invoice totals larger than [number]."
+    },
+    {
+        "instance_id": "530",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "In the This week to date, what has been my mean revenue from Keith Santiago?"
+    },
+    {
+        "instance_id": "531",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What's the profit in january this year?"
+    },
+    {
+        "instance_id": "532",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much did we pay Janice Lopez the This year?"
+    },
+    {
+        "instance_id": "533",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What was my expense by products Last month"
+    },
+    {
+        "instance_id": "534",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "When was the last time we sold Mailbox Services"
+    },
+    {
+        "instance_id": "535",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much have we been spending on Refunds-Allowances Last fiscal year ?"
+    },
+    {
+        "instance_id": "536",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What was our biggest expense This week?"
+    },
+    {
+        "instance_id": "537",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Show the invoice number and the number of items for each invoice."
+    },
+    {
+        "instance_id": "538",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Last month, what was our smallest expense?"
+    },
+    {
+        "instance_id": "539",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "in q3 this year, what was our smallest expense?"
+    },
+    {
+        "instance_id": "540",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "in january last year, what was our smallest expense?"
+    },
+    {
+        "instance_id": "541",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much revenue came through Austin Nolan This quarter to date"
+    },
+    {
+        "instance_id": "542",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What was my expense by products This fiscal year"
+    },
+    {
+        "instance_id": "543",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "what was our top [number] selling products and their sales Last 8 days"
+    },
+    {
+        "instance_id": "544",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Who has the lowest money outstanding?"
+    },
+    {
+        "instance_id": "545",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Show the invoice number and the number of items for each invoice."
+    },
+    {
+        "instance_id": "546",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Who has the lowest money outstanding?"
+    },
+    {
+        "instance_id": "547",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much has James Rice been paying us every month"
+    },
+    {
+        "instance_id": "548",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Show the minimum, average, maximum order quantity of all invoices."
+    },
+    {
+        "instance_id": "549",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much revenue came through Shannon Robbins This quarter"
+    },
+    {
+        "instance_id": "550",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much total income did we receive from credit card transactions Last year?"
+    },
+    {
+        "instance_id": "551",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much has Carolyn Hall been paying us each month?"
+    },
+    {
+        "instance_id": "552",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What was our smallest expense This week to date?"
+    },
+    {
+        "instance_id": "553",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "what customers are buying less than last month"
+    },
+    {
+        "instance_id": "554",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What are Dana Edwards recurring product purchases over past 7 months?"
+    },
+    {
+        "instance_id": "555",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "This fiscal year to date, how much did we pay Kristi Ellis?"
+    },
+    {
+        "instance_id": "556",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "give me the list of accounts where my revenue increased by more than [percentage]% in this month as compared to last month"
+    },
+    {
+        "instance_id": "557",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much did we earn from Katherine Robinson Last 8 days?"
+    },
+    {
+        "instance_id": "558",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much did we spend on Biogenic municipal waste-fueled power generation in jan last year?"
+    },
+    {
+        "instance_id": "559",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "in jan this year, what was our largest expense?"
+    },
+    {
+        "instance_id": "560",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What were our total Manufacturing orange oil expenses Last 30 days?"
+    },
+    {
+        "instance_id": "561",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What's the profit Last month?"
+    },
+    {
+        "instance_id": "562",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "List the top [number] customers by total gross sales."
+    },
+    {
+        "instance_id": "563",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "List the top [number] customers by total gross sales."
+    },
+    {
+        "instance_id": "564",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What were my outgoings during the yesterday?"
+    },
+    {
+        "instance_id": "565",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What are the customers with the [number] cheapest invoices?"
+    },
+    {
+        "instance_id": "566",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What were our total Utilities expenses This week to date?"
+    },
+    {
+        "instance_id": "567",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much did we earn from Phillip Newman Last month?"
+    },
+    {
+        "instance_id": "568",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What's the profit This fiscal year to date?"
+    },
+    {
+        "instance_id": "569",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What our monthly spend on Robert Smith"
+    },
+    {
+        "instance_id": "570",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much money did we make This month to date?"
+    },
+    {
+        "instance_id": "571",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What was our smallest expense Last 8 days?"
+    },
+    {
+        "instance_id": "572",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much revenue came through Timothy Rogers This year to date"
+    },
+    {
+        "instance_id": "573",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much revenue came through Brad Phillips YTD?"
+    },
+    {
+        "instance_id": "574",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much money did we make yesterday?"
+    },
+    {
+        "instance_id": "575",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much money did we make This fiscal year?"
+    },
+    {
+        "instance_id": "576",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What is the product name of the most frequently ordered item on invoices?"
+    },
+    {
+        "instance_id": "577",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What acount had our biggest expense Last fiscal year?"
+    },
+    {
+        "instance_id": "578",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Who has the lowest money outstanding?"
+    },
+    {
+        "instance_id": "579",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "List the top [number] customers by total gross sales."
+    },
+    {
+        "instance_id": "580",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "YTD, what was our largest expense?"
+    },
+    {
+        "instance_id": "581",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How are my sales year to date compared to last year?"
+    },
+    {
+        "instance_id": "582",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much has William Fox been paying us each month?"
+    },
+    {
+        "instance_id": "583",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Last 8 days, what was our smallest expense?"
+    },
+    {
+        "instance_id": "584",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What's the profit Last fiscal year?"
+    },
+    {
+        "instance_id": "585",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What acount had our biggest expense Last quarter?"
+    },
+    {
+        "instance_id": "586",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much money did we make Last year?"
+    },
+    {
+        "instance_id": "587",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "When was the last time we sold Tournaments and Matches"
+    },
+    {
+        "instance_id": "588",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What are my expenses Last year?"
+    },
+    {
+        "instance_id": "589",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What is the product name of the most frequently ordered item on invoices?"
+    },
+    {
+        "instance_id": "590",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "List the top [number] customers by total gross sales."
+    },
+    {
+        "instance_id": "591",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What are Erica Shah recurring product purchases over past 7 months?"
+    },
+    {
+        "instance_id": "592",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much has Samuel Calhoun been paying us each month?"
+    },
+    {
+        "instance_id": "593",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What are Jacqueline Craig recurring product purchases over past 7 months?"
+    },
+    {
+        "instance_id": "594",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What was our total spend for Brandon Watkins in the in january last year?"
+    },
+    {
+        "instance_id": "595",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much have we been spending on Medical services This month to date ?"
+    },
+    {
+        "instance_id": "596",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Show the minimum, average, maximum order quantity of all invoices."
+    },
+    {
+        "instance_id": "597",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "List the top [number] customers by total gross sales."
+    },
+    {
+        "instance_id": "598",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much has Jade Barr been paying us every month"
+    },
+    {
+        "instance_id": "599",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What are the customers with the [number] cheapest invoices?"
+    },
+    {
+        "instance_id": "600",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Compare sales by customer Last month"
+    },
+    {
+        "instance_id": "601",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "This fiscal year, what was our largest expense?"
+    },
+    {
+        "instance_id": "602",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What are the customers with the [number] cheapest invoices?"
+    },
+    {
+        "instance_id": "603",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What was our total spend for Sonya Wilson in the This quarter?"
+    },
+    {
+        "instance_id": "604",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What was my expense by products Last year"
+    },
+    {
+        "instance_id": "605",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Show me total sales by month"
+    },
+    {
+        "instance_id": "606",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "In the This quarter, what has been my first revenue from Danielle Knapp?"
+    },
+    {
+        "instance_id": "607",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What's the profit This fiscal year?"
+    },
+    {
+        "instance_id": "608",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "In the Last 8 days, what has been my last revenue from Brad Hodges?"
+    },
+    {
+        "instance_id": "609",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "In the Last year, what has been my lowest revenue from Angela Barnett?"
+    },
+    {
+        "instance_id": "610",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Who has the lowest money outstanding?"
+    },
+    {
+        "instance_id": "611",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "When was the last time we sold Appearances and speeches"
+    },
+    {
+        "instance_id": "612",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Show me total sales by month"
+    },
+    {
+        "instance_id": "613",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What was our biggest expense Last 30 days?"
+    },
+    {
+        "instance_id": "614",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How are my sales year to date compared to last year?"
+    },
+    {
+        "instance_id": "615",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much have we been spending on Advertising Last 12 months ?"
+    },
+    {
+        "instance_id": "616",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much did we pay Tommy White the This month to date?"
+    },
+    {
+        "instance_id": "617",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What are my total sales by Nonmetallic mineral ore?"
+    },
+    {
+        "instance_id": "618",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Check the sales receipts record and compute the average quantities ordered with the payment method [payment_method]."
+    },
+    {
+        "instance_id": "619",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much did we pay Brandi Barton the in q3 this year?"
+    },
+    {
+        "instance_id": "620",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "This quarter, what was our smallest expense?"
+    },
+    {
+        "instance_id": "621",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "what products are selling less than last month"
+    },
+    {
+        "instance_id": "622",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much has Albert Castro been paying us each month?"
+    },
+    {
+        "instance_id": "623",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much did we earn from Susan Hill This week?"
+    },
+    {
+        "instance_id": "624",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "show me my product level revenue for this month vs last month"
+    },
+    {
+        "instance_id": "625",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Total sales for each product"
+    },
+    {
+        "instance_id": "626",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Show me total sales by month"
+    },
+    {
+        "instance_id": "627",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "what products are selling less than last month"
+    },
+    {
+        "instance_id": "628",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much did we spend on Retailing Chairs Last 30 days?"
+    },
+    {
+        "instance_id": "629",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much revenue came through Samantha Hawkins This month?"
+    },
+    {
+        "instance_id": "630",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Show the invoice number and the number of items for each invoice."
+    },
+    {
+        "instance_id": "631",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "This year to date, what was our largest expense?"
+    },
+    {
+        "instance_id": "632",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What are my expenses for the in january last year?"
+    },
+    {
+        "instance_id": "633",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "what products are selling less than last month"
+    },
+    {
+        "instance_id": "634",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How are my sales year to date compared to last year?"
+    },
+    {
+        "instance_id": "635",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What were my outgoings during the in q4 last year?"
+    },
+    {
+        "instance_id": "636",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What are my expenses This month to date?"
+    },
+    {
+        "instance_id": "637",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Who has the lowest money outstanding?"
+    },
+    {
+        "instance_id": "638",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What are the customers with the [number] cheapest invoices?"
+    },
+    {
+        "instance_id": "639",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What were our total Offering macro funds expenses This week?"
+    },
+    {
+        "instance_id": "640",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much has Jack Durham been paying us each month?"
+    },
+    {
+        "instance_id": "641",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "YTD, how much did we pay Kimberly Barker?"
+    },
+    {
+        "instance_id": "642",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much did we spend on Billable Expense Income in jan last year?"
+    },
+    {
+        "instance_id": "643",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much did Brian Flowers spend on Accounts Receivable (A/R) in january during last year?"
+    },
+    {
+        "instance_id": "644",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "what products are selling less than last month"
+    },
+    {
+        "instance_id": "645",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What are the customers with the [number] costly invoices?"
+    },
+    {
+        "instance_id": "646",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What is my max sales for Erin Pollard in the in january this year?"
+    },
+    {
+        "instance_id": "647",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much money have we paid to Loretta King This quarter to date?"
+    },
+    {
+        "instance_id": "648",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much we received from Computer Repair and Maintainenance?"
+    },
+    {
+        "instance_id": "649",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much revenue came through Patrick Allen This quarter?"
+    },
+    {
+        "instance_id": "650",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Show the invoice number and the number of items for each invoice."
+    },
+    {
+        "instance_id": "651",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "List the top [number] customers by total gross sales."
+    },
+    {
+        "instance_id": "652",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What are the customers with the [number] cheapest invoices?"
+    },
+    {
+        "instance_id": "653",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What was our smallest expense This year?"
+    },
+    {
+        "instance_id": "654",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What are the customers with the [number] costly invoices?"
+    },
+    {
+        "instance_id": "655",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What was our total income from Stephanie White in This week?"
+    },
+    {
+        "instance_id": "656",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Show the invoice number and the number of items for each invoice."
+    },
+    {
+        "instance_id": "657",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What was our smallest expense This week?"
+    },
+    {
+        "instance_id": "658",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much revenue came through Patrick Hernandez Last year"
+    },
+    {
+        "instance_id": "659",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Show the invoice number and the number of items for each invoice."
+    },
+    {
+        "instance_id": "660",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Find all the customer names that do not have invoice totals larger than [number]."
+    },
+    {
+        "instance_id": "661",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What are the customers with the [number] costly invoices?"
+    },
+    {
+        "instance_id": "662",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What is my average invoice from Vanessa Sutton?"
+    },
+    {
+        "instance_id": "663",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Return the most common payment method used for transactions."
+    },
+    {
+        "instance_id": "664",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What was our total income from january Moore in Last year?"
+    },
+    {
+        "instance_id": "665",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What acount had our biggest expense in q3 this year?"
+    },
+    {
+        "instance_id": "666",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "in q4 last year, what was our largest expense?"
+    },
+    {
+        "instance_id": "667",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "This year, what was our largest expense?"
+    },
+    {
+        "instance_id": "668",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What are my expenses for the Last fiscal year?"
+    },
+    {
+        "instance_id": "669",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What is the product name of the most frequently ordered item on invoices?"
+    },
+    {
+        "instance_id": "670",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What was our smallest expense Last month?"
+    },
+    {
+        "instance_id": "671",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What are my total sales by Oxygen?"
+    },
+    {
+        "instance_id": "672",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Return the most common payment method used for transactions."
+    },
+    {
+        "instance_id": "673",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "In the Last fiscal year, what has been my lowest revenue from Raymond Mitchell?"
+    },
+    {
+        "instance_id": "674",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What was our smallest expense This week to date?"
+    },
+    {
+        "instance_id": "675",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What is the product name of the most frequently ordered item on invoices?"
+    },
+    {
+        "instance_id": "676",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much has Joseph Kent been paying us every month"
+    },
+    {
+        "instance_id": "677",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What is the product name of the most frequently ordered item on invoices?"
+    },
+    {
+        "instance_id": "678",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "what was our top [number] selling products and their sales This month to date"
+    },
+    {
+        "instance_id": "679",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much did we spend on Promotional This fiscal year to date?"
+    },
+    {
+        "instance_id": "680",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What our monthly spend on Johnathan Payne"
+    },
+    {
+        "instance_id": "681",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "List the top [number] customers by total gross sales."
+    },
+    {
+        "instance_id": "682",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "what was our top [number] selling products and their sales YTD"
+    },
+    {
+        "instance_id": "683",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What are the customers with the [number] costly invoices?"
+    },
+    {
+        "instance_id": "684",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much has Maria Avery been paying us every month"
+    },
+    {
+        "instance_id": "685",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much have we been spending on Boarding services This fiscal year to date ?"
+    },
+    {
+        "instance_id": "686",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Total sales for each product"
+    },
+    {
+        "instance_id": "687",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Find all the customer names that do not have invoice totals larger than [number]."
+    },
+    {
+        "instance_id": "688",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much did we spend on Providing freight car cleaning services This week?"
+    },
+    {
+        "instance_id": "689",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much money did we make Last year?"
+    },
+    {
+        "instance_id": "690",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What acount had our biggest expense MTD?"
+    },
+    {
+        "instance_id": "691",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much money did we make Last fiscal year?"
+    },
+    {
+        "instance_id": "692",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "what products are selling less than last month"
+    },
+    {
+        "instance_id": "693",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What were our total Private mailbox rental centers expenses Last 30 days?"
+    },
+    {
+        "instance_id": "694",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Show the minimum, average, maximum order quantity of all invoices."
+    },
+    {
+        "instance_id": "695",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What is my first sales for Tammy Mann in the yesterday?"
+    },
+    {
+        "instance_id": "696",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much money did we make This month?"
+    },
+    {
+        "instance_id": "697",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much we received from Providing other outdoor maintenance services?"
+    },
+    {
+        "instance_id": "698",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much has Gary Hobbs been paying us every month"
+    },
+    {
+        "instance_id": "699",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Total sales for each product"
+    },
+    {
+        "instance_id": "700",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Total sales for each product"
+    },
+    {
+        "instance_id": "701",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What are my expenses in jan last year?"
+    },
+    {
+        "instance_id": "702",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What are Preston Conner recurring product purchases over past 7 months?"
+    },
+    {
+        "instance_id": "703",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What are the customers with the [number] cheapest invoices?"
+    },
+    {
+        "instance_id": "704",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much did we earn from Shannon Waller This year to date?"
+    },
+    {
+        "instance_id": "705",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Show the invoice number and the number of items for each invoice."
+    },
+    {
+        "instance_id": "706",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What are my expenses in january last year?"
+    },
+    {
+        "instance_id": "707",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What was our smallest expense Last 12 months?"
+    },
+    {
+        "instance_id": "708",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much has Taylor Odonnell been paying us every month"
+    },
+    {
+        "instance_id": "709",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What's the profit This month?"
+    },
+    {
+        "instance_id": "710",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Show the invoice number and the number of items for each invoice."
+    },
+    {
+        "instance_id": "711",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Total sales for each product"
+    },
+    {
+        "instance_id": "712",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "How much total income did we receive from credit card transactions This fiscal year to date?"
+    },
+    {
+        "instance_id": "713",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What are my expenses for the This year to date?"
+    },
+    {
+        "instance_id": "714",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What's the profit This fiscal year to date?"
+    },
+    {
+        "instance_id": "715",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "Show the minimum, average, maximum order quantity of all invoices."
+    },
+    {
+        "instance_id": "716",
+        "db_id": "accounting",
+        "db_type": "sqlite",
+        "db_size": 62,
+        "question": "What are my expenses for the Last year?"
+    }
+]
