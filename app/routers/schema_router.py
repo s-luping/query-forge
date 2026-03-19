@@ -1032,29 +1032,41 @@ def parse_single_table_data_warehouse(table_ddl: str, schema_name: str, user_id:
 
 
 def _save_parsed_results(parsed_results: List[dict], user_id: int, db: Session) -> tuple:
-    """保存解析结果到数据库"""
+    """保存解析结果到数据库（批量优化）"""
+    if not parsed_results:
+        return 0, 0, []
+
     new_count = 0
     duplicate_count = 0
     schema_names = set()
-    
-    for result in parsed_results:
-        existing = db.query(Schema).filter(
+
+    existing_keys = set()
+    schema_names_all = set(r['schema_name'] for r in parsed_results)
+    for schema_name in schema_names_all:
+        existing = db.query(
+            Schema.table_name,
+            Schema.column_name
+        ).filter(
             Schema.user_id == user_id,
-            Schema.schema_name == result['schema_name'],
-            Schema.table_name == result['table_name'],
-            Schema.column_name == result['column_name']
-        ).first()
+            Schema.schema_name == schema_name
+        ).all()
+        for t, c in existing:
+            existing_keys.add((schema_name, t, c))
 
-        if existing:
+    to_add = []
+    for result in parsed_results:
+        key = (result['schema_name'], result['table_name'], result['column_name'])
+        if key in existing_keys:
             duplicate_count += 1
-            continue
+        else:
+            to_add.append(Schema(**result))
+            new_count += 1
+            schema_names.add(result['schema_name'])
 
-        schema_parse = Schema(**result)
-        db.add(schema_parse)
-        new_count += 1
-        schema_names.add(result['schema_name'])
+    if to_add:
+        db.bulk_save_objects(to_add)
+        db.commit()
 
-    db.commit()
     return new_count, duplicate_count, list(schema_names)
 
 
