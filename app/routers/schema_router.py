@@ -15,6 +15,7 @@ import csv
 import io
 import json
 import re
+import threading
 from datetime import datetime
 from typing import List, Optional, Dict, Any
 
@@ -108,7 +109,6 @@ SUPPORTED_DB_TYPES = [
 
 
 def _auto_build_vector_index(user_id: int, schema_name: str, schema_field_count: int) -> Optional[str]:
-    from core.SQLPipeline import build_vector_index
     from core.VectorStore import SchemaVectorStore
 
     threshold = SchemaVectorStore.VECTOR_INDEX_THRESHOLD
@@ -116,14 +116,18 @@ def _auto_build_vector_index(user_id: int, schema_name: str, schema_field_count:
         logger.info(f"Schema {schema_name} 字段数量 {schema_field_count} 未达到阈值 {threshold}，跳过自动索引构建")
         return None
 
-    try:
-        result = build_vector_index(user_id, schema_name)
-        if result.get('success'):
-            return f"Schema {schema_name} 已自动创建向量索引（字段数: {schema_field_count}）"
-        return None
-    except Exception as e:
-        logger.warning(f"自动构建向量索引失败: {e}")
-        return None
+    def _build_in_background():
+        try:
+            from core.SQLPipeline import build_vector_index
+            result = build_vector_index(user_id, schema_name)
+            if result.get('success'):
+                logger.info(f"Schema {schema_name} 向量索引构建完成（字段数: {schema_field_count}）")
+        except Exception as e:
+            logger.warning(f"后台构建向量索引失败: {e}")
+
+    thread = threading.Thread(target=_build_in_background, daemon=True)
+    thread.start()
+    return f"Schema {schema_name} 正在后台创建向量索引（字段数: {schema_field_count}）"
 
 
 def parse_spider_json(json_data: Dict[str, Any], user_id: int, default_schema: str = None) -> List[dict]:

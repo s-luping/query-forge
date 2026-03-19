@@ -5,7 +5,7 @@ models 包 - 包含所有 SQLAlchemy 模型和初始化逻辑
 import os
 from datetime import datetime
 
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, text, event
 from sqlalchemy.orm import declarative_base, sessionmaker
 
 from app.config import APP_DB_PATH, HISTORY_DB_PATH, SCHEMA_DB_PATH, EXTRA_DB_PATH, LLM_DB_PATH
@@ -13,35 +13,33 @@ from app.logger import logger
 
 Base = declarative_base()
 
-app_engine = create_engine(
-    f'sqlite:///{APP_DB_PATH}',
-    echo=False,
-    connect_args={'check_same_thread': False}
-)
 
-history_engine = create_engine(
-    f'sqlite:///{HISTORY_DB_PATH}',
-    echo=False,
-    connect_args={'check_same_thread': False}
-)
+def _set_sqlite_pragma(dbapi_conn, connection_record):
+    """为 SQLite 启用 WAL 模式和优化参数"""
+    cursor = dbapi_conn.cursor()
+    cursor.execute("PRAGMA journal_mode=WAL")
+    cursor.execute("PRAGMA synchronous=NORMAL")
+    cursor.execute("PRAGMA busy_timeout=5000")
+    cursor.execute("PRAGMA cache_size=-64000")
+    cursor.close()
 
-schema_engine = create_engine(
-    f'sqlite:///{SCHEMA_DB_PATH}',
-    echo=False,
-    connect_args={'check_same_thread': False}
-)
 
-extra_engine = create_engine(
-    f'sqlite:///{EXTRA_DB_PATH}',
-    echo=False,
-    connect_args={'check_same_thread': False}
-)
+def _create_engine_with_wal(db_path: str):
+    """创建启用 WAL 模式的 SQLite engine"""
+    engine = create_engine(
+        f'sqlite:///{db_path}',
+        echo=False,
+        connect_args={'check_same_thread': False, 'timeout': 30}
+    )
+    event.listen(engine, 'connect', _set_sqlite_pragma)
+    return engine
 
-llm_engine = create_engine(
-    f'sqlite:///{LLM_DB_PATH}',
-    echo=False,
-    connect_args={'check_same_thread': False}
-)
+
+app_engine = _create_engine_with_wal(APP_DB_PATH)
+history_engine = _create_engine_with_wal(HISTORY_DB_PATH)
+schema_engine = _create_engine_with_wal(SCHEMA_DB_PATH)
+extra_engine = _create_engine_with_wal(EXTRA_DB_PATH)
+llm_engine = _create_engine_with_wal(LLM_DB_PATH)
 
 AppSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=app_engine)
 HistorySessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=history_engine)
