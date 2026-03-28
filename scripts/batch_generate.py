@@ -63,6 +63,42 @@ def get_db_config(db_name: str) -> dict:
     }
 
 
+class TokenManager:
+    """Token管理器 - 自动刷新过期token"""
+    
+    def __init__(self, username: str, password: str):
+        self.username = username
+        self.password = password
+        self._token = None
+        self._login()
+    
+    def _login(self):
+        """登录获取token"""
+        response = requests.post(
+            f"{BASE_URL}/login",
+            json={"username": self.username, "password": self.password}
+        )
+        if response.status_code == 200:
+            data = response.json()
+            self._token = data.get("access_token")
+            print(f"  [Token] 登录成功，获取新token")
+        else:
+            raise Exception(f"登录失败: {response.text}")
+    
+    def get_token(self) -> str:
+        """获取当前token"""
+        return self._token
+    
+    def refresh(self):
+        """刷新token"""
+        print("  [Token] Token已过期，正在刷新...")
+        self._login()
+    
+    def is_token_expired(self, response: requests.Response) -> bool:
+        """检查响应是否表示token过期"""
+        return response.status_code == 401
+
+
 def login(username: str, password: str):
     """登录获取token"""
     response = requests.post(
@@ -77,7 +113,7 @@ def login(username: str, password: str):
 
 
 def get_llm_configs(token: str) -> List[Dict]:
-    """获取用户的LLM配置列表"""
+    """获取用户的LLM配置列表（仅返回有效配置）"""
     headers = {
         "Authorization": f"Bearer {token}",
         "Content-Type": "application/json"
@@ -90,39 +126,50 @@ def get_llm_configs(token: str) -> List[Dict]:
             timeout=30
         )
         if response.status_code == 200:
-            return response.json().get("items", [])
+            all_configs = response.json().get("items", [])
+            active_configs = [cfg for cfg in all_configs if cfg.get("is_active", True)]
+            return active_configs
         return []
     except Exception:
         return []
 
 
-def generate_sql_with_model(token: str, question: str, schema_name: str, 
-                            db_type: str, llm_config_id: int, timeout: int = 300):
-    """调用SQL生成API，指定模型配置"""
-    headers = {
-        "Authorization": f"Bearer {token}",
-        "Content-Type": "application/json"
-    }
+def generate_sql_with_model(token_manager: 'TokenManager', question: str, schema_name: str, 
+                            db_type: str, llm_config_id: int, timeout: int = 300, retry_count: int = 2):
+    """调用SQL生成API，指定模型配置（支持token自动刷新）"""
+    for attempt in range(retry_count):
+        token = token_manager.get_token()
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json"
+        }
+        
+        payload = {
+            "query": question,
+            "schema_name": schema_name,
+            "db_type": db_type,
+            "llm_config_id": llm_config_id
+        }
+        
+        try:
+            response = requests.post(
+                f"{BASE_URL}/api/chat-to-sql/generate_sql",
+                headers=headers,
+                json=payload,
+                timeout=timeout
+            )
+            
+            if token_manager.is_token_expired(response):
+                token_manager.refresh()
+                continue
+            
+            return response
+        except requests.exceptions.Timeout:
+            return None
+        except Exception as e:
+            return None
     
-    payload = {
-        "query": question,
-        "schema_name": schema_name,
-        "db_type": db_type,
-        "llm_config_id": llm_config_id
-    }
-    
-    try:
-        response = requests.post(
-            f"{BASE_URL}/api/chat-to-sql/generate_sql",
-            headers=headers,
-            json=payload,
-            timeout=timeout
-        )
-        return response
-    except requests.exceptions.Timeout:
-        return None
-    except Exception as e:
-        return None
+    return None
 
 
 def is_context_too_large(error_msg: str) -> bool:
@@ -183,13 +230,13 @@ def log_message(message: str, log_file: str):
 class ModelRotator:
     """模型轮询器"""
     
-    def __init__(self, configs: List[Dict], token: str = None):
+    def __init__(self, configs: List[Dict], token_manager: 'TokenManager' = None):
         self.configs = configs
         self.current_index = 0
         self.exhausted_configs = set()
         self.context_error_configs = set()
         self.error_configs = set()
-        self.token = token
+        self.token_manager = token_manager
     
     def get_next_config(self) -> Optional[Dict]:
         """获取下一个可用配置"""
@@ -227,10 +274,11 @@ class ModelRotator:
         self.error_configs.add(config_id)
         print(f"    [模型轮换] 配置 {config_id} 执行出错，已标记为不可用")
         
-        if self.token:
+        if self.token_manager:
             try:
+                token = self.token_manager.get_token()
                 headers = {
-                    "Authorization": f"Bearer {self.token}",
+                    "Authorization": f"Bearer {token}",
                     "Content-Type": "application/json"
                 }
                 response = requests.put(
@@ -305,12 +353,13 @@ def main():
     log_message(f"共加载 {total} 条问题", log_file)
     
     try:
-        token = login(config["username"], config["password"])
+        token_manager = TokenManager(config["username"], config["password"])
         log_message("登录成功", log_file)
     except Exception as e:
         log_message(f"登录失败: {e}", log_file)
         return
     
+    token = token_manager.get_token()
     llm_configs = get_llm_configs(token)
     if not llm_configs:
         log_message("错误: 没有可用的LLM配置，请先运行 setup_models.py 配置模型", log_file)
@@ -320,7 +369,7 @@ def main():
     for cfg in llm_configs:
         log_message(f"  - {cfg['provider']}/{cfg['model']} (ID: {cfg['id']})", log_file)
     
-    rotator = ModelRotator(llm_configs, token)
+    rotator = ModelRotator(llm_configs, token_manager)
     
     start_index = 0
     results = []
@@ -367,7 +416,7 @@ def main():
             
             try:
                 response = generate_sql_with_model(
-                    token, question, schema_name, db_type, config_id
+                    token_manager, question, schema_name, db_type, config_id
                 )
                 elapsed = time.time() - start_time
                 

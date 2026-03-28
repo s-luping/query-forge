@@ -88,6 +88,30 @@
             overflow: visible;
         }
 
+        .model-cell {
+            max-width: 150px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .model-cell:hover {
+            white-space: normal;
+            overflow: visible;
+        }
+
+        .condition-cell {
+            max-width: 250px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .condition-cell:hover {
+            white-space: normal;
+            overflow: visible;
+        }
+
         .result-cell {
             max-width: 250px;
             overflow: hidden;
@@ -301,8 +325,8 @@
                 <tr>
                     <td>${item.id}</td>
                     <td class="question-cell" title="${escapeHtml(item.question)}">${escapeHtml(item.question)}</td>
-                    <td>${item.model}</td>
-                    <td><small>${item.conditions || '-'}</small></td>
+                    <td class="model-cell" title="${escapeHtml(item.model)}">${item.model}</td>
+                    <td class="condition-cell" title="${escapeHtml(item.conditions || '')}"><small>${item.conditions || '-'}</small></td>
                     <td class="result-cell" title="${escapeHtml(item.result || '')}">${escapeHtml(item.result || '-')}</td>
                     <td>${item.duration_ms ? item.duration_ms.toFixed(0) : '-'}</td>
                     <td>

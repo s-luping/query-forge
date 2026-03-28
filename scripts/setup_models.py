@@ -27,13 +27,16 @@ from models.llm_config import LLMConfig
 BASE_URL = "http://localhost:8188"
 
 API_FILE = os.path.join(SCRIPT_DIR, "api.txt")
-QWEN_API_KEY = ""
-DOUBAO_API_KEY = ""
+QWEN_API_KEY = "sk-d4a47dd0a6944718bd357aeadb2dfe29"
+DOUBAO_API_KEY = "d4396647-2384-4c9b-baed-0f62a33b0286"
+DEEPSEEK_API_KEY = ""
+KIMI_API_KEY = ""
+GLM_API_KEY = ""
 
 
 def load_api_keys():
     """从 api.txt 加载 API Key"""
-    global QWEN_API_KEY, DOUBAO_API_KEY
+    global QWEN_API_KEY, DOUBAO_API_KEY, DEEPSEEK_API_KEY, KIMI_API_KEY, GLM_API_KEY
     
     if os.path.exists(API_FILE):
         with open(API_FILE, "r", encoding="utf-8") as f:
@@ -45,9 +48,18 @@ def load_api_keys():
                         QWEN_API_KEY = key
                     elif provider.lower() == "doubao":
                         DOUBAO_API_KEY = key
+                    elif provider.lower() == "deepseek":
+                        DEEPSEEK_API_KEY = key
+                    elif provider.lower() == "kimi":
+                        KIMI_API_KEY = key
+                    elif provider.lower() == "glm":
+                        GLM_API_KEY = key
         print(f"从 {API_FILE} 加载 API Key")
         print(f"  Qwen: {'已配置' if QWEN_API_KEY else '未配置'}")
         print(f"  Doubao: {'已配置' if DOUBAO_API_KEY else '未配置'}")
+        print(f"  DeepSeek: {'已配置' if DEEPSEEK_API_KEY else '未配置'}")
+        print(f"  Kimi: {'已配置' if KIMI_API_KEY else '未配置'}")
+        print(f"  GLM: {'已配置' if GLM_API_KEY else '未配置'}")
 
 QWEN_MODELS = [
     {"model": "qwen-vl-ocr-2025-11-20", "max_tokens": 8000, "context": 32000},
@@ -156,10 +168,29 @@ DOUBAO_MODELS = [
     {"model": "doubao-seed-1-6-vision-250815", "max_tokens": 8000, "context": 256000},
     {"model": "doubao-seed-1-6-251015", "max_tokens": 8000, "context": 256000},
     {"model": "doubao-seed-1-6-250615", "max_tokens": 8000, "context": 256000},
+    {"model": "doubao-seed-1-6-flash-250615", "max_tokens": 8000, "context": 256000},
+    {"model": "doubao-seed-translation-250915", "max_tokens": 3000, "context": 4000},
     {"model": "doubao-1-5-pro-32k-250115", "max_tokens": 8000, "context": 128000},
-    {"model": "doubao-1-5-lite-32k-250115", "max_tokens": 8000, "context": 32000},
     {"model": "doubao-1-5-pro-32k-character-250715", "max_tokens": 8000, "context": 32000},
+    {"model": "doubao-1-5-pro-32k-character-250228", "max_tokens": 8000, "context": 32000},
+    {"model": "doubao-1-5-lite-32k-250115", "max_tokens": 8000, "context": 32000},
     {"model": "doubao-lite-32k-character-250228", "max_tokens": 8000, "context": 32000},
+]
+
+DEEPSEEK_MODELS = [
+    {"model": "deepseek-v3-2-251201", "max_tokens": 8000, "context": 128000},
+    {"model": "deepseek-v3-1-terminus", "max_tokens": 8000, "context": 128000},
+    {"model": "deepseek-v3-1-250821", "max_tokens": 8000, "context": 128000},
+    {"model": "deepseek-r1-250528", "max_tokens": 8000, "context": 128000},
+]
+
+GLM_MODELS = [
+    {"model": "glm-4-7-251222", "max_tokens": 8000, "context": 200000},
+]
+
+KIMI_MODELS = [
+    {"model": "kimi-k2-thinking-251104", "max_tokens": 8000, "context": 256000},
+    {"model": "kimi-k2-250905", "max_tokens": 8000, "context": 256000},
 ]
 
 
@@ -261,11 +292,14 @@ def main():
     
     load_api_keys()
     
-    if not QWEN_API_KEY and not DOUBAO_API_KEY:
+    if not any([QWEN_API_KEY, DOUBAO_API_KEY, DEEPSEEK_API_KEY, KIMI_API_KEY, GLM_API_KEY]):
         print("错误: 至少需要提供一个 API Key")
         print(f"请在 {API_FILE} 中配置 API Key")
         print("格式: qwen:your_api_key")
         print("      doubao:your_api_key")
+        print("      deepseek:your_api_key")
+        print("      kimi:your_api_key")
+        print("      glm:your_api_key")
         return
     
     users = ["admin"]
@@ -334,6 +368,93 @@ def main():
                     if create_result.get("id"):
                         valid_configs.append({
                             "provider": "doubao",
+                            "model": model,
+                            "config_id": create_result.get("id"),
+                            "context": model_info["context"]
+                        })
+                        print(f"    已保存配置 ID: {create_result.get('id')}")
+                    else:
+                        print(f"    保存失败: {create_result}")
+                else:
+                    print(f"✗ 无效 - {result.get('message', '')[:50]}")
+                
+                time.sleep(0.5)
+        
+        if DEEPSEEK_API_KEY:
+            print(f"\n测试 DeepSeek 模型...")
+            for model_info in DEEPSEEK_MODELS:
+                model = model_info["model"]
+                if ("deepseek", model) in existing_keys:
+                    print(f"  [跳过] {model} - 已存在")
+                    continue
+                
+                print(f"  测试 {model}...", end=" ")
+                result = test_model_connection(token, "deepseek", model, DEEPSEEK_API_KEY)
+                
+                if result.get("success"):
+                    print("✓ 有效")
+                    create_result = create_config(token, "deepseek", model, DEEPSEEK_API_KEY, model_info["max_tokens"])
+                    if create_result.get("id"):
+                        valid_configs.append({
+                            "provider": "deepseek",
+                            "model": model,
+                            "config_id": create_result.get("id"),
+                            "context": model_info["context"]
+                        })
+                        print(f"    已保存配置 ID: {create_result.get('id')}")
+                    else:
+                        print(f"    保存失败: {create_result}")
+                else:
+                    print(f"✗ 无效 - {result.get('message', '')[:50]}")
+                
+                time.sleep(0.5)
+        
+        if KIMI_API_KEY:
+            print(f"\n测试 Kimi 模型...")
+            for model_info in KIMI_MODELS:
+                model = model_info["model"]
+                if ("kimi", model) in existing_keys:
+                    print(f"  [跳过] {model} - 已存在")
+                    continue
+                
+                print(f"  测试 {model}...", end=" ")
+                result = test_model_connection(token, "kimi", model, KIMI_API_KEY)
+                
+                if result.get("success"):
+                    print("✓ 有效")
+                    create_result = create_config(token, "kimi", model, KIMI_API_KEY, model_info["max_tokens"])
+                    if create_result.get("id"):
+                        valid_configs.append({
+                            "provider": "kimi",
+                            "model": model,
+                            "config_id": create_result.get("id"),
+                            "context": model_info["context"]
+                        })
+                        print(f"    已保存配置 ID: {create_result.get('id')}")
+                    else:
+                        print(f"    保存失败: {create_result}")
+                else:
+                    print(f"✗ 无效 - {result.get('message', '')[:50]}")
+                
+                time.sleep(0.5)
+        
+        if GLM_API_KEY:
+            print(f"\n测试 GLM 模型...")
+            for model_info in GLM_MODELS:
+                model = model_info["model"]
+                if ("glm", model) in existing_keys:
+                    print(f"  [跳过] {model} - 已存在")
+                    continue
+                
+                print(f"  测试 {model}...", end=" ")
+                result = test_model_connection(token, "glm", model, GLM_API_KEY)
+                
+                if result.get("success"):
+                    print("✓ 有效")
+                    create_result = create_config(token, "glm", model, GLM_API_KEY, model_info["max_tokens"])
+                    if create_result.get("id"):
+                        valid_configs.append({
+                            "provider": "glm",
                             "model": model,
                             "config_id": create_result.get("id"),
                             "context": model_info["context"]
