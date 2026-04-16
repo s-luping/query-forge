@@ -42,7 +42,8 @@
 }
 
 .tpl-login-root input[type="text"],
-.tpl-login-root input[type="password"] {
+.tpl-login-root input[type="password"],
+.tpl-login-root input[type="email"] {
     width: 100%;
     box-sizing: border-box;
     padding: .7rem .9rem;
@@ -55,7 +56,8 @@
 }
 
 .tpl-login-root input[type="text"]:focus,
-.tpl-login-root input[type="password"]:focus {
+.tpl-login-root input[type="password"]:focus,
+.tpl-login-root input[type="email"]:focus {
     border-color: #2980b9;
     box-shadow: 0 0 0 2px #6dd5fa44
 }

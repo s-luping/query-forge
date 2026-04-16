@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>QueryForge</title>
     <link rel="stylesheet" href="/static/css/bootstrap.min.css">
-    <link rel="stylesheet" href="/static/css/template_index.css">
+    <link rel="stylesheet" href="/static/css/index.css">
 </head>
 
 <body class="tpl-index-root" style="overflow:hidden;">
@@ -18,16 +18,18 @@
                 <div class="menu-group">
                     <div class="menu-group-title" onclick="toggleMenu('llm')">大模型管理</div>
                     <div id="menu-llm" class="menu-items" style="display:none;">
-                        <div class="menu-item"
-                            onclick="openWindow('LLM 模型配置','/static/template/llm/llm_config.html')">模型配置管理</div>
-                        <div class="menu-item"
-                            onclick="openWindow('LLM 调用记录','/static/template/llm/llm_logs.html')">调用记录查询</div>
+                        <div class="menu-item" onclick="openWindow('LLM 模型配置','/static/template/llm/llm_config.html')">
+                            模型配置管理</div>
+                        <div class="menu-item" onclick="openWindow('LLM 调用记录','/static/template/llm/llm_logs.html')">
+                            调用记录查询</div>
                     </div>
                 </div>
                 <div class="menu-group">
                     <div class="menu-group-title" onclick="toggleMenu('schema')">Schema 管理</div>
                     <div id="menu-schema" class="menu-items" style="display:none;">
-                        <div class="menu-item" onclick="openWindow('Schema 管理','/static/template/schema/schema_manage.html')">DDL 解析管理</div>
+                        <div class="menu-item"
+                            onclick="openWindow('Schema 管理','/static/template/schema/schema_manage.html')">DDL 解析管理
+                        </div>
                     </div>
                 </div>
                 <div class="menu-group">
@@ -41,7 +43,8 @@
                     <div class="menu-group-title" onclick="toggleMenu('chat')">生成 SQL 与查询</div>
                     <div id="menu-chat" class="menu-items" style="display:none;">
                         <div class="menu-item"
-                            onclick="openWindow('生成 SQL 与查询','/static/template/chatSQL/chat_to_sql.html')">智能 SQL 生成</div>
+                            onclick="openWindow('生成 SQL 与查询','/static/template/chatSQL/chat_to_sql.html')">智能 SQL 生成
+                        </div>
                     </div>
                 </div>
             </div>
@@ -54,11 +57,14 @@
     </div>
     <!-- 顶部栏，右上角显示用户名 -->
     <div id="topbar" class="tpl-index-topbar">
-        <span class="tpl-index-topbar-title">QueryForge 智能数据查询平台 <span class="tpl-index-topbar-version">v1.0</span></span>
+        <span class="tpl-index-topbar-title">QueryForge 智能数据查询平台 <span
+                class="tpl-index-topbar-version">v1.0</span></span>
         <div class="dropdown tpl-index-user-dropdown">
             <span id="user-info" class="tpl-index-user-info"></span>
-            <a id="login-link" href="/login" class="tpl-index-login-link" style="display:none;color:#fff;text-decoration:none;">登录</a>
+            <a id="login-link" href="/login" class="tpl-index-login-link"
+                style="display:none;color:#fff;text-decoration:none;">登录</a>
             <div id="user-dropdown" class="tpl-index-user-dropdown-menu">
+                <a href="/static/template/change_password.html" class="tpl-index-logout-link">修改密码</a>
                 <a href="/logout" class="tpl-index-logout-link">退出登录</a>
             </div>
         </div>
@@ -169,7 +175,7 @@
             const userInfo = document.getElementById('user-info');
             const dropdown = document.getElementById('user-dropdown');
             const loginLink = document.getElementById('login-link');
-            
+
             if (userInfo.style.display !== 'none') {
                 userInfo.addEventListener('mouseenter', function () {
                     dropdown.style.display = 'block';
