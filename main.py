@@ -21,6 +21,7 @@ from app.routers.extra_router import router as extra_router
 from app.routers.table_data_router import router as table_data_router
 from app.routers.llm_router import router as llm_router
 from app.routers.llm_config_router import router as llm_config_router
+from app.routers.user_router import router as user_router
 from app.config import SECRET_KEY, ALGORITHM
 from models import init_database, AppSessionLocal
 from models.user import User
@@ -105,6 +106,7 @@ async def logout():
 
 
 app.include_router(base_router, tags=["基础认证"])
+app.include_router(user_router, prefix="/api/user", tags=["用户管理"])
 app.include_router(chat_to_sql_router,
                    prefix="/api/chat-to-sql", tags=["chat_to_sql"])
 app.include_router(schema_router, prefix="/api/schema", tags=["schema 管理"])
