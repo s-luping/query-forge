@@ -1,9 +1,4 @@
-# -*- coding: UTF-8 -*-
-"""
-配置模块 - 集中管理所有配置变量
-"""
-import os
-
+"""配置模块 — 数据库路径"""
 from app.utils import (
     _load_env_file,
     get_app_db_path,
@@ -14,10 +9,6 @@ from app.utils import (
 )
 
 _load_env_file()
-
-SECRET_KEY = os.getenv('SECRET_KEY', 'your-secret-key-here')
-ALGORITHM = os.getenv('ALGORITHM', 'HS256')
-ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv('ACCESS_TOKEN_EXPIRE_MINUTES', '1440'))
 
 APP_DB_PATH = get_app_db_path()
 SCHEMA_DB_PATH = get_schema_db_path()

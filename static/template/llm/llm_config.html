@@ -141,6 +141,11 @@
                         <label class="form-check-label" for="isDefault">设为默认模型</label>
                     </div>
 
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" class="form-check-input" id="isPublic">
+                        <label class="form-check-label" for="isPublic">公开（所有用户可见和使用）</label>
+                    </div>
+
                     <div class="d-flex gap-2">
                         <button type="button" class="btn btn-outline-primary btn-test" onclick="testConnection()">
                             <i class="fas fa-plug me-1"></i>测试连接
@@ -170,7 +175,10 @@
             const token = document.cookie.split('; ').find(row => row.startsWith('token='))?.split('=')[1];
             const headers = { 'Content-Type': 'application/json' };
             if (token) headers['Authorization'] = `Bearer ${token}`;
-            return fetch(url, { ...options, headers: { ...headers, ...options.headers } });
+            return fetch(url, { ...options, headers: { ...headers, ...options.headers } }).then(resp => {
+                if (resp.status === 401) { window.parent.location.href = '/login'; throw new Error('登录已过期'); }
+                return resp;
+            });
         };
 
         function toggleApiKey() {
@@ -281,6 +289,7 @@
                 temperature: parseFloat(document.getElementById('temperature').value) || 0.7,
                 timeout: parseInt(document.getElementById('timeout').value) || 300,
                 is_default: document.getElementById('isDefault').checked,
+                is_public: document.getElementById('isPublic').checked,
                 description: document.getElementById('description').value || null
             };
 
@@ -346,6 +355,7 @@
                         <div>
                             <div class="fw-bold">
                                 🤖 ${escapeHtml(item.provider)} / ${escapeHtml(item.model)}
+                                ${item.is_public ? '<span class="status-badge bg-info text-white ms-2">公共</span>' : '<span class="status-badge bg-light text-dark ms-2">私有</span>'}
                                 ${item.is_default ? '<span class="status-badge bg-success text-white ms-2">默认</span>' : ''}
                                 ${!item.is_active ? '<span class="status-badge bg-secondary text-white ms-2">已禁用</span>' : ''}
                             </div>
@@ -398,6 +408,7 @@
                 document.getElementById('temperature').value = config.temperature || 0.7;
                 document.getElementById('timeout').value = config.timeout || 300;
                 document.getElementById('isDefault').checked = config.is_default;
+                document.getElementById('isPublic').checked = config.is_public || false;
                 if (config.description) {
                     document.getElementById('description').value = config.description;
                 }
@@ -451,6 +462,7 @@
             document.getElementById('timeout').value = 300;
             document.getElementById('description').value = '';
             document.getElementById('isDefault').checked = false;
+            document.getElementById('isPublic').checked = false;
         }
 
         function escapeHtml(text) {

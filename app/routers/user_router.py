@@ -4,10 +4,10 @@
 """
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
-from sqlalchemy import func
 
 from app.auth import get_current_user
-from app.logger import logger
+from app.logger import logger, log_audit
+from app.routers.base_router import _validate_password_strength
 from models import AppSessionLocal
 from models.user import User
 
@@ -47,13 +47,20 @@ async def change_password(
         if user.password != request.current_password:
             logger.warning(f"用户 {username} 当前密码验证失败")
             raise HTTPException(status_code=400, detail="当前密码不正确")
-        
+
+        if current_user.get('role') == 'admin':
+            _validate_password_strength(request.new_password)
+        elif len(request.new_password) < 6:
+            raise HTTPException(status_code=400, detail="密码至少需要6个字符")
+
         # 更新密码
+        from datetime import datetime
         user.password = request.new_password
-        user.last_login = func.now()  # 更新最后登录时间作为修改标记
+        user.last_login = datetime.now()
         db.commit()
         
         logger.info(f"用户 {username} 密码修改成功")
+        log_audit(current_user, "change_password")
         return {"message": "密码修改成功"}
         
     except HTTPException:

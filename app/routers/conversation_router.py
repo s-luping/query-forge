@@ -68,8 +68,8 @@ def _get_user_llm_config(user_id: int, config_id: Optional[int] = None) -> Optio
         if config_id:
             config = db.query(LLMConfig).filter(
                 LLMConfig.id == config_id,
-                LLMConfig.user_id == user_id,
-                LLMConfig.is_active == True
+                LLMConfig.is_active == True,
+                (LLMConfig.is_public == True) | (LLMConfig.user_id == user_id)
             ).first()
         else:
             config = db.query(LLMConfig).filter(
@@ -417,14 +417,16 @@ def send_message(
 def list_conversations(
     user=Depends(get_current_user)
 ):
-    """获取对话列表"""
+    """获取对话列表（管理员看全部，用户看自己）"""
     user_id = user['user_id']
+    is_admin = user.get('role') == 'admin'
 
     db = ConversationSessionLocal()
     try:
-        conversations = db.query(Conversation).filter(
-            Conversation.user_id == user_id
-        ).order_by(Conversation.updated_at.desc()).all()
+        query = db.query(Conversation)
+        if not is_admin:
+            query = query.filter(Conversation.user_id == user_id)
+        conversations = query.order_by(Conversation.updated_at.desc()).all()
 
         result = []
         for conv in conversations:

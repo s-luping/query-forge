@@ -17,11 +17,12 @@ from app.routers.base_router import router as base_router
 from app.routers.chat_to_sql_router import router as chat_to_sql_router
 from app.routers.schema_router import router as schema_router
 from app.routers.extra_router import router as extra_router
-from app.routers.llm_router import router as llm_router
-from app.routers.llm_config_router import router as llm_config_router
+from app.routers.llm_router import log_router as llm_router, config_router as llm_config_router
 from app.routers.user_router import router as user_router
 from app.routers.conversation_router import router as conversation_router
-from app.config import SECRET_KEY, ALGORITHM
+from app.routers.system_router import router as system_router
+from app.routers.permission_router import router as permission_router
+from app.auth import ALGORITHM, _get_secret_key
 from models import init_database, AppSessionLocal
 from models.user import User
 
@@ -64,7 +65,7 @@ async def access_log_middleware(request: Request, call_next):
     token = request.cookies.get("token") or request.headers.get("Authorization", "").replace("Bearer ", "")
     if token:
         try:
-            payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+            payload = jwt.decode(token, _get_secret_key(), algorithms=[ALGORITHM])
             user_id = payload.get("user_id")
             username = payload.get("username")
         except:
@@ -115,6 +116,10 @@ app.include_router(llm_config_router,
                    prefix="/api/llm-config", tags=["LLM配置管理"])
 app.include_router(conversation_router,
                    prefix="/api/conversation", tags=["连续对话"])
+app.include_router(system_router,
+                   prefix="/api/system", tags=["系统配置"])
+app.include_router(permission_router,
+                   prefix="/api/permission", tags=["权限管理"])
 
 
 if __name__ == "__main__":

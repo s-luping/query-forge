@@ -1,22 +1,51 @@
-# -*- coding: UTF-8 -*-
 from datetime import datetime, timedelta
 
 import jwt
 from fastapi import HTTPException, Request
 
-from app.config import SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES
-from app.logger import logger
+from app.logger import logger, audit_logger
 from models import AppSessionLocal
 from models.user import User
 
+ALGORITHM = 'HS256'
+_FALLBACK_SECRET_KEY = '***REMOVED***'
+_FALLBACK_EXPIRE_MINUTES = 4320  # 3 天
+
+
+def _get_secret_key() -> str:
+    """从系统配置表读取 SECRET_KEY，不存在则返回默认值"""
+    try:
+        from models.system import SystemConfig
+        db = AppSessionLocal()
+        try:
+            row = db.query(SystemConfig).filter(SystemConfig.key == 'SECRET_KEY').first()
+            if row and row.value:
+                return row.value
+        finally:
+            db.close()
+    except Exception:
+        pass
+    return _FALLBACK_SECRET_KEY
+
+
+def _get_token_expire_minutes() -> int:
+    """从系统配置表读取 ACCESS_TOKEN_EXPIRE_MINUTES"""
+    try:
+        from models.system import SystemConfig
+        db = AppSessionLocal()
+        try:
+            row = db.query(SystemConfig).filter(SystemConfig.key == 'ACCESS_TOKEN_EXPIRE_MINUTES').first()
+            if row and row.value:
+                return int(row.value)
+        finally:
+            db.close()
+    except Exception:
+        pass
+    return _FALLBACK_EXPIRE_MINUTES
+
 
 def authenticate_user(username: str, password: str):
-    """
-    验证用户
-    :param username: 用户名
-    :param password: 密码
-    :return: 用户对象，如果验证失败则返回None
-    """
+    """验证用户"""
     logger.debug(f"尝试验证用户: {username}")
     with AppSessionLocal() as db:
         login_user = db.query(User).filter(User.username == username, User.password == password).first()
@@ -27,16 +56,17 @@ def authenticate_user(username: str, password: str):
     return login_user
 
 
-def create_access_token(data: dict, expires_delta=ACCESS_TOKEN_EXPIRE_MINUTES):
+def create_access_token(data: dict, expires_delta=None):
     """创建JWT访问令牌"""
     to_encode = data.copy()
-    if expires_delta and 0 < expires_delta < 60 * 60 * 24 * 7:
+    if expires_delta is None:
+        expires_delta = _get_token_expire_minutes()
+    if 0 < expires_delta < 60 * 60 * 24 * 7:
         expire = datetime.utcnow() + timedelta(minutes=expires_delta)
     else:
         expire = datetime.utcnow() + timedelta(minutes=15)
-
     to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    encoded_jwt = jwt.encode(to_encode, _get_secret_key(), algorithm=ALGORITHM)
     logger.debug(f"为用户 {data.get('username')} 创建访问令牌")
     return encoded_jwt
 
@@ -54,7 +84,7 @@ async def get_current_user(request: Request):
         raise HTTPException(status_code=401, detail="未登录，请先登录")
 
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        payload = jwt.decode(token, _get_secret_key(), algorithms=[ALGORITHM])
         user_id = payload.get('user_id')
         username = payload.get('username')
 

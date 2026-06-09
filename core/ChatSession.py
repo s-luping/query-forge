@@ -161,7 +161,7 @@ class ChatSession:
         keyword_set = set(k.lower() for k in keywords)
         db = SchemaSessionLocal()
         try:
-            query = db.query(Schema).filter(Schema.user_id == self.user_id)
+            query = db.query(Schema).filter(Schema.id > 0)
             if schema_name:
                 query = query.filter(Schema.schema_name == schema_name)
             schemas = query.all()
@@ -204,7 +204,7 @@ class ChatSession:
             # 没有召回任何表，尝试获取全部
             db = SchemaSessionLocal()
             try:
-                query = db.query(Schema).filter(Schema.user_id == self.user_id)
+                query = db.query(Schema).filter(Schema.id > 0)
                 if schema_name:
                     query = query.filter(Schema.schema_name == schema_name)
                 all_items = query.all()
@@ -218,7 +218,7 @@ class ChatSession:
             db = SchemaSessionLocal()
             try:
                 query = db.query(Schema).filter(
-                    Schema.user_id == self.user_id,
+                    Schema.id > 0,
                     Schema.table_name.in_(table_names)
                 )
                 if schema_name:
