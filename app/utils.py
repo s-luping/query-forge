@@ -28,14 +28,6 @@ def get_app_db_path() -> str:
     return path
 
 
-def get_history_db_path() -> str:
-    """获取历史记录数据库路径"""
-    path = os.getenv('HISTORY_DB_PATH', 'db/sys_history.db')
-    if not os.path.isabs(path):
-        path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), path)
-    return path
-
-
 def get_schema_db_path() -> str:
     """获取模式数据库路径"""
     path = os.getenv('SCHEMA_DB_PATH', 'db/sys_schema.db')
@@ -49,17 +41,6 @@ def get_extra_db_path() -> str:
     path = os.getenv('EXTRA_DB_PATH', 'db/sys_extra.db')
     if not os.path.isabs(path):
         path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), path)
-    return path
-
-
-def get_temp_db_path() -> str:
-    """获取临时数据库目录路径"""
-    path = os.getenv('TEMP_DB_PATH', 'db/temp/')
-    if not os.path.isabs(path):
-        path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), path)
-    path = os.path.normpath(path)
-    if not path.endswith(os.sep):
-        path = path + os.sep
     return path
 
 

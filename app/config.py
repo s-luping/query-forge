@@ -7,10 +7,8 @@ import os
 from app.utils import (
     _load_env_file,
     get_app_db_path,
-    get_history_db_path,
     get_schema_db_path,
     get_extra_db_path,
-    get_temp_db_path,
     get_llm_db_path,
     get_conversation_db_path
 )
@@ -22,9 +20,7 @@ ALGORITHM = os.getenv('ALGORITHM', 'HS256')
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv('ACCESS_TOKEN_EXPIRE_MINUTES', '1440'))
 
 APP_DB_PATH = get_app_db_path()
-HISTORY_DB_PATH = get_history_db_path()
 SCHEMA_DB_PATH = get_schema_db_path()
 EXTRA_DB_PATH = get_extra_db_path()
-TEMP_DB_PATH = get_temp_db_path()
 LLM_DB_PATH = get_llm_db_path()
 CONVERSATION_DB_PATH = get_conversation_db_path()

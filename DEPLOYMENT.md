@@ -2,12 +2,13 @@
 
 ## 项目概述
 
-QueryForge 是一款基于自然语言的数据查询工具，通过大模型技术将自然语言转换为 SQL 查询语句。支持多种主流大模型（GLM、Qwen、DeepSeek、Doubao、OpenAI）、Schema 管理、表数据管理、SQL 生成与查询等功能。
+QueryForge 是一款基于自然语言的数据查询工具，通过大模型技术将自然语言转换为 SQL 查询语句。支持所有 OpenAI 兼容 API 的大模型、Schema 管理、SQL 生成与多轮对话等功能。
 
 ### 技术亮点
 
 - **智能 SQL 生成**：字段级索引 + 按表聚合的 RAG 方案，兼顾精确检索与上下文完整性
-- **多模型支持**：支持 5 种主流大模型，前端灵活配置
+- **灵活模型配置**：支持所有 OpenAI 兼容 API，前端自由配置供应商和模型
+- **多轮对话**：支持连续对话式 SQL 生成，基于上下文迭代优化
 - **高性能向量存储**：纯 Python 实现，基于 BGE-M3 embedding 模型
 - **多数据库解析**：支持 MySQL、PostgreSQL、Oracle、SQL Server、Hive、Doris、ClickHouse 等 DDL 解析
 
@@ -47,11 +48,11 @@ ACCESS_TOKEN_EXPIRE_MINUTES=30
 
 # 数据库路径配置（默认值即可）
 APP_DB_PATH=db/sys_app.db
-HISTORY_DB_PATH=db/sys_history.db
 SCHEMA_DB_PATH=db/sys_schema.db
 EXTRA_DB_PATH=db/sys_extra.db
 TEMP_DB_PATH=db/temp/
 LLM_DB_PATH=db/sys_llm.db
+CONVERSATION_DB_PATH=db/sys_conversation.db
 ```
 
 ### 3. 下载向量模型（推荐）
@@ -83,11 +84,12 @@ docker-compose up -d
 登录系统后，需要在前端配置大模型 API：
 
 1. 点击左侧菜单「大模型管理」→「模型配置管理」
-2. 选择模型提供商（GLM/Qwen/DeepSeek/Doubao/OpenAI）
-3. 输入 API 密钥和模型名称（可自定义输入）
-4. 可配置参数：Max Tokens、Temperature、Timeout
-5. 点击「测试连接」验证配置
-6. 保存配置并设为默认
+2. 输入模型供应商名称（如 OpenAI、DeepSeek、智谱AI 等，自由输入）
+3. 输入模型名称（如 gpt-4、deepseek-chat 等）和 API 密钥
+4. 填写 API 地址（OpenAI 兼容端点）
+5. 可配置参数：Max Tokens、Temperature、Timeout
+6. 点击「测试连接」验证配置
+7. 保存配置并设为默认
 
 ### 7. 配置 Schema
 
@@ -218,10 +220,10 @@ docker-compose logs -f
 | 数据库 | 说明 |
 |--------|------|
 | sys_app.db | 用户数据、LLM配置 |
-| sys_history.db | SQL生成历史记录 |
 | sys_schema.db | Schema数据 |
 | sys_extra.db | 补充知识数据 |
-| sys_llm.db | LLM调用记录 |
+| sys_llm.db | LLM调用记录（含供应商、Token、成本） |
+| sys_conversation.db | 多轮对话和消息记录 |
 
 向量索引存储在 `db/vectors/` 目录。
 
@@ -330,14 +332,14 @@ python download_model.py
 
 ### 3. SQL 生成流程
 
-1. 进入「生成 SQL 与查询」页面
-2. 选择 Schema（必选）
+1. 进入「Chat SQL 连续对话」页面
+2. 选择 Schema 和数据库类型
 3. 输入自然语言问题
-4. 点击「生成 SQL」
-5. 查看生成的 SQL 并执行查询
+4. 点击发送，系统生成 SQL 并返回结果
+5. 可继续发送跟进消息，基于上下文迭代优化 SQL
 
 **补充知识**：
-- 点击右上角「补充知识」按钮
+- 在对话创建时可选择已配置的补充知识
 - 可添加字段示例值、表间关系、领域知识
 - 帮助大模型生成更准确的 SQL
 

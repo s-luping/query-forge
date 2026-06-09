@@ -1,6 +1,6 @@
 # -*- coding: UTF-8 -*-
 """
-多模型LLM客户端 - 支持GLM、Qwen、DeepSeek、Doubao等主流大模型
+LLM客户端 - 通用大模型API调用
 """
 import time
 from typing import Optional
@@ -11,40 +11,26 @@ from app.logger import llm_logger
 
 
 class LLMClient:
-    """多模型大模型客户端"""
+    """通用大模型客户端"""
 
-    AUTH_PREFIX = 'Bearer'
-
-    # 提供商配置: (显示名称, API地址)
-    MODEL_CONFIGS = {
-        'glm':      ('智谱GLM',     'https://open.bigmodel.cn/api/paas/v4/chat/completions'),
-        'qwen':     ('阿里通义千问', 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions'),
-        'deepseek': ('DeepSeek',    'https://api.deepseek.com/v1/chat/completions'),
-        'doubao':   ('字节豆包',    'https://ark.cn-beijing.volces.com/api/v3/chat/completions'),
-        'openai':   ('OpenAI',      'https://api.openai.com/v1/chat/completions'),
-    }
-
-    def __init__(self, provider: str = 'glm', api_key: str = "", model: str = "",
+    def __init__(self, provider: str = '', api_key: str = "", model: str = "",
+                 base_url: Optional[str] = None,
                  max_tokens: int = 8000, timeout: int = 300, temperature: float = 0.7):
         """
         初始化客户端
-        :param provider: 模型提供商 (glm, qwen, deepseek, doubao, openai)
+        :param provider: 模型供应商名称（自由输入，如 OpenAI、DeepSeek 等）
         :param api_key: API密钥
-        :param model: 模型名称，不指定则使用默认
+        :param model: 模型名称
+        :param base_url: API地址
         :param max_tokens: 最大生成token数
         :param timeout: 请求超时时间（秒）
         :param temperature: 生成随机性 (0-2)
         """
-        self.provider = provider.lower() if provider else 'glm'
-
-        if self.provider not in self.MODEL_CONFIGS:
-            raise ValueError(f"不支持的模型提供商: {provider}，支持的提供商: {list(self.MODEL_CONFIGS.keys())}")
-
-        _name, _url = self.MODEL_CONFIGS[self.provider]
-        self.provider_name = _name
+        self.provider = provider or ''
+        self.provider_name = provider or ''
+        self.base_url = base_url or ''
         self.api_key = api_key or ''
         self.model = model or ''
-        self.base_url = _url
         self.max_tokens = max_tokens
         self.timeout = timeout
         self.temperature = temperature
@@ -75,7 +61,7 @@ class LLMClient:
             raise ValueError(f"未配置 {self.provider_name} API密钥，请设置环境变量或在前端配置")
 
         headers = {
-            "Authorization": f"{self.AUTH_PREFIX} {self.api_key}",
+            "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json"
         }
         payload = {
@@ -150,7 +136,7 @@ class LLMClient:
             raise ValueError(f"未配置 {self.provider_name} API密钥，请设置环境变量或在前端配置")
 
         headers = {
-            "Authorization": f"{self.AUTH_PREFIX} {self.api_key}",
+            "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json"
         }
         payload = {
@@ -219,7 +205,7 @@ class LLMClient:
                 return {'success': False, 'message': 'API密钥未配置'}
 
             headers = {
-                "Authorization": f"{self.AUTH_PREFIX} {self.api_key}",
+                "Authorization": f"Bearer {self.api_key}",
                 "Content-Type": "application/json"
             }
             payload = {
@@ -236,16 +222,8 @@ class LLMClient:
             )
 
             if response.status_code == 200:
-                return {'success': True, 'message': f'{self.config["name"]} API连接成功'}
+                return {'success': True, 'message': f'{self.provider_name} API连接成功'}
             else:
                 return {'success': False, 'message': f'API返回错误: {response.status_code} - {response.text[:200]}'}
         except Exception as e:
             return {'success': False, 'message': f'连接失败: {str(e)}'}
-
-    @classmethod
-    def get_supported_providers(cls) -> list:
-        """获取支持的模型提供商列表"""
-        return [
-            {'provider': key, 'name': name, 'url': url}
-            for key, (name, url) in cls.MODEL_CONFIGS.items()
-        ]

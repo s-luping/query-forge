@@ -11,7 +11,7 @@ from pydantic import BaseModel
 from app.auth import get_current_user
 from app.logger import logger
 from models import LLMSessionLocal
-from models.llm_log import LLMLog
+from models.llm import LLMLog
 
 router = APIRouter()
 
@@ -21,6 +21,7 @@ class LLMLogItem(BaseModel):
     id: int
     user_id: int
     conversation_id: Optional[int] = None
+    provider: Optional[str] = None
     question: str
     model: str
     conditions: Optional[str]
@@ -29,6 +30,7 @@ class LLMLogItem(BaseModel):
     prompt_tokens: Optional[int]
     completion_tokens: Optional[int]
     total_tokens: Optional[int]
+    cost: Optional[float] = None
     status: Optional[str]
     error_message: Optional[str]
     created_at: Optional[datetime]
@@ -51,6 +53,7 @@ class LLMLogStats(BaseModel):
     total_completion_tokens: int
     avg_duration_ms: float
     success_rate: float
+    total_cost: Optional[float] = 0.0
 
 
 @router.get("/list", response_model=LLMLogListResponse)
@@ -108,7 +111,8 @@ def get_llm_stats(
                 func.sum(LLMLog.total_tokens).label('total_tokens'),
                 func.sum(LLMLog.prompt_tokens).label('prompt_tokens'),
                 func.sum(LLMLog.completion_tokens).label('completion_tokens'),
-                func.avg(LLMLog.duration_ms).label('avg_duration')
+                func.avg(LLMLog.duration_ms).label('avg_duration'),
+                func.sum(LLMLog.cost).label('total_cost')
             ).filter(LLMLog.user_id == user_id).first()
 
             return LLMLogStats(
@@ -117,7 +121,8 @@ def get_llm_stats(
                 total_prompt_tokens=stats.prompt_tokens or 0,
                 total_completion_tokens=stats.completion_tokens or 0,
                 avg_duration_ms=round(stats.avg_duration or 0, 2),
-                success_rate=round(success_calls / total_calls * 100, 2) if total_calls > 0 else 0
+                success_rate=round(success_calls / total_calls * 100, 2) if total_calls > 0 else 0,
+                total_cost=round(stats.total_cost or 0, 6)
             )
         finally:
             db.close()
