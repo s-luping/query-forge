@@ -1,6 +1,5 @@
-# -*- coding: UTF-8 -*-
 """
-models 包 - 包含所有 SQLAlchemy 模型和初始化逻辑
+models 包 - SQLAlchemy 模型和数据库初始化
 """
 import os
 from datetime import datetime
@@ -8,7 +7,7 @@ from datetime import datetime
 from sqlalchemy import create_engine, text, event
 from sqlalchemy.orm import declarative_base, sessionmaker
 
-from app.config import APP_DB_PATH, HISTORY_DB_PATH, SCHEMA_DB_PATH, EXTRA_DB_PATH, LLM_DB_PATH, CONVERSATION_DB_PATH
+from app.config import APP_DB_PATH, SCHEMA_DB_PATH, EXTRA_DB_PATH, LLM_DB_PATH, CONVERSATION_DB_PATH
 from app.logger import logger
 
 Base = declarative_base()
@@ -39,11 +38,9 @@ app_engine = _create_engine_with_wal(APP_DB_PATH)
 llm_engine = _create_engine_with_wal(LLM_DB_PATH)
 schema_engine = _create_engine_with_wal(SCHEMA_DB_PATH)
 extra_engine = _create_engine_with_wal(EXTRA_DB_PATH)
-history_engine = _create_engine_with_wal(HISTORY_DB_PATH)
 conversation_engine = _create_engine_with_wal(CONVERSATION_DB_PATH)
 
 AppSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=app_engine)
-HistorySessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=history_engine)
 SchemaSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=schema_engine)
 ExtraSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=extra_engine)
 LLMSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=llm_engine)
@@ -55,7 +52,7 @@ def init_database():
     _ensure_db_dirs()
 
     from models.user import User
-    from models.llm_config import LLMConfig
+    from models.llm import LLMConfig
 
     User.__table__.create(bind=app_engine, checkfirst=True)
     LLMConfig.__table__.create(bind=app_engine, checkfirst=True)
@@ -64,7 +61,6 @@ def init_database():
     logger.info(f"应用数据库表创建/检查完成: {APP_DB_PATH}")
     print(f"应用数据库表创建/检查完成: {APP_DB_PATH}")
 
-    init_history_database()
     init_schema_database()
     init_extra_database()
     init_llm_database()
@@ -73,20 +69,11 @@ def init_database():
 
 def _ensure_db_dirs():
     """确保数据库目录存在"""
-    for db_path in [APP_DB_PATH, HISTORY_DB_PATH, SCHEMA_DB_PATH, EXTRA_DB_PATH, LLM_DB_PATH]:
+    for db_path in [APP_DB_PATH, SCHEMA_DB_PATH, EXTRA_DB_PATH, LLM_DB_PATH, CONVERSATION_DB_PATH]:
         db_dir = os.path.dirname(db_path)
         if db_dir and not os.path.exists(db_dir):
             os.makedirs(db_dir)
             logger.info(f"创建数据库目录: {db_dir}")
-
-
-def init_history_database():
-    """初始化历史记录数据库"""
-    from models.historical_sql import HistoricalSQL
-
-    HistoricalSQL.__table__.create(bind=history_engine, checkfirst=True)
-    logger.info(f"历史记录数据库表创建/检查完成: {HISTORY_DB_PATH}")
-    print(f"历史记录数据库表创建/检查完成: {HISTORY_DB_PATH}")
 
 
 def init_schema_database():
@@ -109,11 +96,34 @@ def init_extra_database():
 
 def init_llm_database():
     """初始化LLM调用记录数据库"""
-    from models.llm_log import LLMLog
+    from models.llm import LLMLog
 
     LLMLog.__table__.create(bind=llm_engine, checkfirst=True)
+
+    # 迁移：为已有数据库添加新列
+    _migrate_llm_log_columns()
+
     logger.info(f"LLM调用记录数据库表创建/检查完成: {LLM_DB_PATH}")
     print(f"LLM调用记录数据库表创建/检查完成: {LLM_DB_PATH}")
+
+
+def _migrate_llm_log_columns():
+    """迁移LLM调用记录表 - 添加新列（如果不存在）"""
+    import sqlalchemy
+    try:
+        with llm_engine.connect() as conn:
+            # 检查 provider 列是否存在
+            result = conn.execute(sqlalchemy.text("PRAGMA table_info('llm_logs')"))
+            columns = [row[1] for row in result.fetchall()]
+            if 'provider' not in columns:
+                conn.execute(sqlalchemy.text("ALTER TABLE llm_logs ADD COLUMN provider VARCHAR(50) DEFAULT ''"))
+                logger.info("迁移: llm_logs 表添加 provider 列")
+            if 'cost' not in columns:
+                conn.execute(sqlalchemy.text("ALTER TABLE llm_logs ADD COLUMN cost FLOAT DEFAULT 0.0"))
+                logger.info("迁移: llm_logs 表添加 cost 列")
+            conn.commit()
+    except Exception as e:
+        logger.warning(f"LLM调用记录表迁移失败（可忽略）: {e}")
 
 
 def init_conversation_database():

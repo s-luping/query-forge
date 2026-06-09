@@ -1,25 +1,40 @@
-# -*- coding: UTF-8 -*-
 """
 QueryForge SQL生成路由
 """
 import hashlib
 import time
-from typing import Optional
+from typing import Optional, List
 
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.security import HTTPBearer
+from pydantic import BaseModel
 
 from app.auth import get_current_user
 from app.logger import logger
 from app.routers.extra_router import get_extra_knowledge_safe
-from app.routers.history_router import get_successful_queries
 from core.LLMClient import LLMClient
 from core.SQLGenerator import SqlGenerator
 from core.SQLPipeline import SQLPipeline
-from core.models import TextToSqlRequest, SqlValidationResponse
 from models import AppSessionLocal, LLMSessionLocal
-from models.llm_config import LLMConfig
-from models.llm_log import LLMLog
+from models.llm import LLMConfig, LLMLog
+
+
+class TextToSqlRequest(BaseModel):
+    """文本转SQL请求模型"""
+    query: str
+    table_names: Optional[List[str]] = None
+    knowledge_id: Optional[int] = None
+    db_type: Optional[str] = "sqlite"
+    schema_name: Optional[str] = None
+    llm_config_id: Optional[int] = None
+
+
+class SqlValidationResponse(BaseModel):
+    """SQL验证响应模型"""
+    is_valid: bool
+    sql_query: str
+    error_message: Optional[str] = None
+    columns: Optional[List[str]] = None
 
 router = APIRouter()
 
@@ -62,16 +77,7 @@ def get_user_llm_config(user_id: int, config_id: Optional[int] = None) -> Option
         db.close()
 
 
-def get_history_queries_safe(user_id: int) -> list:
-    """获取历史成功查询（可选，失败返回空列表）"""
-    try:
-        return get_successful_queries(user_id)
-    except Exception as e:
-        logger.warning(f"获取历史查询失败（非致命）: {e}")
-        return []
-
-
-def save_llm_log(user_id: int, question: str, model: str, conditions: str,
+def save_llm_log(user_id: int, provider: str, question: str, model: str, conditions: str,
                  result: str, duration_ms: float, prompt_tokens: int,
                  completion_tokens: int, total_tokens: int, status: str = 'success',
                  error_message: str = None):
@@ -80,6 +86,7 @@ def save_llm_log(user_id: int, question: str, model: str, conditions: str,
     try:
         log = LLMLog(
             user_id=user_id,
+            provider=provider,
             question=question,
             model=model,
             conditions=conditions,
@@ -139,12 +146,11 @@ def generate_sql(
                 provider=llm_config['provider'],
                 api_key=llm_config['api_key'],
                 model=llm_config['model'],
+                base_url=llm_config.get('base_url'),
                 max_tokens=llm_config['max_tokens'],
                 timeout=llm_config['timeout'],
                 temperature=llm_config['temperature']
             )
-            if llm_config.get('base_url'):
-                llm_client.base_url = llm_config['base_url']
             logger.info(f"使用用户配置的模型: {llm_config['provider']} - {llm_config['model']}")
         else:
             llm_client = LLMClient()
@@ -156,9 +162,6 @@ def generate_sql(
             sql_generator=sql_generator
         )
 
-        history_queries = get_history_queries_safe(user_id)
-        logger.info(f"历史查询: {len(history_queries)} 条")
-
         knowledge = get_extra_knowledge_safe(user_id, request.knowledge_id)
         extra_knowledge = knowledge.get("extra_knowledge", "")
         logger.info(f"补充知识: {'已加载' if extra_knowledge else '无'}")
@@ -167,7 +170,7 @@ def generate_sql(
             query=request.query,
             schema_name=request.schema_name,
             extra_knowledge=extra_knowledge.strip() if extra_knowledge else "",
-            history_queries=history_queries,
+            history_queries=[],
             db_type=request.db_type
         )
 
@@ -191,6 +194,7 @@ def generate_sql(
 
         save_llm_log(
             user_id=user_id,
+            provider=llm_client.provider,
             question=request.query,
             model=model_name,
             conditions=conditions,
@@ -212,20 +216,6 @@ def generate_sql(
 
         validation_cache[cache_key] = (response, time.time())
 
-        try:
-            from app.routers.history_router import add_history
-            add_history(
-                query=request.query,
-                sql_query=generated_sql,
-                is_valid=is_valid,
-                error_message=error_msg if not is_valid else None,
-                user_id=user_id,
-                schema_name=request.schema_name,
-                knowledge_id=request.knowledge_id
-            )
-        except Exception as e:
-            logger.warning(f"保存历史记录失败（非致命）: {e}")
-
         return response
 
     except HTTPException:
@@ -234,6 +224,7 @@ def generate_sql(
         logger.error(f"文本转SQL验证失败: {e}")
         save_llm_log(
             user_id=user_id,
+            provider='unknown',
             question=request.query,
             model='unknown',
             conditions=f"schema_name={request.schema_name}, knowledge_id={request.knowledge_id}",

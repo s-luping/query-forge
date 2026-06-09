@@ -1,15 +1,16 @@
 # QueryForge 智能数据查询平台
 
-QueryForge 是一款基于自然语言的数据查询工具，通过大模型技术将自然语言转换为 SQL 查询语句。支持多种主流大模型、Schema 管理、表数据管理、SQL 生成与查询等功能，适用于企业数据分析和快速查询场景。
+QueryForge 是一款基于自然语言的数据查询工具，通过大模型技术将自然语言转换为 SQL 查询语句。支持任意 OpenAI 兼容 API 的大模型、Schema 管理、SQL 生成与查询等功能，适用于企业数据分析和快速查询场景。
 
 ---
 
 ## 技术亮点
 
-### 1. 多模型支持
-- **主流大模型集成**：支持 GLM、Qwen、DeepSeek、Doubao、OpenAI 等主流大模型
-- **前端灵活配置**：通过前端界面配置 API 密钥、模型参数（Max Tokens、Temperature、Timeout）
+### 1. 灵活的模型配置
+- **任意模型支持**：支持所有 OpenAI 兼容 API 的大模型，自由输入供应商、模型名称和 API 地址
+- **前端灵活配置**：通过前端界面配置供应商、模型、API 密钥、API 地址及参数（Max Tokens、Temperature、Timeout）
 - **连接测试验证**：支持 API 连接测试，确保配置正确
+- **调用记录追踪**：自动记录每次 LLM 调用的供应商、模型、Token 消耗、成本、耗时、状态
 
 ### 2. 智能 SQL 生成流程
 - **字段级索引 + 按表聚合**：业界领先的 RAG 方案，兼顾精确检索与上下文完整性
@@ -29,9 +30,8 @@ QueryForge 是一款基于自然语言的数据查询工具，通过大模型技
 - **自动向量索引**：字段数量 >= 50 时自动构建向量索引
 
 ### 5. 完善的数据管理
-- **多数据库分离存储**：用户、历史、知识、Schema、LLM 调用记录分别存储
-- **表数据 CRUD**：支持表数据预览、增删改查操作
-- **历史 SQL 查询**：支持从历史记录中选择 SQL 进行查询
+- **多数据库分离存储**：用户、LLM配置、Schema、补充知识、LLM调用记录、对话记录分别存储
+- **对话记录持久化**：多轮对话和消息自动保存，支持历史对话回溯
 
 ---
 
@@ -44,32 +44,32 @@ QueryForge/
 │   │   ├── base_router.py          # 基础认证路由
 │   │   ├── chat_to_sql_router.py   # SQL生成核心路由
 │   │   ├── schema_router.py        # Schema 管理路由
-│   │   ├── history_router.py       # 历史记录路由
 │   │   ├── extra_router.py        # 补充知识路由
-│   │   ├── table_data_router.py   # 表数据管理路由
 │   │   ├── llm_config_router.py   # 大模型配置路由
-│   │   └── llm_router.py          # LLM调用记录路由
+│   │   ├── llm_router.py          # LLM调用记录路由
+│   │   ├── conversation_router.py  # 多轮对话路由
+│   │   └── user_router.py         # 用户管理路由
 │   ├── config.py           # 配置管理
 │   ├── auth.py             # 用户认证 (JWT)
 │   ├── logger.py           # 日志管理
 │   ├── limiter.py          # 限流配置
 │   └── utils.py            # 工具函数
 ├── core/                   # 核心业务模块
-│   ├── LLMClient.py        # 大模型客户端（支持GLM/Qwen/DeepSeek/Doubao/OpenAI）
+│   ├── LLMClient.py        # 大模型客户端（通用 OpenAI 兼容 API）
 │   ├── SQLGenerator.py     # SQL 生成器
 │   ├── SQLPipeline.py      # SQL生成流程优化（字段级索引+按表聚合）
+│   ├── ChatSession.py      # 多轮对话会话管理
 │   ├── VectorStore.py      # 向量存储（sentence-transformers + BGE-M3）
 │   ├── KeywordExtractor.py # 关键词提取器
-│   ├── DatabaseManager.py  # 数据库管理器
 │   └── models.py           # 数据模型
-├── models/                 # 数据模型定义
+├── models/                 # SQLAlchemy 数据模型
 │   ├── user.py             # 用户模型
-│   ├── schema.py           # Schema 解析模型
-│   ├── historical_sql.py   # SQL 历史记录模型
+│   ├── schema.py           # Schema 模型
 │   ├── extra_knowledge.py  # 补充知识模型
+│   ├── conversation.py     # 多轮对话模型
 │   ├── llm_config.py       # 大模型配置模型
 │   ├── llm_log.py          # LLM调用记录模型
-│   └── __init__.py         # 数据库初始化
+│   └── __init__.py         # 数据库初始化与迁移
 ├── scheduler/              # 定时任务模块
 │   ├── scheduler.py        # 调度器管理
 │   └── jobs.py            # 定时任务定义
@@ -81,21 +81,22 @@ QueryForge/
 │       ├── index.html           # 主页面
 │       ├── login.html           # 登录页面
 │       ├── change_password.html # 修改密码页面
-│       ├── chatSQL/            # SQL生成页面
-│       │   └── chat_to_sql.html
+│       ├── chatSQL/            # Chat SQL 多轮对话页面
+│       │   └── chat.html
 │       ├── llm/                # 大模型管理页面
-│       │   ├── llm_config.html
-│       │   └── llm_logs.html
-│       ├── schema/             # Schema管理页面
-│       │   └── schema_manage.html
-│       └── table_data/         # 表数据管理页面
-│           └── table_data.html
+│       │   ├── llm_config.html  # 模型配置
+│       │   └── llm_logs.html    # 调用记录
+│       └── schema/             # Schema管理页面
+│           └── schema_manage.html
 ├── utils/                  # 工具模块
 │   └── DBSchemaUtil.py     # 数据库 Schema 工具
 ├── db/                     # SQLite 数据库存储（运行时自动创建）
-│   ├── app.db              # 应用数据库（用户、LLM配置等）
-│   ├── vectors/            # 向量索引存储
-│   └── schema.json         # Spider 数据集示例
+│   ├── sys_app.db           # 用户、LLM配置
+│   ├── sys_schema.db        # Schema 数据
+│   ├── sys_extra.db         # 补充知识
+│   ├── sys_llm.db           # LLM 调用记录
+│   ├── sys_conversation.db  # 多轮对话记录
+│   └── vectors/            # 向量索引存储
 ├── models/                 # 本地模型存储
 │   └── embeddings/         # Embedding 模型
 │       └── bge-m3/        # BGE-M3 模型
@@ -116,22 +117,22 @@ QueryForge/
 
 ### 1. 大模型管理
 
-- **多模型支持**：支持 GLM、Qwen、DeepSeek、Doubao、OpenAI 等主流大模型
-- **前端配置**：通过前端界面配置 API 密钥、模型参数（Max Tokens、Temperature、Timeout）
-- **配置管理**：支持多配置管理，可设置默认配置
+- **任意模型支持**：支持所有 OpenAI 兼容 API，自由输入供应商名称、模型名称和 API 地址
+- **前端配置**：通过前端界面配置供应商、API 密钥、模型名称、API 地址及参数
+- **配置管理**：支持多配置管理，可设置默认配置和启用/禁用
 - **连接测试**：支持 API 连接测试验证
-- **调用记录**：记录所有 LLM 调用详情，包括问题、模型、条件、结果、耗时、Token 消耗
+- **调用记录**：记录所有 LLM 调用详情，包括供应商、模型、Token 消耗、成本、耗时、状态
 
 ### 2. SQL 生成与查询
 
+- **多轮对话**：支持连续对话式 SQL 生成，基于上下文迭代优化
 - **自然语言转 SQL**：通过自然语言描述生成 SQL 查询语句
 - **智能流程优化**：
   - 关键词提取：从问题中抽取关键词
   - 向量语义搜索：基于 BGE-M3 模型检索相关字段
   - 按表聚合：获取完整表结构作为上下文
-- **大模型集成**：支持多种主流大模型，智能理解查询意图
+- **大模型集成**：支持所有 OpenAI 兼容 API，智能理解查询意图
 - **SQL 验证**：自动验证生成的 SQL 安全性，只允许 SELECT 查询
-- **历史记录**：保存查询历史，支持评分和复用
 - **补充知识**：支持字段示例值、表间关系、领域知识等补充信息
 
 ### 3. Schema 管理
@@ -209,11 +210,12 @@ python main.py
 ### 5. 配置大模型
 
 1. 登录系统后，点击左侧菜单「大模型管理」→「模型配置管理」
-2. 选择模型提供商（GLM/Qwen/DeepSeek/Doubao/OpenAI）
-3. 输入 API 密钥和模型名称
-4. 配置参数：Max Tokens、Temperature、Timeout
-5. 点击「测试连接」验证配置
-6. 保存配置并设为默认
+2. 输入模型供应商名称（如 OpenAI、DeepSeek、智谱AI 等，自由输入）
+3. 输入模型名称（如 gpt-4、deepseek-chat 等）和 API 密钥
+4. 填写 API 地址（OpenAI 兼容端点）
+5. 配置参数：Max Tokens、Temperature、Timeout
+6. 点击「测试连接」验证配置
+7. 保存配置并设为默认
 
 ### 6. 配置 Schema
 
@@ -270,7 +272,7 @@ app = FastAPI(docs_url="/docs", redoc_url="/redoc", lifespan=lifespan)
 ## 技术栈
 
 - **后端**：FastAPI + SQLAlchemy + SQLite
-- **大模型**：支持 GLM、Qwen、DeepSeek、Doubao、OpenAI
+- **大模型**：支持所有 OpenAI 兼容 API（通用客户端，自由配置）
 - **向量模型**：sentence-transformers + BGE-M3
 - **前端**：HTML + JavaScript + Bootstrap 5
 - **部署**：Docker + Docker Compose
@@ -279,11 +281,15 @@ app = FastAPI(docs_url="/docs", redoc_url="/redoc", lifespan=lifespan)
 
 ## 数据库说明
 
-项目使用 SQLite 数据库存储应用数据，数据库文件在首次运行时自动创建：
+项目使用多个 SQLite 数据库分离存储不同类型的数据，文件在首次运行时自动创建：
 
 | 数据库 | 说明 |
 |--------|------|
-| app.db | 用户数据、LLM配置、Schema、历史记录、补充知识等 |
+| sys_app.db | 用户数据、LLM配置 |
+| sys_schema.db | Schema 元数据 |
+| sys_extra.db | 补充知识 |
+| sys_llm.db | LLM 调用记录（含供应商、Token、成本） |
+| sys_conversation.db | 多轮对话和消息记录 |
 
 向量索引存储在 `db/vectors/` 目录。
 
@@ -317,11 +323,6 @@ app = FastAPI(docs_url="/docs", redoc_url="/redoc", lifespan=lifespan)
 
 ## 扩展开发
 
-### 添加新的大模型支持
-
-1. 在 `core/LLMClient.py` 的 `MODEL_CONFIGS` 中添加新模型配置
-2. 添加对应的默认模型和 API 地址
-
 ### 添加新的业务功能
 
 1. 在 `app/routers/` 目录创建新的路由文件
@@ -336,6 +337,22 @@ app = FastAPI(docs_url="/docs", redoc_url="/redoc", lifespan=lifespan)
 ---
 
 ## 更新日志
+
+### v1.3.0
+
+- **模型配置重构**：
+  - 移除硬编码的模型供应商列表，改为自由文本输入
+  - 支持所有 OpenAI 兼容 API，不再局限于 5 种内置供应商
+  - 简化前端配置页面，供应商、模型、API 密钥、API 地址自由填写
+  - LLM 调用记录新增供应商和成本字段
+  - 数据库自动迁移，兼容旧版本升级
+- **多轮对话**：
+  - 新增 Chat SQL 连续对话功能
+  - 支持基于历史上下文的 SQL 迭代优化
+  - 对话记录持久化存储
+- **代码精简**：
+  - 移除独立的历史记录模块（功能已整合到对话系统）
+  - 移除 `sys_history.db`，精简为 5 个数据库
 
 ### v1.2.0
 
@@ -362,10 +379,7 @@ app = FastAPI(docs_url="/docs", redoc_url="/redoc", lifespan=lifespan)
 
 - 支持自然语言转 SQL
 - 支持 Schema 管理
-- 支持历史记录和评分
 - 支持补充知识功能
-- 支持多种主流大模型（GLM/Qwen/DeepSeek/Doubao/OpenAI）
 - 支持前端配置大模型参数
 - 支持 LLM 调用记录追踪
-- 支持表数据管理
 - 支持 Docker 部署

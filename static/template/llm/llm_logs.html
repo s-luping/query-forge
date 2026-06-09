@@ -173,27 +173,31 @@
     <div class="container-fluid">
         <div class="stats-card">
             <div class="row">
-                <div class="col-md-2 stats-item">
+                <div class="col stats-item">
                     <div class="stats-value" id="totalCalls">0</div>
                     <div class="stats-label">总调用次数</div>
                 </div>
-                <div class="col-md-2 stats-item">
+                <div class="col stats-item">
                     <div class="stats-value" id="totalTokens">0</div>
                     <div class="stats-label">总Token消耗</div>
                 </div>
-                <div class="col-md-2 stats-item">
+                <div class="col stats-item">
                     <div class="stats-value" id="promptTokens">0</div>
                     <div class="stats-label">输入Token</div>
                 </div>
-                <div class="col-md-2 stats-item">
+                <div class="col stats-item">
                     <div class="stats-value" id="completionTokens">0</div>
                     <div class="stats-label">输出Token</div>
                 </div>
-                <div class="col-md-2 stats-item">
+                <div class="col stats-item">
+                    <div class="stats-value" id="totalCost">$0</div>
+                    <div class="stats-label">总成本</div>
+                </div>
+                <div class="col stats-item">
                     <div class="stats-value" id="avgDuration">0</div>
                     <div class="stats-label">平均耗时(ms)</div>
                 </div>
-                <div class="col-md-2 stats-item">
+                <div class="col stats-item">
                     <div class="stats-value" id="successRate">0%</div>
                     <div class="stats-label">成功率</div>
                 </div>
@@ -219,12 +223,13 @@
                             <tr>
                                 <th>ID</th>
                                 <th>来源</th>
+                                <th>供应商</th>
                                 <th>问题</th>
                                 <th>模型</th>
-                                <th>条件</th>
                                 <th>结果</th>
                                 <th>耗时(ms)</th>
                                 <th>Token</th>
+                                <th>成本</th>
                                 <th>状态</th>
                                 <th>时间</th>
                                 <th>操作</th>
@@ -232,7 +237,7 @@
                         </thead>
                         <tbody id="logsTable">
                             <tr>
-                                <td colspan="11" class="text-center text-muted py-4">加载中...</td>
+                                <td colspan="12" class="text-center text-muted py-4">加载中...</td>
                             </tr>
                         </tbody>
                     </table>
@@ -281,11 +286,12 @@
             try {
                 const response = await apiRequest('/api/llm/stats');
                 const data = await response.json();
-                
+
                 document.getElementById('totalCalls').textContent = data.total_calls;
                 document.getElementById('totalTokens').textContent = data.total_tokens.toLocaleString();
                 document.getElementById('promptTokens').textContent = data.total_prompt_tokens.toLocaleString();
                 document.getElementById('completionTokens').textContent = data.total_completion_tokens.toLocaleString();
+                document.getElementById('totalCost').textContent = '$' + ((data.total_cost || 0).toFixed(4));
                 document.getElementById('avgDuration').textContent = data.avg_duration_ms.toFixed(0);
                 document.getElementById('successRate').textContent = data.success_rate + '%';
             } catch (e) {
@@ -310,7 +316,7 @@
             } catch (e) {
                 console.error('加载记录失败:', e);
                 document.getElementById('logsTable').innerHTML = 
-                    '<tr><td colspan="11" class="text-center text-danger py-4">加载失败</td></tr>';
+                    '<tr><td colspan="12" class="text-center text-danger py-4">加载失败</td></tr>';
             }
         }
 
@@ -318,7 +324,7 @@
             const tbody = document.getElementById('logsTable');
             
             if (!items || items.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="11" class="text-center text-muted py-4">暂无记录</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="12" class="text-center text-muted py-4">暂无记录</td></tr>';
                 return;
             }
 
@@ -326,9 +332,9 @@
                 <tr>
                     <td>${item.id}</td>
                     <td>${item.conversation_id ? `<a href="javascript:void(0)" onclick="parent.openWindow('Chat SQL','/static/template/chatSQL/chat.html')" class="badge bg-info text-decoration-none">对话 #${item.conversation_id}</a>` : '<span class="text-muted">单次</span>'}</td>
+                    <td><small>${escapeHtml(item.provider || '-')}</small></td>
                     <td class="question-cell" title="${escapeHtml(item.question)}">${escapeHtml(item.question)}</td>
                     <td class="model-cell" title="${escapeHtml(item.model)}">${item.model}</td>
-                    <td class="condition-cell" title="${escapeHtml(item.conditions || '')}"><small>${item.conditions || '-'}</small></td>
                     <td class="result-cell" title="${escapeHtml(item.result || '')}">${escapeHtml(item.result || '-')}</td>
                     <td>${item.duration_ms ? item.duration_ms.toFixed(0) : '-'}</td>
                     <td>
@@ -337,6 +343,7 @@
                             <span class="text-muted">(${item.prompt_tokens || 0}/${item.completion_tokens || 0})</span>
                         </small>
                     </td>
+                    <td><small>${item.cost ? '$' + item.cost.toFixed(6) : '-'}</small></td>
                     <td>
                         <span class="status-${item.status}">${getStatusText(item.status)}</span>
                     </td>
@@ -404,11 +411,15 @@
                         <div class="detail-value">${escapeHtml(item.question)}</div>
                     </div>
                     <div class="row">
-                        <div class="col-md-6 detail-item">
+                        <div class="col-md-4 detail-item">
+                            <div class="detail-label">供应商</div>
+                            <div class="detail-value">${escapeHtml(item.provider || '-')}</div>
+                        </div>
+                        <div class="col-md-4 detail-item">
                             <div class="detail-label">来源</div>
                             <div class="detail-value">${item.conversation_id ? `对话 #${item.conversation_id}` : '单次生成'}</div>
                         </div>
-                        <div class="col-md-6 detail-item">
+                        <div class="col-md-4 detail-item">
                             <div class="detail-label">模型</div>
                             <div class="detail-value">${item.model}</div>
                         </div>
@@ -424,17 +435,21 @@
                             <div class="detail-label">耗时</div>
                             <div class="detail-value">${item.duration_ms ? item.duration_ms.toFixed(2) : '-'} ms</div>
                         </div>
-                        <div class="col-md-3 detail-item">
+                        <div class="col-md-2 detail-item">
                             <div class="detail-label">输入Token</div>
                             <div class="detail-value">${item.prompt_tokens || 0}</div>
                         </div>
-                        <div class="col-md-3 detail-item">
+                        <div class="col-md-2 detail-item">
                             <div class="detail-label">输出Token</div>
                             <div class="detail-value">${item.completion_tokens || 0}</div>
                         </div>
-                        <div class="col-md-3 detail-item">
+                        <div class="col-md-2 detail-item">
                             <div class="detail-label">总Token</div>
                             <div class="detail-value">${item.total_tokens || 0}</div>
+                        </div>
+                        <div class="col-md-3 detail-item">
+                            <div class="detail-label">成本</div>
+                            <div class="detail-value">${item.cost ? '$' + item.cost.toFixed(6) : '-'}</div>
                         </div>
                     </div>
                     <div class="detail-item">

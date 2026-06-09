@@ -12,7 +12,7 @@ from app.auth import get_current_user
 from app.logger import logger
 from core.LLMClient import LLMClient
 from models import AppSessionLocal
-from models.llm_config import LLMConfig
+from models.llm import LLMConfig
 
 router = APIRouter()
 
@@ -22,7 +22,7 @@ class LLMConfigCreate(BaseModel):
     provider: str
     model: str
     api_key: str
-    base_url: Optional[str] = None
+    base_url: str
     max_tokens: Optional[int] = 8000
     temperature: Optional[float] = 0.7
     timeout: Optional[int] = 300
@@ -69,13 +69,6 @@ class LLMConfigListResponse(BaseModel):
     total: int
 
 
-class ProviderInfo(BaseModel):
-    """模型提供商信息"""
-    provider: str
-    name: str
-    url: str
-
-
 class TestConnectionRequest(BaseModel):
     """测试连接请求"""
     provider: str
@@ -87,11 +80,6 @@ class TestConnectionRequest(BaseModel):
     config_id: Optional[int] = None
 
 
-@router.get("/providers", response_model=List[ProviderInfo])
-def get_providers():
-    """获取支持的模型提供商列表"""
-    providers = LLMClient.get_supported_providers()
-    return [ProviderInfo(**p) for p in providers]
 
 
 @router.get("/list", response_model=LLMConfigListResponse)
@@ -319,11 +307,9 @@ def test_connection(
             provider=request.provider,
             api_key=api_key,
             model=request.model,
+            base_url=base_url,
             max_tokens=request.max_tokens or 8000
         )
-
-        if base_url:
-            client.base_url = base_url
 
         result = client.test_connection()
         return result

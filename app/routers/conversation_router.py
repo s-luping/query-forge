@@ -61,7 +61,7 @@ class MessageItem(BaseModel):
 def _get_user_llm_config(user_id: int, config_id: Optional[int] = None) -> Optional[dict]:
     """获取用户的LLM配置"""
     from models import AppSessionLocal
-    from models.llm_config import LLMConfig
+    from models.llm import LLMConfig
 
     db = AppSessionLocal()
     try:
@@ -102,32 +102,32 @@ def _build_llm_client(user_id: int, llm_config_id: Optional[int] = None) -> LLMC
             provider=llm_config['provider'],
             api_key=llm_config['api_key'],
             model=llm_config['model'],
+            base_url=llm_config.get('base_url'),
             max_tokens=llm_config['max_tokens'],
             timeout=llm_config['timeout'],
             temperature=llm_config['temperature']
         )
-        if llm_config.get('base_url'):
-            llm_client.base_url = llm_config['base_url']
     else:
         llm_client = LLMClient()
 
     return llm_client
 
 
-def _save_llm_log(user_id: int, question: str, model: str, conditions: str,
+def _save_llm_log(user_id: int, provider: str, question: str, model: str, conditions: str,
                   result: str, duration_ms: float, prompt_tokens: int,
                   completion_tokens: int, total_tokens: int,
                   status: str = 'success', error_message: str = None,
                   conversation_id: int = None):
     """保存LLM调用记录"""
     from models import LLMSessionLocal
-    from models.llm_log import LLMLog
+    from models.llm import LLMLog
 
     db = LLMSessionLocal()
     try:
         log = LLMLog(
             user_id=user_id,
             conversation_id=conversation_id,
+            provider=provider,
             question=question,
             model=model,
             conditions=conditions,
@@ -248,6 +248,7 @@ def create_conversation(
         tokens = result.get('tokens', {})
         _save_llm_log(
             user_id=user_id,
+            provider=llm_client.provider,
             question=request.query,
             model=llm_client.model,
             conditions=f"schema={request.schema_name}, db_type={request.db_type}",
@@ -371,6 +372,7 @@ def send_message(
         tokens = result.get('tokens', {})
         _save_llm_log(
             user_id=user_id,
+            provider=llm_client.provider,
             question=request.content,
             model=llm_client.model,
             conditions=f"conversation={conversation_id}, followup",

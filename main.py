@@ -16,7 +16,6 @@ from app.logger import logger
 from app.routers.base_router import router as base_router
 from app.routers.chat_to_sql_router import router as chat_to_sql_router
 from app.routers.schema_router import router as schema_router
-from app.routers.history_router import router as history_router
 from app.routers.extra_router import router as extra_router
 from app.routers.llm_router import router as llm_router
 from app.routers.llm_config_router import router as llm_config_router
@@ -110,7 +109,6 @@ app.include_router(user_router, prefix="/api/user", tags=["用户管理"])
 app.include_router(chat_to_sql_router,
                    prefix="/api/chat-to-sql", tags=["chat_to_sql"])
 app.include_router(schema_router, prefix="/api/schema", tags=["schema 管理"])
-app.include_router(history_router, prefix="/api/history", tags=["历史记录"])
 app.include_router(extra_router, prefix="/api/extra-knowledge", tags=["补充知识"])
 app.include_router(llm_router, prefix="/api/llm", tags=["LLM调用记录"])
 app.include_router(llm_config_router,
