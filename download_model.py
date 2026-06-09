@@ -1,7 +1,7 @@
 # -*- coding: UTF-8 -*-
 """
 从 ModelScope 下载 BGE-M3 多语言嵌入模型
-保存路径: D:\projects\QueryForge\models\embeddings\bge-m3
+保存路径: {项目根目录}/models/embeddings/bge-m3
 """
 import os
 import sys
@@ -42,7 +42,7 @@ def download_model():
         
     except ImportError:
         print("\n未安装 modelscope，正在安装...")
-        os.system(f'pip install --user modelscope')
+        os.system(f'"{sys.executable}" -m pip install modelscope')
         try:
             from modelscope import snapshot_download
             print("正在从 ModelScope 下载模型，请稍候...")

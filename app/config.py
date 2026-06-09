@@ -11,7 +11,8 @@ from app.utils import (
     get_schema_db_path,
     get_extra_db_path,
     get_temp_db_path,
-    get_llm_db_path
+    get_llm_db_path,
+    get_conversation_db_path
 )
 
 _load_env_file()
@@ -26,3 +27,4 @@ SCHEMA_DB_PATH = get_schema_db_path()
 EXTRA_DB_PATH = get_extra_db_path()
 TEMP_DB_PATH = get_temp_db_path()
 LLM_DB_PATH = get_llm_db_path()
+CONVERSATION_DB_PATH = get_conversation_db_path()

@@ -20,6 +20,7 @@ class LLMLogItem(BaseModel):
     """LLM调用记录项模型"""
     id: int
     user_id: int
+    conversation_id: Optional[int] = None
     question: str
     model: str
     conditions: Optional[str]

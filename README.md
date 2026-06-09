@@ -80,9 +80,9 @@ QueryForge/
 │   └── template/          # HTML 模板
 │       ├── index.html           # 主页面
 │       ├── login.html           # 登录页面
+│       ├── change_password.html # 修改密码页面
 │       ├── chatSQL/            # SQL生成页面
-│       │   ├── chat_to_sql.html
-│       │   └── chat_to_data.html
+│       │   └── chat_to_sql.html
 │       ├── llm/                # 大模型管理页面
 │       │   ├── llm_config.html
 │       │   └── llm_logs.html
@@ -92,21 +92,16 @@ QueryForge/
 │           └── table_data.html
 ├── utils/                  # 工具模块
 │   └── DBSchemaUtil.py     # 数据库 Schema 工具
-├── db/                     # SQLite 数据库存储
-│   ├── sys_app.db          # 应用数据库（用户、LLM配置）
-│   ├── sys_history.db      # 历史记录数据库
-│   ├── sys_schema.db       # Schema数据库
-│   ├── sys_extra.db        # 补充知识数据库
-│   ├── sys_llm.db          # LLM调用记录数据库
+├── db/                     # SQLite 数据库存储（运行时自动创建）
+│   ├── app.db              # 应用数据库（用户、LLM配置等）
 │   ├── vectors/            # 向量索引存储
 │   └── schema.json         # Spider 数据集示例
 ├── models/                 # 本地模型存储
 │   └── embeddings/         # Embedding 模型
 │       └── bge-m3/        # BGE-M3 模型
-├── scripts/                # 测试脚本
-│   ├── test_pipeline.py
-│   ├── test_query.py
-│   └── test_vector_index.py
+├── scripts/                # 工具脚本
+│   ├── batch_generate.py     # 批量生成脚本
+│   └── setup_models.py       # 模型初始化脚本
 ├── main.py                 # 项目入口
 ├── download_model.py        # 模型下载脚本
 ├── requirements.txt         # Python 依赖
@@ -153,7 +148,7 @@ QueryForge/
 - **多数据库支持**：JSON/DDL 支持多数据库自动识别
 - **JSON 格式解析**：支持 Spider 数据集格式和自定义格式
 - **字段信息管理**：表名、字段名、类型、注释、主键等
-- **自动向量索引**：字段数量 >= 50 时自动构建
+- **自动向量索引**：字段数量 >= 5000 时自动构建
 
 ### 4. 表数据管理
 
@@ -180,9 +175,10 @@ QueryForge/
 
 ### 1. 环境要求
 
-- Python 3.12+
+- Python >= 3.9, < 3.12（推荐 3.10.x）
 - SQLite
 - 网络访问（用于调用大模型 API）
+- **注意**：Python 3.12+ 尚未充分测试；Windows 下 PyTorch 2.12.0 与 Python 3.10 存在 DLL 兼容性问题，requirements.txt 已排除该版本
 
 ### 2. 安装依赖
 
@@ -199,6 +195,8 @@ python download_model.py
 ```
 
 模型将下载到 `models/embeddings/bge-m3` 目录。
+
+> 向量索引构建的详细原理和流程，请参考 [docs/VECTOR_INDEX.md](docs/VECTOR_INDEX.md)
 
 ### 4. 启动服务
 
@@ -281,15 +279,11 @@ app = FastAPI(docs_url="/docs", redoc_url="/redoc", lifespan=lifespan)
 
 ## 数据库说明
 
-项目使用多个 SQLite 数据库分离存储不同类型的数据：
+项目使用 SQLite 数据库存储应用数据，数据库文件在首次运行时自动创建：
 
 | 数据库 | 说明 |
 |--------|------|
-| sys_app.db | 用户数据、LLM配置 |
-| sys_history.db | SQL生成历史记录 |
-| sys_schema.db | Schema数据 |
-| sys_extra.db | 补充知识数据 |
-| sys_llm.db | LLM调用记录 |
+| app.db | 用户数据、LLM配置、Schema、历史记录、补充知识等 |
 
 向量索引存储在 `db/vectors/` 目录。
 
