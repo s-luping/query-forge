@@ -1,9 +1,15 @@
 # d:\projects\py\query-forge\core\KeywordExtractor.py
+import os
 import re
 import jieba
 from typing import List, Set
 from collections import Counter
 from app.logger import logger
+
+# 优先使用项目本地字典，避免 pip 包缺少 dict.txt 导致分词失败
+_LOCAL_DICT = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'jieba', 'dict.txt')
+if os.path.exists(_LOCAL_DICT):
+    jieba.set_dictionary(_LOCAL_DICT)
 
 
 class KeywordExtractor:

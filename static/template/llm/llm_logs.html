@@ -218,6 +218,7 @@
                         <thead>
                             <tr>
                                 <th>ID</th>
+                                <th>来源</th>
                                 <th>问题</th>
                                 <th>模型</th>
                                 <th>条件</th>
@@ -231,7 +232,7 @@
                         </thead>
                         <tbody id="logsTable">
                             <tr>
-                                <td colspan="10" class="text-center text-muted py-4">加载中...</td>
+                                <td colspan="11" class="text-center text-muted py-4">加载中...</td>
                             </tr>
                         </tbody>
                     </table>
@@ -309,7 +310,7 @@
             } catch (e) {
                 console.error('加载记录失败:', e);
                 document.getElementById('logsTable').innerHTML = 
-                    '<tr><td colspan="10" class="text-center text-danger py-4">加载失败</td></tr>';
+                    '<tr><td colspan="11" class="text-center text-danger py-4">加载失败</td></tr>';
             }
         }
 
@@ -317,13 +318,14 @@
             const tbody = document.getElementById('logsTable');
             
             if (!items || items.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="10" class="text-center text-muted py-4">暂无记录</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="11" class="text-center text-muted py-4">暂无记录</td></tr>';
                 return;
             }
 
             tbody.innerHTML = items.map(item => `
                 <tr>
                     <td>${item.id}</td>
+                    <td>${item.conversation_id ? `<a href="javascript:void(0)" onclick="parent.openWindow('Chat SQL','/static/template/chatSQL/chat.html')" class="badge bg-info text-decoration-none">对话 #${item.conversation_id}</a>` : '<span class="text-muted">单次</span>'}</td>
                     <td class="question-cell" title="${escapeHtml(item.question)}">${escapeHtml(item.question)}</td>
                     <td class="model-cell" title="${escapeHtml(item.model)}">${item.model}</td>
                     <td class="condition-cell" title="${escapeHtml(item.conditions || '')}"><small>${item.conditions || '-'}</small></td>
@@ -403,10 +405,16 @@
                     </div>
                     <div class="row">
                         <div class="col-md-6 detail-item">
+                            <div class="detail-label">来源</div>
+                            <div class="detail-value">${item.conversation_id ? `对话 #${item.conversation_id}` : '单次生成'}</div>
+                        </div>
+                        <div class="col-md-6 detail-item">
                             <div class="detail-label">模型</div>
                             <div class="detail-value">${item.model}</div>
                         </div>
-                        <div class="col-md-6 detail-item">
+                    </div>
+                    <div class="row">
+                        <div class="col-md-12 detail-item">
                             <div class="detail-label">条件</div>
                             <div class="detail-value">${item.conditions || '-'}</div>
                         </div>

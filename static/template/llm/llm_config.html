@@ -141,12 +141,9 @@
 
                             <div class="mb-3">
                                 <label class="form-label">模型名称</label>
-                                <input type="text" class="form-control" id="modelInput" 
-                                       list="modelList" placeholder="选择或输入模型名称" required>
-                                <datalist id="modelList">
-                                    <option value="">请先选择提供商</option>
-                                </datalist>
-                                <small class="text-muted">可从列表选择或手动输入自定义模型名称</small>
+                                <input type="text" class="form-control" id="modelInput"
+                                       placeholder="输入模型名称，如 qwen-plus、deepseek-chat" required>
+                                <small class="text-muted">请手动输入模型名称</small>
                             </div>
 
                             <div class="mb-3">
@@ -267,7 +264,6 @@
                                 ${providerIcons[p.provider]?.icon || '🤖'}
                             </div>
                             <div class="provider-name">${p.name}</div>
-                            <div class="provider-models">${p.models.length} 个模型</div>
                         </div>
                     </div>
                 </div>
@@ -283,14 +279,7 @@
             document.getElementById(`provider-${provider}`).classList.add('selected');
             
             document.getElementById('providerName').value = selectedProvider.name;
-            
-            const modelList = document.getElementById('modelList');
-            modelList.innerHTML = selectedProvider.models.map(m => 
-                `<option value="${m}">`
-            ).join('');
-            
-            document.getElementById('modelInput').value = selectedProvider.default_model;
-            
+
             document.getElementById('configId').value = '';
             document.getElementById('apiKey').value = '';
             document.getElementById('baseUrl').value = '';
@@ -563,7 +552,7 @@
             });
             selectedProvider = null;
             document.getElementById('providerName').value = '';
-            document.getElementById('modelList').innerHTML = '<option value="">请先选择提供商</option>';
+            document.getElementById('modelInput').value = '';
         }
 
         document.addEventListener('DOMContentLoaded', function () {

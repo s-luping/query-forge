@@ -69,3 +69,11 @@ def get_llm_db_path() -> str:
     if not os.path.isabs(path):
         path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), path)
     return path
+
+
+def get_conversation_db_path() -> str:
+    """获取对话记录数据库路径"""
+    path = os.getenv('CONVERSATION_DB_PATH', 'db/sys_conversation.db')
+    if not os.path.isabs(path):
+        path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), path)
+    return path

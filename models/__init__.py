@@ -8,7 +8,7 @@ from datetime import datetime
 from sqlalchemy import create_engine, text, event
 from sqlalchemy.orm import declarative_base, sessionmaker
 
-from app.config import APP_DB_PATH, HISTORY_DB_PATH, SCHEMA_DB_PATH, EXTRA_DB_PATH, LLM_DB_PATH
+from app.config import APP_DB_PATH, HISTORY_DB_PATH, SCHEMA_DB_PATH, EXTRA_DB_PATH, LLM_DB_PATH, CONVERSATION_DB_PATH
 from app.logger import logger
 
 Base = declarative_base()
@@ -40,12 +40,14 @@ llm_engine = _create_engine_with_wal(LLM_DB_PATH)
 schema_engine = _create_engine_with_wal(SCHEMA_DB_PATH)
 extra_engine = _create_engine_with_wal(EXTRA_DB_PATH)
 history_engine = _create_engine_with_wal(HISTORY_DB_PATH)
+conversation_engine = _create_engine_with_wal(CONVERSATION_DB_PATH)
 
 AppSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=app_engine)
 HistorySessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=history_engine)
 SchemaSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=schema_engine)
 ExtraSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=extra_engine)
 LLMSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=llm_engine)
+ConversationSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=conversation_engine)
 
 
 def init_database():
@@ -66,6 +68,7 @@ def init_database():
     init_schema_database()
     init_extra_database()
     init_llm_database()
+    init_conversation_database()
     create_default_admin()
 
 def _ensure_db_dirs():
@@ -111,6 +114,16 @@ def init_llm_database():
     LLMLog.__table__.create(bind=llm_engine, checkfirst=True)
     logger.info(f"LLM调用记录数据库表创建/检查完成: {LLM_DB_PATH}")
     print(f"LLM调用记录数据库表创建/检查完成: {LLM_DB_PATH}")
+
+
+def init_conversation_database():
+    """初始化对话记录数据库"""
+    from models.conversation import Conversation, ConversationMessage
+
+    Conversation.__table__.create(bind=conversation_engine, checkfirst=True)
+    ConversationMessage.__table__.create(bind=conversation_engine, checkfirst=True)
+    logger.info(f"对话记录数据库表创建/检查完成: {CONVERSATION_DB_PATH}")
+    print(f"对话记录数据库表创建/检查完成: {CONVERSATION_DB_PATH}")
 
 
 def create_default_admin():

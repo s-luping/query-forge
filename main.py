@@ -18,10 +18,10 @@ from app.routers.chat_to_sql_router import router as chat_to_sql_router
 from app.routers.schema_router import router as schema_router
 from app.routers.history_router import router as history_router
 from app.routers.extra_router import router as extra_router
-from app.routers.table_data_router import router as table_data_router
 from app.routers.llm_router import router as llm_router
 from app.routers.llm_config_router import router as llm_config_router
 from app.routers.user_router import router as user_router
+from app.routers.conversation_router import router as conversation_router
 from app.config import SECRET_KEY, ALGORITHM
 from models import init_database, AppSessionLocal
 from models.user import User
@@ -67,7 +67,7 @@ async def access_log_middleware(request: Request, call_next):
         try:
             payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
             user_id = payload.get("user_id")
-            username = payload.get("sub")
+            username = payload.get("username")
         except:
             pass
     
@@ -112,10 +112,11 @@ app.include_router(chat_to_sql_router,
 app.include_router(schema_router, prefix="/api/schema", tags=["schema 管理"])
 app.include_router(history_router, prefix="/api/history", tags=["历史记录"])
 app.include_router(extra_router, prefix="/api/extra-knowledge", tags=["补充知识"])
-app.include_router(table_data_router, prefix="/api/table-data", tags=["表数据管理"])
 app.include_router(llm_router, prefix="/api/llm", tags=["LLM调用记录"])
 app.include_router(llm_config_router,
                    prefix="/api/llm-config", tags=["LLM配置管理"])
+app.include_router(conversation_router,
+                   prefix="/api/conversation", tags=["连续对话"])
 
 
 if __name__ == "__main__":

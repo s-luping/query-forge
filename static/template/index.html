@@ -33,17 +33,13 @@
                     </div>
                 </div>
                 <div class="menu-group">
-                    <div class="menu-group-title" onclick="toggleMenu('data')">表数据管理</div>
-                    <div id="menu-data" class="menu-items" style="display:none;">
-                        <div class="menu-item"
-                            onclick="openWindow('表数据管理','/static/template/table_data/table_data.html')">表数据管理与查询</div>
-                    </div>
-                </div>
-                <div class="menu-group">
                     <div class="menu-group-title" onclick="toggleMenu('chat')">生成 SQL 与查询</div>
                     <div id="menu-chat" class="menu-items" style="display:none;">
                         <div class="menu-item"
-                            onclick="openWindow('生成 SQL 与查询','/static/template/chatSQL/chat_to_sql.html')">智能 SQL 生成
+                            onclick="openWindow('Chat SQL 连续对话','/static/template/chatSQL/chat.html')">💬 Chat SQL
+                        </div>
+                        <div class="menu-item"
+                            onclick="openWindow('补充知识管理','/static/template/extra_knowledge.html')">补充知识管理
                         </div>
                     </div>
                 </div>

@@ -15,6 +15,7 @@ class LLMLog(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(Integer, nullable=False, index=True)
+    conversation_id = Column(Integer, nullable=True, index=True)  # 关联的对话ID
     question = Column(Text, nullable=False)
     model = Column(String(100), nullable=False)
     conditions = Column(Text)

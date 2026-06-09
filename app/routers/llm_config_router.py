@@ -73,8 +73,7 @@ class ProviderInfo(BaseModel):
     """模型提供商信息"""
     provider: str
     name: str
-    default_model: str
-    models: List[str]
+    url: str
 
 
 class TestConnectionRequest(BaseModel):
