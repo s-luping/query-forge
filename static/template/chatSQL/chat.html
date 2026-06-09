@@ -435,7 +435,10 @@ function apiRequest(url, options = {}) {
     const token = document.cookie.split('; ').find(row => row.startsWith('token='))?.split('=')[1];
     const headers = { 'Content-Type': 'application/json' };
     if (token) headers['Authorization'] = `Bearer ${token}`;
-    return fetch(url, { ...options, headers });
+    return fetch(url, { ...options, headers }).then(resp => {
+        if (resp.status === 401) { window.parent.location.href = '/login'; throw new Error('登录已过期'); }
+        return resp;
+    });
 }
 
 // ── State ──────────────────────────────────────────────────

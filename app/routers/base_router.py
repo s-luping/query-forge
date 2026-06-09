@@ -1,3 +1,4 @@
+import re
 from datetime import datetime
 from typing import Optional
 
@@ -11,6 +12,20 @@ from models import AppSessionLocal
 from models.user import User
 
 router = APIRouter()
+
+
+def _validate_password_strength(password: str):
+    """验证密码强度：>=8位，含大小写字母+数字+特殊字符"""
+    if len(password) < 8:
+        raise HTTPException(status_code=400, detail="密码至少需要8个字符")
+    if not re.search(r'[a-z]', password):
+        raise HTTPException(status_code=400, detail="密码必须包含小写字母")
+    if not re.search(r'[A-Z]', password):
+        raise HTTPException(status_code=400, detail="密码必须包含大写字母")
+    if not re.search(r'\d', password):
+        raise HTTPException(status_code=400, detail="密码必须包含数字")
+    if not re.search(r'[!@#$%^&*(),.?\":{}|<>_\-+=;\[\]\\/`~]', password):
+        raise HTTPException(status_code=400, detail="密码必须包含特殊字符")
 
 
 class LoginRequest(BaseModel):

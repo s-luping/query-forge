@@ -18,6 +18,7 @@ class LLMConfig(Base):
     timeout = Column(Integer, default=300, comment='请求超时(秒)')
     is_default = Column(Boolean, default=False, comment='是否默认')
     is_active = Column(Boolean, default=True, comment='是否启用')
+    is_public = Column(Boolean, default=False, comment='是否公开(所有用户可见)')
     description = Column(Text, comment='备注')
     created_at = Column(DateTime, default=datetime.now, comment='创建时间')
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment='更新时间')

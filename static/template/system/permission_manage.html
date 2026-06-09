@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>权限管理</title>
+    <link rel="stylesheet" href="/static/css/bootstrap.min.css">
+    <style>
+        body { background: #f4f6fa; font-size: 14px; }
+        .container-fluid { padding: 20px; }
+        .card { border: none; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); margin-bottom: 20px; }
+        .card-header { background: white; border-bottom: 1px solid #eee; font-weight: 600; padding: 12px 20px; border-radius: 12px 12px 0 0 !important; }
+        table { font-size: 13px; }
+        table th { background: #f8f9fa; white-space: nowrap; }
+        .record-list { max-height: 250px; overflow-y: auto; border: 1px solid #eee; border-radius: 6px; padding: 8px; }
+    </style>
+</head>
+<body>
+<div class="container-fluid">
+    <!-- 用户列表 -->
+    <div class="card">
+        <div class="card-header">用户列表</div>
+        <div class="card-body p-0">
+            <table class="table table-hover mb-0">
+                <thead><tr><th>ID</th><th>用户名</th><th>角色</th><th>Schema 权限</th><th>补充知识权限</th></tr></thead>
+                <tbody id="userTable"><tr><td colspan="5" class="text-center py-3 text-muted">加载中...</td></tr></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- 资源分配面板 -->
+    <div class="card" id="assignCard" style="display:none;">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span>资源分配 — <span id="assignUserName"></span></span>
+            <button class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('assignCard').style.display='none'">关闭</button>
+        </div>
+        <div class="card-body">
+            <ul class="nav nav-tabs mb-3" id="resTabs">
+                <li class="nav-item"><a class="nav-link active" href="#" onclick="switchResTab('schema')">Schema</a></li>
+                <li class="nav-item"><a class="nav-link" href="#" onclick="switchResTab('extra')">补充知识</a></li>
+            </ul>
+            <div class="record-list" id="recordList"></div>
+            <div class="text-end mt-2">
+                <span class="text-muted me-2" style="font-size:12px;" id="selCount"></span>
+                <button class="btn btn-primary btn-sm" onclick="saveAssign()">保存分配</button>
+            </div>
+        </div>
+    </div>
+</div>
+<link rel="stylesheet" href="/static/css/all.min.css">
+<script src="/static/js/bootstrap.bundle.min.js"></script>
+<script>
+const apiRequest = window.apiRequest || function(url, options = {}) {
+    const token = document.cookie.split('; ').find(row => row.startsWith('token='))?.split('=')[1];
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    return fetch(url, { ...options, headers }).then(resp => {
+        if (resp.status === 401) { window.parent.location.href = '/login'; throw new Error('登录已过期'); }
+        return resp;
+    });
+};
+
+let allRecords = [], selectedIds = new Set();
+let editingUserId = null, currentResType = 'schema';
+
+async function loadUsers() {
+    const resp = await apiRequest('/api/permission/users');
+    const users = await resp.json();
+    document.getElementById('userTable').innerHTML = users.map(u => `
+        <tr>
+            <td>${u.id}</td><td>${e(u.username)}</td>
+            <td><span class="badge bg-${u.role==='admin'?'danger':'primary'}">${u.role}</span></td>
+            <td><button class="btn btn-outline-primary btn-sm" onclick="openAssign(${u.id},'${e(u.username)}','schema')">设置 Schema</button></td>
+            <td><button class="btn btn-outline-primary btn-sm" onclick="openAssign(${u.id},'${e(u.username)}','extra')">设置补充知识</button></td>
+        </tr>`).join('');
+}
+
+async function openAssign(userId, userName, resType) {
+    editingUserId = userId;
+    currentResType = resType;
+    document.getElementById('assignUserName').textContent = userName;
+    document.getElementById('assignCard').style.display = '';
+    document.querySelectorAll('#resTabs .nav-link').forEach(el => el.classList.remove('active'));
+    document.querySelector(`#resTabs .nav-link[onclick*="${resType}"]`).classList.add('active');
+
+    const [rResp, aResp] = await Promise.all([
+        apiRequest(`/api/permission/resources/${resType}`),
+        apiRequest(`/api/permission/users/${userId}/resources/${resType}`)
+    ]);
+    allRecords = await rResp.json();
+    const assigned = await aResp.json();
+    selectedIds = new Set(assigned.map(String));
+
+    const isSchema = resType === 'schema';
+    document.getElementById('recordList').innerHTML = allRecords.length ? allRecords.map(r => {
+        const val = isSchema ? r.name : String(r.id);
+        return `<label class="d-block mb-1" style="cursor:pointer;">
+            <input type="checkbox" class="record-chk" value="${e(val)}" ${selectedIds.has(val)?'checked':''} onchange="toggleRec('${e(val)}')">
+            <span>${e(r.name)}</span> ${r.detail ? `<small class="text-muted">(${e(r.detail)})</small>` : ''}
+        </label>`;
+    }).join('') : '<div class="text-muted py-3 text-center">暂无数据</div>';
+    updateCount();
+}
+
+function switchResTab(type) { openAssign(editingUserId, document.getElementById('assignUserName').textContent, type); }
+
+function toggleRec(key) {
+    if (selectedIds.has(key)) selectedIds.delete(key); else selectedIds.add(key);
+    updateCount();
+}
+
+function updateCount() { document.getElementById('selCount').textContent = `已选 ${selectedIds.size}/${allRecords.length}`; }
+
+async function saveAssign() {
+    await apiRequest(`/api/permission/users/${editingUserId}/resources/${currentResType}`, {
+        method: 'PUT', body: JSON.stringify({ user_id: editingUserId, resource_ids: Array.from(selectedIds) })
+    });
+    alert('分配已保存');
+}
+
+function e(s) { const d = document.createElement('div'); d.textContent = s||''; return d.innerHTML; }
+
+document.addEventListener('DOMContentLoaded', loadUsers);
+</script>
+</body>
+</html>

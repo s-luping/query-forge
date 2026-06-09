@@ -46,14 +46,14 @@ security = HTTPBearer(auto_error=False)
 
 
 def get_user_llm_config(user_id: int, config_id: Optional[int] = None) -> Optional[dict]:
-    """获取用户的LLM配置（必要）"""
+    """获取用户的LLM配置（自己的 + 公共配置）"""
     db = AppSessionLocal()
     try:
         if config_id:
             config = db.query(LLMConfig).filter(
                 LLMConfig.id == config_id,
-                LLMConfig.user_id == user_id,
-                LLMConfig.is_active == True
+                LLMConfig.is_active == True,
+                (LLMConfig.is_public == True) | (LLMConfig.user_id == user_id)
             ).first()
         else:
             config = db.query(LLMConfig).filter(

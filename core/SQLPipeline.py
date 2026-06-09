@@ -86,7 +86,7 @@ class SQLPipeline:
         """获取schema数据（必要）"""
         db = SchemaSessionLocal()
         try:
-            query = db.query(Schema).filter(Schema.user_id == self.user_id)
+            query = db.query(Schema).filter(Schema.id > 0)
             if schema_name:
                 query = query.filter(Schema.schema_name == schema_name)
             items = query.all()
@@ -109,7 +109,7 @@ class SQLPipeline:
         db = SchemaSessionLocal()
         try:
             query = db.query(Schema).filter(
-                Schema.user_id == self.user_id,
+                Schema.id > 0,
                 Schema.table_name.in_(table_names)
             )
             if schema_name:
@@ -131,7 +131,7 @@ class SQLPipeline:
         """获取字段数量（必要）"""
         db = SchemaSessionLocal()
         try:
-            query = db.query(Schema).filter(Schema.user_id == self.user_id)
+            query = db.query(Schema).filter(Schema.id > 0)
             if schema_name:
                 query = query.filter(Schema.schema_name == schema_name)
             return query.count()
@@ -429,7 +429,7 @@ def build_vector_index(user_id: int, schema_name: Optional[str] = None) -> Dict:
     store = SchemaVectorStore(user_id)
     db = SchemaSessionLocal()
     try:
-        query = db.query(Schema).filter(Schema.user_id == user_id)
+        query = db.query(Schema).filter(Schema.id > 0)
         if schema_name:
             query = query.filter(Schema.schema_name == schema_name)
         schemas = query.all()

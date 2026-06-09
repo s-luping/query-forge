@@ -15,31 +15,40 @@
         <div id="sidebar" class="tpl-index-sidebar">
             <div class="tpl-index-sidebar-title">功能菜单</div>
             <div class="tpl-index-sidebar-content">
+                <!-- 所有用户可见 -->
                 <div class="menu-group">
-                    <div class="menu-group-title" onclick="toggleMenu('llm')">大模型管理</div>
-                    <div id="menu-llm" class="menu-items" style="display:none;">
-                        <div class="menu-item" onclick="openWindow('LLM 模型配置','/static/template/llm/llm_config.html')">
-                            模型配置管理</div>
-                        <div class="menu-item" onclick="openWindow('LLM 调用记录','/static/template/llm/llm_logs.html')">
-                            调用记录查询</div>
-                    </div>
-                </div>
-                <div class="menu-group">
-                    <div class="menu-group-title" onclick="toggleMenu('schema')">Schema 管理</div>
+                    <div class="menu-group-title" onclick="toggleMenu('schema')">Schema 查看</div>
                     <div id="menu-schema" class="menu-items" style="display:none;">
-                        <div class="menu-item"
-                            onclick="openWindow('Schema 管理','/static/template/schema/schema_manage.html')">DDL 解析管理
-                        </div>
+                        <div class="menu-item" onclick="openWindow('Schema 查看','/static/template/schema/schema_view.html')">Schema 查看</div>
                     </div>
                 </div>
                 <div class="menu-group">
                     <div class="menu-group-title" onclick="toggleMenu('chat')">生成 SQL 与查询</div>
                     <div id="menu-chat" class="menu-items" style="display:none;">
-                        <div class="menu-item"
-                            onclick="openWindow('Chat SQL 连续对话','/static/template/chatSQL/chat.html')">💬 Chat SQL
+                        <div class="menu-item" onclick="openWindow('Chat SQL','/static/template/chatSQL/chat.html')">💬 Chat SQL</div>
+                        <div class="menu-item" onclick="openWindow('补充知识','/static/template/extra_knowledge.html')">补充知识</div>
+                    </div>
+                </div>
+                <!-- 仅管理员可见 -->
+                <div id="menu-group-admin" style="display:none;">
+                    <div class="menu-group">
+                        <div class="menu-group-title" onclick="toggleMenu('llm')">大模型管理</div>
+                        <div id="menu-llm" class="menu-items" style="display:none;">
+                            <div class="menu-item" onclick="openWindow('模型配置','/static/template/llm/llm_config.html')">模型配置</div>
+                            <div class="menu-item" onclick="openWindow('调用记录','/static/template/llm/llm_logs.html')">调用记录</div>
                         </div>
-                        <div class="menu-item"
-                            onclick="openWindow('补充知识管理','/static/template/extra_knowledge.html')">补充知识管理
+                    </div>
+                    <div class="menu-group">
+                        <div class="menu-group-title" onclick="toggleMenu('schemaAdmin')">Schema 维护</div>
+                        <div id="menu-schemaAdmin" class="menu-items" style="display:none;">
+                            <div class="menu-item" onclick="openWindow('Schema 维护','/static/template/schema/schema_manage.html')">Schema 维护</div>
+                        </div>
+                    </div>
+                    <div class="menu-group">
+                        <div class="menu-group-title" onclick="toggleMenu('system')">系统管理</div>
+                        <div id="menu-system" class="menu-items" style="display:none;">
+                            <div class="menu-item" onclick="openWindow('系统设置','/static/template/system/system_settings.html')">系统设置</div>
+                            <div class="menu-item" onclick="openWindow('权限管理','/static/template/system/permission_manage.html')">权限管理</div>
                         </div>
                     </div>
                 </div>
@@ -67,6 +76,22 @@
     </div>
     <script src="/static/js/bootstrap.bundle.min.js"></script>
     <script>
+        // 全局 API 请求封装 — 子页面通过 window.apiRequest 调用
+        window.apiRequest = async function (url, options = {}) {
+            const token = getCookie('token');
+            const headers = { 'Content-Type': 'application/json' };
+            if (token) headers['Authorization'] = `Bearer ${token}`;
+            const resp = await fetch(url, { ...options, headers: { ...headers, ...options.headers } });
+            if (resp.status === 401) {
+                const data = await resp.json().catch(() => ({}));
+                const msg = data.detail || '登录已过期，请重新登录';
+                if (confirm(msg + '\n\n点击确定前往登录页面')) {
+                    window.location.href = '/login';
+                }
+                throw new Error(msg);
+            }
+            return resp;
+        };
 
         function getCookie(name) {
             const value = `; ${document.cookie}`;
@@ -82,6 +107,57 @@
                 return payload.username || payload.user || payload.sub || '';
             } catch (e) { return ''; }
         }
+
+        function getUserRoleFromToken() {
+            const token = getCookie('token');
+            if (!token) return '';
+            try {
+                const payload = JSON.parse(atob(token.split('.')[1]));
+                return payload.role || '';
+            } catch (e) { return ''; }
+        }
+
+        // 检查 embedding 模型下载状态
+        async function checkEmbeddingStatus() {
+            try {
+                const resp = await window.apiRequest('/api/system/embedding-status');
+                const data = await resp.json();
+                if (!data.downloaded) {
+                    showEmbeddingBanner();
+                }
+            } catch (e) { /* 静默失败 */ }
+        }
+
+        function showEmbeddingBanner() {
+            const banner = document.createElement('div');
+            banner.id = 'embedding-banner';
+            banner.style.cssText = 'position:fixed;top:60px;left:50%;transform:translateX(-50%);z-index:9999;'
+                + 'background:#fff3cd;color:#856404;border:1px solid #ffc107;border-radius:8px;'
+                + 'padding:12px 24px;display:flex;align-items:center;gap:16px;box-shadow:0 4px 16px rgba(0,0,0,0.15);';
+            banner.innerHTML = `
+                <span>⚠️ Embedding 模型未下载，向量搜索功能不可用</span>
+                <button id="btn-download-embedding" style="background:#0d6efd;color:#fff;border:none;
+                    border-radius:4px;padding:6px 16px;cursor:pointer;white-space:nowrap;">
+                    📥 下载模型
+                </button>
+                <button onclick="this.parentElement.remove()" style="background:none;border:none;
+                    font-size:18px;cursor:pointer;color:#856404;">×</button>
+            `;
+            document.body.appendChild(banner);
+            document.getElementById('btn-download-embedding').addEventListener('click', async function () {
+                this.textContent = '下载中...';
+                this.disabled = true;
+                try {
+                    const resp = await window.apiRequest('/api/system/download-embedding', { method: 'POST' });
+                    const data = await resp.json();
+                    alert(data.message);
+                } catch (e) {
+                    alert('启动下载失败: ' + e.message);
+                }
+                this.textContent = '📥 下载模型';
+                this.disabled = false;
+            });
+        }
         window.addEventListener('DOMContentLoaded', function () {
             const user = getUserNameFromToken();
             const userInfo = document.getElementById('user-info');
@@ -91,6 +167,10 @@
                 userInfo.textContent = user;
                 userInfo.style.display = '';
                 loginLink.style.display = 'none';
+                if (getUserRoleFromToken() === 'admin') {
+                    document.getElementById('menu-group-admin').style.display = '';
+                }
+                checkEmbeddingStatus();
             } else {
                 userInfo.style.display = 'none';
                 loginLink.style.display = '';

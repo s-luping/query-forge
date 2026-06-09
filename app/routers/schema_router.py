@@ -27,7 +27,25 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.auth import get_current_user
-from app.logger import logger
+from app.logger import logger, log_audit
+from app.permissions import get_visible_schema_names
+
+
+def _filter_by_schema_names(query, user: dict, model):
+    """对读查询追加 schema 可见性过滤"""
+    names = get_visible_schema_names(user)
+    if names is not None:  # None=全部可见，list=仅这些
+        if not names:
+            return query.filter(model.id < 0)  # 空列表 → 无可见数据
+        return query.filter(model.schema_name.in_(names))
+    return query
+
+
+def _admin_only(user: dict):
+    """非管理员拒绝访问"""
+    from fastapi import HTTPException
+    if user.get('role') != 'admin':
+        raise HTTPException(status_code=403, detail="仅管理员可执行此操作")
 from models import SchemaSessionLocal
 from models.schema import Schema
 
@@ -1119,7 +1137,9 @@ def parse_ddl_text(
         request: DDLParseRequest,
         user=Depends(get_current_user)
 ):
-    """解析 DDL 文本（支持多种数据库类型，支持多数据库）"""
+    """解析 DDL 文本（仅管理员）"""
+    _admin_only(user)
+    log_audit(user, "parse_schema", f"schema_name={request.schema_name}")
     try:
         user_id = user['user_id']
         db = SchemaSessionLocal()
@@ -1140,15 +1160,13 @@ def parse_ddl_text(
                 message += f"，涉及 Schema: {', '.join(schema_names)}"
 
             items = db.query(Schema).filter(
-                Schema.user_id == user_id,
                 Schema.schema_name.in_(schema_names) if schema_names else Schema.schema_name == request.schema_name
             ).all()
 
             index_messages = []
             for schema_name in schema_names:
                 schema_field_count = db.query(Schema).filter(
-                    Schema.user_id == user_id,
-                    Schema.schema_name == schema_name
+                        Schema.schema_name == schema_name
                 ).count()
                 index_message = _auto_build_vector_index(user_id, schema_name, schema_field_count)
                 if index_message:
@@ -1179,7 +1197,8 @@ def parse_json_text(
         request: JSONParseRequest,
         user=Depends(get_current_user)
 ):
-    """解析 JSON 格式的 Schema（支持 Spider 数据集格式，支持多数据库）"""
+    """解析 JSON 格式的 Schema（仅管理员）"""
+    _admin_only(user)
     try:
         user_id = user['user_id']
         db = SchemaSessionLocal()
@@ -1203,15 +1222,13 @@ def parse_json_text(
                 message += f"，外键 {fk_count} 条"
 
             items = db.query(Schema).filter(
-                Schema.user_id == user_id,
                 Schema.schema_name.in_(schema_names) if schema_names else Schema.schema_name == request.schema_name
             ).all()
 
             index_messages = []
             for schema_name in schema_names:
                 schema_field_count = db.query(Schema).filter(
-                    Schema.user_id == user_id,
-                    Schema.schema_name == schema_name
+                        Schema.schema_name == schema_name
                 ).count()
                 index_message = _auto_build_vector_index(user_id, schema_name, schema_field_count)
                 if index_message:
@@ -1244,7 +1261,8 @@ async def upload_ddl_file(
         db_type: str = Form("auto"),
         user=Depends(get_current_user)
 ):
-    """上传 DDL 或 JSON 文件并解析（支持多数据库）"""
+    """上传 DDL 或 JSON 文件并解析（仅管理员）"""
+    _admin_only(user)
     try:
         user_id = user['user_id']
 
@@ -1277,15 +1295,13 @@ async def upload_ddl_file(
                 message += f"，外键 {fk_count} 条"
 
             items = db.query(Schema).filter(
-                Schema.user_id == user_id,
                 Schema.schema_name.in_(schema_names) if schema_names else Schema.schema_name == schema_name
             ).all()
 
             index_messages = []
             for sn in schema_names:
                 schema_field_count = db.query(Schema).filter(
-                    Schema.user_id == user_id,
-                    Schema.schema_name == sn
+                        Schema.schema_name == sn
                 ).count()
                 index_message = _auto_build_vector_index(user_id, sn, schema_field_count)
                 if index_message:
@@ -1325,7 +1341,8 @@ def get_schema_list(
         db = SchemaSessionLocal()
 
         try:
-            query = db.query(Schema).filter(Schema.user_id == user_id)
+            query = db.query(Schema).filter(Schema.id > 0)
+            query = _filter_by_schema_names(query, user, Schema)
 
             if schema_name:
                 query = query.filter(Schema.schema_name == schema_name)
@@ -1369,7 +1386,8 @@ def build_vector_index(
     request: BuildIndexRequest,
     user=Depends(get_current_user)
 ):
-    """构建向量索引"""
+    """构建向量索引（仅管理员）"""
+    _admin_only(user)
     try:
         user_id = user['user_id']
 
@@ -1417,7 +1435,8 @@ def update_sample_values(
         request: UpdateSampleValuesRequest,
         user=Depends(get_current_user)
 ):
-    """更新字段的示例值"""
+    """更新字段的示例值（仅管理员）"""
+    _admin_only(user)
     try:
         user_id = user['user_id']
         db = SchemaSessionLocal()
@@ -1455,14 +1474,15 @@ def get_schema_stats(
         db = SchemaSessionLocal()
 
         try:
-            column_count = db.query(Schema).filter(Schema.user_id == user_id).count()
+            query = _filter_by_schema_names(db.query(Schema), user, Schema)
+            column_count = query.count()
 
-            schema_count = db.query(Schema.schema_name).filter(
-                Schema.user_id == user_id
+            schema_count = _filter_by_schema_names(
+                db.query(Schema.schema_name), user, Schema
             ).distinct().count()
 
-            table_count = db.query(Schema.table_name).filter(
-                Schema.user_id == user_id
+            table_count = _filter_by_schema_names(
+                db.query(Schema.table_name), user, Schema
             ).distinct().count()
 
             return {
@@ -1488,11 +1508,9 @@ def check_schema(
         db = SchemaSessionLocal()
 
         try:
-            total = db.query(Schema).filter(Schema.user_id == user_id).count()
-
-            tables = db.query(Schema.schema_name, Schema.table_name).filter(
-                Schema.user_id == user_id
-            ).distinct().all()
+            base = _filter_by_schema_names(db.query(Schema), user, Schema)
+            total = base.count()
+            tables = base.with_entities(Schema.schema_name, Schema.table_name).distinct().all()
 
             return SchemaCheckResponse(
                 has_schema=total > 0,
@@ -1519,7 +1537,8 @@ def export_schema(
         db = SchemaSessionLocal()
 
         try:
-            query = db.query(Schema).filter(Schema.user_id == user_id)
+            query = db.query(Schema).filter(Schema.id > 0)
+            query = _filter_by_schema_names(query, user, Schema)
 
             if schema_name:
                 query = query.filter(Schema.schema_name == schema_name)
@@ -1576,9 +1595,8 @@ def get_schemas(
         db = SchemaSessionLocal()
 
         try:
-            schemas = db.query(Schema.schema_name).filter(
-                Schema.user_id == user_id
-            ).distinct().all()
+            query = _filter_by_schema_names(db.query(Schema.schema_name), user, Schema)
+            schemas = query.distinct().all()
 
             return {"schemas": [s[0] for s in schemas]}
         finally:
@@ -1600,9 +1618,8 @@ def get_tables(
         db = SchemaSessionLocal()
 
         try:
-            query = db.query(Schema.table_name, Schema.table_description).filter(
-                Schema.user_id == user_id
-            )
+            query = db.query(Schema.table_name, Schema.table_description)
+            query = _filter_by_schema_names(query, user, Schema)
 
             if schema_name:
                 query = query.filter(Schema.schema_name == schema_name)
@@ -1628,14 +1645,14 @@ def delete_schema(
         schema_name: str,
         user=Depends(get_current_user)
 ):
-    """删除指定 schema 的所有数据"""
+    """删除指定 schema 的所有数据（仅管理员）"""
+    _admin_only(user)
     try:
         user_id = user['user_id']
         db = SchemaSessionLocal()
 
         try:
             count = db.query(Schema).filter(
-                Schema.user_id == user_id,
                 Schema.schema_name == schema_name
             ).delete()
             
@@ -1656,14 +1673,14 @@ def delete_table(
         table_name: str,
         user=Depends(get_current_user)
 ):
-    """删除指定表的所有字段"""
+    """删除指定表的所有字段（仅管理员）"""
+    _admin_only(user)
     try:
         user_id = user['user_id']
         db = SchemaSessionLocal()
 
         try:
             count = db.query(Schema).filter(
-                Schema.user_id == user_id,
                 Schema.schema_name == schema_name,
                 Schema.table_name == table_name
             ).delete()
@@ -1684,7 +1701,8 @@ def delete_schema_item(
         schema_id: int,
         user=Depends(get_current_user)
 ):
-    """删除单个字段"""
+    """删除单个字段（仅管理员）"""
+    _admin_only(user)
     try:
         user_id = user['user_id']
         db = SchemaSessionLocal()

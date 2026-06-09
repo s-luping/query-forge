@@ -9,9 +9,11 @@ from fastapi.security import HTTPBearer
 from pydantic import BaseModel, field_validator
 
 from app.auth import get_current_user
-from app.logger import logger
-from models import ExtraSessionLocal
+from app.logger import logger, log_audit
+from app.permissions import get_visible_extra_ids, is_admin
+from models import ExtraSessionLocal, AppSessionLocal
 from models.extra_knowledge import ExtraKnowledge
+from models.user import UserExtra
 
 router = APIRouter()
 
@@ -58,18 +60,18 @@ class ExtraKnowledgeListResponse(BaseModel):
     total: int
 
 
-def get_all_extra_knowledge(user_id: int, limit: int = 20, offset: int = 0) -> tuple:
-    """获取用户所有补充知识"""
+def get_all_extra_knowledge(user: dict, limit: int = 20, offset: int = 0) -> tuple:
+    """获取补充知识（按用户权限过滤）"""
     db = ExtraSessionLocal()
     try:
-        query = db.query(ExtraKnowledge).filter(
-            ExtraKnowledge.user_id == user_id,
-            ExtraKnowledge.is_active == 1
-        )
-        
+        query = db.query(ExtraKnowledge).filter(ExtraKnowledge.is_active == 1)
+        visible_ids = get_visible_extra_ids(user)
+        if visible_ids is not None:
+            if not visible_ids:
+                return [], 0
+            query = query.filter(ExtraKnowledge.id.in_(visible_ids))
         total = query.count()
         items = query.order_by(ExtraKnowledge.updated_at.desc()).limit(limit).offset(offset).all()
-        
         return items, total
     finally:
         db.close()
@@ -79,21 +81,16 @@ def get_extra_knowledge_safe(user_id: int, knowledge_id: int = None) -> dict:
     """安全获取补充知识"""
     if not knowledge_id:
         return {}
-    
     if not isinstance(knowledge_id, int) or knowledge_id <= 0:
         return {}
-    
     db = ExtraSessionLocal()
     try:
         item = db.query(ExtraKnowledge).filter(
             ExtraKnowledge.id == knowledge_id,
-            ExtraKnowledge.user_id == user_id,
             ExtraKnowledge.is_active == 1
         ).first()
-        
         if not item:
             return {}
-        
         return {
             'id': item.id,
             'title': item.title,
@@ -110,7 +107,7 @@ def list_extra_knowledge(
     user=Depends(get_current_user)
 ):
     """获取补充知识列表"""
-    items, total = get_all_extra_knowledge(user['user_id'], limit, offset)
+    items, total = get_all_extra_knowledge(user, limit, offset)
     
     return {
         'items': [{
@@ -140,9 +137,24 @@ def create_extra_knowledge(
             extra_knowledge=data.extra_knowledge or ''
         )
         db.add(extra)
+        db.flush()  # 获取 extra.id
+
+        # 自动将创建者加入权限
+        app_db = AppSessionLocal()
+        try:
+            existing = app_db.query(UserExtra).filter(
+                UserExtra.user_id == user['user_id'], UserExtra.extra_id == extra.id
+            ).first()
+            if not existing:
+                app_db.add(UserExtra(user_id=user['user_id'], extra_id=extra.id))
+                app_db.commit()
+        finally:
+            app_db.close()
+
         db.commit()
         db.refresh(extra)
-        
+        log_audit(user, "create_extra", f"title={data.title}")
+
         return {
             'id': extra.id,
             'user_id': extra.user_id,
@@ -165,15 +177,16 @@ def get_extra_knowledge(
     knowledge_id: int,
     user=Depends(get_current_user)
 ):
-    """获取单条补充知识"""
+    """获取单条补充知识（权限过滤）"""
+    visible_ids = get_visible_extra_ids(user)
+    if visible_ids is not None and knowledge_id not in visible_ids:
+        raise HTTPException(status_code=404, detail="知识不存在或已删除")
     db = ExtraSessionLocal()
     try:
         extra = db.query(ExtraKnowledge).filter(
             ExtraKnowledge.id == knowledge_id,
-            ExtraKnowledge.user_id == user['user_id'],
             ExtraKnowledge.is_active == 1
         ).first()
-        
         if not extra:
             raise HTTPException(status_code=404, detail="知识不存在或已删除")
         
@@ -196,16 +209,16 @@ def update_extra_knowledge(
     data: ExtraKnowledgeRequest,
     user=Depends(get_current_user)
 ):
-    """更新补充知识"""
+    """更新补充知识（所有者或管理员）"""
     db = ExtraSessionLocal()
     try:
         extra = db.query(ExtraKnowledge).filter(
-            ExtraKnowledge.id == knowledge_id,
-            ExtraKnowledge.user_id == user['user_id']
+            ExtraKnowledge.id == knowledge_id
         ).first()
-        
         if not extra:
             raise HTTPException(status_code=404, detail="知识不存在")
+        if not is_admin(user) and extra.user_id != user['user_id']:
+            raise HTTPException(status_code=403, detail="只能修改自己创建的补充知识")
         
         if data.title is not None:
             extra.title = data.title
@@ -214,7 +227,8 @@ def update_extra_knowledge(
         
         db.commit()
         db.refresh(extra)
-        
+        log_audit(user, "update_extra", f"id={knowledge_id}")
+
         return {
             'id': extra.id,
             'user_id': extra.user_id,
@@ -237,20 +251,21 @@ def delete_extra_knowledge(
     knowledge_id: int,
     user=Depends(get_current_user)
 ):
-    """删除补充知识（软删除）"""
+    """删除补充知识（软删除，所有者或管理员）"""
     db = ExtraSessionLocal()
     try:
         extra = db.query(ExtraKnowledge).filter(
-            ExtraKnowledge.id == knowledge_id,
-            ExtraKnowledge.user_id == user['user_id']
+            ExtraKnowledge.id == knowledge_id
         ).first()
-        
         if not extra:
             raise HTTPException(status_code=404, detail="知识不存在")
+        if not is_admin(user) and extra.user_id != user['user_id']:
+            raise HTTPException(status_code=403, detail="只能删除自己创建的补充知识")
         
         extra.is_active = 0
         db.commit()
-        
+        log_audit(user, "delete_extra", f"id={knowledge_id}")
+
         return {'message': '删除成功'}
     except Exception as e:
         db.rollback()
