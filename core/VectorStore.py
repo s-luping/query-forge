@@ -28,8 +28,92 @@ class EmbeddingModel:
     _lock = threading.Lock()
 
     @classmethod
+    def _set_db_ready(cls, ready: bool):
+        """更新数据库中的模型就绪状态"""
+        try:
+            from models import AppSessionLocal
+            from models.system import SystemConfig
+            db = AppSessionLocal()
+            try:
+                row = db.query(SystemConfig).filter(SystemConfig.key == 'EMBEDDING_MODEL_READY').first()
+                value = 'true' if ready else 'false'
+                if row:
+                    row.value = value
+                else:
+                    db.add(SystemConfig(key='EMBEDDING_MODEL_READY', value=value))
+                if not ready:
+                    path_row = db.query(SystemConfig).filter(SystemConfig.key == 'EMBEDDING_MODEL_PATH').first()
+                    if path_row:
+                        path_row.value = ''
+                db.commit()
+            finally:
+                db.close()
+        except Exception as e:
+            logger.warning(f"更新 EMBEDDING_MODEL_READY 状态失败: {e}")
+
+    @classmethod
+    def _get_db_path(cls) -> Optional[str]:
+        """从数据库读取缓存的模型路径"""
+        try:
+            from models import AppSessionLocal
+            from models.system import SystemConfig
+            db = AppSessionLocal()
+            try:
+                row = db.query(SystemConfig).filter(SystemConfig.key == 'EMBEDDING_MODEL_PATH').first()
+                if row and str(row.value):
+                    return str(row.value)
+            finally:
+                db.close()
+        except Exception:
+            pass
+        return None
+
+    @classmethod
+    def _set_db_path(cls, path: str):
+        """缓存模型路径到数据库"""
+        try:
+            from models import AppSessionLocal
+            from models.system import SystemConfig
+            db = AppSessionLocal()
+            try:
+                row = db.query(SystemConfig).filter(SystemConfig.key == 'EMBEDDING_MODEL_PATH').first()
+                if row:
+                    row.value = path
+                else:
+                    db.add(SystemConfig(key='EMBEDDING_MODEL_PATH', value=path))
+                db.commit()
+            finally:
+                db.close()
+        except Exception as e:
+            logger.warning(f"缓存模型路径失败: {e}")
+
+    @classmethod
+    def is_ready(cls) -> bool:
+        """检查嵌入模型是否就绪（优先查数据库状态）"""
+        try:
+            from models import AppSessionLocal
+            from models.system import SystemConfig
+            db = AppSessionLocal()
+            try:
+                row = db.query(SystemConfig).filter(SystemConfig.key == 'EMBEDDING_MODEL_READY').first()
+                if row and str(row.value) == 'true':
+                    return True
+            finally:
+                db.close()
+        except Exception:
+            pass
+        # 数据库查询失败时，降级检查文件系统
+        return cls.get_local_model_path() is not None
+
+    @classmethod
     def get_local_model_path(cls, model_name: str = None) -> Optional[str]:
         model_name = model_name or cls._model_name
+        # 优先从数据库读取缓存的路径（快速）
+        cached_path = cls._get_db_path()
+        if cached_path and cached_path.strip() and os.path.exists(os.path.join(cached_path, 'config.json')):
+            logger.info(f"从数据库缓存获取模型路径: {cached_path}")
+            return cached_path
+        # 缓存失效，扫描目录
         possible_paths = [
             os.path.join(MODEL_CACHE_DIR, model_name, 'BAAI', model_name),
             os.path.join(MODEL_CACHE_DIR, model_name),
@@ -39,7 +123,8 @@ class EmbeddingModel:
             if os.path.exists(local_path):
                 config_file = os.path.join(local_path, 'config.json')
                 if os.path.exists(config_file):
-                    logger.info(f"找到本地模型: {local_path}")
+                    logger.info(f"扫描目录找到本地模型: {local_path}")
+                    cls._set_db_path(local_path)  # 缓存到数据库
                     return local_path
         return None
 
@@ -58,14 +143,19 @@ class EmbeddingModel:
                             cls._instance = SentenceTransformer(local_path)
                             logger.info(f"从本地加载模型: {local_path}")
                         else:
+                            cls._set_db_ready(False)
                             raise RuntimeError(f"未找到本地模型，请先运行 download_model.py 下载模型")
 
                         cls._dimension = cls._instance.get_sentence_embedding_dimension()
+                        cls._set_db_path(local_path)  # 确保路径已缓存
+                        cls._set_db_ready(True)
                         logger.info(f"模型加载完成，维度: {cls._dimension}")
 
                     except ImportError:
+                        cls._set_db_ready(False)
                         raise ImportError("sentence-transformers 未安装，请运行: pip install sentence-transformers")
                     except Exception as e:
+                        cls._set_db_ready(False)
                         raise RuntimeError(f"加载模型失败: {e}")
 
         return cls._instance
@@ -76,9 +166,11 @@ class EmbeddingModel:
 
     @classmethod
     def encode(cls, texts: List[str]) -> np.ndarray:
+        if not cls.is_ready():
+            raise RuntimeError("Embedding 模型未就绪，请先在系统设置中下载模型")
         model = cls.get_instance()
         if model is None:
-            raise RuntimeError("Embedding 模型未加载，请先运行 download_model.py 下载模型")
+            raise RuntimeError("Embedding 模型加载失败")
         embeddings = model.encode(texts, convert_to_numpy=True, show_progress_bar=False)
         return embeddings.astype('float32')
 
@@ -137,9 +229,11 @@ class VectorIndex:
             'documents': self.documents,
             'metadata': self.metadata
         }
-        with open(filepath + '.pkl', 'wb') as f:
+        pkl_path = filepath + '.pkl'
+        with open(pkl_path, 'wb') as f:
             pickle.dump(data, f)
-        logger.info(f"向量索引已保存: {filepath}")
+        self._last_save_path = pkl_path
+        logger.info(f"向量索引已保存: {pkl_path}")
 
     def load(self, filepath: str) -> bool:
         pkl_path = filepath + '.pkl'
@@ -176,10 +270,9 @@ class SchemaVectorStore:
 
     VECTOR_INDEX_THRESHOLD = 50
 
-    def __init__(self, user_id: int):
-        self.user_id = user_id
+    def __init__(self):
         self.dimension = EmbeddingModel.get_dimension()
-        self.vector_dir = os.path.join(VECTOR_INDEX_DIR, f'user_{user_id}')
+        self.vector_dir = VECTOR_INDEX_DIR
         os.makedirs(self.vector_dir, exist_ok=True)
 
         self.field_index = VectorIndex(self.dimension)
@@ -238,7 +331,6 @@ class SchemaVectorStore:
     def get_info(self, schema_name: Optional[str] = None) -> Dict:
         prefix = f"{schema_name}_" if schema_name else ""
         return {
-            'user_id': self.user_id,
             'dimension': self.dimension,
             'vector_dir': self.vector_dir,
             'fields': {

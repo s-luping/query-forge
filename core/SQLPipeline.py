@@ -154,7 +154,7 @@ class SQLPipeline:
             if field_count < self.VECTOR_INDEX_THRESHOLD:
                 return False
 
-            self.vector_store = SchemaVectorStore(self.user_id)
+            self.vector_store = SchemaVectorStore()
 
             if self.vector_store.load(schema_name):
                 self._vector_loaded = True
@@ -334,14 +334,15 @@ class SQLPipeline:
         })
 
         result = self.llm_client.call_llm_with_details(prompt)
-        
+
         self._log_step("STEP5_RESULT", {
             "sql": result.get("sql", ""),
             "prompt_tokens": result.get("prompt_tokens", 0),
             "completion_tokens": result.get("completion_tokens", 0),
             "total_tokens": result.get("total_tokens", 0)
         })
-        
+
+        result['prompt'] = prompt
         return result
 
     def step6_validate_sql(self, sql: str) -> Tuple[bool, Optional[str], Optional[List[str]]]:
@@ -422,11 +423,88 @@ class SQLPipeline:
         return result
 
 
-def build_vector_index(user_id: int, schema_name: Optional[str] = None) -> Dict:
+def _set_index_meta(schema_name: str, status: str, field_count: int = 0,
+                     table_count: int = 0, file_path: str = '', error_msg: str = ''):
+    """写入向量索引元数据到数据库"""
+    try:
+        from models import AppSessionLocal
+        from models.vector_index import VectorIndexMeta
+        from datetime import datetime
+
+        db = AppSessionLocal()
+        try:
+            row = db.query(VectorIndexMeta).filter(
+                VectorIndexMeta.schema_name == schema_name
+            ).first()
+            if row is not None:
+                # 构建期间有新数据导入导致 stale，不覆盖为 ready
+                current = str(row.status)
+                if status == 'ready' and current == 'stale':
+                    db.close()
+                    return
+                row.status = status  # type: ignore[assignment]
+                if field_count:
+                    row.field_count = field_count  # type: ignore[assignment]
+                if table_count:
+                    row.table_count = table_count  # type: ignore[assignment]
+                if file_path:
+                    row.file_path = file_path  # type: ignore[assignment]
+                if error_msg:
+                    row.error_message = error_msg  # type: ignore[assignment]
+                if status == 'ready':
+                    row.built_at = datetime.now()  # type: ignore[assignment]
+            else:
+                db.add(VectorIndexMeta(
+                    schema_name=schema_name,
+                    status=status,
+                    field_count=field_count,
+                    table_count=table_count,
+                    file_path=file_path,
+                    error_message=error_msg,
+                    built_at=datetime.now() if status == 'ready' else None
+                ))
+            db.commit()
+        finally:
+            db.close()
+    except Exception:
+        pass  # 元数据写入失败不影响索引构建
+
+
+def _get_index_meta(schema_name: str) -> Optional[dict]:
+    """从数据库读取向量索引元数据"""
+    try:
+        from models import AppSessionLocal
+        from models.vector_index import VectorIndexMeta
+
+        db = AppSessionLocal()
+        try:
+            row = db.query(VectorIndexMeta).filter(
+                VectorIndexMeta.schema_name == schema_name
+            ).first()
+            if row is not None:
+                built = str(row.built_at) if row.built_at is not None else None  # type: ignore[union-attr]
+                return {
+                    'schema_name': str(row.schema_name),
+                    'status': str(row.status),
+                    'field_count': int(row.field_count),  # type: ignore[arg-type]
+                    'table_count': int(row.table_count),  # type: ignore[arg-type]
+                    'dimension': int(row.dimension),  # type: ignore[arg-type]
+                    'file_path': str(row.file_path),
+                    'error_message': str(row.error_message),
+                    'built_at': built
+                }
+        finally:
+            db.close()
+    except Exception:
+        pass
+    return None
+
+
+def build_vector_index(schema_name: Optional[str] = None) -> Dict:
     """构建向量索引"""
     from core.VectorStore import SchemaVectorStore
-    
-    store = SchemaVectorStore(user_id)
+
+    store = SchemaVectorStore()
     db = SchemaSessionLocal()
     try:
         query = db.query(Schema).filter(Schema.id > 0)
@@ -445,15 +523,55 @@ def build_vector_index(user_id: int, schema_name: Optional[str] = None) -> Dict:
             'foreign_key': s.foreign_key
         } for s in schemas]
 
-        return store.build_from_schemas(schema_list, schema_name)
+        # 写入构建中状态
+        target_schema = schema_name or 'default'
+        _set_index_meta(target_schema, 'building')
+
+        result = store.build_from_schemas(schema_list, schema_name)
+
+        if result.get('success'):
+            table_count = len(set(s.get('table_name', '') for s in schema_list))
+            file_path = store.field_index._last_save_path or ''
+            _set_index_meta(
+                target_schema, 'ready',
+                field_count=result.get('field_count', len(schema_list)),
+                table_count=table_count,
+                file_path=file_path
+            )
+
+        return result
+    except Exception as e:
+        target_schema = schema_name or 'default'
+        _set_index_meta(target_schema, 'error', error_msg=str(e))
+        raise
     finally:
         db.close()
 
 
-def get_vector_index_info(user_id: int, schema_name: Optional[str] = None) -> Dict:
-    """获取向量索引信息"""
+def get_vector_index_info(schema_name: Optional[str] = None) -> Dict:
+    """获取向量索引信息（优先读数据库元数据）"""
     from core.VectorStore import SchemaVectorStore
-    
-    store = SchemaVectorStore(user_id)
+
+    target = schema_name or 'default'
+    meta = _get_index_meta(target)
+
+    if meta and meta['status'] == 'ready':
+        return {
+            'vector_dir': meta.get('file_path', ''),
+            'field_count': meta.get('field_count', 0),
+            'should_build_index': meta.get('field_count', 0) >= 50,
+            'threshold': 50,
+            'indexes': {
+                'count': meta.get('field_count', 0),
+                'is_built': True,
+                'filepath': meta.get('file_path', ''),
+                'built_at': meta.get('built_at'),
+                'table_count': meta.get('table_count', 0)
+            },
+            'status': meta['status']
+        }
+
+    # 元数据不可用，回退到从磁盘加载检查
+    store = SchemaVectorStore()
     store.load(schema_name)
     return store.get_info(schema_name)

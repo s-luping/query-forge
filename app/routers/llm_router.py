@@ -41,6 +41,7 @@ class LLMLogItem(BaseModel):
     question: str
     model: str
     conditions: Optional[str]
+    system_prompt: Optional[str] = None
     result: Optional[str]
     duration_ms: Optional[float]
     prompt_tokens: Optional[int]

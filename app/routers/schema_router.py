@@ -24,6 +24,7 @@ _vector_build_lock = threading.Lock()
 from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Form
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.auth import get_current_user
@@ -129,24 +130,67 @@ SUPPORTED_DB_TYPES = [
 ]
 
 
-def _auto_build_vector_index(user_id: int, schema_name: str, schema_field_count: int) -> Optional[str]:
-    from core.VectorStore import SchemaVectorStore
+def _check_embedding_ready():
+    """检查嵌入模型是否就绪，未就绪则抛出 400 错误"""
+    from core.VectorStore import EmbeddingModel
+    if not EmbeddingModel.is_ready():
+        raise HTTPException(
+            status_code=400,
+            detail="Embedding 模型未就绪，请先在系统设置中下载模型"
+        )
+
+
+def _mark_index_stale(schema_name: str):
+    """标记索引为过期（数据有新增但索引未更新）"""
+    try:
+        from core.SQLPipeline import _set_index_meta
+        _set_index_meta(schema_name, 'stale')
+    except Exception:
+        pass
+
+
+def _auto_build_vector_index(schema_name: str, schema_field_count: int) -> Optional[str]:
+    from core.VectorStore import SchemaVectorStore, EmbeddingModel
+
+    if not EmbeddingModel.is_ready():
+        logger.warning(f"Embedding 模型未就绪，跳过自动索引构建: {schema_name}")
+        return None
 
     threshold = SchemaVectorStore.VECTOR_INDEX_THRESHOLD
     if schema_field_count < threshold:
         logger.info(f"Schema {schema_name} 字段数量 {schema_field_count} 未达到阈值 {threshold}，跳过自动索引构建")
         return None
 
+    # 先标记为过期（新数据已入库，索引待更新）
+    _mark_index_stale(schema_name)
+
     def _build_in_background():
-        with _vector_build_lock:
-            try:
-                logger.info(f"开始构建向量索引: {schema_name}")
-                from core.SQLPipeline import build_vector_index
-                result = build_vector_index(user_id, schema_name)
-                if result.get('success'):
-                    logger.info(f"Schema {schema_name} 向量索引构建完成（字段数: {schema_field_count}）")
-            except Exception as e:
-                logger.warning(f"后台构建向量索引失败: {e}")
+        from core.SQLPipeline import build_vector_index, _get_index_meta
+        max_retries = 3
+        for attempt in range(max_retries):
+            with _vector_build_lock:
+                # 检查是否仍需构建（可能被上一轮修复了）
+                meta = _get_index_meta(schema_name)
+                if meta and meta['status'] == 'ready':
+                    logger.info(f"Schema {schema_name} 索引已就绪，跳过构建（attempt {attempt+1}）")
+                    return
+
+                try:
+                    logger.info(f"开始构建向量索引: {schema_name} (attempt {attempt+1})")
+                    result = build_vector_index(schema_name)
+                    if result.get('success'):
+                        logger.info(f"Schema {schema_name} 向量索引构建完成")
+                except Exception as e:
+                    logger.warning(f"后台构建向量索引失败: {e}")
+                    return  # 构建失败不重试
+
+            # 释放锁后再次检查：构建期间是否有新数据导入导致索引再次过期
+            if attempt < max_retries - 1:
+                import time
+                time.sleep(0.5)  # 短暂等待，让并发导入有时间标记 stale
+                meta = _get_index_meta(schema_name)
+                if meta and meta['status'] != 'stale':
+                    return  # 索引已是最新，无需再构建
 
     thread = threading.Thread(target=_build_in_background, daemon=True)
     thread.start()
@@ -1168,7 +1212,7 @@ def parse_ddl_text(
                 schema_field_count = db.query(Schema).filter(
                         Schema.schema_name == schema_name
                 ).count()
-                index_message = _auto_build_vector_index(user_id, schema_name, schema_field_count)
+                index_message = _auto_build_vector_index(schema_name, schema_field_count)
                 if index_message:
                     index_messages.append(index_message)
             
@@ -1230,7 +1274,7 @@ def parse_json_text(
                 schema_field_count = db.query(Schema).filter(
                         Schema.schema_name == schema_name
                 ).count()
-                index_message = _auto_build_vector_index(user_id, schema_name, schema_field_count)
+                index_message = _auto_build_vector_index(schema_name, schema_field_count)
                 if index_message:
                     index_messages.append(index_message)
             
@@ -1303,7 +1347,7 @@ async def upload_ddl_file(
                 schema_field_count = db.query(Schema).filter(
                         Schema.schema_name == sn
                 ).count()
-                index_message = _auto_build_vector_index(user_id, sn, schema_field_count)
+                index_message = _auto_build_vector_index(sn, schema_field_count)
                 if index_message:
                     index_messages.append(index_message)
             
@@ -1331,11 +1375,12 @@ async def upload_ddl_file(
 def get_schema_list(
         schema_name: Optional[str] = None,
         table_name: Optional[str] = None,
+        search: Optional[str] = None,
         limit: int = 100,
         offset: int = 0,
         user=Depends(get_current_user)
 ):
-    """获取用户的 Schema 解析列表"""
+    """获取用户的 Schema 解析列表，支持按库名、表名、字段名、描述模糊搜索"""
     try:
         user_id = user['user_id']
         db = SchemaSessionLocal()
@@ -1348,6 +1393,17 @@ def get_schema_list(
                 query = query.filter(Schema.schema_name == schema_name)
             if table_name:
                 query = query.filter(Schema.table_name == table_name)
+            if search:
+                search_pattern = f"%{search}%"
+                query = query.filter(
+                    or_(
+                        Schema.schema_name.like(search_pattern),
+                        Schema.table_name.like(search_pattern),
+                        Schema.column_name.like(search_pattern),
+                        Schema.column_description.like(search_pattern),
+                        Schema.table_description.like(search_pattern),
+                    )
+                )
 
             total = query.count()
             items = query.order_by(Schema.created_at.desc()).limit(limit).offset(offset).all()
@@ -1373,12 +1429,12 @@ class BuildIndexRequest(BaseModel):
 
 class IndexInfoResponse(BaseModel):
     """索引信息响应"""
-    user_id: int
     vector_dir: str
     field_count: int
     should_build_index: bool
     threshold: int
     indexes: dict
+    status: Optional[str] = None
 
 
 @router.post("/build-vector-index")
@@ -1388,12 +1444,11 @@ def build_vector_index(
 ):
     """构建向量索引（仅管理员）"""
     _admin_only(user)
+    _check_embedding_ready()
     try:
-        user_id = user['user_id']
-
         from core.SQLPipeline import build_vector_index as do_build
 
-        result = do_build(user_id, request.schema_name)
+        result = do_build(request.schema_name)
         message = "向量索引重建成功" if request.rebuild else "向量索引构建成功"
 
         return {
@@ -1413,19 +1468,53 @@ def get_vector_index_info(
     user=Depends(get_current_user)
 ):
     """获取向量索引信息"""
+    _check_embedding_ready()
     try:
-        user_id = user['user_id']
-
         from core.SQLPipeline import get_vector_index_info as do_get_info
 
-        info = do_get_info(user_id, schema_name)
-        info['threshold'] = info.get('fields', {}).get('is_built', False) and 50 or 0
-        info['should_build_index'] = info.get('fields', {}).get('count', 0) >= 50
+        info = do_get_info(schema_name)
+        fields = info.get('fields', {})
+        info['field_count'] = fields.get('count', 0)
+        info['indexes'] = fields
+        info['threshold'] = fields.get('is_built', False) and 50 or 0
+        info['should_build_index'] = fields.get('count', 0) >= 50
 
         return IndexInfoResponse(**info)
 
     except Exception as e:
         logger.error(f"获取向量索引信息失败：{e}")
+        raise HTTPException(status_code=500, detail=f"获取失败：{str(e)}")
+
+
+@router.get("/vector-index-list")
+def list_vector_indexes(user=Depends(get_current_user)):
+    """列出所有向量索引元数据（仅管理员）"""
+    _admin_only(user)
+    try:
+        from models import AppSessionLocal
+        from models.vector_index import VectorIndexMeta
+
+        db = AppSessionLocal()
+        try:
+            rows = db.query(VectorIndexMeta).order_by(
+                VectorIndexMeta.schema_name.asc()
+            ).all()
+            return [{
+                'id': r.id,
+                'schema_name': r.schema_name,
+                'status': r.status,
+                'field_count': r.field_count,
+                'table_count': r.table_count,
+                'dimension': r.dimension,
+                'file_path': r.file_path,
+                'error_message': r.error_message,
+                'built_at': r.built_at.isoformat() if r.built_at else None,
+                'created_at': r.created_at.isoformat() if r.created_at else None
+            } for r in rows]
+        finally:
+            db.close()
+    except Exception as e:
+        logger.error(f"获取向量索引列表失败：{e}")
         raise HTTPException(status_code=500, detail=f"获取失败：{str(e)}")
 
 

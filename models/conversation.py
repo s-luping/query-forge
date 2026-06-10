@@ -13,6 +13,7 @@ class Conversation(Base):
     schema_name = Column(String(100), nullable=True, comment='关联模式名')
     db_type = Column(String(20), default="sqlite", comment='数据库类型')
     llm_config_id = Column(Integer, nullable=True, comment='使用的模型配置ID')
+    knowledge_id = Column(Integer, nullable=True, comment='创建对话时使用的补充知识ID')
     created_at = Column(DateTime, default=datetime.now, comment='创建时间')
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment='更新时间')
 

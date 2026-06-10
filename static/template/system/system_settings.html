@@ -7,7 +7,7 @@
     <link rel="stylesheet" href="/static/css/bootstrap.min.css">
     <style>
         body { background: #f4f6fa; font-size: 14px; }
-        .container-fluid { padding: 20px; max-width: 700px; }
+        .container-fluid { padding: 20px; max-width: 750px; }
         .card { border: none; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); margin-bottom: 20px; }
         .card-header { background: white; border-bottom: 1px solid #eee; font-weight: 600; padding: 15px 20px; border-radius: 12px 12px 0 0 !important; }
         .status-dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; margin-right: 6px; }
@@ -15,29 +15,28 @@
         .status-dot.warn { background: #ffc107; }
         .setting-row { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #f0f0f0; }
         .setting-row:last-child { border-bottom: none; }
-        .setting-label { font-weight: 500; min-width: 160px; }
+        .setting-key { font-weight: 500; color: #333; font-size: 13px; min-width: 120px; font-family: 'Consolas', monospace; }
         .setting-value { color: #666; font-size: 13px; word-break: break-all; text-align: right; }
+        .setting-desc { color: #999; font-size: 11px; }
         .btn-sm2 { padding: 2px 10px; font-size: 12px; }
         .form-control-sm2 { font-size: 13px; padding: 4px 8px; }
+        .section-label { font-size: 12px; color: #999; text-transform: uppercase; letter-spacing: 1px; padding: 8px 0 4px; border-bottom: 1px dashed #eee; margin-bottom: 4px; }
     </style>
 </head>
 <body>
 <div class="container-fluid">
-    <!-- 系统状态 -->
+
+    <!-- 向量模型信息 -->
     <div class="card">
-        <div class="card-header"><i class="fas fa-cog me-2"></i>系统状态</div>
-        <div class="card-body">
+        <div class="card-header"><i class="fas fa-brain me-2"></i>向量模型</div>
+        <div class="card-body" id="embeddingInfo">
             <div class="setting-row">
-                <span class="setting-label">Embedding 模型</span>
-                <span id="embeddingStatus">检查中...</span>
+                <span class="setting-key">EMBEDDING_MODEL_READY</span>
+                <span class="setting-value">加载中...</span>
             </div>
             <div class="setting-row">
-                <span class="setting-label">模型路径</span>
-                <span class="setting-value" id="modelPath">-</span>
-            </div>
-            <div class="setting-row">
-                <span class="setting-label">向量索引</span>
-                <span id="vectorStatus"><button class="btn btn-outline-primary btn-sm2" onclick="checkVectorIndex()">检查</button></span>
+                <span class="setting-key">EMBEDDING_MODEL_PATH</span>
+                <span class="setting-value">-</span>
             </div>
         </div>
     </div>
@@ -93,17 +92,37 @@ async function checkEmbedding() {
     try {
         const resp = await apiRequest('/api/system/embedding-status');
         const data = await resp.json();
-        const el = document.getElementById('embeddingStatus');
-        document.getElementById('modelPath').textContent = data.model_path;
-        if (data.downloaded) {
-            el.innerHTML = '<span class="status-dot ok"></span>已下载';
+        const container = document.getElementById('embeddingInfo');
+
+        // status
+        let readyHtml;
+        if (data.ready) {
+            readyHtml = '<span class="status-dot ok"></span>就绪 (true)';
+            document.getElementById('btnDownload').style.display = 'none';
+        } else if (data.downloaded) {
+            readyHtml = '<span class="status-dot warn"></span>已下载待加载 (false)';
             document.getElementById('btnDownload').style.display = 'none';
         } else {
-            el.innerHTML = '<span class="status-dot warn"></span>未下载';
+            readyHtml = '<span class="status-dot warn"></span>未下载 (false)';
             document.getElementById('btnDownload').style.display = '';
         }
+
+        // path
+        const path = data.model_path || '-';
+        const pathDisplay = path !== '-' ? `<small>${escapeHtml(path)}</small>` : '<span class="text-muted">-</span>';
+
+        container.innerHTML = `
+            <div class="setting-row">
+                <div><span class="setting-key">EMBEDDING_MODEL_READY</span><br><span class="setting-desc">模型就绪状态</span></div>
+                <span class="setting-value">${readyHtml}</span>
+            </div>
+            <div class="setting-row">
+                <div><span class="setting-key">EMBEDDING_MODEL_PATH</span><br><span class="setting-desc">本地模型路径</span></div>
+                <span class="setting-value">${pathDisplay}</span>
+            </div>
+        `;
     } catch (e) {
-        document.getElementById('embeddingStatus').textContent = '检查失败';
+        document.getElementById('embeddingInfo').innerHTML = '<div class="text-danger">检查失败: ' + e.message + '</div>';
     }
 }
 
@@ -112,16 +131,28 @@ async function loadSettings() {
         const resp = await apiRequest('/api/system/settings');
         const items = await resp.json();
         const container = document.getElementById('jwtSettings');
-        container.innerHTML = items.map(s => `
+
+        const jwtKeys = ['SECRET_KEY', 'ACCESS_TOKEN_EXPIRE_MINUTES'];
+        const jwtItems = items.filter(s => jwtKeys.includes(s.key));
+
+        container.innerHTML = jwtItems.map(s => {
+            const isSecret = s.key === 'SECRET_KEY';
+            const desc = { 'SECRET_KEY': 'JWT 签名密钥', 'ACCESS_TOKEN_EXPIRE_MINUTES': 'Token 有效时长（分钟）' }[s.key] || '';
+            return `
             <div class="setting-row">
-                <span class="setting-label">${s.key}</span>
+                <div>
+                    <span class="setting-key">${s.key}</span>
+                    <br><span class="setting-desc">${desc}</span>
+                </div>
                 <div style="display:flex;align-items:center;gap:8px;">
                     <input type="text" class="form-control form-control-sm2"
-                           id="val-${s.key}" value="${escapeHtml(s.value)}" style="width:200px;">
-                    <button class="btn btn-outline-primary btn-sm2" onclick="saveSetting('${s.key}')">保存</button>
+                           id="val-${s.key}" value="${escapeHtml(s.value)}"
+                           style="width:${isSecret ? '160px' : '120px'};"
+                           ${isSecret ? 'disabled' : ''}>
+                    ${!isSecret ? `<button class="btn btn-outline-primary btn-sm2" onclick="saveSetting('${s.key}')">保存</button>` : ''}
                 </div>
-            </div>
-        `).join('');
+            </div>`;
+        }).join('');
     } catch (e) {
         document.getElementById('jwtSettings').textContent = '加载失败（仅管理员可查看）';
     }
@@ -135,10 +166,10 @@ async function saveSetting(key) {
             body: JSON.stringify({ key, value: input.value })
         });
         const data = await resp.json();
-        if (data.success) {
+        if (resp.ok) {
             showMsg(data.message + '（重启服务后生效）', 'success');
         } else {
-            showMsg(data.message || '保存失败', 'danger');
+            showMsg((await resp.json()).detail || '保存失败', 'danger');
         }
     } catch (e) {
         showMsg('保存失败: ' + e.message, 'danger');
@@ -156,16 +187,6 @@ async function downloadEmbedding() {
         showMsg('下载失败: ' + e.message, 'danger');
     }
     btn.disabled = false; btn.textContent = '📥 下载 Embedding 模型';
-}
-
-async function checkVectorIndex() {
-    try {
-        const resp = await apiRequest('/api/schema/vector-index-info');
-        const data = await resp.json();
-        document.getElementById('vectorStatus').textContent = data.fields?.is_built ? '已构建' : '未构建';
-    } catch (e) {
-        document.getElementById('vectorStatus').textContent = '检查失败';
-    }
 }
 
 function escapeHtml(text) {

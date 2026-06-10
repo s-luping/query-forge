@@ -22,7 +22,7 @@
         <div class="card-header">用户列表</div>
         <div class="card-body p-0">
             <table class="table table-hover mb-0">
-                <thead><tr><th>ID</th><th>用户名</th><th>角色</th><th>Schema 权限</th><th>补充知识权限</th></tr></thead>
+                <thead><tr><th>ID</th><th>用户名</th><th>角色</th><th>数据库权限</th><th>补充知识权限</th></tr></thead>
                 <tbody id="userTable"><tr><td colspan="5" class="text-center py-3 text-muted">加载中...</td></tr></tbody>
             </table>
         </div>
@@ -36,7 +36,7 @@
         </div>
         <div class="card-body">
             <ul class="nav nav-tabs mb-3" id="resTabs">
-                <li class="nav-item"><a class="nav-link active" href="#" onclick="switchResTab('schema')">Schema</a></li>
+                <li class="nav-item"><a class="nav-link active" href="#" onclick="switchResTab('schema')">数据库</a></li>
                 <li class="nav-item"><a class="nav-link" href="#" onclick="switchResTab('extra')">补充知识</a></li>
             </ul>
             <div class="record-list" id="recordList"></div>
@@ -70,7 +70,7 @@ async function loadUsers() {
         <tr>
             <td>${u.id}</td><td>${e(u.username)}</td>
             <td><span class="badge bg-${u.role==='admin'?'danger':'primary'}">${u.role}</span></td>
-            <td><button class="btn btn-outline-primary btn-sm" onclick="openAssign(${u.id},'${e(u.username)}','schema')">设置 Schema</button></td>
+            <td><button class="btn btn-outline-primary btn-sm" onclick="openAssign(${u.id},'${e(u.username)}','schema')">设置数据库</button></td>
             <td><button class="btn btn-outline-primary btn-sm" onclick="openAssign(${u.id},'${e(u.username)}','extra')">设置补充知识</button></td>
         </tr>`).join('');
 }

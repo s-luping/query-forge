@@ -17,15 +17,15 @@
             <div class="tpl-index-sidebar-content">
                 <!-- 所有用户可见 -->
                 <div class="menu-group">
-                    <div class="menu-group-title" onclick="toggleMenu('schema')">Schema 查看</div>
+                    <div class="menu-group-title" onclick="toggleMenu('schema')">数据库查看</div>
                     <div id="menu-schema" class="menu-items" style="display:none;">
-                        <div class="menu-item" onclick="openWindow('Schema 查看','/static/template/schema/schema_view.html')">Schema 查看</div>
+                        <div class="menu-item" onclick="openWindow('数据库查看','/static/template/schema/schema_view.html')">数据库 查看</div>
                     </div>
                 </div>
                 <div class="menu-group">
-                    <div class="menu-group-title" onclick="toggleMenu('chat')">生成 SQL 与查询</div>
+                    <div class="menu-group-title" onclick="toggleMenu('chat')">生成SQL与查询</div>
                     <div id="menu-chat" class="menu-items" style="display:none;">
-                        <div class="menu-item" onclick="openWindow('Chat SQL','/static/template/chatSQL/chat.html')">💬 Chat SQL</div>
+                        <div class="menu-item" onclick="openWindow('Chat SQL','/static/template/chatSQL/chat.html')">ChatSQL💬</div>
                         <div class="menu-item" onclick="openWindow('补充知识','/static/template/extra_knowledge.html')">补充知识</div>
                     </div>
                 </div>
@@ -39,9 +39,10 @@
                         </div>
                     </div>
                     <div class="menu-group">
-                        <div class="menu-group-title" onclick="toggleMenu('schemaAdmin')">Schema 维护</div>
+                        <div class="menu-group-title" onclick="toggleMenu('schemaAdmin')">数据库维护</div>
                         <div id="menu-schemaAdmin" class="menu-items" style="display:none;">
-                            <div class="menu-item" onclick="openWindow('Schema 维护','/static/template/schema/schema_manage.html')">Schema 维护</div>
+                            <div class="menu-item" onclick="openWindow('数据库维护','/static/template/schema/schema_manage.html')">数据库维护</div>
+                            <div class="menu-item" onclick="openWindow('向量索引','/static/template/schema/vector_index.html')">向量索引</div>
                         </div>
                     </div>
                     <div class="menu-group">

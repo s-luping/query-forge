@@ -150,6 +150,10 @@ class LLMClient:
 
         llm_logger.info(f"【多轮对话】{self.provider_name} - {self.model}")
         llm_logger.info(f"【消息轮次】{len(messages)} 条")
+        for i, msg in enumerate(messages):
+            role = msg.get('role', 'unknown')
+            content = msg.get('content', '')
+            llm_logger.info(f"【消息{i+1}-{role}】\n{content}")
 
         try:
             response = requests.post(

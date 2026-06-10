@@ -52,10 +52,12 @@ def init_database():
     from models.user import User, UserSchema, UserExtra
     from models.llm import LLMConfig
     from models.system import SystemConfig
+    from models.vector_index import VectorIndexMeta
 
     User.__table__.create(bind=app_engine, checkfirst=True)
     LLMConfig.__table__.create(bind=app_engine, checkfirst=True)
     SystemConfig.__table__.create(bind=app_engine, checkfirst=True)
+    VectorIndexMeta.__table__.create(bind=app_engine, checkfirst=True)
     UserSchema.__table__.create(bind=app_engine, checkfirst=True)
     UserExtra.__table__.create(bind=app_engine, checkfirst=True)
     _seed_system_config()
@@ -78,6 +80,41 @@ def _ensure_db_dirs():
             logger.info(f"创建数据库目录: {db_dir}")
 
 
+def _sync_embedding_model_path(db):
+    """如果 EMBEDDING_MODEL_READY=true 但路径为空，自动扫描补齐"""
+    import os
+    from models.system import SystemConfig
+
+    ready_row = db.query(SystemConfig).filter(
+        SystemConfig.key == 'EMBEDDING_MODEL_READY'
+    ).first()
+    path_row = db.query(SystemConfig).filter(
+        SystemConfig.key == 'EMBEDDING_MODEL_PATH'
+    ).first()
+
+    if not ready_row or str(ready_row.value) != 'true':
+        return
+    if path_row and str(path_row.value).strip():
+        return  # 已有路径，无需修复
+
+    # 扫描模型目录
+    PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    MODEL_CACHE_DIR = os.path.join(PROJECT_ROOT, 'models', 'embeddings')
+    possible_paths = [
+        os.path.join(MODEL_CACHE_DIR, 'bge-m3', 'BAAI', 'bge-m3'),
+        os.path.join(MODEL_CACHE_DIR, 'bge-m3'),
+    ]
+    for local_path in possible_paths:
+        if os.path.exists(os.path.join(local_path, 'config.json')):
+            if path_row:
+                path_row.value = local_path  # type: ignore[assignment]
+            else:
+                db.add(SystemConfig(key='EMBEDDING_MODEL_PATH', value=local_path))
+            db.commit()
+            logger.info(f"已自动补齐 EMBEDDING_MODEL_PATH = {local_path}")
+            return
+
+
 def _seed_system_config():
     import secrets
     import string
@@ -93,7 +130,16 @@ def _seed_system_config():
         if not db.query(SystemConfig).filter(SystemConfig.key == 'ACCESS_TOKEN_EXPIRE_MINUTES').first():
             db.add(SystemConfig(key='ACCESS_TOKEN_EXPIRE_MINUTES', value='4320'))
             logger.info("已初始化 ACCESS_TOKEN_EXPIRE_MINUTES = 4320 (3天)")
+        if not db.query(SystemConfig).filter(SystemConfig.key == 'EMBEDDING_MODEL_READY').first():
+            db.add(SystemConfig(key='EMBEDDING_MODEL_READY', value='false'))
+            logger.info("已初始化 EMBEDDING_MODEL_READY = false（嵌入模型未下载）")
+        if not db.query(SystemConfig).filter(SystemConfig.key == 'EMBEDDING_MODEL_PATH').first():
+            db.add(SystemConfig(key='EMBEDDING_MODEL_PATH', value=''))
+            logger.info("已初始化 EMBEDDING_MODEL_PATH（模型路径缓存）")
         db.commit()
+
+        # 一致性修复：ready=true 但 path 为空时，自动扫描补齐路径
+        _sync_embedding_model_path(db)
     except Exception as e:
         logger.warning(f"初始化系统配置失败: {e}")
         db.rollback()
@@ -133,6 +179,8 @@ def _migrate_llm_log_columns():
                 conn.execute(sqlalchemy.text("ALTER TABLE llm_logs ADD COLUMN provider VARCHAR(50) DEFAULT ''"))
             if 'cost' not in columns:
                 conn.execute(sqlalchemy.text("ALTER TABLE llm_logs ADD COLUMN cost FLOAT DEFAULT 0.0"))
+            if 'system_prompt' not in columns:
+                conn.execute(sqlalchemy.text("ALTER TABLE llm_logs ADD COLUMN system_prompt TEXT"))
             conn.commit()
         with app_engine.connect() as conn:
             result = conn.execute(sqlalchemy.text("PRAGMA table_info('llm_configs')"))
@@ -148,8 +196,43 @@ def init_conversation_database():
     from models.conversation import Conversation, ConversationMessage
     Conversation.__table__.create(bind=conversation_engine, checkfirst=True)
     ConversationMessage.__table__.create(bind=conversation_engine, checkfirst=True)
+    _migrate_conversation_columns()
     logger.info(f"对话记录数据库表创建/检查完成: {CONVERSATION_DB_PATH}")
     print(f"对话记录数据库表创建/检查完成: {CONVERSATION_DB_PATH}")
+
+
+def _migrate_conversation_columns():
+    import sqlalchemy
+    try:
+        with conversation_engine.connect() as conn:
+            result = conn.execute(sqlalchemy.text("PRAGMA table_info('conversations')"))
+            columns = [row[1] for row in result.fetchall()]
+            if 'knowledge_id' not in columns:
+                conn.execute(sqlalchemy.text("ALTER TABLE conversations ADD COLUMN knowledge_id INTEGER"))
+            # 清理早期版本遗留的 extra_knowledge 列（已被 knowledge_id 替代）
+            if 'extra_knowledge' in columns and 'knowledge_id' in columns:
+                conn.execute(sqlalchemy.text("""
+                    CREATE TABLE conversations_new (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        user_id INTEGER NOT NULL,
+                        title VARCHAR(200),
+                        schema_name VARCHAR(100),
+                        db_type VARCHAR(20) DEFAULT 'sqlite',
+                        llm_config_id INTEGER,
+                        knowledge_id INTEGER,
+                        created_at DATETIME,
+                        updated_at DATETIME
+                    )
+                """))
+                conn.execute(sqlalchemy.text(
+                    "INSERT INTO conversations_new SELECT id, user_id, title, schema_name, db_type, llm_config_id, knowledge_id, created_at, updated_at FROM conversations"
+                ))
+                conn.execute(sqlalchemy.text("DROP TABLE conversations"))
+                conn.execute(sqlalchemy.text("ALTER TABLE conversations_new RENAME TO conversations"))
+                logger.info("对话表迁移: 已清理多余列 extra_knowledge")
+            conn.commit()
+    except Exception as e:
+        logger.warning(f"对话表迁移失败（可忽略）: {e}")
 
 
 def create_default_admin():

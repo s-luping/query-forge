@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>向量索引管理</title>
+    <link href="/static/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { background: #f4f6fa; font-size: 14px; }
+        .container-fluid { padding: 20px; }
+        .card { border: none; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); margin-bottom: 20px; }
+        .card-header { background: white; border-bottom: 1px solid #eee; font-weight: 600; padding: 15px 20px; border-radius: 12px 12px 0 0 !important; }
+        table { font-size: 13px; }
+        table th { background: #f8f9fa; white-space: nowrap; font-weight: 600; }
+        .status-ready { color: #28a745; }
+        .status-stale { color: #ffc107; }
+        .status-error { color: #dc3545; }
+        .status-building { color: #0d6efd; }
+        .status-pending { color: #6c757d; }
+    </style>
+</head>
+<body>
+<div class="container-fluid">
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span><i class="fas fa-database me-2"></i>向量索引元数据</span>
+            <button class="btn btn-sm btn-outline-secondary" onclick="loadList()">
+                <i class="fas fa-sync"></i> 刷新
+            </button>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover table-sm mb-0">
+                    <thead>
+                        <tr>
+                            <th>数据库</th>
+                            <th>状态</th>
+                            <th>字段数</th>
+                            <th>表数</th>
+                            <th>维度</th>
+                            <th>索引文件</th>
+                            <th>构建时间</th>
+                            <th>错误信息</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody">
+                        <tr><td colspan="9" class="text-center py-4 text-muted">加载中...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+<link rel="stylesheet" href="/static/css/all.min.css">
+<script src="/static/js/bootstrap.bundle.min.js"></script>
+<script>
+const apiRequest = window.apiRequest || function(url, options = {}) {
+    const token = document.cookie.split('; ').find(row => row.startsWith('token='))?.split('=')[1];
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    return fetch(url, { ...options, headers }).then(resp => {
+        if (resp.status === 401) { window.parent.location.href = '/login'; throw new Error('登录已过期'); }
+        return resp;
+    });
+};
+
+const STATUS_MAP = {
+    'ready':    { cls: 'status-ready',    label: '就绪' },
+    'stale':    { cls: 'status-stale',    label: '待更新' },
+    'building': { cls: 'status-building', label: '构建中' },
+    'error':    { cls: 'status-error',    label: '失败' },
+    'pending':  { cls: 'status-pending',  label: '未构建' }
+};
+
+async function loadList() {
+    try {
+        const resp = await apiRequest('/api/schema/vector-index-list');
+        if (!resp.ok) { throw new Error(await resp.text()); }
+        const items = await resp.json();
+        const tbody = document.getElementById('tableBody');
+
+        if (!items.length) {
+            tbody.innerHTML = '<tr><td colspan="9" class="text-center py-4 text-muted">暂无索引数据</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = items.map(r => {
+            const st = STATUS_MAP[r.status] || STATUS_MAP['pending'];
+            return `
+            <tr>
+                <td><strong>${e(r.schema_name)}</strong></td>
+                <td><span class="${st.cls}">● ${st.label}</span></td>
+                <td>${r.field_count || 0}</td>
+                <td>${r.table_count || 0}</td>
+                <td>${r.dimension || '-'}</td>
+                <td><small>${e(r.file_path || '-')}</small></td>
+                <td><small>${r.built_at ? new Date(r.built_at).toLocaleString() : '-'}</small></td>
+                <td><small class="text-danger">${e(r.error_message || '-')}</small></td>
+                <td>
+                    <button class="btn btn-outline-primary btn-sm" onclick="rebuild('${e(r.schema_name)}')"
+                            ${r.status === 'building' ? 'disabled' : ''}>
+                        <i class="fas fa-redo"></i> 重建
+                    </button>
+                </td>
+            </tr>`;
+        }).join('');
+    } catch (e) {
+        document.getElementById('tableBody').innerHTML =
+            '<tr><td colspan="9" class="text-center py-4 text-danger">加载失败: ' + e.message + '</td></tr>';
+    }
+}
+
+async function rebuild(schemaName) {
+    if (!confirm(`确定要重建 "${schemaName}" 的向量索引吗？`)) return;
+    try {
+        const resp = await apiRequest('/api/schema/build-vector-index', {
+            method: 'POST',
+            body: JSON.stringify({ schema_name: schemaName, rebuild: true })
+        });
+        const data = await resp.json();
+        if (data.success) {
+            alert(data.message || '重建已启动');
+            setTimeout(loadList, 2000);
+        } else {
+            alert('失败: ' + (data.message || '未知错误'));
+        }
+    } catch (e) {
+        alert('重建失败: ' + e.message);
+    }
+}
+
+function e(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
+
+document.addEventListener('DOMContentLoaded', loadList);
+</script>
+</body>
+</html>
