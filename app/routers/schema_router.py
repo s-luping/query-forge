@@ -150,13 +150,13 @@ def _mark_index_stale(schema_name: str):
 
 
 def _auto_build_vector_index(schema_name: str, schema_field_count: int) -> Optional[str]:
-    from core.VectorStore import SchemaVectorStore, EmbeddingModel
+    from core.VectorStore import EmbeddingModel, get_vector_config
 
     if not EmbeddingModel.is_ready():
         logger.warning(f"Embedding 模型未就绪，跳过自动索引构建: {schema_name}")
         return None
 
-    threshold = SchemaVectorStore.VECTOR_INDEX_THRESHOLD
+    threshold = get_vector_config('VECTOR_INDEX_THRESHOLD')
     if schema_field_count < threshold:
         logger.info(f"Schema {schema_name} 字段数量 {schema_field_count} 未达到阈值 {threshold}，跳过自动索引构建")
         return None

@@ -115,6 +115,14 @@ def _sync_embedding_model_path(db):
             return
 
 
+def _seed_vector_config(db, key, default_value):
+    """仅在 key 不存在时写入默认值"""
+    from models.system import SystemConfig
+    if not db.query(SystemConfig).filter(SystemConfig.key == key).first():
+        db.add(SystemConfig(key=key, value=default_value))
+        logger.info(f"已初始化 {key} = {default_value}")
+
+
 def _seed_system_config():
     import secrets
     import string
@@ -136,6 +144,11 @@ def _seed_system_config():
         if not db.query(SystemConfig).filter(SystemConfig.key == 'EMBEDDING_MODEL_PATH').first():
             db.add(SystemConfig(key='EMBEDDING_MODEL_PATH', value=''))
             logger.info("已初始化 EMBEDDING_MODEL_PATH（模型路径缓存）")
+
+        # 向量索引参数默认值
+        _seed_vector_config(db, 'VECTOR_INDEX_THRESHOLD', '50')
+        _seed_vector_config(db, 'FIELD_RECALL_TOP_K', '20')
+        _seed_vector_config(db, 'MAX_TABLES', '10')
         db.commit()
 
         # 一致性修复：ready=true 但 path 为空时，自动扫描补齐路径

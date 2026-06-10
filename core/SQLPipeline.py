@@ -12,6 +12,7 @@ from app.logger import pipeline_logger
 from core.KeywordExtractor import KeywordExtractor
 from core.LLMClient import LLMClient
 from core.SQLGenerator import SqlGenerator
+from core.VectorStore import get_vector_config
 from models import SchemaSessionLocal
 from models.schema import Schema
 
@@ -30,10 +31,6 @@ class SQLPipeline:
         - extra_knowledge: 补充知识
         - history_queries: 历史成功查询
     """
-
-    VECTOR_INDEX_THRESHOLD = 50
-    FIELD_RECALL_TOP_K = 20
-    MAX_TABLES = 10
 
     def __init__(self, user_id: int, llm_client: LLMClient, sql_generator: SqlGenerator):
         self.user_id = user_id
@@ -147,11 +144,11 @@ class SQLPipeline:
             
             self._log_step("VECTOR_CHECK", {
                 "field_count": field_count,
-                "threshold": self.VECTOR_INDEX_THRESHOLD,
-                "need_vector": field_count >= self.VECTOR_INDEX_THRESHOLD
+                "threshold": get_vector_config('VECTOR_INDEX_THRESHOLD'),
+                "need_vector": field_count >= get_vector_config('VECTOR_INDEX_THRESHOLD')
             })
             
-            if field_count < self.VECTOR_INDEX_THRESHOLD:
+            if field_count < get_vector_config('VECTOR_INDEX_THRESHOLD'):
                 return False
 
             self.vector_store = SchemaVectorStore()
@@ -200,7 +197,7 @@ class SQLPipeline:
         if self._vector_loaded:
             try:
                 keyword_text = ' '.join(keywords)
-                results = self.vector_store.search_fields(keyword_text, top_k=self.FIELD_RECALL_TOP_K)
+                results = self.vector_store.search_fields(keyword_text, top_k=get_vector_config('FIELD_RECALL_TOP_K'))
                 if results:
                     self._log_step("STEP2_VECTOR_RECALL", {
                         "method": "vector_search",
@@ -240,19 +237,19 @@ class SQLPipeline:
             ]
         })
         
-        return results[:self.FIELD_RECALL_TOP_K]
+        return results[:get_vector_config('FIELD_RECALL_TOP_K')]
 
     def step3_aggregate_tables(self, recalled_fields: List[Dict], schema_name: Optional[str] = None) -> Dict:
         """步骤3: 聚合表获取完整结构（必要）"""
         table_names = list(set(f.get('table_name') for f in recalled_fields if f.get('table_name')))
 
-        if len(table_names) > self.MAX_TABLES:
+        if len(table_names) > get_vector_config('MAX_TABLES'):
             table_counts = {}
             for f in recalled_fields:
                 t = f.get('table_name')
                 if t:
                     table_counts[t] = table_counts.get(t, 0) + 1
-            table_names = sorted(table_counts.keys(), key=lambda x: table_counts.get(x, 0), reverse=True)[:self.MAX_TABLES]
+            table_names = sorted(table_counts.keys(), key=lambda x: table_counts.get(x, 0), reverse=True)[:get_vector_config('MAX_TABLES')]
 
         complete_fields = self._get_table_complete_fields(table_names, schema_name)
 

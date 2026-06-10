@@ -18,6 +18,30 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(__file__))
 MODEL_CACHE_DIR = os.path.join(PROJECT_ROOT, 'models', 'embeddings')
 VECTOR_INDEX_DIR = os.path.join(PROJECT_ROOT, 'db', 'vectors')
 
+# 默认向量参数（数据库无配置时使用）
+_DEFAULT_VECTOR_CONFIG = {
+    'VECTOR_INDEX_THRESHOLD': 50,
+    'FIELD_RECALL_TOP_K': 20,
+    'MAX_TABLES': 10,
+}
+
+
+def get_vector_config(key: str):
+    """从数据库读取向量参数，不存在则返回默认值"""
+    try:
+        from models import AppSessionLocal
+        from models.system import SystemConfig
+        db = AppSessionLocal()
+        try:
+            row = db.query(SystemConfig).filter(SystemConfig.key == key).first()
+            if row is not None and str(row.value).strip():
+                return int(str(row.value))
+        finally:
+            db.close()
+    except Exception:
+        pass
+    return _DEFAULT_VECTOR_CONFIG.get(key, 0)
+
 
 class EmbeddingModel:
     """Sentence-Transformers 模型封装 (BGE-M3)"""
@@ -267,8 +291,6 @@ class VectorIndex:
 
 class SchemaVectorStore:
     """Schema 向量存储 - 仅管理字段索引"""
-
-    VECTOR_INDEX_THRESHOLD = 50
 
     def __init__(self):
         self.dimension = EmbeddingModel.get_dimension()
