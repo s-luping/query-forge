@@ -9,13 +9,11 @@ from app.logger import logger
 from core.KeywordExtractor import KeywordExtractor
 from core.LLMClient import LLMClient
 from core.SQLGenerator import SqlGenerator
+from core.VectorStore import get_vector_config
 
 
 class ChatSession:
     """对话 SQL 生成器"""
-
-    FIELD_RECALL_TOP_K = 20
-    MAX_TABLES = 10
 
     def __init__(self, user_id: int, llm_client: LLMClient, sql_generator: SqlGenerator):
         self.user_id = user_id
@@ -146,7 +144,7 @@ class ChatSession:
                 store = SchemaVectorStore()
                 store.load(schema_name)
                 keyword_text = ' '.join(keywords)
-                results = store.search_fields(keyword_text, top_k=self.FIELD_RECALL_TOP_K)
+                results = store.search_fields(keyword_text, top_k=get_vector_config('FIELD_RECALL_TOP_K'))
                 if results:
                     return results
         except Exception:
@@ -182,7 +180,7 @@ class ChatSession:
                         'column_key': s.column_key,
                         'foreign_key': s.foreign_key
                     })
-            return results[:self.FIELD_RECALL_TOP_K]
+            return results[:get_vector_config('FIELD_RECALL_TOP_K')]
         finally:
             db.close()
 
@@ -194,13 +192,13 @@ class ChatSession:
         table_names = list(set(f.get('table_name') for f in recalled_fields if f.get('table_name')))
 
         # 限制最大表数
-        if len(table_names) > self.MAX_TABLES:
+        if len(table_names) > get_vector_config('MAX_TABLES'):
             table_counts = {}
             for f in recalled_fields:
                 t = f.get('table_name')
                 if t:
                     table_counts[t] = table_counts.get(t, 0) + 1
-            table_names = sorted(table_counts.keys(), key=lambda x: table_counts.get(x, 0), reverse=True)[:self.MAX_TABLES]
+            table_names = sorted(table_counts.keys(), key=lambda x: table_counts.get(x, 0), reverse=True)[:get_vector_config('MAX_TABLES')]
 
         if not table_names:
             # 没有召回任何表，尝试获取全部
@@ -210,7 +208,7 @@ class ChatSession:
                 if schema_name:
                     query = query.filter(Schema.schema_name == schema_name)
                 all_items = query.all()
-                table_names = list(set(s.table_name for s in all_items))[:self.MAX_TABLES]
+                table_names = list(set(s.table_name for s in all_items))[:get_vector_config('MAX_TABLES')]
             finally:
                 db.close()
 

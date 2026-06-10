@@ -165,7 +165,8 @@ def update_setting(req: UpdateSettingRequest, user=Depends(get_current_user)):
     """更新系统配置"""
     if user['role'] != 'admin':
         raise HTTPException(status_code=403, detail="仅管理员可修改")
-    allowed_keys = {'ACCESS_TOKEN_EXPIRE_MINUTES'}
+    allowed_keys = {'ACCESS_TOKEN_EXPIRE_MINUTES', 'VECTOR_INDEX_THRESHOLD',
+                    'FIELD_RECALL_TOP_K', 'MAX_TABLES'}
     if req.key not in allowed_keys:
         raise HTTPException(status_code=400, detail=f"不可修改的配置项: {req.key}")
     _set_setting(req.key, req.value)

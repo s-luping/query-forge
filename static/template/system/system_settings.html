@@ -47,6 +47,12 @@
         <div class="card-body" id="jwtSettings">加载中...</div>
     </div>
 
+    <!-- 向量索引参数 -->
+    <div class="card">
+        <div class="card-header"><i class="fas fa-sliders-h me-2"></i>向量索引参数</div>
+        <div class="card-body" id="vectorConfig">加载中...</div>
+    </div>
+
     <!-- 操作 -->
     <div class="card">
         <div class="card-header"><i class="fas fa-tools me-2"></i>操作</div>
@@ -130,32 +136,47 @@ async function loadSettings() {
     try {
         const resp = await apiRequest('/api/system/settings');
         const items = await resp.json();
-        const container = document.getElementById('jwtSettings');
 
+        // JWT 配置
         const jwtKeys = ['SECRET_KEY', 'ACCESS_TOKEN_EXPIRE_MINUTES'];
         const jwtItems = items.filter(s => jwtKeys.includes(s.key));
+        document.getElementById('jwtSettings').innerHTML = jwtItems.map(s => renderSettingRow(s, {
+            'SECRET_KEY': { desc: 'JWT 签名密钥', disabled: true },
+            'ACCESS_TOKEN_EXPIRE_MINUTES': { desc: 'Token 有效时长（分钟）' }
+        })).join('');
 
-        container.innerHTML = jwtItems.map(s => {
-            const isSecret = s.key === 'SECRET_KEY';
-            const desc = { 'SECRET_KEY': 'JWT 签名密钥', 'ACCESS_TOKEN_EXPIRE_MINUTES': 'Token 有效时长（分钟）' }[s.key] || '';
-            return `
-            <div class="setting-row">
-                <div>
-                    <span class="setting-key">${s.key}</span>
-                    <br><span class="setting-desc">${desc}</span>
-                </div>
-                <div style="display:flex;align-items:center;gap:8px;">
-                    <input type="text" class="form-control form-control-sm2"
-                           id="val-${s.key}" value="${escapeHtml(s.value)}"
-                           style="width:${isSecret ? '160px' : '120px'};"
-                           ${isSecret ? 'disabled' : ''}>
-                    ${!isSecret ? `<button class="btn btn-outline-primary btn-sm2" onclick="saveSetting('${s.key}')">保存</button>` : ''}
-                </div>
-            </div>`;
-        }).join('');
+        // 向量索引参数
+        const vecKeys = ['VECTOR_INDEX_THRESHOLD', 'FIELD_RECALL_TOP_K', 'MAX_TABLES'];
+        const vecItems = items.filter(s => vecKeys.includes(s.key));
+        document.getElementById('vectorConfig').innerHTML = vecItems.map(s => renderSettingRow(s, {
+            'VECTOR_INDEX_THRESHOLD': { desc: '字段数达到此值自动构建索引', width: '80px' },
+            'FIELD_RECALL_TOP_K': { desc: '向量检索时召回的最大字段数', width: '80px' },
+            'MAX_TABLES': { desc: '按表聚合时包含的最大表数', width: '80px' }
+        })).join('');
     } catch (e) {
         document.getElementById('jwtSettings').textContent = '加载失败（仅管理员可查看）';
     }
+}
+
+function renderSettingRow(s, meta) {
+    const m = (meta && meta[s.key]) || {};
+    const desc = m.desc || '';
+    const disabled = m.disabled || false;
+    const width = m.width || '120px';
+    return `
+    <div class="setting-row">
+        <div>
+            <span class="setting-key">${s.key}</span>
+            <br><span class="setting-desc">${desc}</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;">
+            <input type="text" class="form-control form-control-sm2"
+                   id="val-${s.key}" value="${escapeHtml(s.value)}"
+                   style="width:${width};"
+                   ${disabled ? 'disabled' : ''}>
+            ${!disabled ? `<button class="btn btn-outline-primary btn-sm2" onclick="saveSetting('${s.key}')">保存</button>` : ''}
+        </div>
+    </div>`;
 }
 
 async function saveSetting(key) {
