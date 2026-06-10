@@ -3,7 +3,7 @@
 对话 API 路由 — 支持多轮连续对话 SQL 生成
 """
 import json
-from typing import Optional
+from typing import Optional, cast
 
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
@@ -113,11 +113,26 @@ def _build_llm_client(user_id: int, llm_config_id: Optional[int] = None) -> LLMC
     return llm_client
 
 
+def _safe_parse_columns(raw) -> Optional[list]:
+    """安全解析 columns JSON，兼容历史脏数据（字符串被误存为 JSON 字符串）"""
+    if not raw:
+        return None
+    try:
+        parsed = json.loads(raw)
+        if isinstance(parsed, list):
+            return parsed
+        # 历史 bug：可能存成了普通字符串
+        return None
+    except (json.JSONDecodeError, TypeError):
+        return None
+
+
 def _save_llm_log(user_id: int, provider: str, question: str, model: str, conditions: str,
                   result: str, duration_ms: float, prompt_tokens: int,
                   completion_tokens: int, total_tokens: int,
-                  status: str = 'success', error_message: str = None,
-                  conversation_id: int = None):
+                  status: str = 'success', error_message: Optional[str] = None,
+                  conversation_id: Optional[int] = None,
+                  system_prompt: Optional[str] = None):
     """保存LLM调用记录"""
     from models import LLMSessionLocal
     from models.llm import LLMLog
@@ -131,6 +146,7 @@ def _save_llm_log(user_id: int, provider: str, question: str, model: str, condit
             question=question,
             model=model,
             conditions=conditions,
+            system_prompt=system_prompt,
             result=result,
             duration_ms=duration_ms,
             prompt_tokens=prompt_tokens,
@@ -199,7 +215,8 @@ def create_conversation(
                 title=title,
                 schema_name=request.schema_name,
                 db_type=request.db_type,
-                llm_config_id=request.llm_config_id
+                llm_config_id=request.llm_config_id,
+                knowledge_id=request.knowledge_id
             )
             db.add(conversation)
             db.flush()
@@ -238,14 +255,16 @@ def create_conversation(
             # 当前方案：传给 followup 时从 DB 的 schema 重新构建 CSV。
             # 这没问题，因为 schema 数据在 sys_schema.db 中持久化了。
 
-            conversation_id = conversation.id
-            assistant_msg_id = assistant_msg.id
+            conversation_id = cast(int, conversation.id)
+            assistant_msg_id = cast(int, assistant_msg.id)
 
         finally:
             db.close()
 
         # 保存 LLM 调用记录
         tokens = result.get('tokens', {})
+        messages = result.get('messages', [])
+        system_prompt_text = messages[0]['content'] if messages else ''
         _save_llm_log(
             user_id=user_id,
             provider=llm_client.provider,
@@ -259,7 +278,8 @@ def create_conversation(
             total_tokens=tokens.get('total_tokens', 0),
             status='success' if result['is_valid'] else 'warning',
             error_message=result.get('error_message') if not result['is_valid'] else None,
-            conversation_id=conversation_id
+            conversation_id=conversation_id,
+            system_prompt=system_prompt_text
         )
 
         logger.info(f"对话创建成功: id={conversation_id}, user_id={user_id}")
@@ -329,11 +349,13 @@ def send_message(
             )
 
             # 跟进消息
+            extra_knowledge = _get_extra_knowledge_safe(user_id, conversation.knowledge_id)
             result = session.process_followup_message(
                 conversation_messages=history,
                 new_user_content=request.content,
                 schema_csv=schema_csv,
-                db_type=conversation.db_type
+                db_type=conversation.db_type,
+                extra_knowledge=extra_knowledge
             )
 
             # 保存消息
@@ -370,6 +392,8 @@ def send_message(
 
         # 保存 LLM 调用记录
         tokens = result.get('tokens', {})
+        messages = result.get('messages', [])
+        system_prompt_text = messages[0]['content'] if messages else ''
         _save_llm_log(
             user_id=user_id,
             provider=llm_client.provider,
@@ -383,7 +407,8 @@ def send_message(
             total_tokens=tokens.get('total_tokens', 0),
             status='success' if result['is_valid'] else 'warning',
             error_message=result.get('error_message') if not result['is_valid'] else None,
-            conversation_id=conversation_id
+            conversation_id=conversation_id,
+            system_prompt=system_prompt_text
         )
 
         logger.info(f"对话消息已发送: conversation_id={conversation_id}")
@@ -477,7 +502,7 @@ def get_messages(
                 sql=msg.sql,
                 is_valid=msg.is_valid,
                 error_message=msg.error_message,
-                columns=json.loads(msg.columns) if msg.columns else None,
+                columns=_safe_parse_columns(msg.columns),
                 created_at=msg.created_at.isoformat() if msg.created_at else ""
             )
             for msg in messages

@@ -433,6 +433,15 @@
                             <div class="detail-value">${item.conditions || '-'}</div>
                         </div>
                     </div>
+                    ${item.system_prompt ? `
+                    <div class="detail-item">
+                        <div class="detail-label">System Prompt（含表结构 + 补充知识）</div>
+                        <details class="mt-1">
+                            <summary class="text-primary" style="cursor:pointer;font-size:13px;">点击展开 / 折叠</summary>
+                            <pre class="detail-value mt-2" style="max-height:400px;overflow:auto;white-space:pre-wrap;background:#f8f9fa;padding:10px;border-radius:6px;font-size:12px;">${escapeHtml(item.system_prompt)}</pre>
+                        </details>
+                    </div>
+                    ` : ''}
                     <div class="row">
                         <div class="col-md-3 detail-item">
                             <div class="detail-label">耗时</div>

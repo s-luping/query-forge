@@ -85,7 +85,8 @@ class ChatSession:
         conversation_messages: list,
         new_user_content: str,
         schema_csv: str,
-        db_type: str = "sqlite"
+        db_type: str = "sqlite",
+        extra_knowledge: str = ""
     ) -> dict:
         """后续轮次消息：使用对话历史 + 已保存的 schema 上下文
 
@@ -94,12 +95,13 @@ class ChatSession:
             new_user_content: 用户的新消息（修改意见）
             schema_csv: 第一轮保存的 schema CSV
             db_type: 数据库类型
+            extra_knowledge: 创建对话时的补充知识
 
         Returns:
             {"sql": ..., "is_valid": ..., "messages": [...]}
         """
         messages = self._build_messages_from_history(
-            conversation_messages, schema_csv, db_type
+            conversation_messages, schema_csv, db_type, extra_knowledge
         )
 
         # 追加新的 user 消息
@@ -139,9 +141,9 @@ class ChatSession:
             from core.VectorStore import SchemaVectorStore
             from core.SQLPipeline import build_vector_index, get_vector_index_info
 
-            info = get_vector_index_info(self.user_id, schema_name)
+            info = get_vector_index_info(schema_name)
             if info.get('fields', {}).get('is_built'):
-                store = SchemaVectorStore(self.user_id)
+                store = SchemaVectorStore()
                 store.load(schema_name)
                 keyword_text = ' '.join(keywords)
                 results = store.search_fields(keyword_text, top_k=self.FIELD_RECALL_TOP_K)
@@ -277,7 +279,8 @@ class ChatSession:
 2. 确保所有列名和表名都在提供的表结构中存在
 3. 如果需要连接多个表，请使用适当的JOIN
 4. 添加适当的WHERE条件来过滤数据
-5. 如果用户提出修改意见，请基于上一轮的SQL进行修改优化"""
+5. 如果用户提出修改意见，请基于上一轮的SQL进行修改优化
+6. 维度层级过滤（极其重要）：数据采用父子层级存储，父节点值=子节点汇总（预聚合）。【补充知识】中列出的每一个维度列都必须添加 WHERE 条件，用户未指定时使用最高级父节点（根节点），不要混用不同层级。遗漏任何一个维度列都会导致数据翻倍"""
 
         if extra_knowledge:
             prompt += f"\n\n【补充知识】\n{extra_knowledge}"
@@ -289,11 +292,12 @@ class ChatSession:
         self,
         conversation_messages: list,
         schema_csv: str,
-        db_type: str = "sqlite"
+        db_type: str = "sqlite",
+        extra_knowledge: str = ""
     ) -> list:
         """将数据库消息历史转换为 LLM messages 数组"""
         messages = [
-            {"role": "system", "content": self._build_system_prompt(schema_csv, db_type)}
+            {"role": "system", "content": self._build_system_prompt(schema_csv, db_type, extra_knowledge)}
         ]
 
         for msg in conversation_messages:

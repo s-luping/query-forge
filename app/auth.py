@@ -19,7 +19,7 @@ def _get_secret_key() -> str:
         db = AppSessionLocal()
         try:
             row = db.query(SystemConfig).filter(SystemConfig.key == 'SECRET_KEY').first()
-            if row and row.value:
+            if row is not None and str(row.value):
                 return row.value
         finally:
             db.close()
@@ -35,7 +35,7 @@ def _get_token_expire_minutes() -> int:
         db = AppSessionLocal()
         try:
             row = db.query(SystemConfig).filter(SystemConfig.key == 'ACCESS_TOKEN_EXPIRE_MINUTES').first()
-            if row and row.value:
+            if row is not None and str(row.value):
                 return int(row.value)
         finally:
             db.close()

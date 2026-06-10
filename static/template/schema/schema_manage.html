@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Schema 管理</title>
+    <title>数据库 管理</title>
     <link href="/static/css/bootstrap.min.css" rel="stylesheet">
     <style>
         html, body {
@@ -170,7 +170,7 @@
     <div class="container-fluid">
         <div class="row mb-4">
             <div class="col-12">
-                <h3 class="text-center">Schema 管理 - DDL/JSON 解析</h3>
+                <h3 class="text-center">数据库 管理 - DDL/JSON 解析</h3>
                 <p class="text-center text-muted">支持多种数据库 DDL 解析和 Spider JSON 格式</p>
             </div>
         </div>
@@ -179,7 +179,7 @@
             <div class="col-md-4">
                 <div class="card stats-card">
                     <h3 id="schemaCount">0</h3>
-                    <p>Schema 数量</p>
+                    <p>数据库 数量</p>
                 </div>
             </div>
             <div class="col-md-4">
@@ -215,7 +215,7 @@
                     <div class="tab-pane fade show active" id="textInput" role="tabpanel">
                         <div class="row mb-3">
                             <div class="col-md-6">
-                                <label for="schemaName" class="form-label">默认 Schema 名称 <small class="text-muted">(可选，DDL中无数据库信息时使用)</small>:</label>
+                                <label for="schemaName" class="form-label">默认数据库名称 <small class="text-muted">(可选，DDL中无数据库信息时使用)</small>:</label>
                                 <input type="text" class="form-control" id="schemaName" value="" placeholder="留空则自动从DDL中提取">
                             </div>
                             <div class="col-md-6">
@@ -234,7 +234,7 @@
                             </div>
                         </div>
                         <div class="mb-3">
-                            <label for="ddlText" class="form-label">DDL 语句 <small class="text-muted">(支持多数据库，自动从 CREATE DATABASE/USE 语句提取 schema)</small>:</label>
+                            <label for="ddlText" class="form-label">DDL 语句 <small class="text-muted">(支持多数据库，自动从 CREATE DATABASE/USE 语句提取数据库)</small>:</label>
                             <textarea class="form-control ddl-textarea" id="ddlText" rows="10" placeholder="请输入 CREATE TABLE 语句...&#10;&#10;支持 MySQL, PostgreSQL, Oracle, SQL Server, Hive, Doris, ClickHouse 等多种数据库 DDL&#10;支持多数据库解析，会自动从 CREATE DATABASE 或 USE 语句中提取数据库名"></textarea>
                         </div>
                         <button class="btn btn-primary" onclick="parseDDLText()">
@@ -244,7 +244,7 @@
                     
                     <div class="tab-pane fade" id="jsonInput" role="tabpanel">
                         <div class="mb-3">
-                            <label for="schemaNameJson" class="form-label">默认 Schema 名称 <small class="text-muted">(可选，JSON中无db_id/schema_name时使用)</small>:</label>
+                            <label for="schemaNameJson" class="form-label">默认数据库名称 <small class="text-muted">(可选，JSON中无db_id/schema_name时使用)</small>:</label>
                             <input type="text" class="form-control" id="schemaNameJson" value="" placeholder="留空则自动从JSON中提取">
                         </div>
                         <div class="mb-3">
@@ -259,7 +259,7 @@
                     <div class="tab-pane fade" id="fileInput" role="tabpanel">
                         <div class="row mb-3">
                             <div class="col-md-6">
-                                <label for="schemaNameFile" class="form-label">默认 Schema 名称 <small class="text-muted">(可选)</small>:</label>
+                                <label for="schemaNameFile" class="form-label">默认数据库名称 <small class="text-muted">(可选)</small>:</label>
                                 <input type="text" class="form-control" id="schemaNameFile" value="" placeholder="留空则自动从文件中提取">
                             </div>
                             <div class="col-md-6">
@@ -297,7 +297,7 @@
         <div class="filter-section">
             <div class="row">
                 <div class="col-md-3">
-                    <label class="form-label">Schema:</label>
+                    <label class="form-label">数据库:</label>
                     <select class="form-select" id="filterSchema" onchange="onSchemaChange()">
                         <option value="">全部</option>
                     </select>
@@ -305,12 +305,16 @@
                 <div class="col-md-3">
                     <label class="form-label">表名:</label>
                     <select class="form-select" id="filterTable" onchange="onTableChange()" disabled>
-                        <option value="">请先选择 Schema</option>
+                        <option value="">请先选择数据库</option>
                     </select>
                 </div>
-                <div class="col-md-3 d-flex align-items-end gap-2">
+                <div class="col-md-2">
+                    <label class="form-label">搜索:</label>
+                    <input type="text" class="form-control" id="searchInput" placeholder="库、表、字段...">
+                </div>
+                <div class="col-md-2 d-flex align-items-end gap-2">
                     <button class="btn btn-sm btn-outline-danger flex-fill" onclick="deleteBySchema()" id="deleteSchemaBtn" disabled>
-                        <i class="fas fa-trash"></i> 删除 Schema
+                        <i class="fas fa-trash"></i> 删除数据库
                     </button>
                     <button class="btn btn-sm btn-outline-danger flex-fill" onclick="deleteByTable()" id="deleteTableBtn" disabled>
                         <i class="fas fa-trash"></i> 删除表
@@ -337,7 +341,7 @@
                         <thead>
                             <tr>
                                 <th><input type="checkbox" id="selectAll" onclick="toggleSelectAll()"></th>
-                                <th>Schema</th>
+                                <th>数据库</th>
                                 <th>表名</th>
                                 <th>字段名</th>
                                 <th>字段类型</th>
@@ -387,6 +391,7 @@
         let pageSize = 20;
         let totalItems = 0;
         let totalPages = 1;
+        let searchTimeout = null;
 
         async function loadStats() {
             try {
@@ -406,10 +411,12 @@
             try {
                 const schema = document.getElementById('filterSchema').value;
                 const table = document.getElementById('filterTable').value;
+                const search = document.getElementById('searchInput').value.trim();
                 const offset = (currentPage - 1) * pageSize;
                 let url = `/api/schema/list?limit=${pageSize}&offset=${offset}`;
                 if (schema) url += `&schema_name=${encodeURIComponent(schema)}`;
                 if (table) url += `&table_name=${encodeURIComponent(table)}`;
+                if (search) url += `&search=${encodeURIComponent(search)}`;
 
                 const resp = await apiRequest(url);
                 if (resp && resp.ok) {
@@ -449,7 +456,7 @@
                     }
                 }
             } catch (e) {
-                console.error('加载 Schema 列表失败:', e);
+                console.error('加载数据库列表失败:', e);
             }
         }
 
@@ -479,7 +486,7 @@
                 loadTableOptions(schema);
             } else {
                 tableSelect.disabled = true;
-                tableSelect.innerHTML = '<option value="">请先选择 Schema</option>';
+                tableSelect.innerHTML = '<option value="">请先选择数据库</option>';
                 deleteSchemaBtn.disabled = true;
                 deleteTableBtn.disabled = true;
             }
@@ -516,11 +523,11 @@
         async function deleteBySchema() {
             const schema = document.getElementById('filterSchema').value;
             if (!schema) {
-                alert('请先选择要删除的 Schema');
+                alert('请先选择要删除的数据库');
                 return;
             }
             
-            if (!confirm(`确定要删除 Schema "${schema}" 的所有数据吗？此操作不可恢复！`)) return;
+            if (!confirm(`确定要删除数据库 "${schema}" 的所有数据吗？此操作不可恢复！`)) return;
             
             try {
                 const response = await apiRequest(`/api/schema/schema/${encodeURIComponent(schema)}`, {
@@ -531,7 +538,7 @@
                     const data = await response.json();
                     alert(data.message);
                     document.getElementById('filterSchema').value = '';
-                    document.getElementById('filterTable').innerHTML = '<option value="">请先选择 Schema</option>';
+                    document.getElementById('filterTable').innerHTML = '<option value="">请先选择数据库</option>';
                     document.getElementById('filterTable').disabled = true;
                     document.getElementById('deleteSchemaBtn').disabled = true;
                     document.getElementById('deleteTableBtn').disabled = true;
@@ -553,7 +560,7 @@
             const table = document.getElementById('filterTable').value;
             
             if (!schema) {
-                alert('请先选择 Schema');
+                alert('请先选择数据库');
                 return;
             }
             if (!table) {
@@ -864,6 +871,10 @@
             loadStats();
             loadSchemaList();
             loadFilterOptions();
+            document.getElementById('searchInput').addEventListener('input', function() {
+                clearTimeout(searchTimeout);
+                searchTimeout = setTimeout(() => { currentPage = 1; loadSchemaList(); }, 300);
+            });
         });
     </script>
 </body>

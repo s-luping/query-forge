@@ -80,7 +80,8 @@ def get_user_llm_config(user_id: int, config_id: Optional[int] = None) -> Option
 def save_llm_log(user_id: int, provider: str, question: str, model: str, conditions: str,
                  result: str, duration_ms: float, prompt_tokens: int,
                  completion_tokens: int, total_tokens: int, status: str = 'success',
-                 error_message: str = None):
+                 error_message: Optional[str] = None,
+                 system_prompt: Optional[str] = None):
     """保存LLM调用记录"""
     db = LLMSessionLocal()
     try:
@@ -90,6 +91,7 @@ def save_llm_log(user_id: int, provider: str, question: str, model: str, conditi
             question=question,
             model=model,
             conditions=conditions,
+            system_prompt=system_prompt,
             result=result,
             duration_ms=duration_ms,
             prompt_tokens=prompt_tokens,
@@ -204,7 +206,8 @@ def generate_sql(
             completion_tokens=completion_tokens,
             total_tokens=total_tokens,
             status='success' if is_valid else 'warning',
-            error_message=error_msg if not is_valid else None
+            error_message=error_msg if not is_valid else None,
+            system_prompt=pipeline_result.get('prompt', '')
         )
 
         response = SqlValidationResponse(

@@ -1,4 +1,6 @@
 """权限校验 — admin/user 两级，直接查用户表"""
+from typing import Optional
+
 from models import AppSessionLocal
 from models.user import UserSchema, UserExtra
 
@@ -7,7 +9,7 @@ def is_admin(user: dict) -> bool:
     return user.get('role') == 'admin'
 
 
-def get_visible_schema_names(user: dict) -> list:
+def get_visible_schema_names(user: dict) -> Optional[list]:
     """获取用户可见的 schema_name 列表。None=全部。[]=无。"""
     if is_admin(user):
         return None
@@ -24,7 +26,7 @@ def get_visible_schema_names(user: dict) -> list:
         db.close()
 
 
-def get_visible_extra_ids(user: dict) -> list:
+def get_visible_extra_ids(user: dict) -> Optional[list]:
     """获取用户可见的补充知识ID列表。None=全部。[]=无。"""
     if is_admin(user):
         return None

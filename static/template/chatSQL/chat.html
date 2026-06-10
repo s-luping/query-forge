@@ -395,9 +395,9 @@
     <div class="modal-dialog-custom">
         <div class="modal-header-custom">新建对话</div>
         <div class="modal-body-custom">
-            <label>Schema（选择数据库）</label>
+            <label>数据库</label>
             <select id="newConvSchema">
-                <option value="">全部 Schema</option>
+                <option value="">全部数据库</option>
             </select>
 
             <label>数据库类型</label>
@@ -729,7 +729,7 @@ async function loadSchemas() {
             opt.textContent = s;
             sel.appendChild(opt);
         });
-    } catch (e) { console.error('加载 Schema 失败:', e); }
+    } catch (e) { console.error('加载数据库列表失败:', e); }
 }
 
 async function loadLlmConfigs() {

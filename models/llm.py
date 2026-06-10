@@ -34,6 +34,7 @@ class LLMLog(Base):
     question = Column(Text, nullable=False, comment='用户问题')
     model = Column(String(100), nullable=False, comment='模型名称')
     conditions = Column(Text, comment='查询条件')
+    system_prompt = Column(Text, comment='发送给大模型的system prompt(含表结构+补充知识)')
     result = Column(Text, comment='生成结果')
     duration_ms = Column(Float, comment='耗时(毫秒)')
     prompt_tokens = Column(Integer, default=0, comment='输入Token')

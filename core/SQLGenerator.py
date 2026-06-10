@@ -72,7 +72,7 @@ class SqlGenerator:
         sql_lower = sql.lower().strip()
 
         if not sql_lower.startswith('select') and not sql_lower.startswith('with'):
-            return False, "只允许SELECT或WITH查询语句", sql_lower
+            return False, "只允许SELECT或WITH查询语句", None
 
         dangerous_keywords = ['drop', 'delete', 'update',
                               'insert', 'alter', 'create', 'truncate']

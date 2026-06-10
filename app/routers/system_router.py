@@ -60,13 +60,32 @@ def _find_embedding_path() -> Optional[str]:
 
 
 def check_embedding_downloaded() -> bool:
-    return _find_embedding_path() is not None
+    """检查模型是否已下载，并同步数据库状态"""
+    found = _find_embedding_path() is not None
+    # 自动同步：文件存在但 DB 未标记为就绪时，更新 DB
+    if found:
+        db = AppSessionLocal()
+        try:
+            row = db.query(SystemConfig).filter(SystemConfig.key == 'EMBEDDING_MODEL_READY').first()
+            if row is None or str(row.value) != 'true':
+                if row:
+                    row.value = 'true'
+                else:
+                    db.add(SystemConfig(key='EMBEDDING_MODEL_READY', value='true'))
+                db.commit()
+                logger.info("自动同步: EMBEDDING_MODEL_READY 更新为 true")
+        except Exception as e:
+            logger.warning(f"同步 EMBEDDING_MODEL_READY 失败: {e}")
+        finally:
+            db.close()
+    return found
 
 
 # ── Pydantic models ──────────────────────────────────────────────
 
 class EmbeddingStatusResponse(BaseModel):
     downloaded: bool
+    ready: bool
     model_path: str
 
 
@@ -86,10 +105,16 @@ class UpdateSettingRequest(BaseModel):
 def get_embedding_status(user=Depends(get_current_user)):
     """获取 embedding 模型下载状态"""
     found = _find_embedding_path()
+    downloaded = found is not None
+    # 自动同步：模型文件存在则标记 DB 就绪
+    if downloaded:
+        _set_setting('EMBEDDING_MODEL_READY', 'true')
+    db_ready = _get_setting('EMBEDDING_MODEL_READY') == 'true'
     project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     default_path = os.path.join(project_root, 'models', 'embeddings', 'bge-m3')
     return EmbeddingStatusResponse(
-        downloaded=found is not None,
+        downloaded=downloaded,
+        ready=db_ready,
         model_path=found or default_path
     )
 
@@ -117,13 +142,20 @@ def download_embedding(user=Depends(get_current_user)):
 
 @router.get("/settings", response_model=List[SystemSettingItem])
 def get_settings(user=Depends(get_current_user)):
-    """获取所有系统配置"""
+    """获取所有系统配置（密钥类 value 脱敏）"""
     if user['role'] != 'admin':
         raise HTTPException(status_code=403, detail="仅管理员可查看")
     db = AppSessionLocal()
     try:
-        rows = db.query(SystemConfig).filter(SystemConfig.key != 'SECRET_KEY').all()
-        return [SystemSettingItem(key=r.key, value=r.value or '') for r in rows]
+        rows = db.query(SystemConfig).all()
+        result = []
+        for r in rows:
+            value = r.value or ''
+            # SECRET_KEY 脱敏显示
+            if r.key == 'SECRET_KEY' and value:
+                value = value[:8] + '****' + value[-4:] if len(value) > 12 else '****'
+            result.append(SystemSettingItem(key=r.key, value=value))
+        return result
     finally:
         db.close()
 

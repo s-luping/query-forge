@@ -3,40 +3,95 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Schema 查看</title>
+    <title>数据库 查看</title>
     <link href="/static/css/bootstrap.min.css" rel="stylesheet">
     <style>
         body { background: #f4f6fa; font-size: 14px; }
         .container-fluid { padding: 20px; }
         .card { border: none; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); margin-bottom: 20px; }
         .card-header { background: white; border-bottom: 1px solid #eee; font-weight: 600; padding: 12px 20px; border-radius: 12px 12px 0 0 !important; }
+        .filter-section { background-color: white; padding: 15px 20px; border-bottom: 1px solid #eee; }
         table { font-size: 13px; }
-        table th { background: #f8f9fa; white-space: nowrap; }
-        .badge-type { font-size: 11px; }
+        table th { background: #f8f9fa; white-space: nowrap; font-weight: 600; }
+        .schema-badge {
+            background-color: #667eea; color: white; padding: 2px 8px; border-radius: 12px; font-size: 12px;
+        }
+        .table-badge {
+            background-color: #28a745; color: white; padding: 2px 8px; border-radius: 12px; font-size: 12px;
+        }
+        .pk-badge {
+            background-color: #ffc107; color: #333; padding: 2px 6px; border-radius: 4px; font-size: 11px;
+        }
+        .table-cell-ellipsis {
+            max-width: 120px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+            cursor: pointer; position: relative;
+        }
+        .table-cell-ellipsis:hover {
+            white-space: normal; word-break: break-all; position: absolute; z-index: 1000;
+            background-color: white; padding: 5px; border: 1px solid #ddd;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15); max-width: 300px;
+        }
     </style>
 </head>
 <body>
 <div class="container-fluid">
     <div class="card">
         <div class="card-header d-flex justify-content-between align-items-center">
-            <span>Schema 列表</span>
-            <div>
-                <select class="form-select form-select-sm d-inline-block" style="width:180px;" id="schemaFilter" onchange="loadSchemas()">
-                    <option value="">全部 Schema</option>
-                </select>
+            <span>数据库 列表</span>
+            <button class="btn btn-sm btn-outline-secondary" onclick="loadSchemaList()">
+                <i class="fas fa-sync"></i> 刷新
+            </button>
+        </div>
+        <div class="filter-section">
+            <div class="row">
+                <div class="col-md-3">
+                    <label class="form-label">数据库:</label>
+                    <select class="form-select" id="filterSchema" onchange="onSchemaChange()">
+                        <option value="">全部</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">表名:</label>
+                    <select class="form-select" id="filterTable" onchange="onTableChange()" disabled>
+                        <option value="">请先选择数据库</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">搜索:</label>
+                    <input type="text" class="form-control" id="searchInput" placeholder="库、表、字段...">
+                </div>
             </div>
         </div>
         <div class="card-body p-0">
             <div class="table-responsive">
-                <table class="table table-hover mb-0">
-                    <thead><tr><th>Schema</th><th>表名</th><th>字段名</th><th>类型</th><th>描述</th><th>键</th></tr></thead>
-                    <tbody id="schemaTable"><tr><td colspan="6" class="text-center py-4 text-muted">加载中...</td></tr></tbody>
+                <table class="table table-hover table-sm mb-0">
+                    <thead>
+                        <tr>
+                            <th>数据库</th>
+                            <th>表名</th>
+                            <th>字段名</th>
+                            <th>字段类型</th>
+                            <th>字段描述</th>
+                            <th>表描述</th>
+                            <th>主键</th>
+                            <th>外键</th>
+                            <th>创建时间</th>
+                        </tr>
+                    </thead>
+                    <tbody id="schemaTableBody"></tbody>
                 </table>
             </div>
         </div>
-        <div class="card-footer bg-white d-flex justify-content-between align-items-center">
-            <span class="text-muted" style="font-size:13px;">共 <span id="totalCount">0</span> 条</span>
-            <nav><ul class="pagination pagination-sm mb-0" id="pagination"></ul></nav>
+        <div class="card-footer bg-white d-flex justify-content-between align-items-center" id="paginationContainer">
+            <span id="paginationInfo" style="font-size:13px;">共 0 条</span>
+            <div>
+                <button class="btn btn-sm btn-outline-secondary me-2" id="prevPageBtn" onclick="prevPage()" disabled>
+                    <i class="fas fa-chevron-left"></i> 上一页
+                </button>
+                <button class="btn btn-sm btn-outline-secondary" id="nextPageBtn" onclick="nextPage()" disabled>
+                    下一页 <i class="fas fa-chevron-right"></i>
+                </button>
+            </div>
         </div>
     </div>
 </div>
@@ -53,57 +108,116 @@ const apiRequest = window.apiRequest || function(url, options = {}) {
     });
 };
 
-let page = 1, pageSize = 30;
+let currentPage = 1, pageSize = 20, totalItems = 0, totalPages = 1, searchTimeout = null;
 
-async function loadSchemas() {
-    const name = document.getElementById('schemaFilter').value;
-    let url = `/api/schema/list?limit=${pageSize}&offset=${(page-1)*pageSize}`;
-    if (name) url += `&schema_name=${encodeURIComponent(name)}`;
+async function loadSchemaList() {
+    const schema = document.getElementById('filterSchema').value;
+    const table = document.getElementById('filterTable').value;
+    const search = document.getElementById('searchInput').value.trim();
+    const offset = (currentPage - 1) * pageSize;
+    let url = `/api/schema/list?limit=${pageSize}&offset=${offset}`;
+    if (schema) url += `&schema_name=${encodeURIComponent(schema)}`;
+    if (table) url += `&table_name=${encodeURIComponent(table)}`;
+    if (search) url += `&search=${encodeURIComponent(search)}`;
+
     try {
         const resp = await apiRequest(url);
+        if (!resp || !resp.ok) return;
         const data = await resp.json();
-        document.getElementById('totalCount').textContent = data.total;
-        const tbody = document.getElementById('schemaTable');
-        if (!data.items.length) {
-            tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-muted">暂无数据</td></tr>';
-            document.getElementById('pagination').innerHTML = '';
-            return;
+        totalItems = data.total || 0;
+        totalPages = Math.ceil(totalItems / pageSize) || 1;
+
+        const tbody = document.getElementById('schemaTableBody');
+        if (data.items && data.items.length > 0) {
+            tbody.innerHTML = data.items.map(item => `
+                <tr>
+                    <td><span class="schema-badge">${e(item.schema_name)}</span></td>
+                    <td><span class="table-badge">${e(item.table_name)}</span></td>
+                    <td class="table-cell-ellipsis">${e(item.column_name)}</td>
+                    <td class="table-cell-ellipsis">${e(item.column_type || '')}</td>
+                    <td class="table-cell-ellipsis">${e(item.column_description || '')}</td>
+                    <td class="table-cell-ellipsis">${e(item.table_description || '')}</td>
+                    <td>${item.column_key ? '<span class="pk-badge">PK</span>' : ''}</td>
+                    <td class="table-cell-ellipsis">${e(item.foreign_key || '')}</td>
+                    <td>${new Date(item.created_at).toLocaleString()}</td>
+                </tr>
+            `).join('');
+
+            document.getElementById('paginationContainer').style.display = 'flex';
+            document.getElementById('paginationInfo').textContent = `第 ${currentPage} 页，共 ${totalPages} 页，总计 ${totalItems} 条`;
+            document.getElementById('prevPageBtn').disabled = currentPage === 1;
+            document.getElementById('nextPageBtn').disabled = currentPage >= totalPages;
+        } else {
+            tbody.innerHTML = '<tr><td colspan="9" class="text-center py-4 text-muted">暂无数据</td></tr>';
+            document.getElementById('paginationContainer').style.display = 'none';
         }
-        tbody.innerHTML = data.items.map(s => `
-            <tr>
-                <td><span class="badge bg-info">${e(s.schema_name)}</span></td>
-                <td><strong>${e(s.table_name)}</strong>${s.table_description ? `<br><small class="text-muted">${e(s.table_description)}</small>` : ''}</td>
-                <td>${e(s.column_name)}</td>
-                <td><span class="badge-type bg-light text-dark">${e(s.column_type)}</span></td>
-                <td><small>${e(s.column_description||'-')}</small></td>
-                <td>${s.column_key ? `<span class="badge bg-warning text-dark">${s.column_key}</span>` : '-'}</td>
-            </tr>`).join('');
-        // 分页
-        const totalPages = Math.ceil(data.total / pageSize);
-        let html = '';
-        if (page > 1) html += `<li class="page-item"><a class="page-link" href="#" onclick="goPage(${page-1})">上一页</a></li>`;
-        for (let i = 1; i <= Math.min(totalPages, 5); i++) {
-            html += `<li class="page-item ${i===page?'active':''}"><a class="page-link" href="#" onclick="goPage(${i})">${i}</a></li>`;
-        }
-        if (totalPages > 5) html += `<li class="page-item disabled"><span class="page-link">...</span></li><li class="page-item"><a class="page-link" href="#" onclick="goPage(${totalPages})">${totalPages}</a></li>`;
-        if (page < totalPages) html += `<li class="page-item"><a class="page-link" href="#" onclick="goPage(${page+1})">下一页</a></li>`;
-        document.getElementById('pagination').innerHTML = html;
-    } catch(e) { console.error(e); }
+    } catch (e) {
+        console.error('加载 数据库 列表失败:', e);
+    }
 }
 
 async function loadSchemaNames() {
     try {
         const resp = await apiRequest('/api/schema/schemas');
-        const data = await resp.json();
-        const sel = document.getElementById('schemaFilter');
-        data.forEach(s => { const o = document.createElement('option'); o.value = s; o.textContent = s; sel.appendChild(o); });
+        if (resp && resp.ok) {
+            const data = await resp.json();
+            const sel = document.getElementById('filterSchema');
+            (data.schemas || []).forEach(s => { const o = document.createElement('option'); o.value = s; o.textContent = s; sel.appendChild(o); });
+        }
     } catch(e) {}
 }
 
-function goPage(p) { page = p; loadSchemas(); }
+async function loadTableOptions(schemaName) {
+    try {
+        const resp = await apiRequest(`/api/schema/tables?schema_name=${encodeURIComponent(schemaName)}`);
+        if (resp && resp.ok) {
+            const data = await resp.json();
+            const tableSelect = document.getElementById('filterTable');
+            tableSelect.innerHTML = '<option value="">全部</option>';
+            data.tables.forEach(t => {
+                tableSelect.innerHTML += `<option value="${t.name}">${t.name}${t.description ? ' - ' + t.description : ''}</option>`;
+            });
+        }
+    } catch (e) {
+        console.error('加载表名列表失败:', e);
+    }
+}
+
+function onSchemaChange() {
+    const schema = document.getElementById('filterSchema').value;
+    const tableSelect = document.getElementById('filterTable');
+
+    if (schema) {
+        tableSelect.disabled = false;
+        loadTableOptions(schema);
+    } else {
+        tableSelect.disabled = true;
+        tableSelect.innerHTML = '<option value="">请先选择数据库</option>';
+    }
+
+    currentPage = 1;
+    loadSchemaList();
+}
+
+function onTableChange() {
+    currentPage = 1;
+    loadSchemaList();
+}
+
+function prevPage() { if (currentPage > 1) { currentPage--; loadSchemaList(); } }
+function nextPage() { if (currentPage < totalPages) { currentPage++; loadSchemaList(); } }
 function e(s) { const d = document.createElement('div'); d.textContent = s||''; return d.innerHTML; }
 
-document.addEventListener('DOMContentLoaded', () => { loadSchemaNames(); loadSchemas(); });
+function onSearchInput() {
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(() => { currentPage = 1; loadSchemaList(); }, 300);
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    loadSchemaNames();
+    loadSchemaList();
+    document.getElementById('searchInput').addEventListener('input', onSearchInput);
+});
 </script>
 </body>
 </html>
