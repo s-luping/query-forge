@@ -281,6 +281,16 @@ async function toggleJob(id) {
 }
 
 // ── 同步历史 ─────────────────────────────────────────────────
+// 执行记录的目标库名：后端已返回 schema_name；旧记录回退到 summary JSON
+function runSchemaName(r) {
+    if (r.schema_name) return r.schema_name;
+    if (!r.summary) return '-';
+    try {
+        const s = JSON.parse(r.summary);
+        return s.schema || '-';
+    } catch (e) { return '-'; }
+}
+
 async function loadRuns() {
     try {
         const offset = (runsPage - 1) * RUNS_PS;
@@ -292,7 +302,7 @@ async function loadRuns() {
         else {
             tbody.innerHTML = items.map(r => `<tr>
                 <td>${fmt(r.started_at)}</td>
-                <td>-</td>
+                <td><span class="table-badge">${e(runSchemaName(r))}</span></td>
                 <td>${r.triggered_by || '-'}</td>
                 <td><span class="badge badge-${r.status}">${r.status}</span></td>
                 <td>${r.tables_synced || 0}/${r.tables_total || 0}</td>
