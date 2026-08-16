@@ -300,7 +300,15 @@ function onSearchInput() {
 async function deleteSelectedSchema() {
     const schema = document.getElementById('filterSchema').value;
     if (!schema) { alert('请先在「数据库」筛选中选择要删除的库'); return; }
-    if (!confirm(`确定删除库「${schema}」？将同时删除其所有表和字段，且不可恢复。`)) return;
+    // 该库若由数据源同步维护，提示可能被重新同步（避免"删了又回来"）
+    const dsGroup = _schemaGroups.find(g => (g.schemas || []).includes(schema));
+    let msg = `确定删除库「${schema}」？将同时删除其所有表和字段，且不可恢复。`;
+    if (dsGroup && dsGroup.datasource_id !== null && dsGroup.datasource_id !== undefined) {
+        msg += `\n\n⚠ 该库由数据源「${dsGroup.datasource_name || '未知'}」同步维护：` +
+               `若对应同步任务仍启用，删除后可能被自动重新同步。` +
+               `建议先在「数据源管理/同步任务」中停用或删除该任务。`;
+    }
+    if (!confirm(msg)) return;
     try {
         const resp = await apiRequest(`/api/schema/schema/${encodeURIComponent(schema)}`, { method: 'DELETE' });
         const data = await resp.json().catch(() => ({}));
