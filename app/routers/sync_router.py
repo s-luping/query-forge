@@ -397,8 +397,14 @@ def list_runs(
             q = q.filter(SyncRunLog.job_id == job_id)
         total = q.count()
         rows = q.order_by(SyncRunLog.started_at.desc()).limit(limit).offset(offset).all()
+        # 批量取任务目标库名（避免 N+1 查询）
+        run_job_ids = {r.job_id for r in rows if r.job_id}
+        job_schema_map = {}
+        if run_job_ids:
+            job_schema_map = dict(db.query(SyncJobConfig.id, SyncJobConfig.target_schema_name)
+                                  .filter(SyncJobConfig.id.in_(run_job_ids)).all())
         return {
-            "items": [_run_to_dict(r) for r in rows],
+            "items": [_run_to_dict(r, job_schema_map.get(r.job_id, '')) for r in rows],
             "total": total,
         }
     finally:
@@ -419,8 +425,11 @@ def get_run_detail(run_id: int, user: AdminUser):
             SchemaChangeLog.run_log_id == run_id
         ).order_by(SchemaChangeLog.id).all()
 
+        job_schema = db.query(SyncJobConfig.target_schema_name).filter(
+            SyncJobConfig.id == run.job_id).scalar() or ''
+
         return {
-            **_run_to_dict(run),
+            **_run_to_dict(run, job_schema),
             "changes": [_change_to_dict(c) for c in changes],
         }
     finally:
@@ -608,10 +617,11 @@ def _job_to_dict(job: SyncJobConfig, datasource_name: str = '') -> dict:
     }
 
 
-def _run_to_dict(run: SyncRunLog) -> dict:
+def _run_to_dict(run: SyncRunLog, schema_name: str = '') -> dict:
     return {
         "id": run.id,
         "job_id": run.job_id,
+        "schema_name": schema_name or '',
         "triggered_by": run.triggered_by,
         "started_at": run.started_at.isoformat() if run.started_at else None,
         "finished_at": run.finished_at.isoformat() if run.finished_at else None,
