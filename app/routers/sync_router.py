@@ -312,6 +312,24 @@ def update_job(job_id: int, req: SyncJobUpdate, user: AdminUser):
         db.close()
 
 
+@router.post("/history/clear")
+def clear_sync_history(user: AdminUser):
+    """清空全部同步执行历史与变更记录（仅管理员，不可恢复）"""
+    # (权限由 AdminUser 依赖统一校验)
+    db = SessionLocal()
+    try:
+        # 先删变更记录（引用 run_log_id/job_id），再删执行日志
+        changes = db.query(SchemaChangeLog).delete()
+        runs = db.query(SyncRunLog).delete()
+        db.commit()
+        log_audit(user, "clear_sync_history", f"runs={runs} changes={changes}")
+        logger.info(f"管理员 {user['username']} 清空同步历史: runs={runs} changes={changes}")
+        return {"success": True,
+                "message": f"已清除 {runs} 条同步历史、{changes} 条变更记录"}
+    finally:
+        db.close()
+
+
 @router.delete("/jobs/{job_id}")
 def delete_job(job_id: int, user: AdminUser):
     """删除同步任务（连同执行历史与变更记录）"""
