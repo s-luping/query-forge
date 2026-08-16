@@ -18,7 +18,7 @@ QueryForge 是一款基于自然语言的数据查询工具，通过大模型技
 - **向量语义搜索**：基于 BGE-M3 embedding 模型，支持中英文语义理解
 - **降级机制**：向量索引构建失败时自动降级到数据库查询，确保服务可用
 - **维度层级规则**：系统提示词内置维度层级过滤，自动处理父子节点汇总避免数据翻倍
-- **多轮对话**：支持连续对话式 SQL 生成，补充知识在后续轮次自动携带
+- **多轮对话**：支持连续对话式 SQL 生成，知识库内容在后续轮次自动携带
 
 ### 3. 高性能向量存储
 - **纯 Python 实现**：NumPy 向量索引，无需 FAISS 依赖，降低部署复杂度
@@ -35,9 +35,9 @@ QueryForge 是一款基于自然语言的数据查询工具，通过大模型技
 - **自动向量索引**：字段数量 >= 50 时自动后台构建向量索引
 
 ### 5. 完善的数据管理
-- **多数据库分离存储**：用户、LLM配置、Schema、补充知识、LLM调用记录、对话记录、向量索引元数据分别存储
-- **对话记录持久化**：多轮对话和消息自动保存，补充知识按 ID 关联，后续轮次自动复用
-- **权限管理**：支持管理员/普通用户角色，Schema 和补充知识可分配可见权限
+- **多数据库分离存储**：用户、LLM配置、Schema、知识库、LLM调用记录、对话记录、向量索引元数据分别存储
+- **对话记录持久化**：多轮对话和消息自动保存，知识库按 ID 关联，后续轮次自动复用
+- **权限管理**：支持管理员/普通用户角色，Schema 和知识库可分配可见权限
 
 ---
 
@@ -50,7 +50,7 @@ QueryForge/
 │   │   ├── base_router.py          # 基础认证路由
 │   │   ├── chat_to_sql_router.py   # SQL生成核心路由（旧版单次生成）
 │   │   ├── schema_router.py        # Schema 管理 + 向量索引路由
-│   │   ├── extra_router.py         # 补充知识路由
+│   │   ├── knowledge_router.py      # 知识库路由
 │   │   ├── llm_router.py           # 大模型配置 + 调用记录路由
 │   │   ├── conversation_router.py  # 多轮对话路由（新版 Chat SQL）
 │   │   ├── system_router.py        # 系统配置路由
@@ -61,18 +61,24 @@ QueryForge/
 │   ├── logger.py           # 日志管理
 │   ├── limiter.py          # 限流配置
 │   └── utils.py            # 工具函数
-├── core/                   # 核心业务模块
-│   ├── LLMClient.py        # 大模型客户端（通用 OpenAI 兼容 API）
-│   ├── SQLGenerator.py     # SQL 生成器 + 验证
-│   ├── SQLPipeline.py      # SQL生成流程编排（字段召回→表聚合→LLM生成）
-│   ├── ChatSession.py      # 多轮对话会话管理
-│   ├── VectorStore.py      # 向量存储（EmbeddingModel + VectorIndex + SchemaVectorStore）
-│   └── KeywordExtractor.py # 关键词提取器（jieba 分词）
+├── core/                   # 核心业务模块（按功能域分包）
+│   ├── llm/                 # LLM 调用域
+│   │   └── client.py         # LLMClient（通用 OpenAI 兼容 API）
+│   ├── retrieval/           # 检索召回域
+│   │   ├── keywords.py       # 关键词提取（jieba 分词）
+│   │   ├── vector_store.py   # 向量存储（EmbeddingModel + VectorIndex + SchemaVectorStore）
+│   │   ├── index_meta.py     # 向量索引构建 + 元数据读写
+│   │   └── retriever.py      # SchemaRetriever 共享检索器（召回→表聚合→CSV）
+│   └── generation/          # SQL 生成编排域
+│       ├── sql_generator.py  # SQL prompt 构建 + 安全校验
+│       ├── pipeline.py       # SQLPipeline 单轮流水线编排
+│       ├── chat.py           # ChatSession 多轮对话
+│       └── audit.py          # 查询审计日志写入
 ├── models/                 # SQLAlchemy 数据模型
 │   ├── __init__.py         # 数据库初始化、迁移、种子数据
 │   ├── user.py             # 用户 + 权限关联模型
 │   ├── schema.py           # Schema 模型
-│   ├── extra_knowledge.py  # 补充知识模型
+│   ├── knowledge.py        # 知识库模型
 │   ├── conversation.py     # 多轮对话模型（含 knowledge_id）
 │   ├── llm.py              # LLM 配置 + 调用记录模型（含 system_prompt）
 │   ├── system.py           # 系统配置模型（键值对）
@@ -96,7 +102,7 @@ QueryForge/
 ├── db/                     # SQLite 数据库存储（运行时自动创建）
 │   ├── sys_app.db           # 用户、LLM配置、系统配置、向量索引元数据
 │   ├── sys_schema.db        # Schema 数据
-│   ├── sys_extra.db         # 补充知识
+│   ├── sys_extra.db         # 知识库（旧版独立库，已并入主库 queryforge.db）
 │   ├── sys_llm.db           # LLM 调用记录
 │   ├── sys_conversation.db  # 多轮对话记录
 │   └── vectors/             # 向量索引 pickle 文件
@@ -130,7 +136,7 @@ QueryForge/
   - 向量语义搜索：BGE-M3 编码 → 余弦相似度检索 top-K 字段
   - 按表聚合：获取完整表结构作为上下文
 - **SQL 验证**：自动验证安全性，只允许 SELECT/WITH 查询
-- **补充知识**：支持字段示例值、表间关系、领域知识，多轮对话自动携带
+- **知识库**：支持字段示例值、表间关系、领域知识，生成 SQL 时注入提示词，多轮对话自动携带
 - **维度层级保护**：系统提示词内置层级过滤规则，防止父节点汇总导致数据翻倍
 
 ### 3. 数据库管理
@@ -148,18 +154,22 @@ QueryForge/
 - **独立管理页面**：查看所有数据库的索引状态，支持手动重建
 - **自动过期检测**：数据导入时标记 stale，构建完成检测冲突自动重试
 
-### 5. 补充知识
+### 5. 知识库
 
-- **领域知识**：添加业务领域相关知识，帮助大模型理解业务逻辑
+- **领域知识**：添加业务领域相关知识（业务口径、计算规则等），生成 SQL 时以【领域知识】段落注入提示词，帮助大模型理解业务逻辑
 - **字段示例值**：提供字段的常见值，帮助生成更准确的 WHERE 条件
 - **表间关系**：描述表之间的关联关系（如维度层级架构）
-- **公共/私有**：支持设为公开（所有用户可见）或私有
+- **公共/私有**：支持设为公开（所有用户可见）或私有（按用户授权）
 
 ### 6. 用户认证与权限
 
-- **JWT Token 认证**：基于 Token 的用户认证，支持过期时间配置
-- **角色权限**：管理员和普通用户角色
-- **资源权限**：Schema 和补充知识可按用户分配可见权限
+- **JWT Token 认证**：基于 Token 的用户认证，支持过期时间配置；token 以 HttpOnly Cookie 下发（防 XSS 窃取），也支持 `Authorization: Bearer <token>` 头调用 API
+- **角色权限**：管理员和普通用户角色；未登录访问页面/模板一律跳转登录页，非管理员访问管理页面/接口返回 403
+- **类型化依赖注入**：路由统一使用 `user: CurrentUser` / `user: AdminUser`（`Annotated[dict, Depends(...)]`）写法，角色校验下沉到依赖层
+- **用户管理**（管理员）：系统管理 →「用户管理」，支持创建用户、编辑资料/角色、启用/禁用、重置密码（重置后该用户所有旧 token 立即失效）、删除用户（含关联授权/对话/知识清理）；自带保护规则（不能删除/禁用自己、系统至少保留一名管理员）
+- **注册开关**：系统设置中 `ALLOW_REGISTER` 控制是否开放自助注册（企业内部建议关闭，改为管理员创建账号）；自助注册的账号需管理员激活后方可登录
+- **资源权限**：Schema 和知识库可按用户分配可见权限，另有字段级（SELECT/FILTER/NONE）与行级过滤权限
+- **四层权限模型**：数据源 → 库(Schema) → 表 → 字段。权限管理页按层配置：数据源可一键授权其同步出的全部库；库级勾选可见；表级白名单（同一库内配置后仅名单内表可见，未配置默认全可见）；字段级 SELECT/FILTER/NONE（可按敏感等级默认推导）。表级权限在查询列表、Schema 检索(LLM prompt)与 SQL 权限网关三层强制执行
 - **密钥脱敏**：SECRET_KEY 在管理页面脱敏显示
 
 ---
@@ -227,7 +237,7 @@ python main.py
 |--------|-----|------|
 | sys_app.db | users, llm_configs, system_config, vector_index_meta | 用户、LLM配置、系统配置、向量索引元数据 |
 | sys_schema.db | schema | Schema 字段元数据 |
-| sys_extra.db | extra_knowledge | 补充知识 |
+| sys_extra.db | knowledge_items（旧版独立库，现已并入主库 queryforge.db） | 知识库 |
 | sys_llm.db | llm_logs | LLM 调用记录（含 system_prompt） |
 | sys_conversation.db | conversations, conversation_messages | 多轮对话和消息记录 |
 
@@ -263,7 +273,7 @@ python main.py
 - **数据库搜索**：数据库查看页新增库/表/字段模糊搜索，300ms 防抖
 - **向量索引元数据**：新建 vector_index_meta 表持久化索引状态，独立管理页面
 - **模型路径缓存**：EMBEDDING_MODEL_PATH 存入数据库，避免每次扫描目录
-- **系统提示词优化**：内置维度层级过滤规则，多轮对话补充知识自动携带
+- **系统提示词优化**：内置维度层级过滤规则，多轮对话知识库内容自动携带
 - **LLM 日志增强**：system_prompt 列记录完整提示词，前端可折叠展示
 - **并发安全**：索引构建期间数据导入自动过期检测，最多 3 次重试
 - **向量参数可配置**：VECTOR_INDEX_THRESHOLD / FIELD_RECALL_TOP_K / MAX_TABLES 存入 system_config，前端在线编辑实时生效
@@ -286,4 +296,4 @@ python main.py
 
 ### v1.0.0
 
-- 初始版本：NL→SQL、Schema 管理、补充知识、Docker 部署
+- 初始版本：NL→SQL、Schema 管理、知识库、Docker 部署

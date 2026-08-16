@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Chat SQL</title>
     <link rel="stylesheet" href="/static/css/bootstrap.min.css">
+    <link rel="stylesheet" href="/static/css/common.css">
     <style>
         :root {
             --sidebar-width: 260px;
@@ -299,6 +300,22 @@
         .modal-body-custom textarea:focus { border-color: #0d6efd; }
         .modal-body-custom textarea { min-height: 80px; resize: vertical; }
 
+        .newconv-error {
+            background: #fff1f0;
+            border: 1px solid #ffccc7;
+            color: #cf1322;
+            border-radius: 6px;
+            padding: 8px 12px;
+            font-size: 13px;
+            margin-bottom: 12px;
+        }
+        .newconv-error.hide { display: none !important; }
+
+        .modal-footer-custom button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
         .modal-footer-custom {
             padding: 12px 20px;
             border-top: 1px solid #eee;
@@ -395,23 +412,16 @@
     <div class="modal-dialog-custom">
         <div class="modal-header-custom">新建对话</div>
         <div class="modal-body-custom">
-            <label>数据库</label>
-            <select id="newConvSchema">
+            <div class="newconv-error" id="newConvError" style="display:none;"></div>
+
+            <label>数据库 <small class="text-muted" style="font-weight:normal;">（数据库类型随所选库自动带出）</small></label>
+            <select id="newConvSchema" onchange="onSchemaSelect()">
                 <option value="">全部数据库</option>
             </select>
 
-            <label>数据库类型</label>
-            <select id="newConvDbType">
-                <option value="sqlite">SQLite</option>
-                <option value="mysql">MySQL</option>
-                <option value="postgresql">PostgreSQL</option>
-                <option value="oracle">Oracle</option>
-                <option value="sqlserver">SQL Server</option>
-            </select>
-
-            <label>补充知识</label>
+            <label>知识库</label>
             <select id="newConvKnowledge">
-                <option value="">不使用补充知识</option>
+                <option value="">不使用知识库</option>
             </select>
 
             <label>LLM 模型</label>
@@ -419,374 +429,17 @@
                 <option value="">使用默认模型</option>
             </select>
 
-            <label>输入问题</label>
+            <label>输入问题 <span style="color:#999;font-weight:normal;">（Enter 发送，Shift+Enter 换行）</span></label>
             <textarea id="newConvQuery" placeholder="描述你想要查询的数据..."></textarea>
         </div>
         <div class="modal-footer-custom">
             <button class="btn-secondary" onclick="hideNewConvModal()">取消</button>
-            <button class="btn-primary" onclick="createConv()">开始对话</button>
+            <button class="btn-primary" id="newConvSubmit" onclick="createConv()">开始对话</button>
         </div>
     </div>
 </div>
 
-<script>
-// ── API helper ─────────────────────────────────────────────
-function apiRequest(url, options = {}) {
-    const token = document.cookie.split('; ').find(row => row.startsWith('token='))?.split('=')[1];
-    const headers = { 'Content-Type': 'application/json' };
-    if (token) headers['Authorization'] = `Bearer ${token}`;
-    return fetch(url, { ...options, headers }).then(resp => {
-        if (resp.status === 401) { window.parent.location.href = '/login'; throw new Error('登录已过期'); }
-        return resp;
-    });
-}
-
-// ── State ──────────────────────────────────────────────────
-let currentConvId = null;
-let isLoading = false;
-
-// ── Init ───────────────────────────────────────────────────
-document.addEventListener('DOMContentLoaded', () => {
-    loadConvList();
-    loadSchemas();
-    loadLlmConfigs();
-    loadKnowledge();
-});
-
-// ── Conversation List ──────────────────────────────────────
-async function loadConvList() {
-    try {
-        const resp = await apiRequest('/api/conversation');
-        if (!resp.ok) return;
-        const list = await resp.json();
-        renderConvList(list);
-    } catch (e) {
-        console.error('加载对话列表失败:', e);
-    }
-}
-
-function renderConvList(list) {
-    const el = document.getElementById('convList');
-    if (!list || list.length === 0) {
-        el.innerHTML = '<div style="padding:20px;text-align:center;color:#888;font-size:13px;">暂无对话</div>';
-        return;
-    }
-    el.innerHTML = list.map(c => `
-        <div class="conv-item${c.id === currentConvId ? ' active' : ''}"
-             onclick="openConv(${c.id})">
-            <div class="conv-item-title">${escapeHtml(c.title || '(无标题)')}</div>
-            <div class="conv-item-meta">${escapeHtml(c.schema_name || '默认')} · ${c.message_count} 条消息</div>
-            <span class="conv-item-delete" onclick="event.stopPropagation();deleteConv(${c.id})" title="删除">×</span>
-        </div>
-    `).join('');
-}
-
-async function openConv(id) {
-    currentConvId = id;
-    loadConvList(); // refresh active state
-
-    const emptyEl = document.getElementById('chatEmpty');
-    if (emptyEl) emptyEl.style.display = 'none';
-    document.getElementById('chatInputArea').style.display = 'block';
-
-    const msgContainer = document.getElementById('chatMessages');
-    msgContainer.innerHTML = '<div style="text-align:center;color:#aaa;padding:40px;">加载中...</div>';
-
-    try {
-        const resp = await apiRequest(`/api/conversation/${id}/messages`);
-        if (!resp.ok) throw new Error('加载失败');
-        const messages = await resp.json();
-
-        // 获取标题
-        const convResp = await apiRequest('/api/conversation');
-        const convs = await convResp.json();
-        const conv = convs.find(c => c.id === id);
-        document.getElementById('chatHeader').textContent =
-            (conv ? conv.title : 'Chat SQL') + ' — 连续对话';
-
-        msgContainer.innerHTML = '';
-        messages.forEach(m => renderMessage(m));
-        scrollToBottom();
-    } catch (e) {
-        msgContainer.innerHTML = '<div style="text-align:center;color:red;padding:40px;">加载消息失败</div>';
-    }
-}
-
-async function deleteConv(id) {
-    if (!confirm('确定删除此对话？')) return;
-    try {
-        await apiRequest(`/api/conversation/${id}`, { method: 'DELETE' });
-        if (currentConvId === id) {
-            currentConvId = null;
-            document.getElementById('chatMessages').innerHTML = '';
-            document.getElementById('chatEmpty').style.display = 'flex';
-            document.getElementById('chatInputArea').style.display = 'none';
-        }
-        loadConvList();
-    } catch (e) {
-        alert('删除失败: ' + e.message);
-    }
-}
-
-// ── Messages ───────────────────────────────────────────────
-function renderMessage(msg) {
-    const container = document.getElementById('chatMessages');
-
-    if (msg.role === 'user') {
-        const row = document.createElement('div');
-        row.className = 'msg-row user';
-        row.innerHTML = `<div class="msg-bubble">${escapeHtml(msg.content)}</div>`;
-        container.appendChild(row);
-    } else if (msg.role === 'assistant') {
-        const row = document.createElement('div');
-        row.className = 'msg-row assistant';
-        let html = '<div class="msg-bubble">';
-
-        if (msg.sql) {
-            html += `<div class="msg-sql-block">${escapeHtml(msg.sql)}</div>`;
-            html += `<div class="msg-sql-actions">`;
-            html += `<button class="btn btn-sm btn-outline-secondary" onclick="copySql(this, '${escapeAttr(msg.sql)}')">📋 复制</button>`;
-            html += `</div>`;
-        }
-
-        if (msg.is_valid) {
-            html += `<span class="msg-valid-badge ok">✓ 校验通过</span>`;
-        } else {
-            html += `<span class="msg-valid-badge err">✗ 校验未通过</span>`;
-            if (msg.error_message) {
-                html += `<div class="msg-error">${escapeHtml(msg.error_message)}</div>`;
-            }
-        }
-
-        html += '</div>';
-        row.innerHTML = html;
-        container.appendChild(row);
-    }
-
-    scrollToBottom();
-}
-
-function scrollToBottom() {
-    const el = document.getElementById('chatMessages');
-    setTimeout(() => { el.scrollTop = el.scrollHeight; }, 50);
-}
-
-// ── Send Message ───────────────────────────────────────────
-async function sendMsg() {
-    if (isLoading) return;
-
-    const input = document.getElementById('msgInput');
-    const content = input.value.trim();
-    if (!content) return;
-
-    if (!currentConvId) {
-        alert('请先选择或创建一个对话');
-        return;
-    }
-
-    isLoading = true;
-    input.disabled = true;
-    document.getElementById('sendBtn').disabled = true;
-
-    // Show user message immediately
-    renderMessage({ role: 'user', content: content });
-    input.value = '';
-    input.style.height = 'auto';
-
-    // Show loading
-    const container = document.getElementById('chatMessages');
-    const loadingRow = document.createElement('div');
-    loadingRow.className = 'msg-row assistant';
-    loadingRow.id = 'loadingMsg';
-    loadingRow.innerHTML = '<div class="msg-bubble"><div class="loading-dots"><span></span><span></span><span></span></div></div>';
-    container.appendChild(loadingRow);
-    scrollToBottom();
-
-    try {
-        const resp = await apiRequest(`/api/conversation/${currentConvId}/messages`, {
-            method: 'POST',
-            body: JSON.stringify({ content })
-        });
-        if (!resp.ok) throw new Error((await resp.json()).detail || '请求失败');
-
-        const data = await resp.json();
-
-        // Remove loading
-        document.getElementById('loadingMsg')?.remove();
-
-        // Show assistant message
-        renderMessage({
-            role: 'assistant',
-            sql: data.assistant_message.sql,
-            is_valid: data.assistant_message.is_valid,
-            error_message: data.assistant_message.error_message,
-            columns: data.assistant_message.columns
-        });
-
-        loadConvList(); // refresh sidebar
-    } catch (e) {
-        document.getElementById('loadingMsg')?.remove();
-        renderMessage({
-            role: 'assistant',
-            sql: '',
-            is_valid: false,
-            error_message: '发送失败: ' + e.message
-        });
-    }
-
-    isLoading = false;
-    input.disabled = false;
-    document.getElementById('sendBtn').disabled = false;
-    input.focus();
-}
-
-// ── New Conversation ───────────────────────────────────────
-function showNewConvModal() {
-    document.getElementById('newConvModal').classList.add('show');
-    document.getElementById('newConvQuery').focus();
-}
-
-function hideNewConvModal() {
-    document.getElementById('newConvModal').classList.remove('show');
-}
-
-async function createConv() {
-    const query = document.getElementById('newConvQuery').value.trim();
-    if (!query) { alert('请输入问题'); return; }
-
-    const schemaName = document.getElementById('newConvSchema').value || null;
-    const dbType = document.getElementById('newConvDbType').value;
-    const llmConfigId = document.getElementById('newConvLlmConfig').value || null;
-    const knowledgeId = document.getElementById('newConvKnowledge').value || null;
-
-    hideNewConvModal();
-
-    // Show loading
-    const msgContainer = document.getElementById('chatMessages');
-    msgContainer.innerHTML = '';
-    const loadingRow = document.createElement('div');
-    loadingRow.className = 'msg-row assistant';
-    loadingRow.innerHTML = '<div class="msg-bubble"><div class="loading-dots"><span></span><span></span><span></span></div></div>';
-    msgContainer.appendChild(loadingRow);
-    const emptyEl = document.getElementById('chatEmpty');
-    if (emptyEl) emptyEl.style.display = 'none';
-    document.getElementById('chatInputArea').style.display = 'block';
-
-    try {
-        const resp = await apiRequest('/api/conversation', {
-            method: 'POST',
-            body: JSON.stringify({
-                query, schema_name: schemaName, db_type: dbType,
-                llm_config_id: llmConfigId ? parseInt(llmConfigId) : null,
-                knowledge_id: knowledgeId ? parseInt(knowledgeId) : null
-            })
-        });
-        if (!resp.ok) throw new Error((await resp.json()).detail || '创建失败');
-
-        const data = await resp.json();
-
-        // Remove loading
-        msgContainer.innerHTML = '';
-
-        // Open the new conversation
-        currentConvId = data.conversation.id;
-        document.getElementById('chatHeader').textContent =
-            data.conversation.title + ' — 连续对话';
-
-        // Render messages
-        renderMessage({ role: 'user', content: query });
-        renderMessage({
-            role: 'assistant',
-            sql: data.message.sql,
-            is_valid: data.message.is_valid,
-            error_message: data.message.error_message,
-            columns: data.message.columns
-        });
-
-        document.getElementById('newConvQuery').value = '';
-        loadConvList();
-    } catch (e) {
-        msgContainer.innerHTML = '';
-        renderMessage({
-            role: 'assistant',
-            sql: '',
-            is_valid: false,
-            error_message: '创建对话失败: ' + e.message
-        });
-    }
-}
-
-// ── Schema & LLM Config Loaders ────────────────────────────
-async function loadSchemas() {
-    try {
-        const resp = await apiRequest('/api/schema/schemas');
-        if (!resp.ok) return;
-        const data = await resp.json();
-        const sel = document.getElementById('newConvSchema');
-        (data.schemas || []).forEach(s => {
-            const opt = document.createElement('option');
-            opt.value = s;
-            opt.textContent = s;
-            sel.appendChild(opt);
-        });
-    } catch (e) { console.error('加载数据库列表失败:', e); }
-}
-
-async function loadLlmConfigs() {
-    try {
-        const resp = await apiRequest('/api/llm-config/list');
-        if (!resp.ok) return;
-        const data = await resp.json();
-        const sel = document.getElementById('newConvLlmConfig');
-        (data.items || []).forEach(c => {
-            const opt = document.createElement('option');
-            opt.value = c.id;
-            opt.textContent = `${c.provider} - ${c.model}`;
-            if (c.is_default) opt.selected = true;
-            sel.appendChild(opt);
-        });
-    } catch (e) { console.error('加载 LLM 配置失败:', e); }
-}
-
-async function loadKnowledge() {
-    try {
-        const resp = await apiRequest('/api/extra-knowledge');
-        if (!resp.ok) return;
-        const data = await resp.json();
-        const sel = document.getElementById('newConvKnowledge');
-        (data.items || []).forEach(k => {
-            const opt = document.createElement('option');
-            opt.value = k.id;
-            opt.textContent = k.title || '(无标题)';
-            sel.appendChild(opt);
-        });
-    } catch (e) { console.error('加载补充知识失败:', e); }
-}
-
-// ── Utils ──────────────────────────────────────────────────
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
-
-function escapeAttr(text) {
-    return text.replace(/'/g, "\\'").replace(/"/g, '&quot;');
-}
-
-function copySql(btn, sql) {
-    navigator.clipboard.writeText(sql).then(() => {
-        btn.textContent = '✓ 已复制';
-        setTimeout(() => { btn.textContent = '📋 复制'; }, 1500);
-    }).catch(() => {
-        alert('复制失败，请手动复制');
-    });
-}
-
-// Close modal on click-outside
-document.getElementById('newConvModal').addEventListener('click', function(e) {
-    if (e.target === this) hideNewConvModal();
-});
-</script>
+<script src="/static/js/app_common.js"></script>
+<script src="/static/js/chat.js"></script>
 </body>
 </html>

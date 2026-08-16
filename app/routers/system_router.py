@@ -1,44 +1,49 @@
-"""系统配置路由 — 系统参数、embedding状态"""
+# -*- coding: UTF-8 -*-
+"""系统配置路由 — 系统参数、embedding 状态
+
+配置存储于 SystemSetting 表（models/system.py），分类见 category 字段。
+SECRET_KEY（security 分类）不可通过 API 修改，仅脱敏可见。
+"""
 import os
 import subprocess
 import sys
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from app.auth import get_current_user
+from app.auth import AdminUser, CurrentUser
 from app.logger import logger
-from models import AppSessionLocal
-from models.system import SystemConfig
+from models import SessionLocal
+from models.system import SystemSetting
 
 router = APIRouter()
 
 
 def _get_setting(key: str) -> str:
-    db = AppSessionLocal()
+    db = SessionLocal()
     try:
-        row = db.query(SystemConfig).filter(SystemConfig.key == key).first()
+        row = db.query(SystemSetting).filter(SystemSetting.key == key).first()
         return row.value if row else ''
     finally:
         db.close()
 
 
-def _set_setting(key: str, value: str):
-    db = AppSessionLocal()
+def _set_setting(key: str, value: str, category: str = 'runtime'):
+    db = SessionLocal()
     try:
-        row = db.query(SystemConfig).filter(SystemConfig.key == key).first()
+        row = db.query(SystemSetting).filter(SystemSetting.key == key).first()
         if row:
             row.value = value
         else:
-            db.add(SystemConfig(key=key, value=value))
+            db.add(SystemSetting(key=key, value=value, category=category))
         db.commit()
     finally:
         db.close()
 
 
 def _find_embedding_path() -> Optional[str]:
-    """查找 embedding 模型实际路径（匹配 VectorStore 的多路径查找）"""
+    """查找 embedding 模型实际路径"""
     project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     cache_dir = os.path.join(project_root, 'models', 'embeddings')
     model_name = 'bge-m3'
@@ -62,16 +67,15 @@ def _find_embedding_path() -> Optional[str]:
 def check_embedding_downloaded() -> bool:
     """检查模型是否已下载，并同步数据库状态"""
     found = _find_embedding_path() is not None
-    # 自动同步：文件存在但 DB 未标记为就绪时，更新 DB
     if found:
-        db = AppSessionLocal()
+        db = SessionLocal()
         try:
-            row = db.query(SystemConfig).filter(SystemConfig.key == 'EMBEDDING_MODEL_READY').first()
+            row = db.query(SystemSetting).filter(SystemSetting.key == 'EMBEDDING_MODEL_READY').first()
             if row is None or str(row.value) != 'true':
                 if row:
                     row.value = 'true'
                 else:
-                    db.add(SystemConfig(key='EMBEDDING_MODEL_READY', value='true'))
+                    db.add(SystemSetting(key='EMBEDDING_MODEL_READY', value='true', category='runtime'))
                 db.commit()
                 logger.info("自动同步: EMBEDDING_MODEL_READY 更新为 true")
         except Exception as e:
@@ -92,6 +96,7 @@ class EmbeddingStatusResponse(BaseModel):
 class SystemSettingItem(BaseModel):
     key: str
     value: str
+    category: Optional[str] = None
 
 
 class UpdateSettingRequest(BaseModel):
@@ -99,14 +104,18 @@ class UpdateSettingRequest(BaseModel):
     value: str
 
 
+class SiteBrandingResponse(BaseModel):
+    logo: str
+    site_name: str
+
+
 # ── Embedding endpoints ──────────────────────────────────────────
 
 @router.get("/embedding-status", response_model=EmbeddingStatusResponse)
-def get_embedding_status(user=Depends(get_current_user)):
+def get_embedding_status(user: CurrentUser):
     """获取 embedding 模型下载状态"""
     found = _find_embedding_path()
     downloaded = found is not None
-    # 自动同步：模型文件存在则标记 DB 就绪
     if downloaded:
         _set_setting('EMBEDDING_MODEL_READY', 'true')
     db_ready = _get_setting('EMBEDDING_MODEL_READY') == 'true'
@@ -120,7 +129,7 @@ def get_embedding_status(user=Depends(get_current_user)):
 
 
 @router.post("/download-embedding")
-def download_embedding(user=Depends(get_current_user)):
+def download_embedding(user: CurrentUser):
     """触发下载 embedding 模型（后台异步）"""
     try:
         project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -140,35 +149,50 @@ def download_embedding(user=Depends(get_current_user)):
 
 # ── Settings endpoints ───────────────────────────────────────────
 
+@router.get("/site-branding", response_model=SiteBrandingResponse)
+def get_site_branding():
+    """站点品牌配置（公开接口：登录页等未登录场景也需读取）"""
+    return SiteBrandingResponse(
+        logo=_get_setting('SITE_LOGO') or '/static/img/logo.svg',
+        site_name=_get_setting('SITE_NAME') or 'QueryForge',
+    )
+
+
 @router.get("/settings", response_model=List[SystemSettingItem])
-def get_settings(user=Depends(get_current_user)):
-    """获取所有系统配置（密钥类 value 脱敏）"""
-    if user['role'] != 'admin':
-        raise HTTPException(status_code=403, detail="仅管理员可查看")
-    db = AppSessionLocal()
+def get_settings(user: AdminUser):
+    """获取所有系统配置（密钥类 value 脱敏；仅管理员）"""
+    db = SessionLocal()
     try:
-        rows = db.query(SystemConfig).all()
+        rows = db.query(SystemSetting).all()
         result = []
         for r in rows:
             value = r.value or ''
-            # SECRET_KEY 脱敏显示
-            if r.key == 'SECRET_KEY' and value:
+            # security 分类（如 SECRET_KEY）脱敏显示
+            if r.category == 'security' and value:
                 value = value[:8] + '****' + value[-4:] if len(value) > 12 else '****'
-            result.append(SystemSettingItem(key=r.key, value=value))
+            result.append(SystemSettingItem(key=r.key, value=value, category=r.category))
         return result
     finally:
         db.close()
 
 
 @router.put("/settings")
-def update_setting(req: UpdateSettingRequest, user=Depends(get_current_user)):
-    """更新系统配置"""
-    if user['role'] != 'admin':
-        raise HTTPException(status_code=403, detail="仅管理员可修改")
-    allowed_keys = {'ACCESS_TOKEN_EXPIRE_MINUTES', 'VECTOR_INDEX_THRESHOLD',
-                    'FIELD_RECALL_TOP_K', 'MAX_TABLES'}
-    if req.key not in allowed_keys:
-        raise HTTPException(status_code=400, detail=f"不可修改的配置项: {req.key}")
-    _set_setting(req.key, req.value)
+def update_setting(req: UpdateSettingRequest, user: AdminUser):
+    """更新系统配置（仅 auth/vector 分类可改；仅管理员）"""
+    # 仅允许编辑标记为 is_editable 的配置项（排除 security / runtime）
+    db = SessionLocal()
+    try:
+        row = db.query(SystemSetting).filter(SystemSetting.key == req.key).first()
+        if not row or not row.is_editable:
+            raise HTTPException(status_code=400, detail=f"不可修改的配置项: {req.key}")
+        row.value = req.value
+        db.commit()
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
     logger.info(f"系统配置已更新: {req.key}")
     return {"success": True, "message": f"{req.key} 已更新"}

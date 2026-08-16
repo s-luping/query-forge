@@ -48,7 +48,7 @@ QueryForge 使用**字段级向量索引 + 按表聚合**的 RAG（检索增强�
 │  step1: KeywordExtractor  ← jieba 分词 + TF 统计     │
 │  step2: SchemaVectorStore ← 向量语义检索              │
 │  step3: 按表聚合          ← 获取完整表结构             │
-│  step4: 上下文整合         ← 补充知识/历史查询         │
+│  step4: 上下文整合         ← 知识库/历史查询          │
 │  step5: LLM 生成 SQL       ← 大模型调用               │
 │  step6: SQL 校验           ← 安全性检查               │
 └─────────────────────────────────────────────────────┘
@@ -58,12 +58,12 @@ QueryForge 使用**字段级向量索引 + 按表聚合**的 RAG（检索增强�
 
 | 类 | 文件 | 职责 |
 |---|------|------|
-| `EmbeddingModel` | core/VectorStore.py | BGE-M3 模型封装，单例加载，路径缓存到 DB |
-| `VectorIndex` | core/VectorStore.py | 纯 NumPy 向量索引，构建、搜索、pickle 持久化 |
-| `SchemaVectorStore` | core/VectorStore.py | Schema 维度向量存储，管理字段索引 |
+| `EmbeddingModel` | core/retrieval/vector_store.py | BGE-M3 模型封装，单例加载，路径缓存到 DB |
+| `VectorIndex` | core/retrieval/vector_store.py | 纯 NumPy 向量索引，构建、搜索、pickle 持久化 |
+| `SchemaVectorStore` | core/retrieval/vector_store.py | Schema 维度向量存储，管理字段索引 |
 | `VectorIndexMeta` | models/vector_index.py | 索引元数据 ORM 模型（状态、字段数、路径） |
-| `SQLPipeline` | core/SQLPipeline.py | 流程编排，元数据读写 |
-| `KeywordExtractor` | core/KeywordExtractor.py | jieba 分词 + 停用词过滤 + TF 关键词提取 |
+| `SQLPipeline` | core/retrieval/index_meta.py | 流程编排，元数据读写 |
+| `KeywordExtractor` | core/retrieval/keywords.py | jieba 分词 + 停用词过滤 + TF 关键词提取 |
 
 ---
 
@@ -260,7 +260,7 @@ schema_name, table_name, column_name, column_type, column_description, column_ke
 5. 基于上一轮SQL进行修改优化
 6. 维度层级过滤：每个维度列必须添加WHERE条件，默认用最高级父节点
 
-【补充知识】（可选）
+【领域知识】（可选）
 ...
 
 只返回SQL语句，不要包含其他解释文字。

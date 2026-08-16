@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>元数据同步</title>
+    <link rel="stylesheet" href="/static/css/bootstrap.min.css">
+    <link rel="stylesheet" href="/static/css/all.min.css">
+    <link rel="stylesheet" href="/static/css/common.css">
+    <style>
+        .stat-card { border-radius: 12px; padding: 20px; color: white; text-align: center; }
+        .stat-card .stat-value { font-size: 32px; font-weight: 700; }
+        .stat-card .stat-label { font-size: 13px; opacity: 0.9; margin-top: 4px; }
+        .bg-total { background: linear-gradient(135deg, #667eea, #764ba2); }
+        .bg-active { background: linear-gradient(135deg, #2d6a4f, #40916c); }
+        .bg-pending { background: linear-gradient(135deg, #ffb703, #fb8500); }
+        .bg-failed { background: linear-gradient(135deg, #f5365c, #f56036); }
+        .nav-tabs .nav-link { color: #495057; font-weight: 500; }
+        .nav-tabs .nav-link.active { color: #667eea; border-bottom: 2px solid #667eea; }
+        .badge-success { background: #40916c; }
+        .badge-failed { background: #f5365c; }
+        .badge-running { background: #2196f3; }
+        .badge-pending { background: #ffb703; color: #333; }
+        .badge-auto { background: #40916c; }
+        .badge-approved { background: #2196f3; }
+        .badge-rejected { background: #6c757d; }
+        .badge-ignored { background: #adb5bd; }
+        .badge-active { background: #40916c; }
+        .badge-error { background: #f5365c; }
+        .badge-inactive { background: #6c757d; }
+        .empty-state { text-align: center; padding: 40px; color: #999; }
+        .modal-body pre { white-space: pre-wrap; word-break: break-all; font-size: 12px; background: #f8f9fa; padding: 12px; border-radius: 6px; }
+        .pointer { cursor: pointer; }
+    </style>
+</head>
+<body>
+<div class="container-fluid">
+    <!-- 子页签已下沉到左侧菜单（数据源管理/同步任务/同步历史/变更记录），URL #hash 直达 -->
+
+    <!-- ===== Tab: 概览 ===== -->
+    <div id="tab-overview">
+        <div class="row mb-3">
+            <div class="col-md-3"><div class="stat-card bg-total"><div class="stat-value" id="st-ds-total">-</div><div class="stat-label">数据源总数</div></div></div>
+            <div class="col-md-3"><div class="stat-card bg-active"><div class="stat-value" id="st-jobs-enabled">-</div><div class="stat-label">启用同步任务</div></div></div>
+            <div class="col-md-3"><div class="stat-card bg-pending"><div class="stat-value" id="st-changes-pending">-</div><div class="stat-label">待审批变更</div></div></div>
+            <div class="col-md-3"><div class="stat-card bg-failed"><div class="stat-value" id="st-runs-failed">-</div><div class="stat-label">失败次数</div></div></div>
+        </div>
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>最近同步记录</span>
+                <button class="btn btn-sm btn-outline-secondary" onclick="loadOverview()"><i class="fas fa-sync"></i> 刷新</button>
+            </div>
+            <div class="card-body p-0">
+                <table class="table table-hover table-sm mb-0">
+                    <thead><tr><th>开始时间</th><th>Schema</th><th>触发者</th><th>状态</th><th>新增</th><th>修改</th><th>删除</th><th>耗时</th></tr></thead>
+                    <tbody id="recentRuns"><tr><td colspan="8" class="empty-state">加载中...</td></tr></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== Tab: 数据源 ===== -->
+    <div id="tab-datasources" style="display:none;">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>数据源管理</span>
+                <button class="btn btn-sm btn-primary" onclick="showDsModal()"><i class="fas fa-plus"></i> 新增数据源</button>
+            </div>
+            <div class="card-body p-0">
+                <table class="table table-hover table-sm mb-0">
+                    <thead><tr><th>名称</th><th>类型</th><th>主机:端口</th><th>数据库</th><th>用户名</th><th>密码</th><th>状态</th><th>操作</th></tr></thead>
+                    <tbody id="dsTable"><tr><td colspan="8" class="empty-state">加载中...</td></tr></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== Tab: 同步任务 ===== -->
+    <div id="tab-jobs" style="display:none;">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>同步任务</span>
+                <button class="btn btn-sm btn-primary" onclick="showJobModal()"><i class="fas fa-plus"></i> 新增任务</button>
+            </div>
+            <div class="card-body p-0">
+                <table class="table table-hover table-sm mb-0">
+                    <thead><tr><th>数据源</th><th>目标Schema</th><th>调度</th><th>自动分类</th><th>启用</th><th>最后同步</th><th>状态</th><th>操作</th></tr></thead>
+                    <tbody id="jobTable"><tr><td colspan="8" class="empty-state">加载中...</td></tr></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== Tab: 同步历史 ===== -->
+    <div id="tab-runs" style="display:none;">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>同步执行历史</span>
+                <button class="btn btn-sm btn-outline-secondary" onclick="loadRuns()"><i class="fas fa-sync"></i> 刷新</button>
+            </div>
+            <div class="card-body p-0">
+                <table class="table table-hover table-sm mb-0">
+                    <thead><tr><th>开始时间</th><th>Schema</th><th>触发者</th><th>状态</th><th>表数</th><th>新增</th><th>修改</th><th>删除</th><th>自动/待审</th><th>耗时</th><th>详情</th></tr></thead>
+                    <tbody id="runsTable"><tr><td colspan="11" class="empty-state">加载中...</td></tr></tbody>
+                </table>
+                <div class="pager-wrap" id="runsPager"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== Tab: 变更记录 ===== -->
+    <div id="tab-changes" style="display:none;">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>变更记录</span>
+                <div class="d-flex align-items-center gap-2">
+                    <select class="form-select form-select-sm" id="chgFilter" style="width:160px;" onchange="loadChanges()">
+                        <option value="">全部状态</option>
+                        <option value="auto_applied">自动应用</option>
+                        <option value="pending">待审批</option>
+                        <option value="approved">已通过</option>
+                        <option value="rejected">已拒绝</option>
+                    </select>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="loadChanges()"><i class="fas fa-sync"></i></button>
+                </div>
+            </div>
+            <div class="card-body p-0">
+                <table class="table table-hover table-sm mb-0">
+                    <thead><tr><th>时间</th><th>类型</th><th>对象</th><th>变更</th><th>自动分类</th><th>状态</th><th>操作</th></tr></thead>
+                    <tbody id="chgTable"><tr><td colspan="7" class="empty-state">加载中...</td></tr></tbody>
+                </table>
+                <div class="pager-wrap" id="changesPager"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 数据源编辑弹窗 -->
+<div class="modal fade" id="dsModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header"><h5 class="modal-title">数据源配置</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <input type="hidden" id="dsId">
+                <div class="mb-3"><label class="form-label">名称</label><input type="text" class="form-control" id="dsName" placeholder="my-mysql-prod"></div>
+                <div class="row">
+                    <div class="col-md-4 mb-3"><label class="form-label">数据库类型</label>
+                        <select class="form-select" id="dsDbType"><option value="mysql">MySQL</option><option value="postgresql">PostgreSQL</option><option value="sqlite">SQLite</option></select></div>
+                    <div class="col-md-5 mb-3"><label class="form-label">主机</label><input type="text" class="form-control" id="dsHost" value="localhost"></div>
+                    <div class="col-md-3 mb-3"><label class="form-label">端口</label><input type="number" class="form-control" id="dsPort" value="3306"></div>
+                </div>
+                <div class="mb-3"><label class="form-label">数据库名 / Schema</label><input type="text" class="form-control" id="dsDatabase" placeholder="如 mydb 或 public"></div>
+                <div class="row">
+                    <div class="col-md-6 mb-3"><label class="form-label">用户名（只读）</label><input type="text" class="form-control" id="dsUsername" placeholder="readonly_user"></div>
+                    <div class="col-md-6 mb-3"><label class="form-label">密码</label><input type="password" class="form-control" id="dsPassword" placeholder="留空编辑时不修改"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button class="btn btn-primary" onclick="saveDs()">保存</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 同步任务弹窗 -->
+<div class="modal fade" id="jobModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header"><h5 class="modal-title">同步任务配置</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <input type="hidden" id="jobId">
+                <div class="mb-3"><label class="form-label">数据源</label><select class="form-select" id="jobDsId"></select></div>
+                <div class="mb-3"><label class="form-label">目标 Schema 名称</label><input type="text" class="form-control" id="jobSchema" placeholder="如 synced_mysql_prod"></div>
+                <div class="row">
+                    <div class="col-md-6 mb-3"><label class="form-label">调度类型</label>
+                        <select class="form-select" id="jobSchedType" onchange="toggleSchedInput()">
+                            <option value="interval">定时间隔</option>
+                            <option value="manual">仅手动</option>
+                        </select></div>
+                    <div class="col-md-6 mb-3" id="schedValueWrap"><label class="form-label">间隔（分钟）</label><input type="number" class="form-control" id="jobSchedValue" value="360"></div>
+                </div>
+                <div class="mb-3 form-check"><input type="checkbox" class="form-check-input" id="jobAutoClassify" checked><label class="form-check-label">自动分类新字段敏感等级</label></div>
+                <div class="mb-3"><label class="form-label">包含的表（逗号分隔，空=全部）</label><input type="text" class="form-control" id="jobInclude" placeholder="users,orders"></div>
+                <div class="mb-3"><label class="form-label">排除的表（逗号分隔）</label><input type="text" class="form-control" id="jobExclude" placeholder="temp,log_*"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button class="btn btn-primary" onclick="saveJob()">保存</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 变更详情弹窗 -->
+<div class="modal fade" id="changeModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header"><h5 class="modal-title">变更详情</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body" id="changeDetail"></div>
+        </div>
+    </div>
+</div>
+
+<script src="/static/js/bootstrap.bundle.min.js"></script>
+<script src="/static/js/app_common.js"></script>
+<script src="/static/js/sync_manage.js"></script>
+</body>
+</html>

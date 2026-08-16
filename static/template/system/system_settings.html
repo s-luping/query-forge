@@ -5,11 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>系统设置</title>
     <link rel="stylesheet" href="/static/css/bootstrap.min.css">
+    <link rel="stylesheet" href="/static/css/common.css">
     <style>
-        body { background: #f4f6fa; font-size: 14px; }
-        .container-fluid { padding: 20px; max-width: 750px; }
-        .card { border: none; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); margin-bottom: 20px; }
-        .card-header { background: white; border-bottom: 1px solid #eee; font-weight: 600; padding: 15px 20px; border-radius: 12px 12px 0 0 !important; }
+        .container-fluid { max-width: 750px; }
         .status-dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; margin-right: 6px; }
         .status-dot.ok { background: #28a745; }
         .status-dot.warn { background: #ffc107; }
@@ -53,6 +51,15 @@
         <div class="card-body" id="vectorConfig">加载中...</div>
     </div>
 
+    <!-- 站点品牌 -->
+    <div class="card">
+        <div class="card-header"><i class="fas fa-palette me-2"></i>站点品牌</div>
+        <div class="card-body" id="brandingConfig">加载中...</div>
+        <div class="card-body pt-0 text-muted" style="font-size:12px;">
+            自定义 Logo 支持任意可访问的图片地址（如 /static/img/logo.svg 或 http://.../logo.png），保存后登录页、首页、管理后台立即生效。
+        </div>
+    </div>
+
     <!-- 操作 -->
     <div class="card">
         <div class="card-header"><i class="fas fa-tools me-2"></i>操作</div>
@@ -71,17 +78,8 @@
 </div>
 <link rel="stylesheet" href="/static/css/all.min.css">
 <script src="/static/js/bootstrap.bundle.min.js"></script>
+<script src="/static/js/app_common.js"></script>
 <script>
-const apiRequest = window.apiRequest || function(url, options = {}) {
-    const token = document.cookie.split('; ').find(row => row.startsWith('token='))?.split('=')[1];
-    const headers = { 'Content-Type': 'application/json' };
-    if (token) headers['Authorization'] = `Bearer ${token}`;
-    return fetch(url, { ...options, headers }).then(resp => {
-        if (resp.status === 401) { window.parent.location.href = '/login'; throw new Error('登录已过期'); }
-        return resp;
-    });
-};
-
 function showMsg(text, type) {
     const box = document.getElementById('msgBox');
     box.style.display = 'block';
@@ -153,6 +151,14 @@ async function loadSettings() {
             'FIELD_RECALL_TOP_K': { desc: '向量检索时召回的最大字段数', width: '80px' },
             'MAX_TABLES': { desc: '按表聚合时包含的最大表数', width: '80px' }
         })).join('');
+
+        // 站点品牌（Logo / 站点名）
+        const brandKeys = ['SITE_LOGO', 'SITE_NAME'];
+        const brandItems = items.filter(s => brandKeys.includes(s.key));
+        document.getElementById('brandingConfig').innerHTML = brandItems.map(s => renderSettingRow(s, {
+            'SITE_LOGO': { desc: '自定义 Logo 图片地址（留空使用默认）', width: '240px' },
+            'SITE_NAME': { desc: '站点名称（登录页/顶栏品牌显示）', width: '140px' }
+        })).join('');
     } catch (e) {
         document.getElementById('jwtSettings').textContent = '加载失败（仅管理员可查看）';
     }
@@ -210,11 +216,7 @@ async function downloadEmbedding() {
     btn.disabled = false; btn.textContent = '📥 下载 Embedding 模型';
 }
 
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text || '';
-    return div.innerHTML;
-}
+// escapeHtml 由 app_common.js 提供
 
 document.addEventListener('DOMContentLoaded', checkAll);
 </script>

@@ -4,53 +4,56 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>QueryForge</title>
+    <title>QueryForge 管理后台</title>
+    <link rel="icon" href="/static/img/logo.svg">
     <link rel="stylesheet" href="/static/css/bootstrap.min.css">
     <link rel="stylesheet" href="/static/css/index.css">
+    <link rel="stylesheet" href="/static/css/common.css">
 </head>
 
 <body class="tpl-index-root" style="overflow:hidden;">
     <div class="tpl-index-layout">
         <!-- 左侧菜单栏 -->
         <div id="sidebar" class="tpl-index-sidebar">
-            <div class="tpl-index-sidebar-title">功能菜单</div>
+            <div class="tpl-index-sidebar-title"><img src="/static/img/logo.svg" width="22" height="22" alt="" style="vertical-align:-4px;margin-right:6px;" data-brand-logo><span data-brand-name>QueryForge</span></div>
+            <a href="/" class="tpl-index-sidebar-back">← 返回首页</a>
             <div class="tpl-index-sidebar-content">
-                <!-- 所有用户可见 -->
+                <!-- 管理功能（仅管理员，/admin 由后端守卫） -->
                 <div class="menu-group">
-                    <div class="menu-group-title" onclick="toggleMenu('schema')">数据库查看</div>
+                    <div class="menu-group-title" onclick="toggleMenu('schema')">数据管理</div>
                     <div id="menu-schema" class="menu-items" style="display:none;">
-                        <div class="menu-item" onclick="openWindow('数据库查看','/static/template/schema/schema_view.html')">数据库 查看</div>
+                        <div class="menu-item" onclick="openWindow('数据浏览','/static/template/schema/schema_view.html')">数据浏览</div>
+                        <div class="menu-item" onclick="openWindow('向量索引','/static/template/schema/vector_index.html')">向量索引</div>
+                        <div class="menu-item" onclick="openWindow('数据源管理','/static/template/system/sync_manage.html#datasources')">数据源管理</div>
+                        <div class="menu-item" onclick="openWindow('同步任务','/static/template/system/sync_manage.html#jobs')">同步任务</div>
+                        <div class="menu-item" onclick="openWindow('同步历史','/static/template/system/sync_manage.html#runs')">同步历史</div>
+                        <div class="menu-item" onclick="openWindow('变更记录','/static/template/system/sync_manage.html#changes')">变更记录</div>
                     </div>
                 </div>
                 <div class="menu-group">
-                    <div class="menu-group-title" onclick="toggleMenu('chat')">生成SQL与查询</div>
-                    <div id="menu-chat" class="menu-items" style="display:none;">
-                        <div class="menu-item" onclick="openWindow('Chat SQL','/static/template/chatSQL/chat.html')">ChatSQL💬</div>
-                        <div class="menu-item" onclick="openWindow('补充知识','/static/template/extra_knowledge.html')">补充知识</div>
+                    <div class="menu-group-title" onclick="toggleMenu('llm')">模型管理</div>
+                    <div id="menu-llm" class="menu-items" style="display:none;">
+                        <div class="menu-item" onclick="openWindow('模型配置','/static/template/llm/llm_config.html')">模型配置</div>
+                        <div class="menu-item" onclick="openWindow('调用日志','/static/template/llm/llm_logs.html')">调用日志</div>
                     </div>
                 </div>
-                <!-- 仅管理员可见 -->
-                <div id="menu-group-admin" style="display:none;">
-                    <div class="menu-group">
-                        <div class="menu-group-title" onclick="toggleMenu('llm')">大模型管理</div>
-                        <div id="menu-llm" class="menu-items" style="display:none;">
-                            <div class="menu-item" onclick="openWindow('模型配置','/static/template/llm/llm_config.html')">模型配置</div>
-                            <div class="menu-item" onclick="openWindow('调用记录','/static/template/llm/llm_logs.html')">调用记录</div>
-                        </div>
+                <div class="menu-group">
+                    <div class="menu-group-title" onclick="toggleMenu('system')">系统管理</div>
+                    <div id="menu-system" class="menu-items" style="display:none;">
+                        <div class="menu-item" onclick="openWindow('用户管理','/static/template/system/user_manage.html')">用户管理</div>
+                        <div class="menu-item" onclick="openWindow('驱动管理','/static/template/system/driver_manage.html')">驱动管理</div>
+                        <div class="menu-item" onclick="openWindow('权限管理','/static/template/system/permission_manage.html')">权限管理</div>
+                        <div class="menu-item" onclick="openWindow('系统设置','/static/template/system/system_settings.html')">系统设置</div>
+                        <div class="menu-item" onclick="openWindow('接口文档','/docs')">接口文档</div>
                     </div>
-                    <div class="menu-group">
-                        <div class="menu-group-title" onclick="toggleMenu('schemaAdmin')">数据库维护</div>
-                        <div id="menu-schemaAdmin" class="menu-items" style="display:none;">
-                            <div class="menu-item" onclick="openWindow('数据库维护','/static/template/schema/schema_manage.html')">数据库维护</div>
-                            <div class="menu-item" onclick="openWindow('向量索引','/static/template/schema/vector_index.html')">向量索引</div>
-                        </div>
-                    </div>
-                    <div class="menu-group">
-                        <div class="menu-group-title" onclick="toggleMenu('system')">系统管理</div>
-                        <div id="menu-system" class="menu-items" style="display:none;">
-                            <div class="menu-item" onclick="openWindow('系统设置','/static/template/system/system_settings.html')">系统设置</div>
-                            <div class="menu-item" onclick="openWindow('权限管理','/static/template/system/permission_manage.html')">权限管理</div>
-                        </div>
+                </div>
+                <div class="menu-group">
+                    <div class="menu-group-title" onclick="toggleMenu('security')">安全中心</div>
+                    <div id="menu-security" class="menu-items" style="display:none;">
+                        <div class="menu-item" onclick="openWindow('审计概览','/static/template/system/security_manage.html#overview')">审计概览</div>
+                        <div class="menu-item" onclick="openWindow('审计日志','/static/template/system/security_manage.html#logs')">审计日志</div>
+                        <div class="menu-item" onclick="openWindow('敏感字段','/static/template/system/security_manage.html#sensitive')">敏感字段</div>
+                        <div class="menu-item" onclick="openWindow('行级规则','/static/template/system/security_manage.html#rowscope')">行级规则</div>
                     </div>
                 </div>
             </div>
@@ -63,7 +66,7 @@
     </div>
     <!-- 顶部栏，右上角显示用户名 -->
     <div id="topbar" class="tpl-index-topbar">
-        <span class="tpl-index-topbar-title">QueryForge 智能数据查询平台 <span
+        <span class="tpl-index-topbar-title"><img src="/static/img/logo.svg" width="20" height="20" alt="" style="vertical-align:-4px;margin-right:6px;" data-brand-logo>QueryForge 智能数据查询平台 <span
                 class="tpl-index-topbar-version">v1.0</span></span>
         <div class="dropdown tpl-index-user-dropdown">
             <span id="user-info" class="tpl-index-user-info"></span>
@@ -76,6 +79,7 @@
         </div>
     </div>
     <script src="/static/js/bootstrap.bundle.min.js"></script>
+    <script src="/static/js/branding.js"></script>
     <script>
         // 全局 API 请求封装 — 子页面通过 window.apiRequest 调用
         window.apiRequest = async function (url, options = {}) {
@@ -100,22 +104,13 @@
             if (parts.length === 2) return parts.pop().split(';').shift();
         }
 
-        function getUserNameFromToken() {
-            const token = getCookie('token');
-            if (!token) return '';
+        // 从服务端获取当前用户（token 为 HttpOnly cookie，JS 无法读取，必须走后端接口）
+        async function loadCurrentUser() {
             try {
-                const payload = JSON.parse(atob(token.split('.')[1]));
-                return payload.username || payload.user || payload.sub || '';
-            } catch (e) { return ''; }
-        }
-
-        function getUserRoleFromToken() {
-            const token = getCookie('token');
-            if (!token) return '';
-            try {
-                const payload = JSON.parse(atob(token.split('.')[1]));
-                return payload.role || '';
-            } catch (e) { return ''; }
+                const resp = await fetch('/api/user/profile', { credentials: 'same-origin' });
+                if (!resp.ok) return null;
+                return await resp.json();
+            } catch (e) { return null; }
         }
 
         // 检查 embedding 模型下载状态
@@ -159,33 +154,59 @@
                 this.disabled = false;
             });
         }
-        window.addEventListener('DOMContentLoaded', function () {
-            const user = getUserNameFromToken();
+        window.addEventListener('DOMContentLoaded', async function () {
             const userInfo = document.getElementById('user-info');
             const loginLink = document.getElementById('login-link');
             const userDropdown = document.getElementById('user-dropdown');
-            if (user) {
-                userInfo.textContent = user;
+            // token 为 HttpOnly cookie，前端无法解码，统一走后端接口获取当前用户
+            const user = await loadCurrentUser();
+            if (user && user.username) {
+                userInfo.textContent = user.username;
                 userInfo.style.display = '';
                 loginLink.style.display = 'none';
-                if (getUserRoleFromToken() === 'admin') {
-                    document.getElementById('menu-group-admin').style.display = '';
+                // 管理后台仅管理员可访问（后端 /admin 守卫兜底）
+                if (user.role !== 'admin') {
+                    window.location.href = '/';
                 }
                 checkEmbeddingStatus();
+
+                // 下拉菜单由 CSS 悬停驱动（.tpl-index-user-dropdown:hover，含悬停桥），
+                // 鼠标从用户名移入菜单不会消失；点击退出登录直接走 /logout
+                const logoutLink = userDropdown.querySelector('a[href="/logout"]');
+                if (logoutLink) {
+                    logoutLink.addEventListener('click', function (e) {
+                        e.preventDefault();
+                        // token 为 HttpOnly cookie，前端无法清除，交由服务端 /logout 处理
+                        window.location.href = '/logout';
+                    });
+                }
             } else {
+                // 未登录：后端 / 与模板守卫也会拦截，这里前端兜底跳转登录页
                 userInfo.style.display = 'none';
                 loginLink.style.display = '';
                 userDropdown.style.display = 'none';
+                window.location.href = '/login';
             }
         });
 
         function toggleMenu(type) {
             const el = document.getElementById('menu-' + type);
-            el.style.display = (el.style.display === 'none') ? '' : 'none';
+            const isOpen = el.style.display === 'none';
+            el.style.display = isOpen ? '' : 'none';
+            // 组标题箭头旋转状态
+            document.querySelectorAll('.menu-group-title').forEach(t => {
+                if (t.getAttribute('onclick') === `toggleMenu('${type}')`) {
+                    t.classList.toggle('open', isOpen);
+                }
+            });
         }
 
         const tabList = [];
         function openWindow(title, url) {
+            // 菜单选中高亮：按 onclick 中的 url 匹配当前菜单项
+            document.querySelectorAll('.menu-item').forEach(el => el.classList.remove('active'));
+            const matched = document.querySelector(`.menu-item[onclick*="${url}"]`);
+            if (matched) matched.classList.add('active');
             let tabIdx = tabList.findIndex(t => t.url === url);
             if (tabIdx === -1) {
                 const tabId = 'tab-' + Date.now();
@@ -247,34 +268,6 @@
             dragData.win.style.left = (e.clientX - dragData.offsetX) + 'px';
             dragData.win.style.top = (e.clientY - dragData.offsetY) + 'px';
         }
-
-        document.addEventListener('DOMContentLoaded', function () {
-            const userInfo = document.getElementById('user-info');
-            const dropdown = document.getElementById('user-dropdown');
-            const loginLink = document.getElementById('login-link');
-
-            if (userInfo.style.display !== 'none') {
-                userInfo.addEventListener('mouseenter', function () {
-                    dropdown.style.display = 'block';
-                });
-                userInfo.addEventListener('mouseleave', function () {
-                    setTimeout(() => { if (!dropdown.matches(':hover')) dropdown.style.display = 'none'; }, 200);
-                });
-            }
-            dropdown.addEventListener('mouseleave', function () {
-                dropdown.style.display = 'none';
-            });
-            const logoutLink = dropdown.querySelector('a[href="/logout"]');
-            if (logoutLink) {
-                logoutLink.addEventListener('click', function (e) {
-                    e.preventDefault();
-                    document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
-                    localStorage.removeItem('token');
-                    sessionStorage.removeItem('token');
-                    window.location.href = '/logout';
-                });
-            }
-        });
     </script>
 
 </html>

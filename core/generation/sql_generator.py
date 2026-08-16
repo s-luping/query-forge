@@ -21,7 +21,7 @@ class SqlGenerator:
             self,
             query: str,
             schema_csv: str = "",
-            extra_knowledge: str = "",
+            knowledge_content: str = "",
             history_queries: List[Dict[str, str]] = None,
             db_type: str = "sqlite"
     ) -> str:
@@ -30,7 +30,7 @@ class SqlGenerator:
         Args:
             query: 用户查询文本
             schema_csv: 表结构（从数据库动态获取）
-            extra_knowledge: 领域知识内容（已合并到补充知识）
+            knowledge_content: 知识库内容（业务口径/表关系/计算规则等）
             history_queries: 历史成功查询 [{query, sql}]
             db_type: 数据库类型 (mysql, sqlite, postgresql, oracle, sqlserver)
         """
@@ -56,8 +56,8 @@ class SqlGenerator:
             f"【表结构】\n{schema_csv}",
         ]
 
-        if extra_knowledge:
-            prompt_parts.append(f"【补充知识】\n{extra_knowledge.strip()}")
+        if knowledge_content:
+            prompt_parts.append(f"【领域知识】\n{knowledge_content.strip()}")
         if history_section:
             prompt_parts.append(f"【历史成功查询参考】\n{history_section}")
 

@@ -1,5 +1,47 @@
+/* ============================================================
+   QueryForge 主框架样式 — 管理系统常用配色（AntD/Element 风格）
+   侧栏深蓝 #001529 / 顶栏白色 / 内容区浅灰 / 主题色 #1890ff
+   ============================================================ */
+:root {
+    --qf-primary: #1890ff;
+    --qf-sidebar-bg: #001529;
+    --qf-sidebar-text: rgba(255, 255, 255, 0.68);
+    --qf-content-bg: #f0f2f5;
+    --qf-border: #e8e8e8;
+}
+
 .tpl-index-root {
     padding-top: 40px;
+}
+
+/* ── 顶部栏：白底深字 + 顶部主题色细线 ── */
+.tpl-index-topbar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 40px;
+    background: #fff;
+    color: #333;
+    z-index: 1001;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 24px 0 16px;
+    font-size: 15px;
+    border-top: 2px solid var(--qf-primary);
+    border-bottom: 1px solid var(--qf-border);
+    box-shadow: 0 1px 4px rgba(0, 21, 41, 0.08);
+}
+
+.tpl-index-topbar-title {
+    font-weight: 600;
+    color: #001529;
+}
+
+.tpl-index-topbar-version {
+    font-size: 12px;
+    color: #999;
 }
 
 .tpl-index-root .login-btn {
@@ -9,25 +51,291 @@
     z-index: 1000
 }
 
-.tpl-index-root .menu-item {
-    padding: 8px 32px;
-    cursor: pointer;
-    border-radius: 4px;
-    margin: 2px 8px;
-    transition: background .2s
+/* ── 侧边栏：深色导航 ── */
+.tpl-index-sidebar {
+    width: 220px;
+    min-width: 180px;
+    background: var(--qf-sidebar-bg);
+    display: flex;
+    flex-direction: column;
 }
 
-.tpl-index-root .menu-item:hover {
-    background: #e9ecef
+.tpl-index-sidebar-title {
+    padding: 14px 16px;
+    font-weight: 600;
+    font-size: 16px;
+    color: #fff;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    letter-spacing: 0.5px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
 }
 
+/* 品牌色圆点 */
+.tpl-index-sidebar-title::before {
+    content: "";
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--qf-primary);
+    box-shadow: 0 0 0 3px rgba(24, 144, 255, 0.25);
+}
+
+/* 返回首页入口 */
+.tpl-index-sidebar-back {
+    display: block;
+    padding: 10px 16px;
+    color: rgba(255, 255, 255, 0.85);
+    text-decoration: none;
+    font-size: 13px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    transition: background .2s, color .2s;
+}
+
+.tpl-index-sidebar-back:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: #fff;
+}
+
+.tpl-index-sidebar-content {
+    flex: 1;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+}
+
+.tpl-index-sidebar-content::-webkit-scrollbar {
+    width: 6px;
+}
+
+.tpl-index-sidebar-content::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 3px;
+}
+
+/* ── 一级菜单（组标题）── */
 .tpl-index-root .menu-group-title {
     user-select: none;
     cursor: pointer;
-    padding: 8px 16px;
+    padding: 12px 16px 8px;
     font-weight: 600;
+    font-size: 12px;
+    letter-spacing: 1px;
+    color: rgba(255, 255, 255, 0.45);
+    transition: color .2s;
 }
 
+.tpl-index-root .menu-group-title::before {
+    content: "▸";
+    display: inline-block;
+    margin-right: 6px;
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.35);
+    transition: transform .2s;
+}
+
+.tpl-index-root .menu-group-title.open::before {
+    transform: rotate(90deg);
+}
+
+.tpl-index-root .menu-group-title:hover {
+    color: #fff;
+}
+
+/* ── 二级菜单（子项）：加大缩进，与一级明显区分 ── */
+.tpl-index-root .menu-item {
+    padding: 9px 16px 9px 46px;
+    cursor: pointer;
+    color: var(--qf-sidebar-text);
+    font-size: 13px;
+    border-left: 3px solid transparent;
+    transition: background .2s, color .2s;
+    position: relative;
+}
+
+/* 子项前的层级圆点 */
+.tpl-index-root .menu-item::before {
+    content: "";
+    position: absolute;
+    left: 30px;
+    top: 50%;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.25);
+    transform: translateY(-50%);
+}
+
+.tpl-index-root .menu-item:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: #fff;
+}
+
+.tpl-index-root .menu-item:hover::before {
+    background: #fff;
+}
+
+.tpl-index-root .menu-item.active {
+    background: var(--qf-primary);
+    color: #fff;
+    border-left-color: #ffc107;
+}
+
+.tpl-index-root .menu-item.active::before {
+    background: #fff;
+}
+
+/* ── 右侧内容区 ── */
+.tpl-index-window-container {
+    flex: 1;
+    position: relative;
+    overflow: auto;
+    background: var(--qf-content-bg);
+    display: flex;
+    flex-direction: column;
+}
+
+/* 打开页签条：浅灰底 + 下边框，与内容区形成分层 */
+.tpl-index-tab-bar {
+    height: 40px;
+    display: flex;
+    align-items: flex-end;
+    background: #f5f7fa;
+    border-bottom: 1px solid #dcdfe6;
+    padding: 6px 8px 0;
+    box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.02);
+}
+
+.tpl-index-tab-content {
+    flex: 1;
+    min-height: 0;
+    position: relative;
+}
+
+/* 页签：完整边框的"浏览器标签"样式 */
+.tpl-index-root .tab {
+    display: flex;
+    align-items: center;
+    background: #fff;
+    border: 1px solid #dcdfe6;
+    border-bottom: none;
+    border-radius: 6px 6px 0 0;
+    margin-right: 4px;
+    padding: 0 14px;
+    height: 32px;
+    cursor: pointer;
+    position: relative;
+    top: 1px;
+    color: #606266;
+    font-size: 13px;
+    transition: color .2s, border-color .2s;
+}
+
+.tpl-index-root .tab:hover {
+    color: var(--qf-primary);
+    border-color: #c0c4cc;
+}
+
+.tpl-index-root .tab.active {
+    background: #fff;
+    border: 1px solid #dcdfe6;
+    border-top: 2px solid var(--qf-primary);
+    border-bottom: 1px solid #f5f7fa;   /* 与页签条底色同色，视觉上与内容区连体 */
+    color: var(--qf-primary);
+    font-weight: 600;
+    box-shadow: 0 -2px 6px rgba(24, 144, 255, 0.08);
+}
+
+.tpl-index-root .tab-close {
+    margin-left: 8px;
+    color: #999;
+    font-size: 16px;
+    cursor: pointer;
+}
+
+.tpl-index-root .tab-close:hover {
+    color: #f5222d;
+}
+
+.tpl-index-root .tab-iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: #fff;
+    display: none
+}
+
+.tpl-index-root .tab-iframe.active {
+    display: block
+}
+
+/* ── 用户下拉 ── */
+/* 悬停桥：触发器与菜单之间的空隙也计入 hover，鼠标移入过程中菜单不消失 */
+.tpl-index-user-dropdown {
+    position: relative;
+}
+
+.tpl-index-user-dropdown::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 100%;
+    height: 8px;
+}
+
+.tpl-index-user-dropdown:hover #user-dropdown {
+    display: block !important
+}
+
+.tpl-index-user-info {
+    font-size: 14px;
+    cursor: pointer;
+    user-select: none;
+    color: #333;
+}
+
+.tpl-index-user-dropdown-menu {
+    display: none;
+    position: absolute;
+    right: 0;
+    top: calc(100% + 4px);
+    background: #fff;
+    color: #333;
+    min-width: 110px;
+    border-radius: 6px;
+    box-shadow: 0 2px 8px rgba(0, 21, 41, 0.15);
+    border: 1px solid #eee;
+    z-index: 1002;
+    overflow: hidden;
+}
+
+.tpl-index-root #user-dropdown a:hover {
+    background: #f5f5f5
+}
+
+.tpl-index-logout-link {
+    display: block;
+    padding: 8px 16px;
+    text-decoration: none;
+    color: #333;
+    cursor: pointer;
+    font-size: 13px;
+}
+
+/* ── 主体布局 ── */
+.tpl-index-layout {
+    display: flex;
+    height: calc(100vh - 40px);
+}
+
+/* ── 遗留浮动窗口样式（已不使用，保留兼容） ── */
 .tpl-index-root .window-box {
     position: absolute;
     top: 40px;
@@ -36,7 +344,7 @@
     min-width: 400px;
     min-height: 400px;
     background: #fff;
-    border: 1px solid #bbb;
+    border: 1px solid #d9d9d9;
     border-radius: 8px;
     box-shadow: 0 4px 24px rgba(0, 0, 0, .08);
     z-index: 10;
@@ -48,7 +356,7 @@
 
 .tpl-index-root .window-titlebar {
     height: 38px;
-    background: #2980b9;
+    background: var(--qf-primary);
     color: #fff;
     font-weight: bold;
     display: flex;
@@ -70,171 +378,5 @@
     flex: 1;
     border: none;
     width: 100%;
-    background: #f8f9fa
-}
-
-.tpl-index-root .tab {
-    display: flex;
-    align-items: center;
-    background: #eee;
-    border: 1px solid #ccc;
-    border-bottom: none;
-    border-radius: 8px 8px 0 0;
-    margin-right: 4px;
-    padding: 0 16px;
-    height: 36px;
-    cursor: pointer;
-    position: relative;
-    top: 2px
-}
-
-.tpl-index-root .tab.active {
-    background: #fff;
-    border-bottom: 1px solid #fff;
-    font-weight: bold
-}
-
-.tpl-index-root .tab-close {
-    margin-left: 8px;
-    color: #888;
-    font-size: 16px;
-    cursor: pointer
-}
-
-.tpl-index-root .tab-iframe {
-    width: 100%;
-    height: 100%;
-    border: none;
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: #f8f9fa;
-    display: none
-}
-
-.tpl-index-root .tab-iframe.active {
-    display: block
-}
-
-.tpl-index-root #user-info:hover+#user-dropdown,
-.tpl-index-root #user-dropdown:hover {
-    display: block !important
-}
-
-.tpl-index-root #user-dropdown a:hover {
-    background: #f5f5f5
-}
-
-/* 主体布局 */
-.tpl-index-layout {
-    display: flex;
-    height: calc(100vh - 40px);
-}
-
-/* 侧边栏 */
-.tpl-index-sidebar {
-    width: 220px;
-    min-width: 180px;
-    background: #f8f9fa;
-    border-right: 1px solid #ddd;
-    display: flex;
-    flex-direction: column;
-}
-
-.tpl-index-sidebar-title {
-    padding: 16px 12px;
-    font-weight: bold;
-    font-size: 18px;
-    border-bottom: 1px solid #eee;
-}
-
-.tpl-index-sidebar-content {
-    flex: 1;
-    overflow-y: auto;
-}
-
-/* 右侧内容区 */
-.tpl-index-window-container {
-    flex: 1;
-    position: relative;
-    overflow: auto;
-    background: #f4f6fa;
-    display: flex;
-    flex-direction: column;
-}
-
-.tpl-index-tab-bar {
-    height: 40px;
-    display: flex;
-    align-items: end;
-    background: #f8f9fa;
-    border-bottom: 1px solid #ddd;
-    padding-left: 8px;
-}
-
-.tpl-index-tab-content {
-    flex: 1;
-    min-height: 0;
-    position: relative;
-}
-
-/* 顶部栏 */
-.tpl-index-topbar {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 40px;
-    background: #222;
-    color: #fff;
-    z-index: 1001;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0 24px 0 12px;
-    font-size: 16px;
-}
-
-.tpl-index-topbar-title {
-    font-weight: bold;
-}
-
-.tpl-index-topbar-version {
-    font-size: 12px;
-    color: #aaa;
-}
-
-/* 用户名下拉 */
-.tpl-index-user-dropdown {
-    position: relative;
-}
-
-.tpl-index-user-info {
-    font-size: 15px;
-    cursor: pointer;
-    user-select: none;
-}
-
-.tpl-index-user-dropdown-menu {
-    display: none;
-    position: absolute;
-    right: 0;
-    top: 36px;
-    background: #fff;
-    color: #222;
-    min-width: 100px;
-    border-radius: 6px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
-    border: 1px solid #eee;
-    z-index: 1002;
-}
-
-.tpl-index-logout-link {
-    display: block;
-    padding: 8px 16px;
-    text-decoration: none;
-    color: #222;
-    cursor: pointer;
+    background: #fff
 }

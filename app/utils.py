@@ -37,7 +37,7 @@ def get_schema_db_path() -> str:
 
 
 def get_extra_db_path() -> str:
-    """获取补充知识数据库路径"""
+    """获取知识库数据库路径（旧版独立库，当前已并入主库）"""
     path = os.getenv('EXTRA_DB_PATH', 'db/sys_extra.db')
     if not os.path.isabs(path):
         path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), path)
