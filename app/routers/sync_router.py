@@ -163,7 +163,7 @@ def update_datasource(ds_id: int, req: DataSourceUpdate, user: AdminUser):
 
 @router.delete("/datasources/{ds_id}")
 def delete_datasource(ds_id: int, user: AdminUser):
-    """删除数据源（关联的同步任务一并标记禁用）"""
+    """删除数据源（级联清理同步任务/执行历史/变更记录；关联库解除绑定、保留元数据）"""
     # (权限由 AdminUser 依赖统一校验)
     db = SessionLocal()
     try:
@@ -171,17 +171,29 @@ def delete_datasource(ds_id: int, user: AdminUser):
         if not ds:
             raise HTTPException(404, "数据源不存在")
 
-        # 禁用关联的同步任务
-        jobs = db.query(SyncJobConfig).filter(
-            SyncJobConfig.datasource_id == ds_id
-        ).all()
-        for j in jobs:
-            j.is_enabled = False
+        job_ids = [j[0] for j in db.query(SyncJobConfig.id).filter(
+            SyncJobConfig.datasource_id == ds_id).all()]
+
+        # 主库外键约束开启，须按依赖顺序清理，否则 IntegrityError → 500
+        # 1) 变更记录（引用 datasource_id / job_id）
+        db.query(SchemaChangeLog).filter(
+            SchemaChangeLog.datasource_id == ds_id).delete()
+        # 2) 执行历史（引用 job_id）
+        if job_ids:
+            db.query(SyncRunLog).filter(SyncRunLog.job_id.in_(job_ids)).delete()
+        # 3) 同步任务
+        db.query(SyncJobConfig).filter(
+            SyncJobConfig.datasource_id == ds_id).delete()
+        # 4) 该数据源同步出的库解除绑定（保留结构元数据，不误删）
+        db.query(DbSchema).filter(DbSchema.datasource_id == ds_id).update(
+            {DbSchema.datasource_id: None})
 
         db.delete(ds)
         db.commit()
-        log_audit(user, "delete_datasource", f"id={ds_id}")
-        return {"success": True, "message": f"数据源已删除，{len(jobs)} 个关联任务已禁用"}
+        log_audit(user, "delete_datasource",
+                  f"id={ds_id} jobs_cleaned={len(job_ids)}")
+        return {"success": True,
+                "message": f"数据源已删除，已清理 {len(job_ids)} 个关联同步任务及历史记录"}
     finally:
         db.close()
 
@@ -302,15 +314,19 @@ def update_job(job_id: int, req: SyncJobUpdate, user: AdminUser):
 
 @router.delete("/jobs/{job_id}")
 def delete_job(job_id: int, user: AdminUser):
-    """删除同步任务"""
+    """删除同步任务（连同执行历史与变更记录）"""
     # (权限由 AdminUser 依赖统一校验)
     db = SessionLocal()
     try:
         job = db.query(SyncJobConfig).filter(SyncJobConfig.id == job_id).first()
         if not job:
             raise HTTPException(404, "同步任务不存在")
+        # 主库外键约束开启：先删变更记录与执行日志，再删任务
+        db.query(SchemaChangeLog).filter(SchemaChangeLog.job_id == job_id).delete()
+        db.query(SyncRunLog).filter(SyncRunLog.job_id == job_id).delete()
         db.delete(job)
         db.commit()
+        log_audit(user, "delete_sync_job", f"job_id={job_id}")
         return {"success": True, "message": "同步任务已删除"}
     finally:
         db.close()
