@@ -280,6 +280,21 @@ async function toggleJob(id) {
     } catch (e) { alert('操作失败: ' + e.message); }
 }
 
+// ── 清空同步历史与变更记录（仅管理员） ─────────────────────────
+async function clearSyncHistory() {
+    if (!confirm('确认清空全部同步执行历史与变更记录？此操作不可恢复。\n\n（不影响数据源/同步任务/库表结构）')) return;
+    try {
+        const resp = await apiRequest('/api/sync/history/clear', { method: 'POST' });
+        const data = await resp.json().catch(() => ({}));
+        if (!resp.ok) return alert(data.detail || '清空失败');
+        alert(data.message || '已清空');
+        runsPage = 1; changesPage = 1;
+        loadOverview();
+        loadRuns();
+        loadChanges();
+    } catch (e) { alert('清空失败: ' + e.message); }
+}
+
 // ── 同步历史 ─────────────────────────────────────────────────
 // 执行记录的目标库名：后端已返回 schema_name；旧记录回退到 summary JSON
 function runSchemaName(r) {
