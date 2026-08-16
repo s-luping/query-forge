@@ -169,6 +169,9 @@ async function loadJobs() {
             <td>${fmt(j.last_synced_at)}</td>
             <td>${j.last_sync_status ? '<span class="badge badge-'+j.last_sync_status+'">'+j.last_sync_status+'</span>' : '-'}</td>
             <td>
+                <button class="btn btn-sm ${j.is_enabled ? 'btn-outline-warning' : 'btn-outline-success'}" onclick="toggleJob(${j.id})" title="${j.is_enabled ? '停用（暂停调度）' : '启用'}" ${j.is_enabled ? '' : 'style="background:#28a745;color:#fff;"'}>
+                    <i class="fas ${j.is_enabled ? 'fa-pause' : 'fa-play-circle'}"></i> ${j.is_enabled ? '停用' : '启用'}
+                </button>
                 <button class="btn btn-sm btn-outline-success" onclick="triggerSync(${j.id})" title="立即同步"><i class="fas fa-play"></i></button>
                 <button class="btn btn-sm btn-outline-primary" onclick="showJobModal(${j.id})" title="编辑"><i class="fas fa-edit"></i></button>
                 <button class="btn btn-sm btn-outline-danger" onclick="deleteJob(${j.id})" title="删除"><i class="fas fa-trash"></i></button>
@@ -258,6 +261,23 @@ async function deleteJob(id) {
         await apiRequest(`/api/sync/jobs/${id}`, { method: 'DELETE' });
         loadJobs();
     } catch (e) { alert('删除失败: ' + e.message); }
+}
+
+// ── 启用/停用同步任务（暂停/恢复调度） ─────────────────────────
+async function toggleJob(id) {
+    const job = jobList.find(x => x.id === id);
+    if (!job) return;
+    const next = job.is_enabled ? 0 : 1;
+    try {
+        const resp = await apiRequest(`/api/sync/jobs/${id}`, {
+            method: 'PUT',
+            body: JSON.stringify({ is_enabled: next })
+        });
+        const data = await resp.json().catch(() => ({}));
+        if (!resp.ok) return alert(data.detail || '操作失败');
+        alert(next ? '同步任务已启用' : '同步任务已停用（不再自动同步）');
+        loadJobs();
+    } catch (e) { alert('操作失败: ' + e.message); }
 }
 
 // ── 同步历史 ─────────────────────────────────────────────────
