@@ -1,4 +1,5 @@
-# d:\projects\py\query-forge\core\KeywordExtractor.py
+# -*- coding: UTF-8 -*-
+"""关键词抽取 - jieba 分词 + 停用词过滤 + TF 统计"""
 import os
 import re
 import jieba
@@ -7,7 +8,8 @@ from collections import Counter
 from app.logger import logger
 
 # 优先使用项目本地字典，避免 pip 包缺少 dict.txt 导致分词失败
-_LOCAL_DICT = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'jieba', 'dict.txt')
+# core/retrieval/keywords.py → 上溯 3 级到项目根
+_LOCAL_DICT = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'data', 'jieba', 'dict.txt')
 if os.path.exists(_LOCAL_DICT):
     jieba.set_dictionary(_LOCAL_DICT)
 

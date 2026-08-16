@@ -1,0 +1,68 @@
+/* ============================================================
+   QueryForge 公共样式 — 合并各页面重复的布局样板
+   使用方式：所有模板在 bootstrap.css 之后引入本文件
+   ============================================================ */
+body { background: #f0f2f5; font-size: 14px; }
+.container-fluid { padding: 20px; }
+.card {
+    border: none; border-radius: 12px;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+    margin-bottom: 20px;
+}
+.card-header {
+    background: white; border-bottom: 1px solid #eee;
+    font-weight: 600; padding: 12px 20px;
+    border-radius: 12px 12px 0 0 !important;
+}
+.filter-section { background-color: white; padding: 15px 20px; border-bottom: 1px solid #eee; }
+table { font-size: 13px; }
+table th { background: #f8f9fa; white-space: nowrap; font-weight: 600; }
+
+/* 角色徽标 */
+.badge-admin { background: #dc3545; }
+.badge-user { background: #0d6efd; }
+.badge-off { background: #6c757d; }
+
+/* 字段级/表级小徽标（数据库查看等页面） */
+.schema-badge { background-color: #667eea; color: white; padding: 2px 8px; border-radius: 12px; font-size: 12px; }
+.table-badge { background-color: #28a745; color: white; padding: 2px 8px; border-radius: 12px; font-size: 12px; }
+.pk-badge { background-color: #ffc107; color: #333; padding: 2px 6px; border-radius: 4px; font-size: 11px; }
+
+/* 长文本省略 + 悬停展开（数据库查看等页面） */
+.table-cell-ellipsis {
+    max-width: 120px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    cursor: pointer; position: relative;
+}
+.table-cell-ellipsis:hover {
+    white-space: normal; word-break: break-all; position: absolute; z-index: 1000;
+    background-color: white; padding: 5px; border: 1px solid #ddd;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15); max-width: 300px;
+}
+
+/* 通用分页条容器（QF.renderPager） */
+.pager-wrap {
+    padding: 8px 12px;
+    border-top: 1px solid #f0f0f0;
+    background: #fafbfc;
+    border-radius: 0 0 12px 12px;
+}
+.pager-wrap .pagination { margin: 0; }
+
+/* 敏感等级徽标（badge.bg-* 用于表格列内显示，必须带底色否则白字不可见） */
+.badge.bg-public { background: #6c757d; color: #fff; }
+.badge.bg-internal { background: #0d6efd; color: #fff; }
+.badge.bg-sensitive { background: #ffb703; color: #333; }
+.badge.bg-confidential { background: #dc3545; color: #fff; }
+
+/* 敏感等级徽标（badge.badge-* 变体，同步/变更记录等页面使用） */
+.badge.badge-public { background: #40916c; color: #fff; }
+.badge.badge-internal { background: #2196f3; color: #fff; }
+.badge.badge-sensitive { background: #ffb703; color: #333; }
+.badge.badge-confidential { background: #f5365c; color: #fff; }
+
+/* 同步变更审批状态徽标（approval_status 为 auto_applied/pending/approved/rejected/ignored） */
+.badge.badge-auto_applied { background: #40916c; color: #fff; }
+.badge.badge-pending { background: #ffb703; color: #333; }
+.badge.badge-approved { background: #2196f3; color: #fff; }
+.badge.badge-rejected { background: #6c757d; color: #fff; }
+.badge.badge-ignored { background: #adb5bd; color: #fff; }

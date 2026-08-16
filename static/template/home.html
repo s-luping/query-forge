@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QueryForge 智能数据查询平台</title>
+    <link rel="icon" href="/static/img/logo.svg">
+    <link rel="stylesheet" href="/static/css/bootstrap.min.css">
+    <link rel="stylesheet" href="/static/css/common.css">
+    <style>
+        html, body { height: 100%; margin: 0; background: #f0f2f5; font-size: 14px; }
+        /* 顶栏 */
+        .home-topbar {
+            height: 48px; background: #fff; border-bottom: 1px solid #e4e7ed;
+            display: flex; align-items: center; padding: 0 16px; gap: 8px;
+            box-shadow: 0 1px 4px rgba(0, 21, 41, 0.06);
+        }
+        .home-brand {
+            display: flex; align-items: center; gap: 8px;
+            font-weight: 600; font-size: 16px; color: #001529; margin-right: 12px;
+        }
+        .home-brand img { display: block; }
+        .home-nav { display: flex; gap: 4px; flex: 1; }
+        .home-nav a {
+            padding: 6px 14px; border-radius: 6px; color: #555;
+            text-decoration: none; font-size: 13px; cursor: pointer; transition: all .2s;
+        }
+        .home-nav a:hover { background: #f0f2f5; color: #1890ff; }
+        .home-nav a.active { background: #e6f4ff; color: #1890ff; font-weight: 600; }
+        .home-right { display: flex; align-items: center; gap: 10px; }
+        /* 用户下拉 */
+        .home-user { position: relative; }
+        /* 悬停桥：触发器与菜单之间的空隙也计入 hover，鼠标移入过程中菜单不消失 */
+        .home-user::after {
+            content: ""; position: absolute; left: 0; right: 0; top: 100%; height: 8px;
+        }
+        .home-user-name { font-size: 14px; color: #333; cursor: pointer; user-select: none; padding: 4px 8px; border-radius: 6px; }
+        .home-user-name:hover { background: #f0f2f5; }
+        .home-user-menu {
+            display: none; position: absolute; right: 0; top: calc(100% + 4px); background: #fff;
+            min-width: 110px; border-radius: 6px; box-shadow: 0 2px 8px rgba(0,21,41,.15);
+            border: 1px solid #eee; z-index: 1002; overflow: hidden;
+        }
+        .home-user:hover .home-user-menu { display: block; }
+        .home-user-menu a {
+            display: block; padding: 8px 16px; color: #333; text-decoration: none; font-size: 13px;
+        }
+        .home-user-menu a:hover { background: #f5f5f5; }
+        /* 内容区 */
+        .home-main { position: absolute; top: 48px; left: 0; right: 0; bottom: 0; }
+        .home-main iframe { width: 100%; height: 100%; border: 0; display: block; background: #fff; }
+    </style>
+</head>
+<body>
+<div class="home-topbar">
+    <span class="home-brand"><img src="/static/img/logo.svg" width="26" height="26" alt="QueryForge" data-brand-logo><span data-brand-name>QueryForge</span></span>
+    <nav class="home-nav">
+        <a class="active" data-page="chat" onclick="openPage('chat')">SQL 对话</a>
+        <a data-page="knowledge" onclick="openPage('knowledge')">知识库</a>
+        <a data-page="usage" onclick="openPage('usage')">使用记录</a>
+    </nav>
+    <div class="home-right">
+        <a href="/admin" class="btn btn-sm btn-outline-primary" data-admin-only>管理后台</a>
+        <div class="home-user">
+            <span class="home-user-name" id="userName"></span>
+            <div class="home-user-menu">
+                <a href="/static/template/change_password.html">修改密码</a>
+                <a href="/logout">退出登录</a>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="home-main">
+    <iframe id="pageFrame" src="/static/template/chatSQL/chat.html"></iframe>
+</div>
+<script src="/static/js/bootstrap.bundle.min.js"></script>
+<script src="/static/js/app_common.js"></script>
+<script src="/static/js/branding.js"></script>
+<script>
+const PAGES = {
+    chat: '/static/template/chatSQL/chat.html',
+    knowledge: '/static/template/knowledge.html',
+    usage: '/static/template/llm/llm_logs.html',
+};
+
+function openPage(key) {
+    document.querySelectorAll('.home-nav a').forEach(a => a.classList.toggle('active', a.dataset.page === key));
+    document.getElementById('pageFrame').src = PAGES[key];
+}
+
+// 等公共层认证就绪后渲染用户信息与管理员入口
+window.QF.onReady = function () {
+    document.getElementById('userName').textContent = window.QF.user.username;
+    if (!window.QF.isAdmin()) {
+        document.querySelectorAll('[data-admin-only]').forEach(el => el.remove());
+    }
+};
+</script>
+</body>
+</html>

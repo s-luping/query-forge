@@ -1,10 +1,14 @@
-"""向量索引元数据模型 — 持久化索引构建状态和位置"""
+"""向量索引元数据模型 — 持久化索引构建状态和位置
+
+注：仍以 schema_name 字符串为键（索引文件名也使用 schema 前缀），
+与 db_schemas.id 的强关联留作后续演进。
+"""
 from datetime import datetime
 from sqlalchemy import Column, Integer, String, Text, DateTime
-from models import Base
+from models.base import MainBase
 
 
-class VectorIndexMeta(Base):
+class VectorIndexMeta(MainBase):
     """向量索引元数据表"""
     __tablename__ = 'vector_index_meta'
     id = Column(Integer, primary_key=True, autoincrement=True, comment='主键')

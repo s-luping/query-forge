@@ -1,5 +1,19 @@
-# -*- coding: utf-8 -*-
+# -*- coding: UTF-8 -*-
+"""调度器管理 — 注册定时聚合、清理与同步任务
+
+任务清单：
+  - aggregate_usage  每小时聚合 LLM 用量到 llm_usage_stats（回溯 7 天幂等覆盖）
+  - cleanup_telemetry 每天凌晨 3 点清理过期遥测数据（默认保留 90 天）
+  - run_scheduled_syncs 每 10 分钟检查并执行到期的元数据同步任务
+"""
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.interval import IntervalTrigger
+from apscheduler.triggers.cron import CronTrigger
+
+from app.logger import logger
+from scheduler.jobs.usage_stats import aggregate_usage_stats
+from scheduler.jobs.retention import cleanup_telemetry
+from scheduler.jobs.schema_sync import run_scheduled_syncs
 
 
 class SchedulerManager:
@@ -7,31 +21,42 @@ class SchedulerManager:
         self.scheduler = AsyncIOScheduler()
 
     def init_scheduler(self):
-        """初始化调度任务"""
-        pass
-        # 示例：每5分钟执行一次
-        # self.scheduler.add_job(
-        #     scheduled_task_example,
-        #     'interval',
-        #     minutes=1,
-        #     id='example_task',
-        #     kwargs={'say': 'Hello, World!'},
-        # )
+        """注册定时任务"""
+        self.scheduler.add_job(
+            aggregate_usage_stats,
+            IntervalTrigger(hours=1),
+            id='aggregate_usage',
+            kwargs={'days_back': 7},
+            replace_existing=True,
+        )
+        logger.info("已注册定时任务: aggregate_usage (每小时)")
 
-        # 示例：每天凌晨执行
-        # self.scheduler.add_job(
-        #     scheduled_task_example,
-        #     CronTrigger(hour=0, minute=0),
-        #     id='daily_task'
-        # )
+        self.scheduler.add_job(
+            cleanup_telemetry,
+            CronTrigger(hour=3, minute=0),
+            id='cleanup_telemetry',
+            kwargs={'retention_days': 90},
+            replace_existing=True,
+        )
+        logger.info("已注册定时任务: cleanup_telemetry (每天 03:00)")
+
+        self.scheduler.add_job(
+            run_scheduled_syncs,
+            IntervalTrigger(minutes=10),
+            id='run_scheduled_syncs',
+            replace_existing=True,
+        )
+        logger.info("已注册定时任务: run_scheduled_syncs (每 10 分钟)")
 
     def start(self):
         """启动调度器"""
         self.scheduler.start()
+        logger.info("调度器已启动")
 
     def shutdown(self):
         """关闭调度器"""
-        self.scheduler.shutdown()
+        self.scheduler.shutdown(wait=False)
+        logger.info("调度器已关闭")
 
 
 scheduler_manager = SchedulerManager()

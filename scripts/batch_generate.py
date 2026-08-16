@@ -8,7 +8,7 @@
 功能：
     - 输入数据集编号（如 db1, db2）
     - 读取 scripts/db{n}/dataset.json 中的问题
-    - 使用 admin 用户登录（密码: REDACTED）
+    - 使用环境变量 BATCH_DB_USERNAME / BATCH_DB_PASSWORD 指定的账号登录
     - 轮询调用多个模型配置
     - 支持断点继续
     - 捕捉上下文大小不足、额度用完等错误
@@ -18,7 +18,6 @@
 import json
 import os
 import re
-import sys
 import time
 import requests
 from datetime import datetime
@@ -49,11 +48,16 @@ QUOTA_EXHAUSTED_PATTERNS = [
 
 
 def get_db_config(db_name: str) -> dict:
-    """获取数据库配置"""
+    """获取数据库配置（凭据从环境变量读取，禁止硬编码）"""
     db_path = os.path.join(DB_DIR, db_name)
+    username = os.getenv("BATCH_DB_USERNAME", "")
+    password = os.getenv("BATCH_DB_PASSWORD", "")
+    if not username or not password:
+        raise SystemExit(
+            "缺少批量生成凭据: 请设置环境变量 BATCH_DB_USERNAME / BATCH_DB_PASSWORD")
     return {
-        "username": "admin",
-        "password": "REDACTED",
+        "username": username,
+        "password": password,
         "dataset_file": os.path.join(db_path, "dataset.json"),
         "results_file": os.path.join(db_path, "results.json"),
         "log_file": os.path.join(db_path, "batch_log.txt"),

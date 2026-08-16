@@ -158,13 +158,34 @@ docker-compose logs -f
 - 检查默认管理员账号是否已创建：`docker-compose logs | grep "默认管理员用户创建成功"`
 - 确保 `SECRET_KEY` 已正确配置
 
-### 6. Schema 解析失败
+### 6. 将系统嵌入到其他页面（iframe）
+
+系统默认只允许**同源** iframe 嵌入（主界面自身用 iframe 加载各模块页面），
+外部站点（如公司门户、数据平台）直接 `<iframe src="http://服务器IP:8188/">` 会被
+CSP `frame-ancestors` 拦截，浏览器控制台报错：
+
+> Refused to frame 'http://…:8188/' because it violates the following Content Security Policy directive: "frame-ancestors 'self'".
+
+如需放行指定来源，设置环境变量 `QUERYFORGE_FRAME_ANCESTORS`（逗号分隔，可多个），例如：
+
+```env
+# 允许本机门户(3000端口)与公司门户嵌入
+QUERYFORGE_FRAME_ANCESTORS=http://127.0.0.1:3000,http://portal.example.com
+```
+
+- 重启服务后生效：`docker-compose down && docker-compose up -d`（或重启 uvicorn 进程）。
+- 放行外部来源后，`X-Frame-Options` 将不再下发，防点击劫持由 CSP `frame-ancestors` 精确控制。
+- 如确需允许任意站点嵌入（不推荐，有被点击劫持/钓鱼风险），可设为 `QUERYFORGE_FRAME_ANCESTORS=*`。
+- 注意：仅配置此项即可，无需同时改 CORS 白名单（iframe 嵌入不受 CORS 限制）。
+- 若控制台仍提示 `frame-ancestors 'none'`，说明浏览器缓存了旧响应头，请强制刷新（Ctrl+F5）或清缓存后再试。
+
+### 7. Schema 解析失败
 
 - 检查 DDL 语句格式是否正确
 - 尝试选择正确的数据库类型
 - 查看 `logs/app.log` 获取详细错误信息
 
-### 7. SQL 生成问题
+### 8. SQL 生成问题
 
 - 查看 `logs/pipeline.log` 了解生成过程
 - 查看 `logs/llm.log` 了解大模型调用详情
@@ -221,7 +242,7 @@ docker-compose logs -f
 |--------|------|
 | sys_app.db | 用户数据、LLM配置 |
 | sys_schema.db | Schema数据 |
-| sys_extra.db | 补充知识数据 |
+| sys_extra.db | 知识库（旧版独立库，已并入主库） |
 | sys_llm.db | LLM调用记录（含供应商、Token、成本） |
 | sys_conversation.db | 多轮对话和消息记录 |
 
@@ -338,10 +359,10 @@ python download_model.py
 4. 点击发送，系统生成 SQL 并返回结果
 5. 可继续发送跟进消息，基于上下文迭代优化 SQL
 
-**补充知识**：
-- 在对话创建时可选择已配置的补充知识
-- 可添加字段示例值、表间关系、领域知识
-- 帮助大模型生成更准确的 SQL
+**知识库**：
+- 在对话创建时可选择已配置的知识库条目
+- 可添加字段示例值、表间关系、领域知识（业务口径/计算规则）
+- 生成 SQL 时注入提示词，帮助大模型生成更准确的 SQL
 
 ## 联系方式
 

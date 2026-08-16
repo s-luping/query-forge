@@ -4,14 +4,14 @@
     align-items: center;
     justify-content: center;
     font-family: 'Segoe UI', Arial, sans-serif;
-    background: linear-gradient(135deg, #2980b9 0%, #6dd5fa 100%)
+    background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 52%, #2563eb 100%);
 }
 
 .tpl-login-root .login-container {
     background: #fff;
-    padding: 2.5rem 2.5rem 2rem;
+    padding: 2.2rem 2.5rem 1.6rem;
     border-radius: 16px;
-    box-shadow: 0 8px 32px rgba(44, 62, 80, .18);
+    box-shadow: 0 12px 40px rgba(2, 6, 23, .35);
     width: 370px;
     max-width: 92vw;
     display: flex;
@@ -19,13 +19,49 @@
     align-items: center
 }
 
+/* 品牌区：Logo + 系统名 + 副标题 */
+.tpl-login-root .login-brand {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-bottom: 1.2rem;
+}
+
+.tpl-login-root .login-brand img {
+    border-radius: 10px;
+    box-shadow: 0 4px 14px rgba(30, 58, 138, .28);
+    margin-bottom: .7rem;
+}
+
+.tpl-login-root .login-brand-name {
+    font-size: 1.55rem;
+    font-weight: 700;
+    color: #1e3a8a;
+    letter-spacing: 1px;
+}
+
+.tpl-login-root .login-brand-sub {
+    font-size: .85rem;
+    color: #64748b;
+    margin-top: .2rem;
+    letter-spacing: 3px;
+}
+
 .tpl-login-root .login-title {
     text-align: center;
-    font-size: 2.1rem;
-    margin-bottom: 2rem;
-    color: #2980b9;
-    letter-spacing: 2px;
-    font-weight: 600
+    font-size: 1.05rem;
+    margin-bottom: 1.4rem;
+    color: #475569;
+    letter-spacing: 6px;
+    font-weight: 500
+}
+
+.tpl-login-root .login-footer {
+    margin-top: 1.2rem;
+    font-size: .78rem;
+    color: #94a3b8;
+    text-align: center;
+    user-select: none;
 }
 
 .tpl-login-root .form-group {
@@ -58,29 +94,33 @@
 .tpl-login-root input[type="text"]:focus,
 .tpl-login-root input[type="password"]:focus,
 .tpl-login-root input[type="email"]:focus {
-    border-color: #2980b9;
-    box-shadow: 0 0 0 2px #6dd5fa44
+    border-color: #2563eb;
+    box-shadow: 0 0 0 2px #2563eb33
 }
 
 .tpl-login-root .login-btn {
     width: 100%;
     box-sizing: border-box;
     padding: .85rem;
-    background: linear-gradient(90deg, #2980b9 60%, #6dd5fa 100%);
+    background: linear-gradient(90deg, #2563eb 0%, #1e3a8a 100%);
     color: #fff;
     border: none;
     border-radius: 8px;
-    font-size: 1.15rem;
+    font-size: 1.1rem;
     font-weight: bold;
     cursor: pointer;
-    transition: background .2s, box-shadow .2s;
-    box-shadow: 0 2px 8px #2980b91a;
+    transition: box-shadow .2s, transform .1s;
+    box-shadow: 0 2px 10px #2563eb40;
     margin-top: .2rem
 }
 
 .tpl-login-root .login-btn:hover {
-    background: linear-gradient(90deg, #2573a6 60%, #4fc3f7 100%);
-    box-shadow: 0 4px 16px #2980b91a
+    background: linear-gradient(90deg, #1d4ed8 0%, #172c6e 100%);
+    box-shadow: 0 4px 16px #2563eb55
+}
+
+.tpl-login-root .login-btn:active {
+    transform: translateY(1px)
 }
 
 .tpl-login-root .error-message {

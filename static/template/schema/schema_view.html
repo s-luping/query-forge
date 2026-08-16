@@ -5,45 +5,39 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>数据库 查看</title>
     <link href="/static/css/bootstrap.min.css" rel="stylesheet">
-    <style>
-        body { background: #f4f6fa; font-size: 14px; }
-        .container-fluid { padding: 20px; }
-        .card { border: none; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); margin-bottom: 20px; }
-        .card-header { background: white; border-bottom: 1px solid #eee; font-weight: 600; padding: 12px 20px; border-radius: 12px 12px 0 0 !important; }
-        .filter-section { background-color: white; padding: 15px 20px; border-bottom: 1px solid #eee; }
-        table { font-size: 13px; }
-        table th { background: #f8f9fa; white-space: nowrap; font-weight: 600; }
-        .schema-badge {
-            background-color: #667eea; color: white; padding: 2px 8px; border-radius: 12px; font-size: 12px;
-        }
-        .table-badge {
-            background-color: #28a745; color: white; padding: 2px 8px; border-radius: 12px; font-size: 12px;
-        }
-        .pk-badge {
-            background-color: #ffc107; color: #333; padding: 2px 6px; border-radius: 4px; font-size: 11px;
-        }
-        .table-cell-ellipsis {
-            max-width: 120px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-            cursor: pointer; position: relative;
-        }
-        .table-cell-ellipsis:hover {
-            white-space: normal; word-break: break-all; position: absolute; z-index: 1000;
-            background-color: white; padding: 5px; border: 1px solid #ddd;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.15); max-width: 300px;
-        }
-    </style>
+    <link rel="stylesheet" href="/static/css/common.css">
 </head>
 <body>
 <div class="container-fluid">
     <div class="card">
         <div class="card-header d-flex justify-content-between align-items-center">
             <span>数据库 列表</span>
-            <button class="btn btn-sm btn-outline-secondary" onclick="loadSchemaList()">
-                <i class="fas fa-sync"></i> 刷新
-            </button>
+            <div class="d-flex align-items-center gap-2">
+                <button class="btn btn-sm btn-outline-danger" id="btnDelSchema" onclick="deleteSelectedSchema()" data-admin-only title="删除筛选器中选中的库（含表/字段）">
+                    <i class="fas fa-trash-alt"></i> 删除选中库
+                </button>
+                <button class="btn btn-sm btn-outline-danger" id="btnDelTable" onclick="deleteSelectedTable()" data-admin-only title="删除筛选器中选中的表（含字段）">
+                    <i class="fas fa-trash-alt"></i> 删除选中表
+                </button>
+                <button class="btn btn-sm btn-outline-primary" onclick="downloadCsvTemplate()" title="下载标准 CSV 模板">
+                    <i class="fas fa-download"></i> 模板下载
+                </button>
+                <button class="btn btn-sm btn-primary" id="btnCsvUpload" onclick="openCsvUpload()" data-admin-only title="按模板导入 CSV（仅管理员）">
+                    <i class="fas fa-upload"></i> CSV 上传
+                </button>
+                <button class="btn btn-sm btn-outline-secondary" onclick="loadSchemaList()">
+                    <i class="fas fa-sync"></i> 刷新
+                </button>
+            </div>
         </div>
         <div class="filter-section">
             <div class="row">
+                <div class="col-md-3">
+                    <label class="form-label">数据源:</label>
+                    <select class="form-select" id="filterDatasource" onchange="onDatasourceChange()">
+                        <option value="">全部数据源</option>
+                    </select>
+                </div>
                 <div class="col-md-3">
                     <label class="form-label">数据库:</label>
                     <select class="form-select" id="filterSchema" onchange="onSchemaChange()">
@@ -76,6 +70,7 @@
                             <th>主键</th>
                             <th>外键</th>
                             <th>创建时间</th>
+                            <th id="thOps" style="display:none;">操作</th>
                         </tr>
                     </thead>
                     <tbody id="schemaTableBody"></tbody>
@@ -95,19 +90,60 @@
         </div>
     </div>
 </div>
+<!-- CSV 上传弹窗（仅管理员可见按钮；接口本身强制管理员 + 大小/格式校验） -->
+<div class="modal fade" id="csvUploadModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h6 class="modal-title">CSV 导入</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="关闭"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info py-2" style="font-size:12px;">
+                    请先点「模板下载」获取标准格式后填写再上传；仅支持 <b>.csv</b> 文件（≤5MB），
+                    表头必须包含 <b>表名</b>、<b>字段名</b>。导入的库将关联到所选数据源。
+                </div>
+                <div class="mb-2">
+                    <label class="form-label mb-1">数据源 <span class="text-danger">*</span></label>
+                    <select id="csvDatasource" class="form-select form-select-sm" onchange="onCsvDatasourceChange()">
+                        <option value="">请选择数据源</option>
+                    </select>
+                </div>
+                <div class="mb-2">
+                    <label class="form-label mb-1">数据库类型 <span class="text-danger">*</span> <small class="text-muted">(选择数据源后自动带出，可改)</small></label>
+                    <select id="csvDbType" class="form-select form-select-sm">
+                        <option value="mysql" selected>MySQL / MariaDB</option>
+                        <option value="postgresql">PostgreSQL</option>
+                        <option value="oracle">Oracle</option>
+                        <option value="sqlserver">SQL Server</option>
+                        <option value="sqlite">SQLite</option>
+                        <option value="hive">Hive</option>
+                        <option value="doris">Doris</option>
+                        <option value="clickhouse">ClickHouse</option>
+                    </select>
+                </div>
+                <div class="mb-2">
+                    <label class="form-label mb-1">默认数据库名称 <small class="text-muted">(可选，CSV 行内 schema_name 为空时使用)</small></label>
+                    <input type="text" id="csvSchemaName" class="form-control form-control-sm" placeholder="留空使用 default">
+                </div>
+                <div class="mb-2">
+                    <label class="form-label mb-1">选择 CSV 文件 <span class="text-danger">*</span></label>
+                    <input type="file" id="csvFile" class="form-control form-control-sm" accept=".csv">
+                </div>
+                <div id="csvUploadMsg" style="display:none;"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary btn-sm" id="csvUploadBtn" onclick="uploadCsvFile()">上传导入</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <link rel="stylesheet" href="/static/css/all.min.css">
 <script src="/static/js/bootstrap.bundle.min.js"></script>
+<script src="/static/js/app_common.js"></script>
 <script>
-const apiRequest = window.apiRequest || function(url, options = {}) {
-    const token = document.cookie.split('; ').find(row => row.startsWith('token='))?.split('=')[1];
-    const headers = { 'Content-Type': 'application/json' };
-    if (token) headers['Authorization'] = `Bearer ${token}`;
-    return fetch(url, { ...options, headers }).then(resp => {
-        if (resp.status === 401) { window.parent.location.href = '/login'; throw new Error('登录已过期'); }
-        return resp;
-    });
-};
-
 let currentPage = 1, pageSize = 20, totalItems = 0, totalPages = 1, searchTimeout = null;
 
 async function loadSchemaList() {
@@ -129,6 +165,8 @@ async function loadSchemaList() {
 
         const tbody = document.getElementById('schemaTableBody');
         if (data.items && data.items.length > 0) {
+            const isAdmin = window.QF && QF.isAdmin();
+            if (isAdmin) document.getElementById('thOps').style.display = '';
             tbody.innerHTML = data.items.map(item => `
                 <tr>
                     <td><span class="schema-badge">${e(item.schema_name)}</span></td>
@@ -140,6 +178,7 @@ async function loadSchemaList() {
                     <td>${item.column_key ? '<span class="pk-badge">PK</span>' : ''}</td>
                     <td class="table-cell-ellipsis">${e(item.foreign_key || '')}</td>
                     <td>${new Date(item.created_at).toLocaleString()}</td>
+                    ${isAdmin ? `<td><button class="btn btn-outline-danger btn-sm py-0 px-2" title="删除字段 ${e(item.column_name)}" onclick="deleteColumn(${item.id}, '${e(item.schema_name).replace(/'/g, "\\'")}', '${e(item.table_name).replace(/'/g, "\\'")}', '${e(item.column_name).replace(/'/g, "\\'")}')"><i class="fas fa-trash-alt"></i></button></td>` : ''}
                 </tr>
             `).join('');
 
@@ -148,7 +187,7 @@ async function loadSchemaList() {
             document.getElementById('prevPageBtn').disabled = currentPage === 1;
             document.getElementById('nextPageBtn').disabled = currentPage >= totalPages;
         } else {
-            tbody.innerHTML = '<tr><td colspan="9" class="text-center py-4 text-muted">暂无数据</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="10" class="text-center py-4 text-muted">暂无数据</td></tr>';
             document.getElementById('paginationContainer').style.display = 'none';
         }
     } catch (e) {
@@ -156,15 +195,58 @@ async function loadSchemaList() {
     }
 }
 
+let _schemaGroups = [];   // /api/schema/schemas 返回的 数据源→库 分组
+
 async function loadSchemaNames() {
     try {
         const resp = await apiRequest('/api/schema/schemas');
         if (resp && resp.ok) {
             const data = await resp.json();
-            const sel = document.getElementById('filterSchema');
-            (data.schemas || []).forEach(s => { const o = document.createElement('option'); o.value = s; o.textContent = s; sel.appendChild(o); });
+            _schemaGroups = data.datasources || [];
+            // 数据源筛选下拉
+            const dsSel = document.getElementById('filterDatasource');
+            dsSel.innerHTML = '<option value="">全部数据源</option>';
+            _schemaGroups.forEach(g => {
+                const o = document.createElement('option');
+                o.value = g.datasource_id;
+                o.textContent = g.datasource_name || '未关联数据源';
+                dsSel.appendChild(o);
+            });
+            buildSchemaOptions();
         }
     } catch(e) {}
+}
+
+// 按选中的数据源重建"数据库"下拉（未选数据源 = 全部，按数据源分组显示）
+function buildSchemaOptions() {
+    const dsId = document.getElementById('filterDatasource').value;
+    const sel = document.getElementById('filterSchema');
+    sel.innerHTML = '<option value="">全部</option>';
+    _schemaGroups
+        .filter(g => dsId === '' || String(g.datasource_id) === String(dsId))
+        .forEach(g => {
+            const schemas = (g.schemas || []).filter(Boolean);
+            if (!schemas.length) return;
+            const og = document.createElement('optgroup');
+            og.label = g.datasource_name || '未关联数据源';
+            schemas.forEach(s => {
+                const o = document.createElement('option');
+                o.value = s;
+                o.textContent = s;
+                og.appendChild(o);
+            });
+            sel.appendChild(og);
+        });
+}
+
+function onDatasourceChange() {
+    buildSchemaOptions();
+    document.getElementById('filterSchema').value = '';
+    const tableSelect = document.getElementById('filterTable');
+    tableSelect.disabled = true;
+    tableSelect.innerHTML = '<option value="">请先选择数据库</option>';
+    currentPage = 1;
+    loadSchemaList();
 }
 
 async function loadTableOptions(schemaName) {
@@ -206,11 +288,165 @@ function onTableChange() {
 
 function prevPage() { if (currentPage > 1) { currentPage--; loadSchemaList(); } }
 function nextPage() { if (currentPage < totalPages) { currentPage++; loadSchemaList(); } }
-function e(s) { const d = document.createElement('div'); d.textContent = s||''; return d.innerHTML; }
 
 function onSearchInput() {
     clearTimeout(searchTimeout);
     searchTimeout = setTimeout(() => { currentPage = 1; loadSchemaList(); }, 300);
+}
+
+// ═══════════════════════════════════════════════════════════
+// 删除库 / 表 / 字段（仅管理员；后端 AdminUser 兜底）
+// ═══════════════════════════════════════════════════════════
+async function deleteSelectedSchema() {
+    const schema = document.getElementById('filterSchema').value;
+    if (!schema) { alert('请先在「数据库」筛选中选择要删除的库'); return; }
+    if (!confirm(`确定删除库「${schema}」？将同时删除其所有表和字段，且不可恢复。`)) return;
+    try {
+        const resp = await apiRequest(`/api/schema/schema/${encodeURIComponent(schema)}`, { method: 'DELETE' });
+        const data = await resp.json().catch(() => ({}));
+        if (resp.ok) {
+            alert(data.message || '删除成功');
+            loadSchemaNames();
+            loadSchemaList();
+        } else {
+            alert(data.detail || '删除失败');
+        }
+    } catch (err) { alert('删除失败：' + err.message); }
+}
+
+async function deleteSelectedTable() {
+    const schema = document.getElementById('filterSchema').value;
+    const table = document.getElementById('filterTable').value;
+    if (!schema || !table) { alert('请先在筛选中选择库和表'); return; }
+    if (!confirm(`确定删除表「${schema}.${table}」？将同时删除其所有字段，且不可恢复。`)) return;
+    try {
+        const resp = await apiRequest(`/api/schema/table?schema_name=${encodeURIComponent(schema)}&table_name=${encodeURIComponent(table)}`, { method: 'DELETE' });
+        const data = await resp.json().catch(() => ({}));
+        if (resp.ok) {
+            alert(data.message || '删除成功');
+            document.getElementById('filterTable').value = '';
+            loadSchemaList();
+        } else {
+            alert(data.detail || '删除失败');
+        }
+    } catch (err) { alert('删除失败：' + err.message); }
+}
+
+async function deleteColumn(id, schemaName, tableName, columnName) {
+    if (!confirm(`确定删除字段「${schemaName}.${tableName}.${columnName}」？`)) return;
+    try {
+        const resp = await apiRequest(`/api/schema/${id}`, { method: 'DELETE' });
+        const data = await resp.json().catch(() => ({}));
+        if (resp.ok) {
+            alert('字段已删除');
+            loadSchemaList();
+        } else {
+            alert(data.detail || '删除失败');
+        }
+    } catch (err) { alert('删除失败：' + err.message); }
+}
+
+// ═══════════════════════════════════════════════════════════
+// CSV 模板下载 / 上传（仅 CSV；前端校验 + 后端管理员/格式/大小/数据源校验）
+// ═══════════════════════════════════════════════════════════
+function downloadCsvTemplate() {
+    // 表头为中文（解析器支持中文别名），文件名中文
+    const header = ['库名', '表名', '字段名', '字段类型', '字段描述',
+                    '表描述', '可空', '默认值', '键类型', '外键', '示例值'];
+    const sample = ['shop', 'users', 'id', 'INT', '用户ID', '用户表', '1', '', 'PRI', '', ''];
+    const csv = '\uFEFF' + [header.join(','), sample.join(',')].join('\r\n') + '\r\n';   // BOM 兼容 Excel
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = '数据库结构导入模板.csv';
+    document.body.appendChild(a);
+    a.click();
+    URL.revokeObjectURL(a.href);
+    a.remove();
+}
+
+let _csvModal = null;
+let _csvDatasources = [];
+
+async function loadCsvDatasources() {
+    const sel = document.getElementById('csvDatasource');
+    try {
+        const resp = await apiRequest('/api/sync/datasources');
+        const data = await resp.json();
+        _csvDatasources = data.items || [];
+        sel.innerHTML = '<option value="">请选择数据源</option>' +
+            _csvDatasources.map(d => `<option value="${d.id}">${e(d.name)}（${e(d.db_type || '-')}）</option>`).join('');
+    } catch (err) {
+        sel.innerHTML = '<option value="">数据源加载失败</option>';
+        console.error(err);
+    }
+}
+
+function onCsvDatasourceChange() {
+    const id = document.getElementById('csvDatasource').value;
+    const ds = _csvDatasources.find(d => String(d.id) === String(id));
+    if (ds && ds.db_type) {
+        const dt = document.getElementById('csvDbType');
+        if (Array.from(dt.options).some(o => o.value === ds.db_type)) {
+            dt.value = ds.db_type;
+        }
+    }
+}
+
+function openCsvUpload() {
+    if (!_csvModal) _csvModal = new bootstrap.Modal(document.getElementById('csvUploadModal'));
+    document.getElementById('csvUploadMsg').style.display = 'none';
+    loadCsvDatasources();
+    _csvModal.show();
+}
+
+function showCsvMsg(text, type) {
+    const msg = document.getElementById('csvUploadMsg');
+    msg.className = 'mt-2 alert alert-' + (type || 'info') + ' py-2';
+    msg.style.fontSize = '12px';
+    msg.style.marginBottom = '0';
+    msg.textContent = text;
+    msg.style.display = 'block';
+}
+
+async function uploadCsvFile() {
+    const fileInput = document.getElementById('csvFile');
+    const file = fileInput.files[0];
+    const btn = document.getElementById('csvUploadBtn');
+    const dsId = document.getElementById('csvDatasource').value;
+    if (!dsId) { showCsvMsg('请选择数据源', 'danger'); return; }
+    if (!file) { showCsvMsg('请选择 CSV 文件', 'danger'); return; }
+    const name = (file.name || '').toLowerCase();
+    if (!name.endsWith('.csv')) { showCsvMsg('仅支持 .csv 格式文件', 'danger'); fileInput.value = ''; return; }
+    if (file.size > 5 * 1024 * 1024) { showCsvMsg('文件过大，仅支持 5MB 以内', 'danger'); return; }
+
+    const fd = new FormData();
+    fd.append('schema_name', document.getElementById('csvSchemaName').value.trim() || 'default');
+    fd.append('db_type', document.getElementById('csvDbType').value);
+    fd.append('datasource_id', dsId);
+    fd.append('file', file);
+
+    btn.disabled = true;
+    btn.textContent = '导入中...';
+    showCsvMsg('正在解析导入...', 'info');
+    try {
+        const resp = await apiRequest('/api/schema/upload', { method: 'POST', body: fd });
+        const data = await resp.json().catch(() => ({}));
+        if (resp.ok) {
+            showCsvMsg(`导入成功：${data.total || 0} 个字段${data.message ? '，' + data.message : ''}`, 'success');
+            fileInput.value = '';
+            loadSchemaList();
+            loadSchemaNames();
+            setTimeout(() => { if (_csvModal) _csvModal.hide(); }, 1500);
+        } else {
+            showCsvMsg(data.detail || '导入失败', 'danger');
+        }
+    } catch (err) {
+        showCsvMsg('导入失败：' + err.message, 'danger');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = '上传导入';
+    }
 }
 
 document.addEventListener('DOMContentLoaded', () => {

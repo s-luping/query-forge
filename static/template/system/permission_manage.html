@@ -5,122 +5,598 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>权限管理</title>
     <link rel="stylesheet" href="/static/css/bootstrap.min.css">
+    <link rel="stylesheet" href="/static/css/common.css">
     <style>
-        body { background: #f4f6fa; font-size: 14px; }
-        .container-fluid { padding: 20px; }
-        .card { border: none; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); margin-bottom: 20px; }
-        .card-header { background: white; border-bottom: 1px solid #eee; font-weight: 600; padding: 12px 20px; border-radius: 12px 12px 0 0 !important; }
-        table { font-size: 13px; }
-        table th { background: #f8f9fa; white-space: nowrap; }
-        .record-list { max-height: 250px; overflow-y: auto; border: 1px solid #eee; border-radius: 6px; padding: 8px; }
+        .user-list { max-height: 420px; overflow-y: auto; }
+        .user-list .user-item { cursor: pointer; padding: 8px 14px; border-bottom: 1px solid #f0f0f0; }
+        .user-list .user-item:hover { background: #f8f9fa; }
+        .user-list .user-item.active { background: #e7f1ff; border-left: 3px solid #0d6efd; }
+        .record-list { max-height: 420px; overflow-y: auto; border: 1px solid #eee; border-radius: 6px; padding: 8px; }
+        .ds-schema-badge { display: inline-block; background: #e7f1ff; color: #0b5ed7; border-radius: 4px; padding: 1px 8px; margin: 2px; font-size: 12px; }
+        .hint { font-size: 12px; color: #999; }
+        table td, table th { vertical-align: middle; }
+        .search-box { position: relative; }
+        .search-box input { padding-left: 28px; }
+        .search-box i { position: absolute; left: 10px; top: 9px; color: #aaa; font-size: 12px; }
+        .pager-wrap { padding: 8px 12px; border-top: 1px solid #f0f0f0; background: #fafbfc; }
+        .chk-row { display: flex; align-items: center; padding: 5px 8px; border-bottom: 1px solid #f6f7f9; cursor: pointer; border-radius: 4px; }
+        .chk-row:hover { background: #f8f9fa; }
+        .chk-row input { margin-right: 8px; }
     </style>
 </head>
 <body>
 <div class="container-fluid">
-    <!-- 用户列表 -->
-    <div class="card">
-        <div class="card-header">用户列表</div>
-        <div class="card-body p-0">
-            <table class="table table-hover mb-0">
-                <thead><tr><th>ID</th><th>用户名</th><th>角色</th><th>数据库权限</th><th>补充知识权限</th></tr></thead>
-                <tbody id="userTable"><tr><td colspan="5" class="text-center py-3 text-muted">加载中...</td></tr></tbody>
-            </table>
+    <div class="row g-3">
+        <!-- 左侧：用户列表 -->
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span>选择用户</span>
+                    <span class="hint" id="userCount"></span>
+                </div>
+                <div class="card-body p-0">
+                    <div class="p-2 search-box">
+                        <i class="fas fa-search"></i>
+                        <input type="text" class="form-control form-control-sm" id="userSearch"
+                               placeholder="搜索用户名..." oninput="onUserSearch()">
+                    </div>
+                    <div class="user-list" id="userList"><div class="p-3 text-muted">加载中...</div></div>
+                    <div class="pager-wrap" id="userPager"></div>
+                </div>
+            </div>
         </div>
-    </div>
 
-    <!-- 资源分配面板 -->
-    <div class="card" id="assignCard" style="display:none;">
-        <div class="card-header d-flex justify-content-between align-items-center">
-            <span>资源分配 — <span id="assignUserName"></span></span>
-            <button class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('assignCard').style.display='none'">关闭</button>
-        </div>
-        <div class="card-body">
-            <ul class="nav nav-tabs mb-3" id="resTabs">
-                <li class="nav-item"><a class="nav-link active" href="#" onclick="switchResTab('schema')">数据库</a></li>
-                <li class="nav-item"><a class="nav-link" href="#" onclick="switchResTab('extra')">补充知识</a></li>
-            </ul>
-            <div class="record-list" id="recordList"></div>
-            <div class="text-end mt-2">
-                <span class="text-muted me-2" style="font-size:12px;" id="selCount"></span>
-                <button class="btn btn-primary btn-sm" onclick="saveAssign()">保存分配</button>
+        <!-- 右侧：权限配置 -->
+        <div class="col-md-9">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span>权限配置 — <span id="curUserName" class="text-primary">请先选择用户</span></span>
+                    <span class="hint">层级：数据源 → 库 → 表 → 字段</span>
+                </div>
+                <div class="card-body">
+                    <!-- 权限配置层级：数据源 → 库 → 表 → 字段 → 知识库（同一配置流程，页内页签切换） -->
+                    <ul class="nav nav-tabs mb-3" id="permTabs">
+                        <li class="nav-item"><a class="nav-link" href="#" data-tab="ds" onclick="switchTab('ds')">数据源</a></li>
+                        <li class="nav-item"><a class="nav-link" href="#" data-tab="schema" onclick="switchTab('schema')">库</a></li>
+                        <li class="nav-item"><a class="nav-link" href="#" data-tab="table" onclick="switchTab('table')">表</a></li>
+                        <li class="nav-item"><a class="nav-link" href="#" data-tab="field" onclick="switchTab('field')">字段</a></li>
+                        <li class="nav-item"><a class="nav-link" href="#" data-tab="knowledge" onclick="switchTab('knowledge')">知识库</a></li>
+                    </ul>
+
+                    <!-- 数据源 -->
+                    <div id="tab-ds">
+                        <div class="hint mb-2">数据源由「元数据同步」维护；此处可一键把某数据源同步出的所有库授权给当前用户（库级授权）。</div>
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead><tr><th>数据源</th><th>类型</th><th>数据库</th><th>同步到的库</th><th>操作</th></tr></thead>
+                                <tbody id="dsTableBody"><tr><td colspan="5" class="text-center text-muted py-3">加载中...</td></tr></tbody>
+                            </table>
+                        </div>
+                        <div class="pager-wrap" id="dsPager"></div>
+                    </div>
+
+                    <!-- 库 -->
+                    <div id="tab-schema" style="display:none;">
+                        <div class="hint mb-2">勾选后点击保存，用户仅可见勾选的库；不勾选任何库 = 无库可见。勾选状态跨页保留。</div>
+                        <div class="row mb-2">
+                            <div class="col-md-5 search-box">
+                                <i class="fas fa-search"></i>
+                                <input type="text" class="form-control form-control-sm" id="schemaSearch"
+                                       placeholder="搜索库名..." oninput="onSchemaSearch()">
+                            </div>
+                        </div>
+                        <div class="record-list" id="schemaList">请先选择用户</div>
+                        <div class="pager-wrap d-flex justify-content-between align-items-center">
+                            <span class="hint" id="schemaCount"></span>
+                            <div class="d-flex align-items-center gap-2">
+                                <div id="schemaPager"></div>
+                                <button class="btn btn-primary btn-sm" onclick="saveSchemaGrants()">保存库授权</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 表 -->
+                    <div id="tab-table" style="display:none;">
+                        <div class="row mb-2">
+                            <div class="col-md-4">
+                                <label class="form-label mb-1">选择库</label>
+                                <select id="tableSchemaSel" class="form-select form-select-sm" onchange="loadUserTables()">
+                                    <option value="">请先选择库</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="hint mb-2">表级白名单：勾选的表用户可见；<b>一个都不勾</b> = 该库下全部表可见（默认）。保存后该库即进入"受限"模式，仅名单内表可见。勾选状态跨页保留。</div>
+                        <div class="row mb-2">
+                            <div class="col-md-5 search-box">
+                                <i class="fas fa-search"></i>
+                                <input type="text" class="form-control form-control-sm" id="tableSearch"
+                                       placeholder="搜索表名..." oninput="onTableSearch()">
+                            </div>
+                        </div>
+                        <div class="record-list" id="tableList">请先选择用户与库</div>
+                        <div class="pager-wrap d-flex justify-content-between align-items-center">
+                            <span class="hint" id="tableHint"></span>
+                            <div class="d-flex align-items-center gap-2">
+                                <div id="tablePager"></div>
+                                <button class="btn btn-primary btn-sm" onclick="saveTableGrants()">保存表授权</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 字段 -->
+                    <div id="tab-field" style="display:none;">
+                        <div class="row mb-2">
+                            <div class="col-md-4">
+                                <label class="form-label mb-1">选择库</label>
+                                <select id="fieldSchemaSel" class="form-select form-select-sm" onchange="loadFieldTables()">
+                                    <option value="">请先选择库</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label mb-1">选择表</label>
+                                <select id="fieldTableSel" class="form-select form-select-sm" onchange="loadUserColumns()">
+                                    <option value="">请先选择表</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="hint mb-2">
+                            字段权限：SELECT=可读可查；FILTER=仅可用于条件(WHERE/JOIN/GROUP BY)，不可出现在 SELECT 列表；NONE=完全不可用。
+                            「默认」= 按敏感等级推导（公开/内部→SELECT，敏感→FILTER，机密→NONE）。修改状态跨页保留。
+                        </div>
+                        <div class="record-list" id="columnList">请先选择用户与表</div>
+                        <div class="pager-wrap d-flex justify-content-between align-items-center">
+                            <span class="hint" id="fieldCount"></span>
+                            <div class="d-flex align-items-center gap-2">
+                                <div id="fieldPager"></div>
+                                <button class="btn btn-primary btn-sm" onclick="saveColumnGrants()">保存字段授权</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 知识库 -->
+                    <div id="tab-knowledge" style="display:none;">
+                        <div class="hint mb-2">勾选后点击保存，用户仅可见勾选的知识。勾选状态跨页保留。</div>
+                        <div class="row mb-2">
+                            <div class="col-md-5 search-box">
+                                <i class="fas fa-search"></i>
+                                <input type="text" class="form-control form-control-sm" id="knowledgeSearch"
+                                       placeholder="搜索知识标题/ID..." oninput="onKnowledgeSearch()">
+                            </div>
+                        </div>
+                        <div class="record-list" id="knowledgeList">请先选择用户</div>
+                        <div class="pager-wrap d-flex justify-content-between align-items-center">
+                            <span class="hint" id="knowledgeCount"></span>
+                            <div class="d-flex align-items-center gap-2">
+                                <div id="knowledgePager"></div>
+                                <button class="btn btn-primary btn-sm" onclick="saveExtraGrants()">保存知识授权</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 </div>
 <link rel="stylesheet" href="/static/css/all.min.css">
 <script src="/static/js/bootstrap.bundle.min.js"></script>
+<script src="/static/js/app_common.js"></script>
 <script>
-const apiRequest = window.apiRequest || function(url, options = {}) {
-    const token = document.cookie.split('; ').find(row => row.startsWith('token='))?.split('=')[1];
-    const headers = { 'Content-Type': 'application/json' };
-    if (token) headers['Authorization'] = `Bearer ${token}`;
-    return fetch(url, { ...options, headers }).then(resp => {
-        if (resp.status === 401) { window.parent.location.href = '/login'; throw new Error('登录已过期'); }
-        return resp;
-    });
-};
+// ═══════════════════════════════════════════════════════════
+// 状态（分页/搜索的勾选与修改状态跨页保留）
+// ═══════════════════════════════════════════════════════════
+let users = [], curUserId = null, curUserName = '';
+let dsCache = [], allSchemaNames = [], allExtras = [];
+let tableCache = [], columnCache = [];
+let colGrantMap = {};        // 服务端已有显式授权: column_id -> access_type
+let colLocal = {};           // 本地修改: column_id -> access_type(''/SELECT/FILTER/NONE)
+let schemaChecked = new Set();    // 库勾选（跨页）
+let tableChecked = new Set();     // 表勾选（跨页）
+let knowledgeChecked = new Set(); // 知识勾选（跨页）
 
-let allRecords = [], selectedIds = new Set();
-let editingUserId = null, currentResType = 'schema';
+const USER_PS = 20, DS_PS = 20, LIST_PS = 50;
+let userPage = 1, dsPage = 1, schemaPage = 1, tablePage = 1, fieldPage = 1, knowledgePage = 1;
+let userSearch = '', schemaSearch = '', tableSearch = '', knowledgeSearch = '';
 
+// ═══════════════════════════════════════════════════════════
+// 用户选择
+// ═══════════════════════════════════════════════════════════
 async function loadUsers() {
     const resp = await apiRequest('/api/permission/users');
-    const users = await resp.json();
-    document.getElementById('userTable').innerHTML = users.map(u => `
-        <tr>
-            <td>${u.id}</td><td>${e(u.username)}</td>
-            <td><span class="badge bg-${u.role==='admin'?'danger':'primary'}">${u.role}</span></td>
-            <td><button class="btn btn-outline-primary btn-sm" onclick="openAssign(${u.id},'${e(u.username)}','schema')">设置数据库</button></td>
-            <td><button class="btn btn-outline-primary btn-sm" onclick="openAssign(${u.id},'${e(u.username)}','extra')">设置补充知识</button></td>
-        </tr>`).join('');
+    users = await resp.json();
+    renderUsers();
 }
 
-async function openAssign(userId, userName, resType) {
-    editingUserId = userId;
-    currentResType = resType;
-    document.getElementById('assignUserName').textContent = userName;
-    document.getElementById('assignCard').style.display = '';
-    document.querySelectorAll('#resTabs .nav-link').forEach(el => el.classList.remove('active'));
-    document.querySelector(`#resTabs .nav-link[onclick*="${resType}"]`).classList.add('active');
-
-    const [rResp, aResp] = await Promise.all([
-        apiRequest(`/api/permission/resources/${resType}`),
-        apiRequest(`/api/permission/users/${userId}/resources/${resType}`)
-    ]);
-    allRecords = await rResp.json();
-    const assigned = await aResp.json();
-    selectedIds = new Set(assigned.map(String));
-
-    const isSchema = resType === 'schema';
-    document.getElementById('recordList').innerHTML = allRecords.length ? allRecords.map(r => {
-        const val = isSchema ? r.name : String(r.id);
-        return `<label class="d-block mb-1" style="cursor:pointer;">
-            <input type="checkbox" class="record-chk" value="${e(val)}" ${selectedIds.has(val)?'checked':''} onchange="toggleRec('${e(val)}')">
-            <span>${e(r.name)}</span> ${r.detail ? `<small class="text-muted">(${e(r.detail)})</small>` : ''}
-        </label>`;
-    }).join('') : '<div class="text-muted py-3 text-center">暂无数据</div>';
-    updateCount();
-}
-
-function switchResTab(type) { openAssign(editingUserId, document.getElementById('assignUserName').textContent, type); }
-
-function toggleRec(key) {
-    if (selectedIds.has(key)) selectedIds.delete(key); else selectedIds.add(key);
-    updateCount();
-}
-
-function updateCount() { document.getElementById('selCount').textContent = `已选 ${selectedIds.size}/${allRecords.length}`; }
-
-async function saveAssign() {
-    await apiRequest(`/api/permission/users/${editingUserId}/resources/${currentResType}`, {
-        method: 'PUT', body: JSON.stringify({ user_id: editingUserId, resource_ids: Array.from(selectedIds) })
+function renderUsers() {
+    const kw = userSearch.toLowerCase();
+    const filtered = users.filter(u => !kw || (u.username || '').toLowerCase().includes(kw));
+    const pageItems = filtered.slice((userPage - 1) * USER_PS, userPage * USER_PS);
+    document.getElementById('userCount').textContent = `共 ${filtered.length} 个用户`;
+    document.getElementById('userList').innerHTML = pageItems.length ? pageItems.map(u => `
+        <div class="user-item ${u.id === curUserId ? 'active' : ''}" onclick="selectUser(${u.id})">
+            <div><strong>${e(u.username)}</strong>
+                <span class="badge ${u.role === 'admin' ? 'badge-admin' : 'badge-user'}">${u.role === 'admin' ? '管理员' : '用户'}</span>
+            </div>
+            <small class="text-muted">ID ${u.id} ${u.is_active === 1 ? '' : '（已禁用）'}</small>
+        </div>`).join('')
+        : '<div class="p-3 text-muted text-center">无匹配用户</div>';
+    QF.renderPager('userPager', {
+        total: filtered.length, page: userPage, pageSize: USER_PS,
+        onPage: p => { userPage = p; renderUsers(); }
     });
-    alert('分配已保存');
 }
 
-function e(s) { const d = document.createElement('div'); d.textContent = s||''; return d.innerHTML; }
+function onUserSearch() {
+    userSearch = document.getElementById('userSearch').value.trim();
+    userPage = 1;
+    renderUsers();
+}
 
-document.addEventListener('DOMContentLoaded', loadUsers);
+function selectUser(uid) {
+    curUserId = uid;
+    const u = users.find(x => x.id === uid);
+    curUserName = u ? u.username : '';
+    document.getElementById('curUserName').textContent = curUserName;
+    document.querySelectorAll('.user-item').forEach(el => el.classList.toggle('active', +el.getAttribute('onclick').match(/\d+/)[0] === uid));
+    document.getElementById('tableSchemaSel').innerHTML = '<option value="">请先选择库</option>';
+    document.getElementById('fieldSchemaSel').innerHTML = '<option value="">请先选择库</option>';
+    document.getElementById('fieldTableSel').innerHTML = '<option value="">请先选择表</option>';
+    document.getElementById('tableList').innerHTML = '请选择库';
+    document.getElementById('columnList').innerHTML = '请选择表';
+    loadDatasources();
+    loadSchemaResources();
+    loadExtraResources();
+}
+
+function switchTab(name) {
+    document.querySelectorAll('#permTabs .nav-link').forEach(el =>
+        el.classList.toggle('active', el.dataset.tab === name));
+    ['ds', 'schema', 'table', 'field', 'knowledge'].forEach(t => {
+        document.getElementById('tab-' + t).style.display = t === name ? '' : 'none';
+    });
+    // URL hash 同步（支持从外部以 #field 直达）
+    if (location.hash !== '#' + name) history.replaceState(null, '', '#' + name);
+    if (curUserId) {
+        if (name === 'ds') loadDatasources();
+        if (name === 'schema') loadSchemaResources();
+        if (name === 'table') loadTableSchemas();
+        if (name === 'field') loadFieldSchemas();
+        if (name === 'knowledge') loadExtraResources();
+    }
+}
+
+// ═══════════════════════════════════════════════════════════
+// 数据源（分页 20/页）
+// ═══════════════════════════════════════════════════════════
+async function loadDatasources() {
+    if (!curUserId) return;
+    const resp = await apiRequest('/api/permission/datasources');
+    const data = await resp.json();
+    dsCache = data.items || [];
+    const sResp = await apiRequest(`/api/permission/users/${curUserId}/resources/schema`);
+    const granted = await sResp.json();
+    window._dsGranted = new Set(granted);
+    renderDatasources();
+}
+
+function renderDatasources() {
+    const grantedSet = window._dsGranted || new Set();
+    const pageItems = dsCache.slice((dsPage - 1) * DS_PS, dsPage * DS_PS);
+    document.getElementById('dsTableBody').innerHTML = pageItems.length ? pageItems.map(ds => `
+        <tr>
+            <td><strong>${e(ds.name)}</strong></td>
+            <td>${e(ds.db_type || '-')}</td>
+            <td>${e(ds.database || '-')}</td>
+            <td>${ds.schemas.length ? ds.schemas.map(s =>
+                `<span class="ds-schema-badge ${grantedSet.has(s) ? 'bg-success text-white' : ''}">${e(s)}</span>`).join('')
+                : '<span class="text-muted">无</span>'}</td>
+            <td>
+                <button class="btn btn-outline-primary btn-sm" onclick="grantDsSchemas(${ds.id})"
+                        ${ds.schemas.length ? '' : 'disabled'}>一键授权全部库</button>
+            </td>
+        </tr>`).join('')
+        : '<tr><td colspan="5" class="text-center text-muted py-3">暂无数据源（请先在「元数据同步」中配置）</td></tr>';
+    QF.renderPager('dsPager', {
+        total: dsCache.length, page: dsPage, pageSize: DS_PS,
+        onPage: p => { dsPage = p; renderDatasources(); }
+    });
+}
+
+async function grantDsSchemas(dsId) {
+    const ds = dsCache.find(x => x.id === dsId);
+    if (!ds || !ds.schemas.length) return;
+    if (!confirm(`将把数据源「${ds.name}」的 ${ds.schemas.length} 个库全部授权给「${curUserName}」？`)) return;
+    const resp = await apiRequest(`/api/permission/users/${curUserId}/resources/schema`, {
+        method: 'PUT',
+        body: JSON.stringify({ user_id: curUserId, resource_ids: ds.schemas })
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) return alert(data.detail || '授权失败');
+    alert(data.message || '已授权');
+    loadDatasources();
+    loadSchemaResources();
+}
+
+// ═══════════════════════════════════════════════════════════
+// 库（搜索 + 分页 50/页，勾选跨页保留）
+// ═══════════════════════════════════════════════════════════
+async function loadSchemaResources() {
+    if (!curUserId) return;
+    const [rAll, rUser] = await Promise.all([
+        apiRequest('/api/permission/resources/schema'),
+        apiRequest(`/api/permission/users/${curUserId}/resources/schema`)
+    ]);
+    allSchemaNames = (await rAll.json()).map(x => x.name);
+    schemaChecked = new Set(await rUser.json());
+    renderSchemaResources();
+}
+
+function renderSchemaResources() {
+    const kw = schemaSearch.toLowerCase();
+    const filtered = allSchemaNames.filter(n => !kw || n.toLowerCase().includes(kw));
+    const pageItems = filtered.slice((schemaPage - 1) * LIST_PS, schemaPage * LIST_PS);
+    document.getElementById('schemaList').innerHTML = pageItems.length ? pageItems.map(n => `
+        <label class="chk-row mb-0">
+            <input type="checkbox" class="schema-chk" value="${e(n)}" ${schemaChecked.has(n) ? 'checked' : ''}
+                   onchange="toggleSchemaChk('${e(n).replace(/'/g, "\\'")}', this.checked)">
+            <span>${e(n)}</span>
+        </label>`).join('')
+        : '<div class="text-muted text-center py-3">暂无库数据</div>';
+    document.getElementById('schemaCount').textContent = `已选 ${schemaChecked.size}/${allSchemaNames.length}`;
+    QF.renderPager('schemaPager', {
+        total: filtered.length, page: schemaPage, pageSize: LIST_PS,
+        onPage: p => { schemaPage = p; renderSchemaResources(); }
+    });
+}
+
+function toggleSchemaChk(name, checked) {
+    if (checked) schemaChecked.add(name); else schemaChecked.delete(name);
+    document.getElementById('schemaCount').textContent = `已选 ${schemaChecked.size}/${allSchemaNames.length}`;
+}
+
+function onSchemaSearch() {
+    schemaSearch = document.getElementById('schemaSearch').value.trim();
+    schemaPage = 1;
+    renderSchemaResources();
+}
+
+async function saveSchemaGrants() {
+    const ids = Array.from(schemaChecked);
+    const resp = await apiRequest(`/api/permission/users/${curUserId}/resources/schema`, {
+        method: 'PUT',
+        body: JSON.stringify({ user_id: curUserId, resource_ids: ids })
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) return alert(data.detail || '保存失败');
+    alert(data.message || '已保存');
+    loadDatasources();
+}
+
+// ═══════════════════════════════════════════════════════════
+// 表（搜索 + 分页 50/页，勾选跨页保留）
+// ═══════════════════════════════════════════════════════════
+async function loadTableSchemas() {
+    const resp = await apiRequest('/api/schema/schemas');
+    const data = await resp.json();
+    const sel = document.getElementById('tableSchemaSel');
+    sel.innerHTML = '<option value="">请先选择库</option>' + (data.schemas || []).map(s => `<option value="${e(s)}">${e(s)}</option>`).join('');
+}
+
+async function loadUserTables() {
+    if (!curUserId) { document.getElementById('tableList').innerHTML = '请先选择用户'; return; }
+    const schemaName = document.getElementById('tableSchemaSel').value;
+    if (!schemaName) return;
+    const schemas = await (await apiRequest('/api/permission/resources/schema')).json();
+    const schema = schemas.find(s => s.name === schemaName);
+    if (!schema) return;
+    const resp = await apiRequest(`/api/permission/users/${curUserId}/tables/${schema.id}`);
+    const data = await resp.json();
+    tableCache = data.tables || [];
+    tableChecked = new Set(tableCache.filter(t => t.granted).map(t => t.id));
+    window._tableRestricted = data.restricted;
+    tablePage = 1;
+    tableSearch = '';
+    document.getElementById('tableSearch').value = '';
+    renderTableResources();
+}
+
+function renderTableResources() {
+    const kw = tableSearch.toLowerCase();
+    const filtered = tableCache.filter(t => !kw || t.name.toLowerCase().includes(kw));
+    const pageItems = filtered.slice((tablePage - 1) * LIST_PS, tablePage * LIST_PS);
+    document.getElementById('tableList').innerHTML = pageItems.length ? pageItems.map(t => `
+        <label class="chk-row mb-0">
+            <input type="checkbox" class="table-chk" value="${t.id}" ${tableChecked.has(t.id) ? 'checked' : ''}
+                   onchange="toggleTableChk(${t.id}, this.checked)">
+            <span>${e(t.name)}</span>
+            ${t.description ? `<small class="text-muted">(${e(t.description)})</small>` : ''}
+        </label>`).join('')
+        : '<div class="text-muted text-center py-3">该库暂无表</div>';
+    document.getElementById('tableHint').textContent =
+        window._tableRestricted ? '⚠ 当前处于受限模式：仅勾选表可见' : '当前为默认模式：该库全部表可见';
+    QF.renderPager('tablePager', {
+        total: filtered.length, page: tablePage, pageSize: LIST_PS,
+        onPage: p => { tablePage = p; renderTableResources(); }
+    });
+}
+
+function toggleTableChk(id, checked) {
+    if (checked) tableChecked.add(id); else tableChecked.delete(id);
+}
+
+function onTableSearch() {
+    tableSearch = document.getElementById('tableSearch').value.trim();
+    tablePage = 1;
+    renderTableResources();
+}
+
+async function saveTableGrants() {
+    const schemaName = document.getElementById('tableSchemaSel').value;
+    const schemas = await (await apiRequest('/api/permission/resources/schema')).json();
+    const schema = schemas.find(s => s.name === schemaName);
+    const ids = Array.from(tableChecked);
+    const resp = await apiRequest(`/api/permission/users/${curUserId}/tables/${schema.id}`, {
+        method: 'PUT',
+        body: JSON.stringify({ table_ids: ids })
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) return alert(data.detail || '保存失败');
+    alert(data.message || '已保存');
+    loadUserTables();
+}
+
+// ═══════════════════════════════════════════════════════════
+// 字段（分页 50/页，修改状态跨页保留）
+// ═══════════════════════════════════════════════════════════
+async function loadFieldSchemas() {
+    const resp = await apiRequest('/api/schema/schemas');
+    const data = await resp.json();
+    const sel = document.getElementById('fieldSchemaSel');
+    sel.innerHTML = '<option value="">请先选择库</option>' + (data.schemas || []).map(s => `<option value="${e(s)}">${e(s)}</option>`).join('');
+}
+
+async function loadFieldTables() {
+    const schemaName = document.getElementById('fieldSchemaSel').value;
+    const sel = document.getElementById('fieldTableSel');
+    sel.innerHTML = '<option value="">请先选择表</option>';
+    document.getElementById('columnList').innerHTML = '请选择表';
+    if (!schemaName) return;
+    const resp = await apiRequest(`/api/schema/tables?schema_name=${encodeURIComponent(schemaName)}`);
+    const data = await resp.json();
+    sel.innerHTML = '<option value="">请先选择表</option>' + (data.tables || []).map(t => `<option value="${e(t.name)}">${e(t.name)}</option>`).join('');
+}
+
+async function loadUserColumns() {
+    if (!curUserId) return;
+    const schemaName = document.getElementById('fieldSchemaSel').value;
+    const tableName = document.getElementById('fieldTableSel').value;
+    if (!tableName) return;
+    const cResp = await apiRequest(`/api/audit/all-columns?schema_name=${encodeURIComponent(schemaName)}&table_name=${encodeURIComponent(tableName)}`);
+    const cData = await cResp.json();
+    columnCache = cData.items || [];
+    const gResp = await apiRequest(`/api/audit/column-permissions?target_user_id=${curUserId}`);
+    const gData = await gResp.json();
+    colGrantMap = {};
+    (gData.items || []).forEach(g => { colGrantMap[g.column_id] = g.access_type; });
+    colLocal = {};
+    fieldPage = 1;
+    renderColumnResources();
+}
+
+function renderColumnResources() {
+    const defMap = { 'public': 'SELECT', 'internal': 'SELECT', 'sensitive': 'FILTER', 'confidential': 'NONE' };
+    const pageItems = columnCache.slice((fieldPage - 1) * LIST_PS, fieldPage * LIST_PS);
+    document.getElementById('columnList').innerHTML = pageItems.length ? pageItems.map(c => {
+        const cur = colLocal[c.column_id] !== undefined ? colLocal[c.column_id] : (colGrantMap[c.column_id] || '');
+        return `
+        <div class="d-flex justify-content-between align-items-center mb-1" style="border-bottom:1px solid #f0f0f0;padding:4px 0;">
+            <span>
+                <span class="text-monospace">${e(c.column_name)}</span>
+                ${c.sensitive_level ? `<span class="badge bg-${c.sensitive_level === 'confidential' ? 'danger' : c.sensitive_level === 'sensitive' ? 'warning' : 'secondary'}">${QF.levelLabel(c.sensitive_level)}</span>` : ''}
+            </span>
+            <select class="form-select form-select-sm col-access" style="width:140px;" data-cid="${c.column_id}" onchange="onColChange(${c.column_id}, this.value)">
+                <option value="">默认</option>
+                <option value="SELECT" ${cur === 'SELECT' ? 'selected' : ''}>SELECT 可读</option>
+                <option value="FILTER" ${cur === 'FILTER' ? 'selected' : ''}>FILTER 仅条件</option>
+                <option value="NONE" ${cur === 'NONE' ? 'selected' : ''}>NONE 不可用</option>
+            </select>
+        </div>`;
+    }).join('') : '<div class="text-muted text-center py-3">该表暂无字段</div>';
+    document.getElementById('fieldCount').textContent = `共 ${columnCache.length} 个字段`;
+    QF.renderPager('fieldPager', {
+        total: columnCache.length, page: fieldPage, pageSize: LIST_PS,
+        onPage: p => { fieldPage = p; renderColumnResources(); }
+    });
+}
+
+function onColChange(cid, val) {
+    colLocal[cid] = val;   // 跨页保留本地修改
+}
+
+async function saveColumnGrants() {
+    const changed = [];
+    Object.keys(colLocal).forEach(k => {
+        const cid = parseInt(k);
+        const val = colLocal[k];
+        const prev = colGrantMap[cid] || '';
+        if (val !== prev) changed.push({ column_id: cid, access_type: val, was: prev });
+    });
+    if (!changed.length) return alert('没有需要保存的变更');
+    for (const c of changed) {
+        if (c.access_type) {
+            const resp = await apiRequest('/api/audit/column-permission', {
+                method: 'POST',
+                body: JSON.stringify({ user_id: curUserId, column_id: c.column_id, access_type: c.access_type })
+            });
+            if (!resp.ok) return alert(`字段 ${c.column_id} 保存失败`);
+        } else if (c.was) {
+            const resp = await apiRequest(`/api/audit/column-permission?user_id=${curUserId}&column_id=${c.column_id}`, { method: 'DELETE' });
+            if (!resp.ok && resp.status !== 404) return alert(`字段 ${c.column_id} 重置失败`);
+        }
+    }
+    alert('字段授权已保存');
+    loadUserColumns();
+}
+
+// ═══════════════════════════════════════════════════════════
+// 知识库（搜索 + 分页 50/页，勾选跨页保留）
+// ═══════════════════════════════════════════════════════════
+async function loadExtraResources() {
+    if (!curUserId) return;
+    const [rAll, rUser] = await Promise.all([
+        apiRequest('/api/permission/resources/knowledge'),
+        apiRequest(`/api/permission/users/${curUserId}/resources/knowledge`)
+    ]);
+    allExtras = (await rAll.json()).map(x => String(x.id));
+    knowledgeChecked = new Set(await rUser.json());
+    renderKnowledgeResources();
+}
+
+function renderKnowledgeResources() {
+    const kw = knowledgeSearch.toLowerCase();
+    const filtered = allExtras.filter(id => !kw || id.includes(kw));
+    const pageItems = filtered.slice((knowledgePage - 1) * LIST_PS, knowledgePage * LIST_PS);
+    document.getElementById('knowledgeList').innerHTML = pageItems.length ? pageItems.map(id => `
+        <label class="chk-row mb-0">
+            <input type="checkbox" class="knowledge-chk" value="${e(id)}" ${knowledgeChecked.has(id) ? 'checked' : ''}
+                   onchange="toggleKnowledgeChk('${e(id)}', this.checked)">
+            <span>知识 #${e(id)}</span>
+        </label>`).join('')
+        : '<div class="text-muted text-center py-3">暂无知识</div>';
+    document.getElementById('knowledgeCount').textContent = `已选 ${knowledgeChecked.size}/${allExtras.length}`;
+    QF.renderPager('knowledgePager', {
+        total: filtered.length, page: knowledgePage, pageSize: LIST_PS,
+        onPage: p => { knowledgePage = p; renderKnowledgeResources(); }
+    });
+}
+
+function toggleKnowledgeChk(id, checked) {
+    if (checked) knowledgeChecked.add(id); else knowledgeChecked.delete(id);
+    document.getElementById('knowledgeCount').textContent = `已选 ${knowledgeChecked.size}/${allExtras.length}`;
+}
+
+function onKnowledgeSearch() {
+    knowledgeSearch = document.getElementById('knowledgeSearch').value.trim();
+    knowledgePage = 1;
+    renderKnowledgeResources();
+}
+
+async function saveExtraGrants() {
+    const ids = Array.from(knowledgeChecked);
+    const resp = await apiRequest(`/api/permission/users/${curUserId}/resources/knowledge`, {
+        method: 'PUT',
+        body: JSON.stringify({ user_id: curUserId, resource_ids: ids })
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) return alert(data.detail || '保存失败');
+    alert(data.message || '已保存');
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    loadUsers();
+    // 子页签下沉到左侧菜单，按 URL hash 直达（#ds/#schema/#table/#field/#knowledge）
+    const h = location.hash.replace('#', '');
+    switchTab(['ds', 'schema', 'table', 'field', 'knowledge'].includes(h) ? h : 'ds');
+});
 </script>
 </body>
 </html>

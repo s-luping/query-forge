@@ -14,7 +14,8 @@ from typing import List, Dict, Tuple, Optional
 from app.logger import logger
 
 
-PROJECT_ROOT = os.path.dirname(os.path.dirname(__file__))
+# core/retrieval/vector_store.py → 上溯 3 级到项目根
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 MODEL_CACHE_DIR = os.path.join(PROJECT_ROOT, 'models', 'embeddings')
 VECTOR_INDEX_DIR = os.path.join(PROJECT_ROOT, 'db', 'vectors')
 
@@ -29,11 +30,11 @@ _DEFAULT_VECTOR_CONFIG = {
 def get_vector_config(key: str):
     """从数据库读取向量参数，不存在则返回默认值"""
     try:
-        from models import AppSessionLocal
-        from models.system import SystemConfig
-        db = AppSessionLocal()
+        from models import SessionLocal
+        from models.system import SystemSetting
+        db = SessionLocal()
         try:
-            row = db.query(SystemConfig).filter(SystemConfig.key == key).first()
+            row = db.query(SystemSetting).filter(SystemSetting.key == key).first()
             if row is not None and str(row.value).strip():
                 return int(str(row.value))
         finally:
@@ -55,18 +56,18 @@ class EmbeddingModel:
     def _set_db_ready(cls, ready: bool):
         """更新数据库中的模型就绪状态"""
         try:
-            from models import AppSessionLocal
-            from models.system import SystemConfig
-            db = AppSessionLocal()
+            from models import SessionLocal
+            from models.system import SystemSetting
+            db = SessionLocal()
             try:
-                row = db.query(SystemConfig).filter(SystemConfig.key == 'EMBEDDING_MODEL_READY').first()
+                row = db.query(SystemSetting).filter(SystemSetting.key == 'EMBEDDING_MODEL_READY').first()
                 value = 'true' if ready else 'false'
                 if row:
                     row.value = value
                 else:
-                    db.add(SystemConfig(key='EMBEDDING_MODEL_READY', value=value))
+                    db.add(SystemSetting(key='EMBEDDING_MODEL_READY', value=value))
                 if not ready:
-                    path_row = db.query(SystemConfig).filter(SystemConfig.key == 'EMBEDDING_MODEL_PATH').first()
+                    path_row = db.query(SystemSetting).filter(SystemSetting.key == 'EMBEDDING_MODEL_PATH').first()
                     if path_row:
                         path_row.value = ''
                 db.commit()
@@ -79,11 +80,11 @@ class EmbeddingModel:
     def _get_db_path(cls) -> Optional[str]:
         """从数据库读取缓存的模型路径"""
         try:
-            from models import AppSessionLocal
-            from models.system import SystemConfig
-            db = AppSessionLocal()
+            from models import SessionLocal
+            from models.system import SystemSetting
+            db = SessionLocal()
             try:
-                row = db.query(SystemConfig).filter(SystemConfig.key == 'EMBEDDING_MODEL_PATH').first()
+                row = db.query(SystemSetting).filter(SystemSetting.key == 'EMBEDDING_MODEL_PATH').first()
                 if row and str(row.value):
                     return str(row.value)
             finally:
@@ -96,15 +97,15 @@ class EmbeddingModel:
     def _set_db_path(cls, path: str):
         """缓存模型路径到数据库"""
         try:
-            from models import AppSessionLocal
-            from models.system import SystemConfig
-            db = AppSessionLocal()
+            from models import SessionLocal
+            from models.system import SystemSetting
+            db = SessionLocal()
             try:
-                row = db.query(SystemConfig).filter(SystemConfig.key == 'EMBEDDING_MODEL_PATH').first()
+                row = db.query(SystemSetting).filter(SystemSetting.key == 'EMBEDDING_MODEL_PATH').first()
                 if row:
                     row.value = path
                 else:
-                    db.add(SystemConfig(key='EMBEDDING_MODEL_PATH', value=path))
+                    db.add(SystemSetting(key='EMBEDDING_MODEL_PATH', value=path))
                 db.commit()
             finally:
                 db.close()
@@ -115,11 +116,11 @@ class EmbeddingModel:
     def is_ready(cls) -> bool:
         """检查嵌入模型是否就绪（优先查数据库状态）"""
         try:
-            from models import AppSessionLocal
-            from models.system import SystemConfig
-            db = AppSessionLocal()
+            from models import SessionLocal
+            from models.system import SystemSetting
+            db = SessionLocal()
             try:
-                row = db.query(SystemConfig).filter(SystemConfig.key == 'EMBEDDING_MODEL_READY').first()
+                row = db.query(SystemSetting).filter(SystemSetting.key == 'EMBEDDING_MODEL_READY').first()
                 if row and str(row.value) == 'true':
                     return True
             finally:

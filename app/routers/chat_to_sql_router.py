@@ -1,22 +1,26 @@
 """
-QueryForge SQL生成路由
+QueryForge SQL生成路由（单次问答模式）
+
+遥测：LLM 调用记录写入遥测库 services/llm/telemetry（purpose='single'）。
 """
 import hashlib
 import time
 from typing import Optional, List
 
-from fastapi import APIRouter, HTTPException, Depends
-from fastapi.security import HTTPBearer
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from app.auth import get_current_user
+from app.auth import CurrentUser
 from app.logger import logger
-from app.routers.extra_router import get_extra_knowledge_safe
-from core.LLMClient import LLMClient
-from core.SQLGenerator import SqlGenerator
-from core.SQLPipeline import SQLPipeline
-from models import AppSessionLocal, LLMSessionLocal
-from models.llm import LLMConfig, LLMLog
+from app.permissions import is_schema_visible
+from app.routers.knowledge_router import get_knowledge_safe
+from app.security.crypto import decrypt_secret
+from core.llm import LLMClient
+from core.generation.sql_generator import SqlGenerator
+from core.generation.pipeline import SQLPipeline
+from models import SessionLocal
+from models.llm import LLMConfig
+from services.llm import telemetry
 
 
 class TextToSqlRequest(BaseModel):
@@ -36,18 +40,17 @@ class SqlValidationResponse(BaseModel):
     error_message: Optional[str] = None
     columns: Optional[List[str]] = None
 
+
 router = APIRouter()
 
 sql_generator = SqlGenerator()
 
 validation_cache = {}
 
-security = HTTPBearer(auto_error=False)
-
 
 def get_user_llm_config(user_id: int, config_id: Optional[int] = None) -> Optional[dict]:
-    """获取用户的LLM配置（自己的 + 公共配置）"""
-    db = AppSessionLocal()
+    """获取用户的LLM配置（自己的 + 公共配置，api_key 解密）"""
+    db = SessionLocal()
     try:
         if config_id:
             config = db.query(LLMConfig).filter(
@@ -64,9 +67,10 @@ def get_user_llm_config(user_id: int, config_id: Optional[int] = None) -> Option
 
         if config:
             return {
+                'id': config.id,
                 'provider': config.provider,
                 'model': config.model,
-                'api_key': config.api_key,
+                'api_key': decrypt_secret(config.api_key),
                 'base_url': config.base_url,
                 'max_tokens': config.max_tokens or 8000,
                 'temperature': config.temperature or 0.7,
@@ -77,59 +81,20 @@ def get_user_llm_config(user_id: int, config_id: Optional[int] = None) -> Option
         db.close()
 
 
-def save_llm_log(user_id: int, provider: str, question: str, model: str, conditions: str,
-                 result: str, duration_ms: float, prompt_tokens: int,
-                 completion_tokens: int, total_tokens: int, status: str = 'success',
-                 error_message: Optional[str] = None,
-                 system_prompt: Optional[str] = None):
-    """保存LLM调用记录"""
-    db = LLMSessionLocal()
-    try:
-        log = LLMLog(
-            user_id=user_id,
-            provider=provider,
-            question=question,
-            model=model,
-            conditions=conditions,
-            system_prompt=system_prompt,
-            result=result,
-            duration_ms=duration_ms,
-            prompt_tokens=prompt_tokens,
-            completion_tokens=completion_tokens,
-            total_tokens=total_tokens,
-            status=status,
-            error_message=error_message
-        )
-        db.add(log)
-        db.commit()
-        logger.info(f"LLM调用记录已保存: user_id={user_id}, model={model}")
-    except Exception as e:
-        logger.error(f"保存LLM调用记录失败: {e}")
-        db.rollback()
-    finally:
-        db.close()
-
-
 @router.post("/generate_sql")
 def generate_sql(
     request: TextToSqlRequest,
-    user=Depends(get_current_user)
+    user: CurrentUser,
 ):
     """生成SQL - 统一使用字段级索引+按表聚合方案
-    
-    必要依赖：
-        - user_id: 用户ID
-        - llm_client: LLM客户端（需要有可用配置或默认配置）
-        - query: 用户问题
-        
-    可选依赖（缺失不影响流程）：
-        - schema_name: 模式名（不指定则查询所有）
-        - knowledge_id: 补充知识ID
-        - llm_config_id: LLM配置ID
-        - history_queries: 历史成功查询
+    认证：CurrentUser 类型化依赖（未登录 401），Bearer 头或 HttpOnly cookie 均可。
     """
     user_id = user['user_id']
     start_time = time.time()
+
+    # 库级可见性二次校验（防绕过前端下拉直接请求无权限库）
+    if not is_schema_visible(user, request.schema_name):
+        raise HTTPException(status_code=403, detail="无权访问该数据库")
 
     try:
         cache_key = hashlib.md5(
@@ -161,17 +126,18 @@ def generate_sql(
         pipeline = SQLPipeline(
             user_id=user_id,
             llm_client=llm_client,
-            sql_generator=sql_generator
+            sql_generator=sql_generator,
+            user=user
         )
 
-        knowledge = get_extra_knowledge_safe(user_id, request.knowledge_id)
-        extra_knowledge = knowledge.get("extra_knowledge", "")
-        logger.info(f"补充知识: {'已加载' if extra_knowledge else '无'}")
+        knowledge = get_knowledge_safe(user_id, request.knowledge_id)
+        knowledge_content = knowledge.get("content", "")
+        logger.info(f"知识库: {'已加载' if knowledge_content else '无'}")
 
         pipeline_result = pipeline.run_pipeline(
             query=request.query,
             schema_name=request.schema_name,
-            extra_knowledge=extra_knowledge.strip() if extra_knowledge else "",
+            knowledge_content=knowledge_content.strip() if knowledge_content else "",
             history_queries=[],
             db_type=request.db_type
         )
@@ -194,7 +160,7 @@ def generate_sql(
 
         model_name = llm_client.model if hasattr(llm_client, 'model') else 'unknown'
 
-        save_llm_log(
+        telemetry.record_call(
             user_id=user_id,
             provider=llm_client.provider,
             question=request.query,
@@ -207,7 +173,9 @@ def generate_sql(
             total_tokens=total_tokens,
             status='success' if is_valid else 'warning',
             error_message=error_msg if not is_valid else None,
-            system_prompt=pipeline_result.get('prompt', '')
+            config_id=llm_config['id'] if llm_config else None,
+            purpose='single',
+            system_prompt=pipeline_result.get('prompt', ''),
         )
 
         response = SqlValidationResponse(
@@ -225,7 +193,7 @@ def generate_sql(
         raise
     except Exception as e:
         logger.error(f"文本转SQL验证失败: {e}")
-        save_llm_log(
+        telemetry.record_call(
             user_id=user_id,
             provider='unknown',
             question=request.query,
@@ -233,10 +201,8 @@ def generate_sql(
             conditions=f"schema_name={request.schema_name}, knowledge_id={request.knowledge_id}",
             result='',
             duration_ms=(time.time() - start_time) * 1000,
-            prompt_tokens=0,
-            completion_tokens=0,
-            total_tokens=0,
             status='error',
-            error_message=str(e)
+            error_message=str(e),
+            purpose='single',
         )
         raise HTTPException(status_code=500, detail=f"处理失败: {str(e)}")

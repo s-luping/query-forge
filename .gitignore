@@ -9,6 +9,7 @@ __pycache__
 *.db-wal
 *.jsonl
 .env
+.workbuddy
 
 db/temp
 db/vectors
