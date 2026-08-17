@@ -114,7 +114,7 @@ EmbeddingModel.get_instance()  # 后续调用返回缓存实例
 
 #### Step 1: 收集字段文本
 
-从 `sys_schema.db` 读取指定数据库的所有字段记录。
+从主库 `queryforge.db`（db_schemas/db_tables/db_columns 三层）读取指定数据库的所有字段记录。
 
 #### Step 2: 构造字段描述文本
 
@@ -162,8 +162,8 @@ L2 归一化，使相似度计算可简化为内积：
 ### 1. 自动触发（数据导入时）
 
 ```
-DDL/JSON/文件上传
-  → 解析 → 写入 sys_schema.db
+CSV/JSON 导入
+  → 解析 → 写入主库 db_schemas/db_tables/db_columns
   → 统计数据库总字段数 >= 50 ?
   → 是 → 标记 stale → 后台线程重建索引
   → 否 → 跳过
@@ -281,7 +281,7 @@ schema_name, table_name, column_name, column_type, column_description, column_ke
 │   ├── vectors/                   # 向量索引 pickle 文件
 │   │   ├── DM_fields.pkl          # DM 数据库字段索引
 │   │   └── default_fields.pkl     # 默认数据库索引
-│   └── sys_app.db                 # vector_index_meta 表
+│   └── queryforge.db                # 主库（vector_index_meta 表存索引元数据）
 ```
 
 ### 索引文件格式 (.pkl)

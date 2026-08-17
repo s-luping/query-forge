@@ -1,10 +1,11 @@
 """
-日志系统 — 按类型分离
+日志系统 — 按类型分离（统一写入 logs/，自动轮转）
   app.log      应用日志（请求、认证、业务）
   llm.log      大模型调用详情
   pipeline.log SQL生成过程
-  sqlalchemy.log  数据库查询
+  sqlalchemy.log  数据库异常（WARNING 以上；不再逐句记录 SQL）
   audit.log    审计日志（写操作、权限变更）
+  server.log   服务日志（uvicorn 启动/访问，按天轮转保留30天，由 main.py 配置）
 """
 import logging
 import os

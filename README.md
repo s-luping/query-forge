@@ -28,8 +28,8 @@ QueryForge 是一款基于自然语言的数据查询工具，通过大模型技
 - **并发安全**：构建期间新数据导入自动标记过期，支持最多 3 次重试
 
 ### 4. 强大的数据库管理
-- **多数据库 DDL 解析**：支持 MySQL、PostgreSQL、Oracle、SQL Server、Hive、Doris、ClickHouse 等
-- **多数据库自动识别**：JSON/DDL 支持 `CREATE DATABASE`/`USE` 语句自动提取
+- **规范结构导入**：支持规范 CSV（中文表头）与 JSON（Spider/自定义格式）导入，数据库类型与数据源必填
+- **元数据同步**：MySQL、PostgreSQL、SQLite 定时同步表结构并自动比对变更（新增自动应用、删除待审批）
 - **Spider 数据集兼容**：支持 Spider 数据集 JSON 格式解析
 - **库/表/字段搜索**：支持按数据库名、表名、字段名、描述模糊搜索
 - **自动向量索引**：字段数量 >= 50 时自动后台构建向量索引
@@ -140,9 +140,9 @@ QueryForge/
 
 ### 3. 数据库管理
 
-- **DDL 解析**：MySQL、PostgreSQL、Oracle、SQL Server、SQLite、Hive、Doris、ClickHouse
+- **规范 CSV 导入**：中文表头模板（库名/表名/字段名/字段类型/…），仅支持 .csv / .json 文件
 - **JSON 解析**：Spider 格式和自定义格式
-- **文件上传**：支持 .sql / .txt / .json 文件导入
+- **数据源关联**：导入时必选数据源与数据库类型，库→表→字段四层结构，数据源→库→表级联筛选
 - **搜索功能**：按数据库名、表名、字段名、描述模糊搜索，300ms 防抖
 - **Schema/表级联筛选**：选择数据库后自动加载表列表
 - **自动向量索引**：字段数 >= 50 时后台自动构建，支持重试和并发保护
@@ -216,10 +216,9 @@ python main.py
 
 ### 6. 导入数据库结构
 
-1. 进入「数据库维护」→「数据库 维护」
-2. 选择输入方式：DDL 文本 / JSON 文本 / 文件上传
-3. 选择数据库类型或自动检测
-4. 点击解析，系统自动提取表结构并触发向量索引构建
+1. 进入「数据浏览」页
+2. 点击「模板下载」获取标准 CSV 模板，或使用规范 JSON（Spider/自定义格式）
+3. 上传时必须选择**数据源**与**数据库类型**（均必填），支持 .csv / .json 文件
 
 ### 7. 默认管理员账号
 
@@ -230,15 +229,12 @@ python main.py
 
 ## 数据库说明
 
-项目使用多个 SQLite 数据库分离存储：
+项目使用 SQLite **双库**存储：
 
-| 数据库 | 表 | 说明 |
-|--------|-----|------|
-| sys_app.db | users, llm_configs, system_config, vector_index_meta | 用户、LLM配置、系统配置、向量索引元数据 |
-| sys_schema.db | schema | Schema 字段元数据 |
-| sys_extra.db | knowledge_items（旧版独立库，现已并入主库 queryforge.db） | 知识库 |
-| sys_llm.db | llm_logs | LLM 调用记录（含 system_prompt） |
-| sys_conversation.db | conversations, conversation_messages | 多轮对话和消息记录 |
+| 数据库 | 说明 |
+|--------|------|
+| queryforge.db（主库） | 用户、系统配置、Schema（库→表→字段）、知识、对话、统计、数据源/同步、权限、审计 |
+| llm_telemetry.db（遥测库） | LLM 调用明细（llm_calls / llm_prompts） |
 
 向量索引 pickle 文件存储在 `db/vectors/` 目录。
 
@@ -249,9 +245,11 @@ python main.py
 | 日志文件 | 说明 |
 |---------|------|
 | app.log | 应用日志（API请求、认证、业务操作） |
+| server.log | 服务日志（uvicorn 启动/访问，按天轮转保留30天） |
 | llm.log | 大模型请求日志（含完整 system prompt 和消息内容） |
 | pipeline.log | SQL生成过程日志（关键词提取、向量召回、表聚合） |
-| sqlalchemy.log | 数据库查询日志 |
+| sqlalchemy.log | 数据库异常日志（WARNING 以上，不再逐句记录 SQL） |
+| audit.log | 审计日志（写操作、权限变更） |
 
 ---
 
