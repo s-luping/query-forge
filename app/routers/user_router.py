@@ -12,7 +12,7 @@ from pydantic import BaseModel
 
 from app.auth import AdminUser, CurrentUser, hash_password, verify_password
 from app.logger import logger, log_audit
-from app.routers.base_router import _validate_password_strength
+from app.routers.auth_router import _validate_password_strength
 from models import SessionLocal
 from models.user import User
 

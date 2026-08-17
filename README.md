@@ -47,7 +47,7 @@ QueryForge 是一款基于自然语言的数据查询工具，通过大模型技
 QueryForge/
 ├── app/                    # 应用核心模块
 │   ├── routers/            # API 路由
-│   │   ├── base_router.py          # 基础认证路由
+│   │   ├── auth_router.py           # 基础认证路由（登录/注册）
 │   │   ├── chat_to_sql_router.py   # SQL生成核心路由（旧版单次生成）
 │   │   ├── schema_router.py        # Schema 管理 + 向量索引路由
 │   │   ├── knowledge_router.py      # 知识库路由

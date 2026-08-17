@@ -17,7 +17,7 @@ from app.limiter import limiter
 from app.logger import logger
 from app.config import CORS_ORIGINS, COOKIE_SECURE, DEBUG, FRAME_ANCESTORS
 from app.auth import _get_secret_key, resolve_token_user
-from app.routers.base_router import router as base_router
+from app.routers.auth_router import router as auth_router
 from app.routers.chat_to_sql_router import router as chat_to_sql_router
 from app.routers.schema_router import router as schema_router
 from app.routers.knowledge_router import router as knowledge_router
@@ -288,7 +288,7 @@ async def logout():
     return response
 
 
-app.include_router(base_router, tags=["基础认证"])
+app.include_router(auth_router, tags=["基础认证"])
 app.include_router(user_router, prefix="/api/user", tags=["用户管理"])
 app.include_router(chat_to_sql_router,
                    prefix="/api/chat-to-sql", tags=["chat_to_sql"])
