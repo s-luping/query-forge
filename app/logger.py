@@ -34,7 +34,9 @@ def _create_logger(name, filename, level=logging.INFO, fmt=None, console=False):
 logger = _create_logger("app", "app.log", fmt="%(asctime)s [%(levelname)s] %(module)s: %(message)s", console=True)
 llm_logger = _create_logger("llm", "llm.log", level=logging.DEBUG, fmt="%(asctime)s\n%(message)s\n" + "=" * 80)
 pipeline_logger = _create_logger("pipeline", "pipeline.log", level=logging.DEBUG, fmt="%(asctime)s\n%(message)s\n" + "=" * 80)
-sqlalchemy_logger = _create_logger("sqlalchemy.engine", "sqlalchemy.log", fmt="%(asctime)s %(message)s")
+# sqlalchemy 仅记录 WARNING 以上（不再每句 SQL 都写日志，避免日志无限膨胀）
+sqlalchemy_logger = _create_logger("sqlalchemy.engine", "sqlalchemy.log",
+                                   level=logging.WARNING, fmt="%(asctime)s %(message)s")
 audit_logger = _create_logger("audit", "audit.log", fmt="%(asctime)s | %(message)s")
 
 
