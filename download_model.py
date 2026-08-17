@@ -14,11 +14,11 @@ MODEL_SAVE_DIR = os.path.join(PROJECT_ROOT, 'models', 'embeddings', 'bge-m3')
 def _update_db_status(ready: bool, model_path: str = None):
     """更新数据库中的 EMBEDDING_MODEL_READY 状态和模型路径"""
     try:
-        from app.config import APP_DB_PATH
+        from app.config import MAIN_DB_PATH
         from sqlalchemy import create_engine
         from sqlalchemy.orm import sessionmaker
 
-        engine = create_engine(f'sqlite:///{APP_DB_PATH}')
+        engine = create_engine(f'sqlite:///{MAIN_DB_PATH}')
         Session = sessionmaker(bind=engine)
         db = Session()
         try:
