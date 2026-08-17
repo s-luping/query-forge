@@ -19,7 +19,11 @@ function switchTab(tab) {
     document.querySelectorAll('[id^="tab-"]').forEach(el => el.style.display = 'none');
     const el = document.getElementById('tab-' + tab);
     if (el) el.style.display = '';
-    // 页签已下沉到左侧菜单，这里保持 URL hash 同步（#tab）
+    // 页内 tab 导航条高亮同步
+    document.querySelectorAll('#pageTabs .nav-link').forEach(a => {
+        a.classList.toggle('active', a.getAttribute('onclick') === `return navTab('${tab}')`);
+    });
+    // 保持 URL hash 同步（#tab），左侧菜单与页内导航共用
     if (location.hash !== '#' + tab) history.replaceState(null, '', '#' + tab);
 
     if (tab === 'overview') loadOverview();
@@ -27,6 +31,11 @@ function switchTab(tab) {
     else if (tab === 'jobs') loadJobs();
     else if (tab === 'runs') loadRuns();
     else if (tab === 'changes') loadChanges();
+}
+
+function navTab(tab) {
+    switchTab(tab);
+    return false;
 }
 
 // ── 概览 ──────────────────────────────────────────────────

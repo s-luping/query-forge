@@ -36,7 +36,14 @@
 </head>
 <body>
 <div class="container-fluid">
-    <!-- 子页签已下沉到左侧菜单（审计概览/审计日志/敏感字段/行级规则），URL #hash 直达 -->
+    <!-- 页内 tab 导航条（左侧菜单保留 hash 直达入口，页面内亦可切换） -->
+    <ul class="nav nav-tabs mb-3" id="pageTabs">
+        <li class="nav-item"><a class="nav-link active" href="#" onclick="return navTab('overview')">审计概览</a></li>
+        <li class="nav-item"><a class="nav-link" href="#" onclick="return navTab('logs')">审计日志</a></li>
+        <li class="nav-item"><a class="nav-link" href="#" onclick="return navTab('sensitive')">敏感字段</a></li>
+        <li class="nav-item"><a class="nav-link" href="#" onclick="return navTab('columnperm')">字段权限</a></li>
+        <li class="nav-item"><a class="nav-link" href="#" onclick="return navTab('rowscope')">行级规则</a></li>
+    </ul>
 
     <!-- ===== Tab: 审计概览 ===== -->
     <div id="tab-overview">
@@ -123,6 +130,71 @@
                 </div>
                 <hr class="my-2">
                 <p class="text-muted mb-0">权限级别：SELECT（完全可读）/ FILTER（可用不可见，允许 WHERE/JOIN/GROUP BY，禁止 SELECT 列表）/ NONE（完全不可用）</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== Tab: 字段权限 ===== -->
+    <div id="tab-columnperm" style="display:none;">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>字段级权限管理（按用户配置）</span>
+                <div class="d-flex align-items-center gap-2">
+                    <select class="form-select form-select-sm" id="cpUserSelect" onchange="loadColumnPerms()" style="width:180px;">
+                        <option value="">选择用户...</option>
+                    </select>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="loadColumnPerms()"><i class="fas fa-sync"></i></button>
+                </div>
+            </div>
+            <div class="card-body p-0">
+                <table class="table table-hover table-sm mb-0">
+                    <thead><tr><th>数据库</th><th>表名</th><th>字段名</th><th>敏感等级</th><th>访问级别</th><th>操作</th></tr></thead>
+                    <tbody id="columnPermTable"><tr><td colspan="6" class="empty-state">请先选择用户</td></tr></tbody>
+                </table>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-header">新增 / 修改字段权限</div>
+            <div class="card-body">
+                <div class="row align-items-end">
+                    <div class="col-md-3">
+                        <label class="form-label small">选择用户</label>
+                        <select class="form-select form-select-sm" id="cpNewUser">
+                            <option value="">选择用户...</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small">选择表</label>
+                        <select class="form-select form-select-sm" id="cpNewTable" onchange="loadColumnPermColumns()">
+                            <option value="">选择表...</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small">选择字段</label>
+                        <select class="form-select form-select-sm" id="cpNewColumn">
+                            <option value="">选择字段...</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small">访问级别</label>
+                        <div class="d-flex gap-2">
+                            <select class="form-select form-select-sm" id="cpNewAccess">
+                                <option value="SELECT">SELECT（完全可读）</option>
+                                <option value="FILTER">FILTER（可用不可见）</option>
+                                <option value="NONE">NONE（完全不可用）</option>
+                            </select>
+                            <button class="btn btn-primary btn-sm" style="white-space:nowrap;" onclick="addColumnPerm()">添加</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-header">使用说明</div>
+            <div class="card-body" style="font-size:13px;">
+                <p class="mb-1"><strong>字段级权限</strong>按「用户 × 字段」配置访问级别，优先级高于敏感等级默认策略。</p>
+                <p class="mb-1 text-muted">SELECT：可出现在 SELECT 列表中；FILTER：可用于 WHERE/JOIN/GROUP BY 但不可 SELECT；NONE：完全不可用（查询引用即拦截）。</p>
+                <p class="mb-0 text-muted">未配置的字段按敏感等级走默认策略（public/internal=SELECT，sensitive=FILTER，confidential=NONE）。管理员不受限制。</p>
             </div>
         </div>
     </div>

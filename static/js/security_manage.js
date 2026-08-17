@@ -20,15 +20,25 @@ const LIST_PS = 50;
 
 function switchTab(tab) {
     currentTab = tab;
-    ['overview', 'logs', 'sensitive', 'rowscope'].forEach(t => {
+    ['overview', 'logs', 'sensitive', 'columnperm', 'rowscope'].forEach(t => {
         document.getElementById('tab-' + t).style.display = t === tab ? '' : 'none';
+    });
+    // 页内 tab 导航条高亮同步
+    document.querySelectorAll('#pageTabs .nav-link').forEach(a => {
+        a.classList.toggle('active', a.getAttribute('onclick') === `return navTab('${tab}')`);
     });
     // 页签已下沉到左侧菜单，这里保持 URL hash 同步（#tab）
     if (location.hash !== '#' + tab) history.replaceState(null, '', '#' + tab);
     if (tab === 'overview') loadOverview();
     if (tab === 'logs') loadLogs();
     if (tab === 'sensitive') { loadSchemaFilters(); loadSensitive(); }
+    if (tab === 'columnperm') { loadUserSelect('cpUserSelect'); loadUserSelect('cpNewUser'); loadColumnPermTables(); loadColumnPerms(); }
     if (tab === 'rowscope') { loadUserSelect('rsUserSelect'); loadRowScopes(); loadAllTablesForSelect(); }
+}
+
+function navTab(tab) {
+    switchTab(tab);
+    return false;
 }
 
 // ═══════════════════════════════════════════════════════
@@ -227,6 +237,119 @@ async function loadUserSelect(selectId) {
 }
 
 // ═══════════════════════════════════════════════════════
+// Tab: 字段权限
+// ═══════════════════════════════════════════════════════
+const ACCESS_LABELS = { 'SELECT': '完全可读', 'FILTER': '可用不可见', 'NONE': '不可用' };
+
+async function loadColumnPerms() {
+    const userId = document.getElementById('cpUserSelect').value;
+    const tbody = document.getElementById('columnPermTable');
+    if (!userId) { tbody.innerHTML = '<tr><td colspan="6" class="empty-state">请先选择用户</td></tr>'; return; }
+    try {
+        const resp = await apiRequest(`/api/audit/column-permissions?target_user_id=${userId}`);
+        const data = await resp.json();
+        const items = data.items || [];
+        if (!items.length) {
+            tbody.innerHTML = '<tr><td colspan="6" class="empty-state">该用户暂无字段级权限（按敏感等级走默认策略）</td></tr>';
+            return;
+        }
+        tbody.innerHTML = items.map(p => `
+            <tr>
+                <td>${e(p.schema_name)}</td>
+                <td>${e(p.table_name)}</td>
+                <td><strong>${e(p.column_name)}</strong></td>
+                <td>${LEVEL_BADGES[p.sensitive_level] || LEVEL_BADGES['public']}</td>
+                <td>
+                    <select class="form-select form-select-sm d-inline-block" style="width:auto;" onchange="updateColumnPerm(${p.user_id}, ${p.column_id}, this.value)">
+                        ${Object.keys(ACCESS_LABELS).map(at => `<option value="${at}" ${at === p.access_type ? 'selected' : ''}>${at}（${ACCESS_LABELS[at]}）</option>`).join('')}
+                    </select>
+                </td>
+                <td><button class="btn btn-outline-danger btn-sm py-0 px-2" onclick="delColumnPerm(${p.user_id}, ${p.column_id})">删除</button></td>
+            </tr>`).join('');
+    } catch (err) { console.error('loadColumnPerms error:', err); }
+}
+
+async function updateColumnPerm(userId, columnId, accessType) {
+    try {
+        const resp = await apiRequest('/api/audit/column-permission', {
+            method: 'POST',
+            body: JSON.stringify({ user_id: userId, column_id: columnId, access_type: accessType })
+        });
+        const data = await resp.json();
+        if (!data.success) alert('更新失败');
+        else loadColumnPerms();
+    } catch (err) { alert('更新失败: ' + err.message); }
+}
+
+async function delColumnPerm(userId, columnId) {
+    if (!confirm('确认删除此字段权限？')) return;
+    try {
+        const resp = await apiRequest(`/api/audit/column-permission?user_id=${userId}&column_id=${columnId}`, { method: 'DELETE' });
+        const data = await resp.json();
+        if (!data.success) alert('删除失败');
+        else loadColumnPerms();
+    } catch (err) { alert('删除失败: ' + err.message); }
+}
+
+// 新增权限：选表 → 联动加载该表字段
+let cpTableMap = {};  // table_id -> {schema_name, table_name}
+async function loadColumnPermTables() {
+    const sel = document.getElementById('cpNewTable');
+    sel.innerHTML = '<option value="">选择表...</option>';
+    document.getElementById('cpNewColumn').innerHTML = '<option value="">选择字段...</option>';
+    cpTableMap = {};
+    try {
+        const resp = await apiRequest('/api/audit/all-tables');
+        const data = await resp.json();
+        (data.items || []).forEach(t => {
+            cpTableMap[t.table_id] = { schema_name: t.schema_name, table_name: t.table_name };
+            const opt = document.createElement('option');
+            opt.value = t.table_id;
+            opt.textContent = `${t.schema_name}.${t.table_name}`;
+            sel.appendChild(opt);
+        });
+    } catch (err) { console.error(err); }
+}
+
+async function loadColumnPermColumns() {
+    const tableId = document.getElementById('cpNewTable').value;
+    const sel = document.getElementById('cpNewColumn');
+    sel.innerHTML = '<option value="">选择字段...</option>';
+    if (!tableId) return;
+    const t = cpTableMap[tableId];
+    if (!t) return;
+    try {
+        const resp = await apiRequest(`/api/audit/all-columns?schema_name=${encodeURIComponent(t.schema_name)}&table_name=${encodeURIComponent(t.table_name)}`);
+        const data = await resp.json();
+        (data.items || []).forEach(c => {
+            const opt = document.createElement('option');
+            opt.value = c.column_id;
+            opt.textContent = `${c.column_name}（${LEVEL_LABELS[c.sensitive_level] || c.sensitive_level}）`;
+            sel.appendChild(opt);
+        });
+    } catch (err) { console.error(err); }
+}
+
+async function addColumnPerm() {
+    const userId = document.getElementById('cpNewUser').value;
+    const columnId = document.getElementById('cpNewColumn').value;
+    const accessType = document.getElementById('cpNewAccess').value;
+    if (!userId) { alert('请先选择用户'); return; }
+    if (!columnId) { alert('请选择字段'); return; }
+    try {
+        const resp = await apiRequest('/api/audit/column-permission', {
+            method: 'POST',
+            body: JSON.stringify({ user_id: parseInt(userId), column_id: parseInt(columnId), access_type: accessType })
+        });
+        const data = await resp.json();
+        if (!data.success) { alert('添加失败'); return; }
+        // 同步刷新用户选择与列表
+        if (document.getElementById('cpUserSelect').value === userId) loadColumnPerms();
+        document.getElementById('cpNewColumn').value = '';
+    } catch (err) { alert('添加失败: ' + err.message); }
+}
+
+// ═══════════════════════════════════════════════════════
 // Tab: 行级规则
 // ═══════════════════════════════════════════════════════
 async function loadAllTablesForSelect() {
@@ -291,8 +414,8 @@ async function delRowScope(userId, tableId) {
     } catch (err) { alert('删除失败: ' + err.message); }
 }
 
-// Init：优先按 URL hash（#logs/#sensitive/#rowscope）直达子页签，默认审计概览
+// Init：优先按 URL hash（#logs/#sensitive/#columnperm/#rowscope）直达子页签，默认审计概览
 document.addEventListener('DOMContentLoaded', () => {
     const h = location.hash.replace('#', '');
-    switchTab(['overview', 'logs', 'sensitive', 'rowscope'].includes(h) ? h : 'overview');
+    switchTab(['overview', 'logs', 'sensitive', 'columnperm', 'rowscope'].includes(h) ? h : 'overview');
 });
