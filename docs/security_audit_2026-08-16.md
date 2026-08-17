@@ -228,6 +228,6 @@ async def security_headers(request, call_next):
 
 ## 六、部署面补充建议
 
-- `docker-compose.yml` 检查 8188 端口映射范围，内网工具建议绑定特定网段而非 `0.0.0.0` 全暴露。
+- 服务监听 `0.0.0.0:8188`（main.py / start_server.bat），内网工具建议通过防火墙/反向代理仅暴露特定网段，而非全端口开放。
 - `db/*.db` 已在 `.gitignore`（✔），但注意运行机上的定时备份文件也要同样管控权限。
 - 上生产前置反向代理（nginx）终结 TLS，开启 HSTS。

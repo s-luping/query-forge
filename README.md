@@ -93,25 +93,24 @@ QueryForge/
 │       │   ├── llm_config.html     # 模型配置
 │       │   └── llm_logs.html       # 调用记录（含 system_prompt 展示）
 │       ├── schema/
-│       │   ├── schema_view.html    # 数据库查看（含搜索）
-│       │   ├── schema_manage.html  # 数据库维护（DDL/JSON/文件导入）
+│       │   ├── schema_view.html    # 数据库查看/浏览（级联筛选、CSV 导入、删除）
 │       │   └── vector_index.html   # 向量索引管理（新建）
 │       └── system/
 │           ├── system_settings.html # 系统设置
-│           └── permission_manage.html # 权限管理
-├── db/                     # SQLite 数据库存储（运行时自动创建）
-│   ├── sys_app.db           # 用户、LLM配置、系统配置、向量索引元数据
-│   ├── sys_schema.db        # Schema 数据
-│   ├── sys_extra.db         # 知识库（旧版独立库，已并入主库 queryforge.db）
-│   ├── sys_llm.db           # LLM 调用记录
-│   ├── sys_conversation.db  # 多轮对话记录
+│           ├── user_manage.html    # 用户管理（管理员 CRUD）
+│           ├── permission_manage.html # 权限管理（数据源→库→表→字段→知识库）
+│           ├── sync_manage.html    # 元数据同步（数据源/任务/历史/变更）
+│           ├── security_manage.html # 安全审计（日志/敏感字段/行级规则）
+│           └── driver_manage.html  # 数据库驱动管理
+├── db/                     # SQLite 双库存储（运行时自动创建）
+│   ├── queryforge.db        # 主库：用户/配置/Schema/知识/对话/统计/设置
+│   ├── llm_telemetry.db     # 遥测库：LLM 调用明细
 │   └── vectors/             # 向量索引 pickle 文件
-├── logs/                   # 日志文件
-│   ├── app.log / llm.log / pipeline.log / sqlalchemy.log
+├── logs/                   # 日志文件（app/server/sqlalchemy 等，自动轮转）
 ├── main.py                 # 项目入口
 ├── download_model.py        # 模型下载脚本（含路径缓存写入）
 ├── requirements.txt
-├── Dockerfile / docker-compose.yml
+├── start_server.bat         # 启动脚本（日志统一写入 logs/）
 └── docs/VECTOR_INDEX.md    # 向量索引技术文档
 ```
 
@@ -262,7 +261,7 @@ python main.py
 - **大模型**：支持所有 OpenAI 兼容 API（通用客户端，自由配置）
 - **向量模型**：sentence-transformers + BGE-M3（1024维）
 - **前端**：HTML + JavaScript + Bootstrap 5
-- **部署**：Docker + Docker Compose
+- **部署**：本地 venv + start_server.bat（Python 3.10）
 
 ---
 
@@ -296,4 +295,4 @@ python main.py
 
 ### v1.0.0
 
-- 初始版本：NL→SQL、Schema 管理、知识库、Docker 部署
+- 初始版本：NL→SQL、Schema 管理、知识库

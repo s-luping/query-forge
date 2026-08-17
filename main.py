@@ -1,4 +1,6 @@
 # -*- coding: UTF-8 -*-
+import logging
+import os
 from contextlib import asynccontextmanager
 import time
 import uvicorn
@@ -8,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, HTMLResponse
 from slowapi.errors import RateLimitExceeded
 from slowapi import _rate_limit_exceeded_handler
+from logging.handlers import TimedRotatingFileHandler
 
 from scheduler.scheduler import scheduler_manager
 from app.limiter import limiter
@@ -27,6 +30,23 @@ from app.routers.security_router import router as security_router
 from app.routers.sync_router import router as sync_router
 from app.routers.driver_router import router as driver_router
 from models import init_database
+
+
+def _setup_server_logging():
+    """uvicorn 控制台日志写入 logs/server.log（按天轮转，保留 30 天），终端仍实时显示"""
+    log_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'logs')
+    os.makedirs(log_dir, exist_ok=True)
+    handler = TimedRotatingFileHandler(
+        os.path.join(log_dir, 'server.log'), when='midnight',
+        backupCount=30, encoding='utf-8')
+    handler.setFormatter(logging.Formatter('%(asctime)s | %(levelname)s | %(message)s'))
+    for name in ('uvicorn', 'uvicorn.error', 'uvicorn.access'):
+        lg = logging.getLogger(name)
+        if not any(isinstance(h, TimedRotatingFileHandler) for h in lg.handlers):
+            lg.addHandler(handler)
+
+
+_setup_server_logging()
 
 
 @asynccontextmanager
@@ -298,5 +318,5 @@ if __name__ == "__main__":
         host=HOST,
         port=PORT,
         reload=DEBUG,           # DEBUG 模式下自动重载（单进程）
-        workers=1,              # 多 worker 需关闭 reload，由 Docker/gunicorn 管理
+        workers=1,              # 多 worker 需关闭 reload；本机部署保持单进程即可
     )
