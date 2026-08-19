@@ -8,6 +8,7 @@
 from typing import Optional
 
 from app.logger import logger
+from app.timezone import now_beijing
 from core.llm.client import LLMClient
 from core.generation.sql_generator import SqlGenerator
 from core.generation.audit import write_query_audit_log
@@ -42,7 +43,7 @@ class ChatSession:
             {"sql": ..., "is_valid": ..., "schema_csv": ..., "messages": [...]}
         """
         from datetime import datetime
-        start_time = datetime.now()
+        start_time = now_beijing()
 
         # Step 1: 关键词提取
         keywords = self.keyword_extractor.extract(query, top_k=10)
@@ -76,7 +77,7 @@ class ChatSession:
             sql, is_valid, error_msg, db_type, schema_name)
 
         # Step 8: 审计日志
-        duration_ms = int((datetime.now() - start_time).total_seconds() * 1000)
+        duration_ms = int((now_beijing() - start_time).total_seconds() * 1000)
         write_query_audit_log(
             self.user_id, self.user, query, generated_sql, sql,
             gateway_result=gateway_info, duration_ms=duration_ms

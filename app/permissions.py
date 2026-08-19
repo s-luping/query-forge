@@ -1,5 +1,5 @@
 # -*- coding: UTF-8 -*-
-"""权限校验 — admin/user 两级，授权基于外键关联表
+"""权限校验 — 用户通过角色继承数据与功能权限
 
 可见性语义（对 schema 与知识一致）：
     None  = 全部可见（admin 或持有 schema_id/knowledge_id 为 NULL 的"全量"授权）
@@ -11,7 +11,7 @@
     FILTER  — 可用不可见：允许 WHERE/JOIN/GROUP BY/HAVING，禁止 SELECT 列表
     NONE    — 完全不可用
 
-默认行为（无显式 UserColumnGrant 时）按 sensitive_level 推导：
+默认行为（无显式角色字段权限时）按 sensitive_level 推导：
     public        → SELECT
     internal      → SELECT
     sensitive     → FILTER
@@ -20,13 +20,45 @@
 from typing import Optional, Dict, List
 
 from models import SessionLocal
-from models.user import UserSchemaGrant, UserKnowledgeGrant, UserTableGrant
-from models.security import UserColumnGrant, RowScopeRule
 from models.schema import DbColumn, DbTable, DbSchema
+from models.role import RolePermission, UserRole
 
 
 def is_admin(user: dict) -> bool:
-    return user.get('role') == 'admin'
+    return user.get('role') == 'admin' or 'admin' in user.get('roles', [])
+
+
+def _role_ids(db, user: dict) -> list:
+    return [r[0] for r in db.query(UserRole.role_id).filter(
+        UserRole.user_id == user['user_id']).all()]
+
+
+def _role_grants(db, user: dict, resource_type: str):
+    role_ids = _role_ids(db, user)
+    if not role_ids:
+        return []
+    return db.query(RolePermission).filter(
+        RolePermission.role_id.in_(role_ids),
+        RolePermission.resource_type == resource_type).all()
+
+
+def has_permission(user: dict, permission_code: str,
+                   resource_type: str = 'route', resource_key: Optional[str] = None) -> bool:
+    """检查用户通过任一角色继承的功能权限。"""
+    if is_admin(user):
+        return True
+    db = SessionLocal()
+    try:
+        query = db.query(RolePermission).filter(
+            RolePermission.role_id.in_(_role_ids(db, user)),
+            RolePermission.permission_code == permission_code,
+            RolePermission.resource_type == resource_type,
+            RolePermission.access_type.in_(['ALLOW', 'SELECT']))
+        if resource_key is not None:
+            query = query.filter(RolePermission.resource_key == resource_key)
+        return query.first() is not None
+    finally:
+        db.close()
 
 
 def get_visible_schema_ids(user: dict) -> Optional[list]:
@@ -35,14 +67,13 @@ def get_visible_schema_ids(user: dict) -> Optional[list]:
         return None
     db = SessionLocal()
     try:
-        records = db.query(UserSchemaGrant).filter(
-            UserSchemaGrant.user_id == user['user_id']).all()
-        if not records:
+        grants = [g for g in _role_grants(db, user, 'schema')
+                  if g.access_type in ('ALLOW', 'SELECT')]
+        if not grants:
             return []
-        ids = [r.schema_id for r in records]
-        if None in ids:
+        if any(g.resource_id is None for g in grants):
             return None
-        return ids
+        return list({g.resource_id for g in grants})
     finally:
         db.close()
 
@@ -68,14 +99,13 @@ def get_visible_knowledge_ids(user: dict) -> Optional[list]:
         return None
     db = SessionLocal()
     try:
-        records = db.query(UserKnowledgeGrant).filter(
-            UserKnowledgeGrant.user_id == user['user_id']).all()
-        if not records:
+        grants = [g for g in _role_grants(db, user, 'knowledge')
+                  if g.access_type in ('ALLOW', 'SELECT')]
+        if not grants:
             return []
-        ids = [r.knowledge_id for r in records]
-        if None in ids:
+        if any(g.resource_id is None for g in grants):
             return None
-        return ids
+        return list({g.resource_id for g in grants})
     finally:
         db.close()
 
@@ -96,9 +126,11 @@ def get_table_grants_by_schema(user: dict) -> Dict[int, List[int]]:
         return {}
     db = SessionLocal()
     try:
-        rows = (db.query(DbTable.schema_id, UserTableGrant.table_id)
-                .join(UserTableGrant, UserTableGrant.table_id == DbTable.id)
-                .filter(UserTableGrant.user_id == user['user_id']).all())
+        rows = (db.query(DbTable.schema_id, RolePermission.resource_id)
+            .join(RolePermission, RolePermission.resource_id == DbTable.id)
+            .filter(RolePermission.role_id.in_(_role_ids(db, user)),
+                RolePermission.resource_type == 'table',
+                RolePermission.access_type == 'ALLOW').all())
         result: Dict[int, List[int]] = {}
         for schema_id, table_id in rows:
             result.setdefault(schema_id, []).append(table_id)
@@ -151,7 +183,7 @@ def get_column_access_map(user: dict, schema_name: Optional[str] = None,
     """获取字段级权限映射 {column_id: access_type}。
 
     admin → 全部 SELECT
-    非 admin → 先按 sensitive_level 推导默认值，再用 UserColumnGrant 覆盖
+    非 admin → 先按 sensitive_level 推导默认值，再用角色权限覆盖
     """
     if is_admin(user):
         return {}
@@ -171,15 +203,14 @@ def get_column_access_map(user: dict, schema_name: Optional[str] = None,
         for col_id, level in rows:
             result[col_id] = _SENSITIVE_DEFAULTS.get(level or 'public', 'SELECT')
 
-        # 覆盖显式授权
-        col_ids = list(result.keys())
-        if col_ids:
-            grants = db.query(UserColumnGrant).filter(
-                UserColumnGrant.user_id == user['user_id'],
-                UserColumnGrant.column_id.in_(col_ids)
-            ).all()
-            for g in grants:
-                result[g.column_id] = g.access_type
+        # 多角色授权取最高访问级别：SELECT > FILTER > NONE
+        role_grants = _role_grants(db, user, 'column')
+        rank = {'NONE': 0, 'FILTER': 1, 'SELECT': 2}
+        for grant in role_grants:
+            if grant.resource_id in result and grant.access_type in rank:
+                current = result[grant.resource_id]
+                if rank[grant.access_type] > rank.get(current, 0):
+                    result[grant.resource_id] = grant.access_type
 
         return result
     finally:
@@ -213,11 +244,14 @@ def get_row_scope_rules(user: dict, table_names: Optional[List[str]] = None) -> 
 
     db = SessionLocal()
     try:
-        q = (db.query(DbTable.name, RowScopeRule.filter_expression)
-             .join(RowScopeRule, RowScopeRule.table_id == DbTable.id)
-             .filter(RowScopeRule.user_id == user['user_id']))
-        if table_names:
-            q = q.filter(DbTable.name.in_(table_names))
-        return {r[0]: r[1] for r in q.all()}
+        result = {}
+        grants = _role_grants(db, user, 'row')
+        for grant in grants:
+            if grant.resource_id is None or not grant.filter_expression:
+                continue
+            table = db.query(DbTable).filter(DbTable.id == grant.resource_id).first()
+            if table and (not table_names or table.name in table_names):
+                result[table.name] = grant.filter_expression
+        return result
     finally:
         db.close()

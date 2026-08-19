@@ -2,268 +2,65 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>安全与审计</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>安全中心</title>
     <link rel="stylesheet" href="/static/css/bootstrap.min.css">
-    <link rel="stylesheet" href="/static/css/all.min.css">
     <link rel="stylesheet" href="/static/css/common.css">
     <style>
-        .stat-card { border-radius: 12px; padding: 20px; color: white; text-align: center; }
-        .stat-card .stat-value { font-size: 32px; font-weight: 700; }
-        .stat-card .stat-label { font-size: 13px; opacity: 0.9; margin-top: 4px; }
-        .bg-total { background: linear-gradient(135deg, #667eea, #764ba2); }
-        .bg-blocked { background: linear-gradient(135deg, #f5365c, #f56036); }
-        .bg-sensitive { background: linear-gradient(135deg, #ffb703, #fb8500); }
-        .bg-rate { background: linear-gradient(135deg, #2d6a4f, #40916c); }
-        .nav-tabs .nav-link { color: #495057; font-weight: 500; }
-        .nav-tabs .nav-link.active { color: #667eea; border-bottom: 2px solid #667eea; }
-        .sql-cell { max-width: 300px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
-        .sql-cell:hover { white-space: normal; }
-        .badge-select { background: #667eea; }
-        .badge-filter { background: #ffb703; color: #333; }
-        .badge-none { background: #f5365c; }
-        .badge-public { background: #40916c; }
-        .badge-sensitive { background: #ffb703; color: #333; }
-        .badge-confidential { background: #f5365c; }
-        .badge-internal { background: #2196f3; }
-        .filter-bar { background: white; padding: 12px 20px; border-bottom: 1px solid #eee; }
-        .form-select-sm, .form-control-sm { font-size: 13px; }
-        .empty-state { text-align: center; padding: 40px; color: #999; }
-        .modal-body pre { white-space: pre-wrap; word-break: break-all; font-size: 12px; background: #f8f9fa; padding: 12px; border-radius: 6px; }
-        .pointer { cursor: pointer; }
-        .text-monospace { font-family: 'Courier New', monospace; }
+        .stat-card { border-radius: 8px; padding: 18px; color: white; text-align: center; }
+        .stat-value { font-size: 28px; font-weight: 700; }
+        .stat-label { font-size: 13px; opacity: .9; }
+        .stat-total { background: #315c8c; } .stat-blocked { background: #b94a48; }
+        .stat-sensitive { background: #b87924; } .stat-rate { background: #34745d; }
+        .sql-cell { max-width: 280px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     </style>
 </head>
 <body>
-<div class="container-fluid">
-    <!-- 页内 tab 导航条（左侧菜单保留 hash 直达入口，页面内亦可切换） -->
-    <ul class="nav nav-tabs mb-3" id="pageTabs">
-        <li class="nav-item"><a class="nav-link active" href="#" onclick="return navTab('overview')">审计概览</a></li>
-        <li class="nav-item"><a class="nav-link" href="#" onclick="return navTab('logs')">审计日志</a></li>
-        <li class="nav-item"><a class="nav-link" href="#" onclick="return navTab('sensitive')">敏感字段</a></li>
-        <li class="nav-item"><a class="nav-link" href="#" onclick="return navTab('columnperm')">字段权限</a></li>
-        <li class="nav-item"><a class="nav-link" href="#" onclick="return navTab('rowscope')">行级规则</a></li>
+<div class="container-fluid py-3">
+    <ul class="nav nav-tabs mb-3">
+        <li class="nav-item"><button class="nav-link active" data-tab="overview">审计概览</button></li>
+        <li class="nav-item"><button class="nav-link" data-tab="logs">审计日志</button></li>
+        <li class="nav-item"><button class="nav-link" data-tab="sensitive">敏感字段</button></li>
     </ul>
-
-    <!-- ===== Tab: 审计概览 ===== -->
-    <div id="tab-overview">
-        <div class="row mb-3" id="statsRow">
-            <div class="col-md-3"><div class="stat-card bg-total"><div class="stat-value" id="stat-total">-</div><div class="stat-label">总查询数</div></div></div>
-            <div class="col-md-3"><div class="stat-card bg-blocked"><div class="stat-value" id="stat-blocked">-</div><div class="stat-label">被拦截查询</div></div></div>
-            <div class="col-md-3"><div class="stat-card bg-sensitive"><div class="stat-value" id="stat-sensitive">-</div><div class="stat-label">敏感字段命中</div></div></div>
-            <div class="col-md-3"><div class="stat-card bg-rate"><div class="stat-value" id="stat-rate">-</div><div class="stat-label">拦截率</div></div></div>
+    <section id="tab-overview">
+        <div class="row g-3 mb-3" id="stats"></div>
+        <div class="card"><div class="card-header">最近拦截记录</div><div class="card-body p-0">
+            <table class="table table-sm mb-0"><thead><tr><th>时间</th><th>用户</th><th>问题</th><th>原因</th></tr></thead>
+            <tbody id="recent"></tbody></table>
+        </div></div>
+    </section>
+    <section id="tab-logs" hidden>
+        <div class="card"><div class="card-header d-flex justify-content-between"><span>查询审计日志</span><button class="btn btn-sm btn-outline-secondary" onclick="loadLogs()">刷新</button></div>
+            <div class="card-body p-0"><table class="table table-sm mb-0"><thead><tr><th>时间</th><th>用户</th><th>问题</th><th>生成 SQL</th><th>状态</th></tr></thead><tbody id="logs"></tbody></table></div>
         </div>
-        <div class="card">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <span>最近拦截记录</span>
-                <button class="btn btn-sm btn-outline-secondary" onclick="loadOverview()"><i class="fas fa-sync"></i> 刷新</button>
-            </div>
-            <div class="card-body p-0">
-                <table class="table table-hover table-sm mb-0">
-                    <thead><tr><th>时间</th><th>用户</th><th>问题</th><th>拦截原因</th><th>耗时</th></tr></thead>
-                    <tbody id="recentBlocked"><tr><td colspan="5" class="empty-state">加载中...</td></tr></tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-
-    <!-- ===== Tab: 审计日志 ===== -->
-    <div id="tab-logs" style="display:none;">
-        <div class="card">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <span>查询审计日志</span>
-                <div class="d-flex align-items-center gap-2">
-                    <div class="form-check form-switch">
-                        <input class="form-check-input" type="checkbox" id="logBlockedOnly" onchange="loadLogs()">
-                        <label class="form-check-label" for="logBlockedOnly">仅看拦截</label>
-                    </div>
-                    <button class="btn btn-sm btn-outline-secondary" onclick="loadLogs()"><i class="fas fa-sync"></i></button>
-                </div>
-            </div>
-            <div class="card-body p-0">
-                <table class="table table-hover table-sm mb-0">
-                    <thead><tr><th>时间</th><th>用户</th><th>问题</th><th>生成SQL</th><th>修改后SQL</th><th>命中表</th><th>命中字段</th><th>状态</th><th>耗时</th><th>操作</th></tr></thead>
-                    <tbody id="logsTable"><tr><td colspan="10" class="empty-state">加载中...</td></tr></tbody>
-                </table>
-            </div>
-            <div class="card-footer d-flex justify-content-between align-items-center">
-                <span class="text-muted" id="logsPageInfo" style="font-size:12px;"></span>
-                <div class="btn-group btn-group-sm">
-                    <button class="btn btn-outline-secondary" id="logsPrev" onclick="logsPrevPage()">上一页</button>
-                    <button class="btn btn-outline-secondary" id="logsNext" onclick="logsNextPage()">下一页</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- ===== Tab: 敏感字段 ===== -->
-    <div id="tab-sensitive" style="display:none;">
-        <div class="card">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <span>敏感字段管理</span>
-                <div class="d-flex align-items-center gap-2">
-                    <select class="form-select form-select-sm" id="sensSchemaFilter" onchange="loadSensitive()" style="width:160px;">
-                        <option value="">全部数据库</option>
-                    </select>
-                    <select class="form-select form-select-sm" id="sensTableFilter" onchange="loadSensitive()" style="width:160px;">
-                        <option value="">全部表</option>
-                    </select>
-                    <button class="btn btn-sm btn-outline-secondary" onclick="loadSensitive()"><i class="fas fa-sync"></i></button>
-                </div>
-            </div>
-            <div class="card-body p-0">
-                <table class="table table-hover table-sm mb-0">
-                    <thead><tr><th>数据库</th><th>表名</th><th>字段名</th><th>当前等级</th><th>修改为</th></tr></thead>
-                    <tbody id="sensitiveTable"><tr><td colspan="5" class="empty-state">加载中...</td></tr></tbody>
-                </table>
-                <div class="pager-wrap" id="sensPager"></div>
-            </div>
-        </div>
-        <div class="card">
-            <div class="card-header">敏感等级说明</div>
-            <div class="card-body" style="font-size:13px;">
-                <div class="row">
-                    <div class="col-md-3"><span class="badge bg-public">公开</span> public — 默认 SELECT 权限</div>
-                    <div class="col-md-3"><span class="badge bg-internal">内部</span> internal — 默认 SELECT 权限</div>
-                    <div class="col-md-3"><span class="badge bg-sensitive">敏感</span> sensitive — 默认 FILTER 权限（可用不可见）</div>
-                    <div class="col-md-3"><span class="badge bg-confidential">机密</span> confidential — 默认 NONE 权限（完全不可用）</div>
-                </div>
-                <hr class="my-2">
-                <p class="text-muted mb-0">权限级别：SELECT（完全可读）/ FILTER（可用不可见，允许 WHERE/JOIN/GROUP BY，禁止 SELECT 列表）/ NONE（完全不可用）</p>
-            </div>
-        </div>
-    </div>
-
-    <!-- ===== Tab: 字段权限 ===== -->
-    <div id="tab-columnperm" style="display:none;">
-        <div class="card">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <span>字段级权限管理（按用户配置）</span>
-                <div class="d-flex align-items-center gap-2">
-                    <select class="form-select form-select-sm" id="cpUserSelect" onchange="loadColumnPerms()" style="width:180px;">
-                        <option value="">选择用户...</option>
-                    </select>
-                    <button class="btn btn-sm btn-outline-secondary" onclick="loadColumnPerms()"><i class="fas fa-sync"></i></button>
-                </div>
-            </div>
-            <div class="card-body p-0">
-                <table class="table table-hover table-sm mb-0">
-                    <thead><tr><th>数据库</th><th>表名</th><th>字段名</th><th>敏感等级</th><th>访问级别</th><th>操作</th></tr></thead>
-                    <tbody id="columnPermTable"><tr><td colspan="6" class="empty-state">请先选择用户</td></tr></tbody>
-                </table>
-            </div>
-        </div>
-        <div class="card">
-            <div class="card-header">新增 / 修改字段权限</div>
-            <div class="card-body">
-                <div class="row align-items-end">
-                    <div class="col-md-3">
-                        <label class="form-label small">选择用户</label>
-                        <select class="form-select form-select-sm" id="cpNewUser">
-                            <option value="">选择用户...</option>
-                        </select>
-                    </div>
-                    <div class="col-md-3">
-                        <label class="form-label small">选择表</label>
-                        <select class="form-select form-select-sm" id="cpNewTable" onchange="loadColumnPermColumns()">
-                            <option value="">选择表...</option>
-                        </select>
-                    </div>
-                    <div class="col-md-3">
-                        <label class="form-label small">选择字段</label>
-                        <select class="form-select form-select-sm" id="cpNewColumn">
-                            <option value="">选择字段...</option>
-                        </select>
-                    </div>
-                    <div class="col-md-3">
-                        <label class="form-label small">访问级别</label>
-                        <div class="d-flex gap-2">
-                            <select class="form-select form-select-sm" id="cpNewAccess">
-                                <option value="SELECT">SELECT（完全可读）</option>
-                                <option value="FILTER">FILTER（可用不可见）</option>
-                                <option value="NONE">NONE（完全不可用）</option>
-                            </select>
-                            <button class="btn btn-primary btn-sm" style="white-space:nowrap;" onclick="addColumnPerm()">添加</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="card">
-            <div class="card-header">使用说明</div>
-            <div class="card-body" style="font-size:13px;">
-                <p class="mb-1"><strong>字段级权限</strong>按「用户 × 字段」配置访问级别，优先级高于敏感等级默认策略。</p>
-                <p class="mb-1 text-muted">SELECT：可出现在 SELECT 列表中；FILTER：可用于 WHERE/JOIN/GROUP BY 但不可 SELECT；NONE：完全不可用（查询引用即拦截）。</p>
-                <p class="mb-0 text-muted">未配置的字段按敏感等级走默认策略（public/internal=SELECT，sensitive=FILTER，confidential=NONE）。管理员不受限制。</p>
-            </div>
-        </div>
-    </div>
-
-    <!-- ===== Tab: 行级规则 ===== -->
-    <div id="tab-rowscope" style="display:none;">
-        <div class="card">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <span>行级过滤规则</span>
-                <div class="d-flex align-items-center gap-2">
-                    <select class="form-select form-select-sm" id="rsUserSelect" onchange="loadRowScopes()" style="width:180px;">
-                        <option value="">选择用户...</option>
-                    </select>
-                    <button class="btn btn-sm btn-outline-secondary" onclick="loadRowScopes()"><i class="fas fa-sync"></i></button>
-                </div>
-            </div>
-            <div class="card-body p-0">
-                <table class="table table-hover table-sm mb-0">
-                    <thead><tr><th>数据库</th><th>表名</th><th>过滤表达式</th><th>操作</th></tr></thead>
-                    <tbody id="rowScopeTable"><tr><td colspan="4" class="empty-state">请先选择用户</td></tr></tbody>
-                </table>
-            </div>
-        </div>
-        <div class="card">
-            <div class="card-header">新增行级规则</div>
-            <div class="card-body">
-                <div class="row align-items-end">
-                    <div class="col-md-3">
-                        <label class="form-label small">选择表</label>
-                        <select class="form-select form-select-sm" id="rsNewTable">
-                            <option value="">选择表...</option>
-                        </select>
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label small">过滤表达式（SQL WHERE 条件，如 <code>dept_id = 10</code>）</label>
-                        <input type="text" class="form-control form-control-sm text-monospace" id="rsNewExpr" placeholder="例: dept_id = 10 AND status = 'active'">
-                    </div>
-                    <div class="col-md-3">
-                        <button class="btn btn-primary btn-sm w-100" onclick="addRowScope()">添加规则</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="card">
-            <div class="card-header">使用说明</div>
-            <div class="card-body" style="font-size:13px;">
-                <p class="mb-1"><strong>行级过滤</strong>会在 SQL 执行前自动注入 WHERE 条件，限制用户只能看到满足条件的数据行。</p>
-                <p class="mb-1 text-muted">例如：为用户设置 <code>employees</code> 表的 <code>dept_id = 10</code>，则该用户查询时生成的 SQL 会自动追加 <code>AND dept_id = 10</code>。</p>
-                <p class="mb-0 text-muted">管理员不受行级规则限制。</p>
-            </div>
-        </div>
-    </div>
+    </section>
+    <section id="tab-sensitive" hidden>
+        <div class="card"><div class="card-header">敏感字段</div><div class="card-body p-0">
+            <table class="table table-sm mb-0"><thead><tr><th>数据库</th><th>表</th><th>字段</th><th>当前等级</th><th>修改</th></tr></thead><tbody id="sensitive"></tbody></table>
+        </div></div>
+    </section>
 </div>
-
-<!-- Detail Modal -->
-<div class="modal fade" id="detailModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">审计日志详情</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body" id="detailBody"></div>
-        </div>
-    </div>
-</div>
-
-<script src="/static/js/bootstrap.bundle.min.js"></script>
 <script src="/static/js/app_common.js"></script>
-<script src="/static/js/security_manage.js"></script>
+<script>
+const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+async function get(url, options) { const response = await apiRequest(url, options); return response.json(); }
+async function loadStats() {
+    const data = await get('/api/audit/stats');
+    document.getElementById('stats').innerHTML = [['total_queries','总查询数','stat-total'],['blocked_queries','被拦截','stat-blocked'],['sensitive_hits','敏感命中','stat-sensitive'],['block_rate','拦截率','stat-rate']].map(([key, label, cls]) => `<div class="col-md-3"><div class="stat-card ${cls}"><div class="stat-value">${esc(data[key])}</div><div class="stat-label">${label}</div></div></div>`).join('');
+    const logs = await get('/api/audit/logs?blocked_only=true&limit=10');
+    document.getElementById('recent').innerHTML = logs.items.map(item => `<tr><td>${esc(item.created_at)}</td><td>${esc(item.username)}</td><td>${esc(item.query)}</td><td>${esc(item.block_reason)}</td></tr>`).join('') || '<tr><td colspan="4" class="text-center text-muted">暂无记录</td></tr>';
+}
+async function loadLogs() {
+    const data = await get('/api/audit/logs?limit=100');
+    document.getElementById('logs').innerHTML = data.items.map(item => `<tr><td>${esc(item.created_at)}</td><td>${esc(item.username)}</td><td>${esc(item.query)}</td><td class="sql-cell" title="${esc(item.generated_sql)}">${esc(item.generated_sql)}</td><td>${item.was_blocked ? '已拦截' : '通过'}</td></tr>`).join('');
+}
+async function loadSensitive() {
+    const data = await get('/api/audit/all-columns');
+    document.getElementById('sensitive').innerHTML = data.items.map(item => `<tr><td>${esc(item.schema_name)}</td><td>${esc(item.table_name)}</td><td>${esc(item.column_name)}</td><td>${esc(item.sensitive_level)}</td><td><select class="form-select form-select-sm" onchange="updateSensitive(${item.column_id}, this.value)"><option value="public" ${item.sensitive_level === 'public' ? 'selected' : ''}>public</option><option value="internal" ${item.sensitive_level === 'internal' ? 'selected' : ''}>internal</option><option value="sensitive" ${item.sensitive_level === 'sensitive' ? 'selected' : ''}>sensitive</option><option value="confidential" ${item.sensitive_level === 'confidential' ? 'selected' : ''}>confidential</option></select></td></tr>`).join('');
+}
+async function updateSensitive(columnId, level) { await get('/api/audit/sensitive-level', { method: 'PUT', body: JSON.stringify({column_id: columnId, sensitive_level: level}) }); }
+document.querySelectorAll('[data-tab]').forEach(button => button.addEventListener('click', () => { document.querySelectorAll('[data-tab]').forEach(item => item.classList.remove('active')); button.classList.add('active'); ['overview','logs','sensitive'].forEach(tab => document.getElementById('tab-' + tab).hidden = tab !== button.dataset.tab); if (button.dataset.tab === 'logs') loadLogs(); if (button.dataset.tab === 'sensitive') loadSensitive(); }));
+loadStats();
+</script>
 </body>
 </html>

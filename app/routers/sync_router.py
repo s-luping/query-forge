@@ -15,6 +15,7 @@ from pydantic import BaseModel
 
 from app.auth import AdminUser
 from app.logger import logger, log_audit
+from app.timezone import now_beijing
 from app.security.crypto import encrypt_secret, decrypt_secret, mask_api_key
 from models import SessionLocal
 from models.sync import DataSource, SyncJobConfig, SyncRunLog, SchemaChangeLog
@@ -217,7 +218,7 @@ def test_datasource(ds_id: int, user: AdminUser):
         ok, msg = connector.test_connection()
         connector.close()
 
-        ds.last_tested_at = datetime.now()
+        ds.last_tested_at = now_beijing()
         ds.status = 'active' if ok else 'error'
         ds.last_error = '' if ok else msg[:500]
         db.commit()
@@ -529,7 +530,7 @@ def approve_change(change_id: int, user: AdminUser):
 
         ch.approval_status = 'approved'
         ch.approved_by = user['user_id']
-        ch.approved_at = datetime.now()
+        ch.approved_at = now_beijing()
         db.commit()
 
         log_audit(user, "approve_change",
@@ -553,7 +554,7 @@ def reject_change(change_id: int, user: AdminUser):
 
         ch.approval_status = 'rejected'
         ch.approved_by = user['user_id']
-        ch.approved_at = datetime.now()
+        ch.approved_at = now_beijing()
         db.commit()
 
         log_audit(user, "reject_change", f"id={change_id}, {ch.object_name}")

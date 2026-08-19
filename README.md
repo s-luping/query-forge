@@ -98,9 +98,9 @@ QueryForge/
 │       └── system/
 │           ├── system_settings.html # 系统设置
 │           ├── user_manage.html    # 用户管理（管理员 CRUD）
-│           ├── permission_manage.html # 权限管理（数据源→库→表→字段→知识库）
+│           ├── role_manage.html       # 角色与权限（用户→角色→路由/页面/库表字段）
 │           ├── sync_manage.html    # 元数据同步（数据源/任务/历史/变更）
-│           ├── security_manage.html # 安全审计（日志/敏感字段/行级规则）
+│           ├── security_manage.html # 安全中心（审计日志/敏感字段）
 │           └── driver_manage.html  # 数据库驱动管理
 ├── db/                     # SQLite 双库存储（运行时自动创建）
 │   ├── queryforge.db        # 主库：用户/配置/Schema/知识/对话/统计/设置

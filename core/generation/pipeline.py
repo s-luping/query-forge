@@ -11,6 +11,7 @@ from datetime import datetime
 from typing import List, Dict, Optional, Tuple
 
 from app.logger import pipeline_logger
+from app.timezone import now_beijing
 from core.llm.client import LLMClient
 from core.generation.sql_generator import SqlGenerator
 from core.generation.audit import write_query_audit_log
@@ -49,7 +50,7 @@ class SQLPipeline:
         """记录步骤日志"""
         log_entry = {
             "step": step_name,
-            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "timestamp": now_beijing().strftime("%Y-%m-%d %H:%M:%S"),
             "data": data
         }
         self._pipeline_log.append(log_entry)
@@ -68,13 +69,13 @@ class SQLPipeline:
             "user_id": self.user_id,
             "query": query,
             "schema_name": schema_name or "全部",
-            "start_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            "start_time": now_beijing().strftime("%Y-%m-%d %H:%M:%S")
         })
 
     def _log_pipeline_end(self, result: dict):
         """记录流程结束"""
         self._log_step("PIPELINE_END", {
-            "end_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "end_time": now_beijing().strftime("%Y-%m-%d %H:%M:%S"),
             "is_valid": result.get("is_valid"),
             "sql_length": len(result.get("sql", "")),
             "used_vector_search": result.get("used_vector_search"),
@@ -227,7 +228,7 @@ class SQLPipeline:
         Returns:
             Dict: 包含sql, is_valid, error_message等字段
         """
-        start_time = datetime.now()
+        start_time = now_beijing()
         self._log_pipeline_start(query, schema_name)
 
         # 向量索引加载（失败自动降级 DB 查询）
@@ -282,7 +283,7 @@ class SQLPipeline:
             except Exception as e:
                 self._log_step("STEP7_GATEWAY_ERROR", {"error": str(e)}, level="ERROR")
 
-        duration_ms = int((datetime.now() - start_time).total_seconds() * 1000)
+        duration_ms = int((now_beijing() - start_time).total_seconds() * 1000)
 
         # Step 8: 审计日志
         write_query_audit_log(

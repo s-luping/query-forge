@@ -9,6 +9,7 @@
 """
 from datetime import datetime
 from typing import Optional, Dict
+from app.timezone import now_beijing
 
 
 def set_index_meta(schema_name: str, status: str, field_count: int = 0,
@@ -39,7 +40,7 @@ def set_index_meta(schema_name: str, status: str, field_count: int = 0,
                 if error_msg:
                     row.error_message = error_msg  # type: ignore[assignment]
                 if status == 'ready':
-                    row.built_at = datetime.now()  # type: ignore[assignment]
+                    row.built_at = now_beijing()  # type: ignore[assignment]
             else:
                 db.add(VectorIndexMeta(
                     schema_name=schema_name,
@@ -48,7 +49,7 @@ def set_index_meta(schema_name: str, status: str, field_count: int = 0,
                     table_count=table_count,
                     file_path=file_path,
                     error_message=error_msg,
-                    built_at=datetime.now() if status == 'ready' else None
+                    built_at=now_beijing() if status == 'ready' else None
                 ))
             db.commit()
         finally:

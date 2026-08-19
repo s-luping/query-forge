@@ -15,7 +15,7 @@ from app.logger import logger, log_audit
 from app.permissions import get_visible_knowledge_ids, is_admin
 from models import SessionLocal
 from models.knowledge import KnowledgeItem
-from models.user import UserKnowledgeGrant
+from models.user import User
 
 router = APIRouter()
 
@@ -103,14 +103,14 @@ def get_knowledge_safe(user_id: int, knowledge_id: int = None) -> dict:
         ).first()
         if not item:
             return {}
-        # 授权校验：admin 或持有该知识授权（含"全部可见"授权）
-        from models.user import User, UserKnowledgeGrant
+        from models.role import Role, UserRole
         usr = db.query(User).filter(User.id == user_id).first()
-        if usr and usr.role != 'admin':
-            grants = db.query(UserKnowledgeGrant).filter(
-                UserKnowledgeGrant.user_id == user_id).all()
-            ids = [g.knowledge_id for g in grants]
-            if None not in ids and knowledge_id not in ids:
+        roles = [row[0] for row in db.query(Role.code).join(
+            UserRole, UserRole.role_id == Role.id).filter(UserRole.user_id == user_id).all()]
+        if not (usr and is_admin({'user_id': user_id, 'role': usr.role, 'roles': roles})):
+            visible_ids = get_visible_knowledge_ids({
+                'user_id': user_id, 'role': usr.role if usr else 'user', 'roles': roles})
+            if visible_ids is not None and knowledge_id not in visible_ids:
                 return {}
         return {
             'id': item.id,
@@ -147,15 +147,6 @@ def create_knowledge(
         )
         db.add(item)
         db.flush()
-
-        # 自动将创建者加入权限
-        existing = db.query(UserKnowledgeGrant).filter(
-            UserKnowledgeGrant.user_id == user['user_id'],
-            UserKnowledgeGrant.knowledge_id == item.id
-        ).first()
-        if not existing:
-            db.add(UserKnowledgeGrant(user_id=user['user_id'], knowledge_id=item.id))
-
         db.commit()
         db.refresh(item)
         log_audit(user, "create_knowledge", f"title={data.title}")

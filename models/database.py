@@ -9,16 +9,20 @@
 - 业务代码保持短事务：一个请求内多次小 commit，避免长事务持锁
 """
 import os
-import secrets
-import string
 import time
 from datetime import datetime
 
 from sqlalchemy import create_engine, event, text
 from sqlalchemy.orm import sessionmaker
 
-from app.config import MAIN_DB_PATH, TELEMETRY_DB_PATH
+from app.config import (
+    MAIN_DB_PATH,
+    TELEMETRY_DB_PATH,
+    SYSTEM_SETTING_DEFAULTS,
+    initialize_runtime_secrets,
+)
 from app.logger import logger
+from app.timezone import now_beijing
 
 
 def _make_pragma(foreign_keys: bool):
@@ -67,36 +71,51 @@ TelemetrySessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=eng
 # 初始化与种子数据
 # ═══════════════════════════════════════════════════════════════════
 
-# 系统配置种子：key → (默认值, 分类, 可编辑)
-_SEED_SETTINGS = {
-    'SECRET_KEY': (None, 'security', 0),   # None = 启动时随机生成
-    'ACCESS_TOKEN_EXPIRE_MINUTES': ('4320', 'auth', 1),
-    'ALLOW_REGISTER': ('true', 'auth', 1),  # 是否开放自助注册（企业内部建议关闭，由管理员创建账号）
-    'EMBEDDING_MODEL_READY': ('false', 'runtime', 0),
-    'EMBEDDING_MODEL_PATH': ('', 'runtime', 0),
-    'VECTOR_INDEX_THRESHOLD': ('50', 'vector', 1),
-    'FIELD_RECALL_TOP_K': ('20', 'vector', 1),
-    'MAX_TABLES': ('10', 'vector', 1),
-}
-
-
 def _seed_system_settings():
     from models.system import SystemSetting
 
     db = SessionLocal()
     try:
-        for key, (default_value, category, editable) in _SEED_SETTINGS.items():
+        for key, (default_value, category, editable) in SYSTEM_SETTING_DEFAULTS.items():
             if db.query(SystemSetting).filter(SystemSetting.key == key).first():
                 continue
-            if default_value is None:  # SECRET_KEY 随机生成
-                chars = string.ascii_letters + string.digits
-                default_value = ''.join(secrets.choice(chars) for _ in range(36))
             db.add(SystemSetting(key=key, value=default_value,
                                  category=category, is_editable=editable))
             logger.info(f"已初始化系统配置 {key} (category={category})")
         db.commit()
     except Exception as e:
         logger.warning(f"初始化系统配置失败: {e}")
+        db.rollback()
+    finally:
+        db.close()
+
+
+def _seed_roles():
+    from models.role import Role, UserRole
+    from models.user import User
+
+    db = SessionLocal()
+    try:
+        admin_role = db.query(Role).filter(Role.code == 'admin').first()
+        if not admin_role:
+            admin_role = Role(name='管理员', code='admin', description='系统全部权限', is_system=1)
+            db.add(admin_role)
+            db.flush()
+        user_role = db.query(Role).filter(Role.code == 'user').first()
+        if not user_role:
+            user_role = Role(name='普通用户', code='user', description='默认用户权限', is_system=1)
+            db.add(user_role)
+            db.flush()
+        admin = db.query(User).filter(User.role == 'admin').first()
+        if admin and not db.query(UserRole).filter(
+                UserRole.user_id == admin.id, UserRole.role_id == admin_role.id).first():
+            db.add(UserRole(user_id=admin.id, role_id=admin_role.id))
+        for item in db.query(User).filter(User.role != 'admin').all():
+            if not db.query(UserRole).filter(UserRole.user_id == item.id).first():
+                db.add(UserRole(user_id=item.id, role_id=user_role.id))
+        db.commit()
+    except Exception as e:
+        logger.warning(f"初始化角色失败: {e}")
         db.rollback()
     finally:
         db.close()
@@ -115,7 +134,7 @@ def create_default_admin():
             db.add(User(
                 username='admin', password=hash_password(pwd), role='admin',
                 description='系统管理员', is_active=1,
-                pwd_ts=time.time(), register_date=datetime.now()
+                pwd_ts=time.time(), register_date=now_beijing()
             ))
             db.commit()
             logger.info("默认管理员用户创建成功: admin")
@@ -134,45 +153,18 @@ def create_default_admin():
         db.close()
 
 
-def _migrate_columns():
-    """轻量迁移：给已有表补充新增列（create_all 不会 ALTER 已有表）"""
-    from sqlalchemy import inspect, text
-    insp = inspect(engine_main)
-
-    migrations = [
-        ('db_columns', 'sensitive_level', "ALTER TABLE db_columns ADD COLUMN sensitive_level VARCHAR(20) DEFAULT 'public'"),
-        ('db_columns', 'is_dimension', "ALTER TABLE db_columns ADD COLUMN is_dimension BOOLEAN DEFAULT 0"),
-        ('db_columns', 'is_measure', "ALTER TABLE db_columns ADD COLUMN is_measure BOOLEAN DEFAULT 0"),
-        ('users', 'pwd_ts', "ALTER TABLE users ADD COLUMN pwd_ts FLOAT DEFAULT 0"),
-        ('db_schemas', 'datasource_id', "ALTER TABLE db_schemas ADD COLUMN datasource_id INTEGER"),
-    ]
-
-    db = SessionLocal()
-    try:
-        for table_name, col_name, ddl in migrations:
-            existing_cols = [c['name'] for c in insp.get_columns(table_name)]
-            if col_name not in existing_cols:
-                db.execute(text(ddl))
-                logger.info(f"迁移: {table_name} 新增列 {col_name}")
-        db.commit()
-    except Exception as e:
-        logger.warning(f"迁移列失败(可能已存在): {e}")
-        db.rollback()
-    finally:
-        db.close()
-
-
 def init_database():
     """初始化双库表结构 + 种子数据"""
+    initialize_runtime_secrets()
     from models.base import MainBase, TelemetryBase
     # 触发所有模型注册
-    from models import user, schema, knowledge, conversation, llm, system, vector_index, security, sync  # noqa: F401
+    from models import user, role, schema, knowledge, conversation, llm, system, vector_index, security, sync  # noqa: F401
 
     MainBase.metadata.create_all(engine_main)
     TelemetryBase.metadata.create_all(engine_telemetry)
     logger.info(f"主库表创建/检查完成: {MAIN_DB_PATH}")
     logger.info(f"遥测库表创建/检查完成: {TELEMETRY_DB_PATH}")
 
-    _migrate_columns()
     _seed_system_settings()
     create_default_admin()
+    _seed_roles()

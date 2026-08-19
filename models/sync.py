@@ -16,6 +16,7 @@
 from datetime import datetime
 from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime, ForeignKey, UniqueConstraint
 from models.base import MainBase
+from app.timezone import now_beijing
 
 
 class DataSource(MainBase):
@@ -34,8 +35,8 @@ class DataSource(MainBase):
     last_error = Column(Text, default='', comment='最近一次连接错误')
     last_tested_at = Column(DateTime, comment='最后测试时间')
     created_by = Column(Integer, ForeignKey('users.id'), nullable=True, comment='创建者')
-    created_at = Column(DateTime, default=datetime.now, comment='创建时间')
-    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment='更新时间')
+    created_at = Column(DateTime, default=now_beijing, comment='创建时间（北京时间）')
+    updated_at = Column(DateTime, default=now_beijing, onupdate=now_beijing, comment='更新时间（北京时间）')
 
 
 class SyncJobConfig(MainBase):
@@ -54,8 +55,8 @@ class SyncJobConfig(MainBase):
     exclude_tables = Column(Text, default='', comment='排除的表名(逗号分隔)')
     last_synced_at = Column(DateTime, comment='最后同步时间')
     last_sync_status = Column(String(20), default='', comment='最后同步状态: success/failed/running')
-    created_at = Column(DateTime, default=datetime.now, comment='创建时间')
-    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment='更新时间')
+    created_at = Column(DateTime, default=now_beijing, comment='创建时间（北京时间）')
+    updated_at = Column(DateTime, default=now_beijing, onupdate=now_beijing, comment='更新时间（北京时间）')
 
 
 class SyncRunLog(MainBase):
@@ -64,7 +65,7 @@ class SyncRunLog(MainBase):
     id = Column(Integer, primary_key=True, autoincrement=True, comment='主键')
     job_id = Column(Integer, ForeignKey('sync_job_configs.id'), nullable=False, index=True, comment='同步任务ID')
     triggered_by = Column(String(50), default='scheduler', comment='触发者: scheduler/manual/<username>')
-    started_at = Column(DateTime, default=datetime.now, comment='开始时间')
+    started_at = Column(DateTime, default=now_beijing, comment='开始时间（北京时间）')
     finished_at = Column(DateTime, comment='结束时间')
     status = Column(String(20), default='running', comment='状态: running/success/failed')
     tables_total = Column(Integer, default=0, comment='源库表总数')
@@ -97,4 +98,4 @@ class SchemaChangeLog(MainBase):
                              comment='审批状态: auto_applied/pending/approved/rejected/ignored')
     approved_by = Column(Integer, nullable=True, comment='审批人ID')
     approved_at = Column(DateTime, nullable=True, comment='审批时间')
-    created_at = Column(DateTime, default=datetime.now, index=True, comment='创建时间')
+    created_at = Column(DateTime, default=now_beijing, index=True, comment='创建时间（北京时间）')

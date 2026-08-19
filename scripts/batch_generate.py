@@ -223,7 +223,8 @@ def save_results(results: list, file_path: str):
 
 def log_message(message: str, log_file: str):
     """记录日志"""
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    from app.timezone import now_beijing
+    timestamp = now_beijing().strftime("%Y-%m-%d %H:%M:%S")
     log_line = f"[{timestamp}] {message}"
     print(log_line)
     os.makedirs(os.path.dirname(log_file), exist_ok=True)

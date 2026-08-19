@@ -11,6 +11,7 @@ from app.auth import (authenticate_user, create_access_token, hash_password,
 from app.config import COOKIE_SECURE
 from app.limiter import limiter
 from app.logger import logger
+from app.timezone import now_beijing
 from models import AppSessionLocal
 from models.system import SystemSetting
 from models.user import User
@@ -63,7 +64,7 @@ def login(request: LoginRequest):
         try:
             db_user = db.query(User).filter(User.id == user.id).first()
             if db_user:
-                db_user.last_login = datetime.now()
+                db_user.last_login = now_beijing()
                 db.commit()
         finally:
             db.close()

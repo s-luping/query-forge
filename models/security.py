@@ -1,43 +1,11 @@
-"""安全模型 — 字段级权限 + 行级过滤 + 查询审计
+"""安全模型 — 查询审计。
 
-权限三级模型：
-    SELECT  — 完全可读，可出现在 SQL 任意子句
-    FILTER  — 可用不可见：允许 WHERE/JOIN/GROUP BY/HAVING，禁止 SELECT 列表
-    NONE    — 完全不可用
-
-默认行为（无显式授权记录时）按 sensitive_level 推导：
-    public        → SELECT
-    internal      → SELECT
-    sensitive     → FILTER
-    confidential  → NONE
+字段敏感等级和角色字段权限由 schema 模型与 models.role 共同管理。
 """
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime, ForeignKey, UniqueConstraint
+from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime, ForeignKey
 from models.base import MainBase
-
-
-class UserColumnGrant(MainBase):
-    """用户字段级授权 — 覆盖 sensitive_level 的默认推导"""
-    __tablename__ = 'user_column_grants'
-    __table_args__ = (UniqueConstraint('user_id', 'column_id', name='uix_user_column_grant'),)
-    id = Column(Integer, primary_key=True, autoincrement=True, comment='主键')
-    user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True, comment='用户ID')
-    column_id = Column(Integer, ForeignKey('db_columns.id'), nullable=False, index=True, comment='字段ID')
-    access_type = Column(String(10), nullable=False, default='SELECT',
-                         comment='权限级别: SELECT/FILTER/NONE')
-    created_at = Column(DateTime, default=datetime.now, comment='创建时间')
-
-
-class RowScopeRule(MainBase):
-    """行级数据范围规则 — SQL 执行前注入 WHERE 条件"""
-    __tablename__ = 'row_scope_rules'
-    __table_args__ = (UniqueConstraint('user_id', 'table_id', name='uix_row_scope_rule'),)
-    id = Column(Integer, primary_key=True, autoincrement=True, comment='主键')
-    user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True, comment='用户ID')
-    table_id = Column(Integer, ForeignKey('db_tables.id'), nullable=False, index=True, comment='表ID')
-    filter_expression = Column(Text, nullable=False, comment='行级过滤表达式(如 dept_id = 10)')
-    created_at = Column(DateTime, default=datetime.now, comment='创建时间')
-    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment='更新时间')
+from app.timezone import now_beijing
 
 
 class QueryAuditLog(MainBase):
@@ -56,4 +24,4 @@ class QueryAuditLog(MainBase):
     block_reason = Column(String(500), comment='拦截原因')
     pipeline_log = Column(Text, comment='流程日志(JSON)')
     duration_ms = Column(Integer, default=0, comment='耗时(毫秒)')
-    created_at = Column(DateTime, default=datetime.now, index=True, comment='创建时间')
+    created_at = Column(DateTime, default=now_beijing, index=True, comment='创建时间（北京时间）')

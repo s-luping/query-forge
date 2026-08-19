@@ -12,6 +12,7 @@ from datetime import datetime
 from typing import List, Optional, Tuple
 
 from app.logger import logger
+from app.timezone import now_beijing
 from app.security.crypto import decrypt_secret
 from models import SessionLocal
 from models.schema import DbSchema, DbTable, DbColumn
@@ -44,7 +45,7 @@ class SyncEngine:
             run_log = SyncRunLog(
                 job_id=self.job.id,
                 triggered_by=self.triggered_by,
-                started_at=datetime.now(),
+                started_at=now_beijing(),
                 status='running',
             )
             db.add(run_log)
@@ -88,7 +89,7 @@ class SyncEngine:
             self._log_changes(db, run_log.id, changes)
 
             # 8. 完成
-            run_log.finished_at = datetime.now()
+            run_log.finished_at = now_beijing()
             run_log.status = 'success'
             run_log.tables_total = len(source_tables)
             run_log.tables_synced = stats['tables_touched']
@@ -106,7 +107,7 @@ class SyncEngine:
             db.commit()
 
             # 9. 更新任务状态
-            self.job.last_synced_at = datetime.now()
+            self.job.last_synced_at = now_beijing()
             self.job.last_sync_status = 'success'
             db.commit()
 
@@ -121,7 +122,7 @@ class SyncEngine:
             if self._run_log:
                 self._run_log.status = 'failed'
                 self._run_log.error_message = str(e)[:2000]
-                self._run_log.finished_at = datetime.now()
+                self._run_log.finished_at = now_beijing()
                 self._run_log.duration_ms = int((time.time() - start) * 1000)
                 db.commit()
             self.job.last_sync_status = 'failed'

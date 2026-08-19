@@ -6,6 +6,7 @@
 from datetime import datetime, timedelta
 
 from app.logger import logger
+from app.timezone import now_beijing
 from models import TelemetrySessionLocal
 from models.llm import LLMCall, LLMPrompt
 
@@ -23,7 +24,7 @@ def cleanup_telemetry(retention_days: int = 90) -> dict:
     Returns:
         {"calls_deleted": int, "prompts_deleted": int}
     """
-    cutoff = datetime.now() - timedelta(days=retention_days)
+    cutoff = now_beijing() - timedelta(days=retention_days)
     db = TelemetrySessionLocal()
     try:
         # 1. 删除过期调用记录
