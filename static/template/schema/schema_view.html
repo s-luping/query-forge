@@ -461,6 +461,18 @@ document.addEventListener('DOMContentLoaded', () => {
     loadSchemaNames();
     loadSchemaList();
     document.getElementById('searchInput').addEventListener('input', onSearchInput);
+    window.addEventListener('storage', event => {
+        if (event.key === 'qf_schema_refresh') {
+            currentPage = 1;
+            loadSchemaNames();
+            loadSchemaList();
+        }
+    });
+    // 同步任务在其他 iframe 完成时刷新当前页面；定时刷新作为兜底。
+    setInterval(() => {
+        loadSchemaNames();
+        loadSchemaList();
+    }, 30000);
 });
 </script>
 </body>

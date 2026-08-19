@@ -53,11 +53,6 @@
                         <input type="password" id="c-password" class="form-control form-control-sm" autocomplete="new-password" required></div>
                     <div class="mb-2"><label class="form-label mb-1">邮箱</label>
                         <input type="email" id="c-email" class="form-control form-control-sm" autocomplete="email"></div>
-                    <div class="mb-2"><label class="form-label mb-1">角色</label>
-                        <select id="c-role" class="form-select form-select-sm">
-                            <option value="user">普通用户</option>
-                            <option value="admin">管理员</option>
-                        </select></div>
                     <div class="mb-2"><label class="form-label mb-1">描述</label>
                         <input type="text" id="c-desc" class="form-control form-control-sm" maxlength="255"></div>
                     <div class="form-check">
@@ -88,10 +83,8 @@
                     <div class="mb-2"><label class="form-label mb-1">邮箱</label>
                         <input type="email" id="e-email" class="form-control form-control-sm" autocomplete="email"></div>
                     <div class="mb-2"><label class="form-label mb-1">角色</label>
-                        <select id="e-role" class="form-select form-select-sm">
-                            <option value="user">普通用户</option>
-                            <option value="admin">管理员</option>
-                        </select></div>
+                        <div id="e-roles" class="border rounded p-2">加载中...</div>
+                        <small class="text-muted">用户通过角色继承权限，可选择多个角色。</small></div>
                     <div class="mb-2"><label class="form-label mb-1">描述</label>
                         <input type="text" id="e-desc" class="form-control form-control-sm" maxlength="255"></div>
                     <div class="form-check">
@@ -209,7 +202,6 @@ async function submitCreate() {
         username: document.getElementById('c-username').value.trim(),
         password: document.getElementById('c-password').value,
         email: document.getElementById('c-email').value.trim() || null,
-        role: document.getElementById('c-role').value,
         description: document.getElementById('c-desc').value.trim() || null,
         is_active: document.getElementById('c-active').checked ? 1 : 0,
     };
@@ -223,13 +215,13 @@ async function submitCreate() {
 }
 
 // ── 编辑 ──────────────────────────────────────────────
-function openEdit(uid) {
+async function openEdit(uid) {
     const u = users.find(x => x.user_id === uid);
     if (!u) return;
     document.getElementById('e-user-id').value = uid;
     document.getElementById('e-username-label').textContent = u.username;
     document.getElementById('e-email').value = u.email || '';
-    document.getElementById('e-role').value = u.role;
+    await loadUserRoles(uid);
     document.getElementById('e-desc').value = u.description || '';
     document.getElementById('e-active').checked = u.is_active === 1;
     editModal.show();
@@ -239,16 +231,40 @@ async function submitEdit() {
     const uid = document.getElementById('e-user-id').value;
     const body = {
         email: document.getElementById('e-email').value.trim() || null,
-        role: document.getElementById('e-role').value,
         description: document.getElementById('e-desc').value.trim() || null,
         is_active: document.getElementById('e-active').checked ? 1 : 0,
     };
     const resp = await apiRequest(`/api/user/${uid}`, { method: 'PUT', body: JSON.stringify(body) });
     const data = await resp.json().catch(() => ({}));
     if (!resp.ok) return alert(data.detail || '保存失败');
+    await saveUserRoles(uid);
     alert(data.message || '已保存');
     editModal.hide();
     loadUsers();
+}
+
+async function loadUserRoles(uid) {
+    const [rolesResp, assignedResp] = await Promise.all([
+        apiRequest('/api/permission/roles'),
+        apiRequest(`/api/permission/users/${uid}/roles`)
+    ]);
+    const roles = await rolesResp.json();
+    const assigned = await assignedResp.json();
+    const assignedIds = new Set(assigned.map(item => item.id));
+    document.getElementById('e-roles').innerHTML = roles.map(role =>
+        `<label class="form-check form-check-inline"><input class="form-check-input e-role" type="checkbox" value="${role.id}" ${assignedIds.has(role.id) ? 'checked' : ''}><span class="form-check-label">${e(role.name)}</span></label>`
+    ).join('') || '<span class="text-muted">暂无角色</span>';
+}
+
+async function saveUserRoles(uid) {
+    const roleIds = [...document.querySelectorAll('.e-role:checked')].map(item => +item.value);
+    const resp = await apiRequest(`/api/permission/users/${uid}/roles`, {
+        method: 'PUT', body: JSON.stringify({ role_ids: roleIds })
+    });
+    if (!resp.ok) {
+        const data = await resp.json().catch(() => ({}));
+        throw new Error(data.detail || '角色保存失败');
+    }
 }
 
 // ── 启用/禁用 ────────────────────────────────────────

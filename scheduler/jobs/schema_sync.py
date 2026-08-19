@@ -39,9 +39,10 @@ def run_scheduled_syncs():
                 logger.warning(f"同步任务 {job.id} schedule_value 无效: {job.schedule_value}")
                 continue
 
-            if job.last_synced_at is None:
-                due_jobs.append(job)
-            elif now - job.last_synced_at >= timedelta(minutes=interval_minutes):
+            # 新建任务不立即执行：按创建时间计算首个周期，避免调度器启动后
+            # 第一次十分钟巡检绕过用户配置的 interval。
+            reference_time = job.last_synced_at or job.created_at
+            if reference_time and now - reference_time >= timedelta(minutes=interval_minutes):
                 due_jobs.append(job)
 
         if not due_jobs:

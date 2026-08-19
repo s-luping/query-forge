@@ -226,6 +226,10 @@ async function loadAll() {
 }
 
 window.QF.onReady = function () { loadAll(); };
+window.addEventListener('storage', event => {
+    if (event.key === 'qf_schema_refresh') loadAll();
+});
+setInterval(loadAll, 30000);
 </script>
 </body>
 </html>

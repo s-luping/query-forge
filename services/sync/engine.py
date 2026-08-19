@@ -144,6 +144,18 @@ class SyncEngine:
         if not schema:
             return None, [], {}
 
+        # 兼容历史手动导入的同名库：首次通过同步任务维护时补齐数据源关联，
+        # 这样数据浏览页和仪表盘可以正确按数据源分组展示。
+        changed = False
+        if schema.datasource_id != self.datasource.id:
+            schema.datasource_id = self.datasource.id
+            changed = True
+        if not schema.db_type and self.datasource.db_type:
+            schema.db_type = self.datasource.db_type
+            changed = True
+        if changed:
+            db.commit()
+
         tables = db.query(DbTable).filter(
             DbTable.schema_id == schema.id
         ).all()

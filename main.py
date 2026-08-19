@@ -26,6 +26,7 @@ from app.routers.sync_router import router as sync_router
 from app.routers.driver_router import router as driver_router
 from app.routers.docs_router import register_docs
 from app.routers.page_router import router as page_router
+from app.routers.scheduler_router import router as scheduler_router
 from models import init_database
 
 
@@ -80,6 +81,8 @@ app.include_router(sync_router,
                    prefix="/api/sync", tags=["元数据同步"])
 app.include_router(driver_router,
                    prefix="/api/driver", tags=["数据库驱动管理"])
+app.include_router(scheduler_router,
+                   prefix="/api/scheduler", tags=["系统定时任务"])
 
 
 if __name__ == "__main__":

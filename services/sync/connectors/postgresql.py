@@ -6,6 +6,7 @@ PostgreSQL 的注释存储在 pg_description 中，
 """
 from typing import List, Optional
 from sqlalchemy import create_engine, text
+from sqlalchemy.engine import URL
 from sqlalchemy.engine import Engine
 
 from services.sync.connectors.base import BaseConnector, TableMetadata, ColumnMetadata
@@ -15,8 +16,14 @@ class PostgreSQLConnector(BaseConnector):
     """PostgreSQL 元数据读取"""
 
     def _build_engine(self) -> Engine:
-        url = (f"postgresql+psycopg2://{self.username}:{self.password}"
-               f"@{self.host}:{self.port}/{self.database}")
+        url = URL.create(
+            'postgresql+psycopg2',
+            username=self.username,
+            password=self.password,
+            host=self.host,
+            port=self.port,
+            database=self.database,
+        )
         return create_engine(url, pool_pre_ping=True, pool_size=2, max_overflow=3)
 
     def read_metadata(self, include_tables: Optional[List[str]] = None,

@@ -11,6 +11,7 @@ from apscheduler.triggers.interval import IntervalTrigger
 from apscheduler.triggers.cron import CronTrigger
 
 from app.logger import logger
+from app.timezone import BEIJING_TZ
 from scheduler.jobs.usage_stats import aggregate_usage_stats
 from scheduler.jobs.retention import cleanup_telemetry
 from scheduler.jobs.schema_sync import run_scheduled_syncs
@@ -18,7 +19,7 @@ from scheduler.jobs.schema_sync import run_scheduled_syncs
 
 class SchedulerManager:
     def __init__(self):
-        self.scheduler = AsyncIOScheduler()
+        self.scheduler = AsyncIOScheduler(timezone=BEIJING_TZ)
 
     def init_scheduler(self):
         """注册定时任务"""
