@@ -51,6 +51,8 @@ def _find_embedding_path() -> Optional[str]:
         os.path.join(cache_dir, model_name, 'BAAI', model_name),
         os.path.join(cache_dir, model_name),
         os.path.join(cache_dir, f'BAAI/{model_name}'.replace('/', os.sep)),
+        # ModelScope snapshot_download(cache_dir=...)
+        os.path.join(cache_dir, model_name, 'models', 'BAAI--bge-m3', 'snapshots', 'master'),
     ]
     for path in possible_paths:
         config_file = os.path.join(path, 'config.json')
@@ -118,7 +120,8 @@ def get_embedding_status(user: CurrentUser):
     downloaded = found is not None
     if downloaded:
         _set_setting('EMBEDDING_MODEL_READY', 'true')
-    db_ready = _get_setting('EMBEDDING_MODEL_READY') == 'true'
+    # 文件已完整存在时，以实际文件为准，避免数据库缓存状态滞后导致误报。
+    db_ready = downloaded or _get_setting('EMBEDDING_MODEL_READY') == 'true'
     project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     default_path = os.path.join(project_root, 'models', 'embeddings', 'bge-m3')
     return EmbeddingStatusResponse(

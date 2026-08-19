@@ -257,11 +257,35 @@ async function saveJob() {
 
 async function triggerSync(id) {
     try {
+        const before = jobList.find(item => item.id === id);
+        const beforeSyncedAt = before ? before.last_synced_at : null;
         const resp = await apiRequest(`/api/sync/jobs/${id}/run`, { method: 'POST' });
         const data = await resp.json();
         alert(data.message || '同步已触发');
-        setTimeout(() => loadJobs(), 2000);
+        waitForSyncCompletion(id, beforeSyncedAt);
     } catch (e) { alert('请求失败: ' + e.message); }
+}
+
+async function waitForSyncCompletion(id, beforeSyncedAt, attempt = 0) {
+    if (attempt >= 30) return;
+    setTimeout(async () => {
+        try {
+            const resp = await apiRequest('/api/sync/jobs');
+            const data = await resp.json();
+            const job = (data.items || []).find(item => item.id === id);
+            loadJobs();
+            if (job && job.last_sync_status && job.last_sync_status !== 'running' &&
+                job.last_synced_at !== beforeSyncedAt) {
+                notifySchemaRefresh();
+                return;
+            }
+        } catch (e) { /* 下一轮继续尝试 */ }
+        waitForSyncCompletion(id, beforeSyncedAt, attempt + 1);
+    }, 2000);
+}
+
+function notifySchemaRefresh() {
+    localStorage.setItem('qf_schema_refresh', String(Date.now()));
 }
 
 async function deleteJob(id) {

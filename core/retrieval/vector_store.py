@@ -143,6 +143,8 @@ class EmbeddingModel:
             os.path.join(MODEL_CACHE_DIR, model_name, 'BAAI', model_name),
             os.path.join(MODEL_CACHE_DIR, model_name),
             os.path.join(MODEL_CACHE_DIR, f'BAAI/{model_name}'.replace('/', os.sep)),
+            # ModelScope snapshot_download(cache_dir=...)
+            os.path.join(MODEL_CACHE_DIR, model_name, 'models', 'BAAI--bge-m3', 'snapshots', 'master'),
         ]
         for local_path in possible_paths:
             if os.path.exists(local_path):

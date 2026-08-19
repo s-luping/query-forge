@@ -69,11 +69,19 @@ def get_visible_schema_ids(user: dict) -> Optional[list]:
     try:
         grants = [g for g in _role_grants(db, user, 'schema')
                   if g.access_type in ('ALLOW', 'SELECT')]
-        if not grants:
+        datasource_grants = [g for g in _role_grants(db, user, 'datasource')
+                             if g.access_type in ('ALLOW', 'SELECT')]
+        if not grants and not datasource_grants:
             return []
-        if any(g.resource_id is None for g in grants):
+        if any(g.resource_id is None for g in grants + datasource_grants):
             return None
-        return list({g.resource_id for g in grants})
+        schema_ids = {g.resource_id for g in grants}
+        if datasource_grants:
+            datasource_ids = {g.resource_id for g in datasource_grants}
+            datasource_schema_ids = {row[0] for row in db.query(DbSchema.id).filter(
+                DbSchema.datasource_id.in_(datasource_ids)).all()}
+            schema_ids = schema_ids | datasource_schema_ids
+        return list(schema_ids)
     finally:
         db.close()
 
@@ -205,6 +213,7 @@ def get_column_access_map(user: dict, schema_name: Optional[str] = None,
 
         # 多角色授权取最高访问级别：SELECT > FILTER > NONE
         role_grants = _role_grants(db, user, 'column')
+        role_grants += _role_grants(db, user, 'metric')
         rank = {'NONE': 0, 'FILTER': 1, 'SELECT': 2}
         for grant in role_grants:
             if grant.resource_id in result and grant.access_type in rank:

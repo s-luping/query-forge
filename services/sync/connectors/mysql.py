@@ -7,6 +7,7 @@
 """
 from typing import List, Optional
 from sqlalchemy import create_engine, text
+from sqlalchemy.engine import URL
 from sqlalchemy.engine import Engine
 
 from services.sync.connectors.base import BaseConnector, TableMetadata, ColumnMetadata
@@ -16,8 +17,15 @@ class MySQLConnector(BaseConnector):
     """MySQL / MariaDB 元数据读取"""
 
     def _build_engine(self) -> Engine:
-        url = (f"mysql+pymysql://{self.username}:{self.password}"
-               f"@{self.host}:{self.port}/{self.database}?charset=utf8mb4")
+        url = URL.create(
+            'mysql+pymysql',
+            username=self.username,
+            password=self.password,
+            host=self.host,
+            port=self.port,
+            database=self.database,
+            query={'charset': 'utf8mb4'},
+        )
         return create_engine(url, pool_pre_ping=True, pool_size=2, max_overflow=3)
 
     def read_metadata(self, include_tables: Optional[List[str]] = None,

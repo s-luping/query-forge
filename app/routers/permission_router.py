@@ -9,6 +9,7 @@ from app.logger import log_audit
 from models import SessionLocal
 from models.role import Role, UserRole, RolePermission
 from models.schema import DbSchema
+from models.schema import DbTable, DbColumn
 from models.user import User
 from models.knowledge import KnowledgeItem
 from models.sync import DataSource, SyncJobConfig
@@ -31,7 +32,7 @@ class RoleUsersRequest(BaseModel):
 
 
 class RolePermissionItem(BaseModel):
-    permission_code: str
+    permission_code: str = 'access'
     resource_type: str
     resource_id: Optional[int] = None
     resource_key: Optional[str] = None
@@ -41,6 +42,51 @@ class RolePermissionItem(BaseModel):
 
 class RolePermissionsRequest(BaseModel):
     permissions: List[RolePermissionItem]
+
+
+@router.get('/permission-catalog')
+def permission_catalog(user: AdminUser):
+    """返回权限页面所需的固定功能目录和数据资源目录。"""
+    db = SessionLocal()
+    try:
+        schemas = db.query(DbSchema).order_by(DbSchema.name).all()
+        return {
+            'pages': [
+                {'key': '/static/template/system/system_settings.html', 'name': '系统设置'},
+                {'key': '/static/template/system/user_manage.html', 'name': '用户管理'},
+                {'key': '/static/template/system/role_manage.html', 'name': '角色与权限'},
+                {'key': '/static/template/system/scheduler_manage.html', 'name': '定时任务'},
+                {'key': '/static/template/system/driver_manage.html', 'name': '驱动管理'},
+                {'key': '/static/template/system/sync_manage.html', 'name': '同步管理'},
+                {'key': '/static/template/system/security_manage.html', 'name': '安全中心'},
+                {'key': '/static/template/schema/schema_view.html', 'name': '数据浏览'},
+                {'key': '/static/template/knowledge.html', 'name': '知识库'},
+                {'key': '/static/template/llm/llm_config.html', 'name': '模型配置'},
+                {'key': '/static/template/llm/llm_logs.html', 'name': '调用日志'},
+            ],
+            'routes': [
+                {'key': '/api/schema', 'name': 'Schema 管理'},
+                {'key': '/api/sync', 'name': '元数据同步'},
+                {'key': '/api/knowledge', 'name': '知识库'},
+                {'key': '/api/llm-config', 'name': '模型配置'},
+                {'key': '/api/scheduler', 'name': '系统定时任务'},
+                {'key': '/api/audit', 'name': '安全审计'},
+            ],
+            'datasources': [{'id': item.id, 'name': item.name} for item in db.query(
+                DataSource).order_by(DataSource.name).all()],
+            'schemas': [{'id': item.id, 'name': item.name} for item in schemas],
+            'tables': [{'id': table.id, 'schema_id': table.schema_id,
+                        'name': table.name} for table in db.query(DbTable).order_by(DbTable.name).all()],
+            'columns': [{'id': column.id, 'table_id': column.table_id,
+                         'name': column.name} for column in db.query(DbColumn).order_by(DbColumn.name).all()],
+            'metrics': [{'id': column.id, 'table_id': column.table_id,
+                         'name': column.name} for column in db.query(DbColumn).filter(
+                             DbColumn.is_measure == True).order_by(DbColumn.name).all()],
+            'knowledge': [{'id': item.id, 'name': item.title or f'知识#{item.id}'}
+                          for item in db.query(KnowledgeItem).filter(KnowledgeItem.is_active == 1).all()],
+        }
+    finally:
+        db.close()
 
 
 @router.get('/roles')
@@ -159,7 +205,7 @@ def set_role_users(role_id: int, req: RoleUsersRequest, user: AdminUser):
         if valid_ids != set(req.user_ids):
             raise HTTPException(400, '包含不存在的用户')
         db.query(UserRole).filter(UserRole.role_id == role_id).delete()
-        db.add_all(UserRole(user_id=user_id, role_id=role_id) for user_id in valid_ids)
+        db.add_all(UserRole(user_id=item_id, role_id=role_id) for item_id in valid_ids)
         db.commit()
         log_audit(user, 'assign_role_users', f'role={role.code} user_ids={sorted(valid_ids)}')
         return {'message': '角色用户已更新'}
@@ -186,7 +232,7 @@ def get_role_permissions(role_id: int, user: AdminUser):
 
 @router.put('/roles/{role_id}/permissions')
 def set_role_permissions(role_id: int, req: RolePermissionsRequest, user: AdminUser):
-    allowed_types = {'route', 'page', 'schema', 'table', 'column', 'knowledge', 'row'}
+    allowed_types = {'datasource', 'schema', 'table', 'column', 'knowledge', 'metric'}
     allowed_access = {'ALLOW', 'SELECT', 'FILTER', 'NONE', 'DENY'}
     if any(item.resource_type not in allowed_types or item.access_type not in allowed_access
            for item in req.permissions):
@@ -197,7 +243,14 @@ def set_role_permissions(role_id: int, req: RolePermissionsRequest, user: AdminU
         if not role:
             raise HTTPException(404, '角色不存在')
         db.query(RolePermission).filter(RolePermission.role_id == role_id).delete()
-        db.add_all(RolePermission(role_id=role_id, **item.model_dump()) for item in req.permissions)
+        db.add_all(RolePermission(
+            role_id=role_id,
+            permission_code='access',
+            resource_type=item.resource_type,
+            resource_id=item.resource_id,
+            resource_key=item.resource_key,
+            access_type=item.access_type,
+        ) for item in req.permissions)
         db.commit()
         log_audit(user, 'assign_role_permissions', f'role={role.code} count={len(req.permissions)}')
         return {'message': '角色权限已更新', 'count': len(req.permissions)}

@@ -12,7 +12,7 @@
         .role-item { cursor: pointer; border-bottom: 1px solid #edf0f4; padding: 12px 14px; }
         .role-item:hover, .role-item.active { background: #eaf2ff; }
         .role-item.active { border-left: 3px solid #0d6efd; padding-left: 11px; }
-        .permission-table input, .permission-table select { min-width: 100px; }
+        .permission-table input, .permission-table select { min-width: 110px; }
         .muted { color: #7b8492; font-size: 12px; }
         .sticky-head { position: sticky; top: 0; z-index: 1; background: #fff; }
     </style>
@@ -36,25 +36,23 @@
                         <div class="col-md-5"><label class="form-label">角色说明</label><input id="roleDescription" class="form-control"></div>
                         <div class="col-md-7"><span class="muted">权限按角色统一配置，用户仅通过角色继承权限。</span></div>
                     </div>
-                    <hr>
-                    <label class="form-label">分配用户</label>
-                    <div id="userList" class="d-flex flex-wrap gap-2"></div>
-                    <button class="btn btn-primary btn-sm mt-3" onclick="saveUsers()">保存角色用户</button>
                 </div>
             </div>
             <div class="card">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <strong>角色资源权限</strong>
-                    <button class="btn btn-primary btn-sm" onclick="savePermissions()">保存权限</button>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-outline-secondary btn-sm" onclick="addPermission()">添加权限项</button>
+                        <button class="btn btn-primary btn-sm" onclick="savePermissions()">保存权限</button>
+                    </div>
                 </div>
                 <div class="card-body p-0">
                     <div class="table-responsive">
                         <table class="table table-sm table-hover align-middle mb-0 permission-table">
-                            <thead class="sticky-head"><tr><th>权限编码</th><th>资源类型</th><th>资源ID</th><th>路由/页面/键</th><th>级别</th><th>行过滤</th><th></th></tr></thead>
+                            <thead class="sticky-head"><tr><th>资源类型</th><th>资源</th><th>权限级别</th><th></th></tr></thead>
                             <tbody id="permissionRows"></tbody>
                         </table>
                     </div>
-                    <div class="p-2"><button class="btn btn-outline-secondary btn-sm" onclick="addPermission()">添加权限项</button></div>
                 </div>
             </div>
         </div>
@@ -62,13 +60,18 @@
 </div>
 <script src="/static/js/app_common.js"></script>
 <script>
-let roles = [], users = [], selectedRole = null, permissions = [];
-const types = ['route', 'page', 'schema', 'table', 'column', 'knowledge', 'row'];
+let roles = [], selectedRole = null, permissions = [], catalog = {};
+const types = [
+    ['datasource', '数据源'], ['schema', '数据库'], ['table', '表'],
+    ['column', '字段'], ['knowledge', '知识库'], ['metric', '指标']
+];
 const levels = ['ALLOW', 'SELECT', 'FILTER', 'NONE', 'DENY'];
 
 async function load() {
-    roles = await (await apiRequest('/api/permission/roles')).json();
-    users = await (await apiRequest('/api/permission/users')).json();
+    [roles, catalog] = await Promise.all([
+        apiRequest('/api/permission/roles').then(response => response.json()),
+        apiRequest('/api/permission/permission-catalog').then(response => response.json())
+    ]);
     renderRoles();
     if (roles.length) selectRole(roles[0].id);
 }
@@ -86,29 +89,36 @@ async function selectRole(id) {
     document.getElementById('roleTitle').textContent = `${selectedRole.name}（${selectedRole.code}）`;
     document.getElementById('roleDescription').value = selectedRole.description || '';
     const assigned = await (await apiRequest(`/api/permission/roles/${id}/permissions`)).json();
-    permissions = assigned.map(normalizePermission);
-    const assignedUsers = await (await apiRequest(`/api/permission/roles/${id}/users`)).json().catch(() => []);
-    renderUsers(assignedUsers.map(x => x.id));
+    permissions = assigned.filter(item => types.some(type => type[0] === item.resource_type)).map(normalizePermission);
     renderPermissions();
 }
-function renderUsers(selected) {
-    document.getElementById('userList').innerHTML = users.map(u => `
-        <label class="form-check form-check-inline"><input class="form-check-input role-user" type="checkbox" value="${u.id}" ${selected.includes(u.id) ? 'checked' : ''}><span class="form-check-label">${esc(u.username)}</span></label>`).join('');
+function normalizePermission(p) {
+    return { permission_code: 'access', resource_type: p.resource_type || 'datasource',
+        resource_id: p.resource_id || null, resource_key: p.resource_key || '',
+        access_type: p.access_type || 'ALLOW', filter_expression: p.filter_expression || '', resource_search: '' };
 }
-async function saveUsers() {
-    if (!selectedRole) return;
-    const roleIds = [...document.querySelectorAll('.role-user:checked')].map(x => +x.value);
-    alert((await (await apiRequest(`/api/permission/roles/${selectedRole.id}/users`, { method: 'PUT', body: JSON.stringify({ user_ids: roleIds }) })).json()).message || '已保存');
+function optionList(items, value, label, empty = '请选择') {
+    return `<option value="">${empty}</option>` + (items || []).map(item =>
+        `<option value="${item[value]}" ${String(item[value]) === String(label) ? 'selected' : ''}>${esc(item.name || item[label])}</option>`).join('');
 }
-function normalizePermission(p) { return { permission_code: p.permission_code || '', resource_type: p.resource_type || 'route', resource_id: p.resource_id || '', resource_key: p.resource_key || '', access_type: p.access_type || 'ALLOW', filter_expression: p.filter_expression || '' }; }
+function resourceOptions(p) {
+    const index = permissions.indexOf(p);
+    let items = catalog[p.resource_type + 's'] || [];
+    if (p.resource_type === 'schema') items = catalog.schemas || [];
+    if (p.resource_type === 'knowledge') items = catalog.knowledge || [];
+    if (p.resource_type === 'metric') items = catalog.metrics || [];
+    const search = (p.resource_search || '').toLowerCase();
+    if (search) items = items.filter(item => String(item.name || '').toLowerCase().includes(search));
+    const searchBox = ['column', 'metric'].includes(p.resource_type) ?
+        `<input class="form-control form-control-sm mb-1" placeholder="搜索${p.resource_type === 'metric' ? '指标' : '字段'}" value="${esc(p.resource_search || '')}" oninput="setPermission(${index}, 'resource_search', this.value)">` : '';
+    return `${searchBox}<select class="form-select form-select-sm" onchange="setPermission(${index}, 'resource_id', this.value ? +this.value : null)">${optionList(items, 'id', p.resource_id, '请选择' + (p.resource_type === 'datasource' ? '数据源' : p.resource_type === 'schema' ? '数据库' : p.resource_type === 'table' ? '表' : p.resource_type === 'column' ? '字段' : p.resource_type === 'metric' ? '指标' : '知识库'))}</select>`;
+}
+function setPermission(index, key, value) { permissions[index][key] = value; renderPermissions(); }
 function renderPermissions() {
     document.getElementById('permissionRows').innerHTML = permissions.map((p, i) => `<tr>
-        <td><input class="form-control form-control-sm" value="${esc(p.permission_code)}" onchange="permissions[${i}].permission_code=this.value"></td>
-        <td><select class="form-select form-select-sm" onchange="permissions[${i}].resource_type=this.value">${types.map(x => `<option ${x === p.resource_type ? 'selected' : ''}>${x}</option>`).join('')}</select></td>
-        <td><input type="number" class="form-control form-control-sm" value="${p.resource_id}" onchange="permissions[${i}].resource_id=this.value ? +this.value : null"></td>
-        <td><input class="form-control form-control-sm" value="${esc(p.resource_key)}" onchange="permissions[${i}].resource_key=this.value"></td>
+        <td><select class="form-select form-select-sm" onchange="permissions[${i}].resource_type=this.value; permissions[${i}].resource_id=null; permissions[${i}].resource_key=''; renderPermissions()">${types.map(([value, label]) => `<option value="${value}" ${value === p.resource_type ? 'selected' : ''}>${label}</option>`).join('')}</select></td>
+        <td>${resourceOptions(p)}</td>
         <td><select class="form-select form-select-sm" onchange="permissions[${i}].access_type=this.value">${levels.map(x => `<option ${x === p.access_type ? 'selected' : ''}>${x}</option>`).join('')}</select></td>
-        <td><input class="form-control form-control-sm" value="${esc(p.filter_expression)}" onchange="permissions[${i}].filter_expression=this.value"></td>
         <td><button class="btn btn-outline-danger btn-sm" onclick="permissions.splice(${i}, 1); renderPermissions()">删除</button></td>
     </tr>`).join('');
 }

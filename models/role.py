@@ -30,7 +30,7 @@ class RolePermission(MainBase):
         name='uix_role_permission_resource'),)
     id = Column(Integer, primary_key=True, autoincrement=True)
     role_id = Column(Integer, ForeignKey('roles.id'), nullable=False, index=True)
-    permission_code = Column(String(120), nullable=False, index=True)
+    permission_code = Column(String(120), nullable=False, default='access', index=True)
     resource_type = Column(String(30), nullable=False, default='route')
     resource_id = Column(Integer, nullable=True, index=True)
     resource_key = Column(String(255), nullable=True, index=True)
