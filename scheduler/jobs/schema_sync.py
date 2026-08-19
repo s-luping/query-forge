@@ -10,6 +10,7 @@
 """
 from datetime import datetime, timedelta
 from app.logger import logger
+from app.timezone import now_beijing
 
 
 def run_scheduled_syncs():
@@ -28,7 +29,7 @@ def run_scheduled_syncs():
         if not jobs:
             return
 
-        now = datetime.now()
+        now = now_beijing()
         due_jobs = []
 
         for job in jobs:

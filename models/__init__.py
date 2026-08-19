@@ -16,6 +16,7 @@ from models.database import (
     TelemetrySessionLocal,
     init_database,
 )
+from models.role import Role, UserRole, RolePermission
 
 # 兼容别名：老代码中的 AppSessionLocal 全部指向主库
 AppSessionLocal = SessionLocal

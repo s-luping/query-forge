@@ -8,6 +8,7 @@
 from datetime import datetime
 from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, ForeignKey, UniqueConstraint
 from models.base import MainBase
+from app.timezone import now_beijing
 
 
 class DbSchema(MainBase):
@@ -21,8 +22,8 @@ class DbSchema(MainBase):
     db_type = Column(String(30), default='', comment='数据库类型(mysql/postgresql/...)')
     description = Column(Text, comment='描述')
     source = Column(String(30), default='ddl', comment='来源: ddl|json|spider|sync')
-    created_at = Column(DateTime, default=datetime.now, comment='创建时间')
-    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment='更新时间')
+    created_at = Column(DateTime, default=now_beijing, comment='创建时间（北京时间）')
+    updated_at = Column(DateTime, default=now_beijing, onupdate=now_beijing, comment='更新时间（北京时间）')
 
 
 class DbTable(MainBase):
@@ -33,7 +34,7 @@ class DbTable(MainBase):
     schema_id = Column(Integer, ForeignKey('db_schemas.id'), nullable=False, index=True, comment='所属 Schema')
     name = Column(String(150), nullable=False, comment='表名')
     description = Column(Text, comment='表注释')
-    created_at = Column(DateTime, default=datetime.now, comment='创建时间')
+    created_at = Column(DateTime, default=now_beijing, comment='创建时间（北京时间）')
 
 
 class DbColumn(MainBase):
@@ -54,4 +55,4 @@ class DbColumn(MainBase):
     sensitive_level = Column(String(20), default='public', comment='敏感等级: public/internal/sensitive/confidential')
     is_dimension = Column(Boolean, default=False, comment='是否维度字段(可分组)')
     is_measure = Column(Boolean, default=False, comment='是否度量字段(可聚合)')
-    created_at = Column(DateTime, default=datetime.now, comment='创建时间')
+    created_at = Column(DateTime, default=now_beijing, comment='创建时间（北京时间）')

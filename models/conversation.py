@@ -8,6 +8,7 @@
 from datetime import datetime
 from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime, ForeignKey
 from models.base import MainBase
+from app.timezone import now_beijing
 
 
 class Conversation(MainBase):
@@ -21,8 +22,8 @@ class Conversation(MainBase):
     llm_config_id = Column(Integer, nullable=True, comment='使用的模型配置ID')
     knowledge_id = Column(Integer, ForeignKey('knowledge_items.id'), nullable=True, comment='创建对话时关联的知识库条目ID')
     context_prompt_id = Column(Integer, nullable=True, comment='首轮 schema 上下文 prompt ID(→llm_prompts，跨库逻辑引用)')
-    created_at = Column(DateTime, default=datetime.now, comment='创建时间')
-    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment='更新时间')
+    created_at = Column(DateTime, default=now_beijing, comment='创建时间（北京时间）')
+    updated_at = Column(DateTime, default=now_beijing, onupdate=now_beijing, comment='更新时间（北京时间）')
 
 
 class ConversationMessage(MainBase):
@@ -37,4 +38,4 @@ class ConversationMessage(MainBase):
     error_message = Column(Text, nullable=True, comment='错误信息')
     columns = Column(Text, nullable=True, comment='结果列名(JSON数组)')
     llm_call_id = Column(Integer, nullable=True, index=True, comment='关联的LLM调用ID(→llm_calls，跨库逻辑引用)')
-    created_at = Column(DateTime, default=datetime.now, comment='创建时间')
+    created_at = Column(DateTime, default=now_beijing, comment='创建时间（北京时间）')

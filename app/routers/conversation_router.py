@@ -21,6 +21,7 @@ from core.llm import LLMClient
 from core.generation.sql_generator import SqlGenerator
 from core.generation.chat import ChatSession
 from models import SessionLocal
+from app.timezone import now_beijing
 from models.conversation import Conversation, ConversationMessage
 from services.llm import telemetry
 from services.schema import service as schema_service
@@ -399,7 +400,7 @@ def send_message(
             # 更新会话时间
             db.query(Conversation).filter(
                 Conversation.id == conversation_id
-            ).update({'updated_at': datetime.now()})
+            ).update({'updated_at': now_beijing()})
 
             db.commit()
 

@@ -9,6 +9,7 @@ __pycache__
 *.db-wal
 *.jsonl
 .env
+.runtime_secrets
 .workbuddy
 
 db/temp

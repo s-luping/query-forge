@@ -9,6 +9,7 @@ category 分类：
 from datetime import datetime
 from sqlalchemy import Column, Integer, String, Text, DateTime
 from models.base import MainBase
+from app.timezone import now_beijing
 
 
 class SystemSetting(MainBase):
@@ -19,7 +20,7 @@ class SystemSetting(MainBase):
     value = Column(Text, comment='配置值')
     category = Column(String(30), default='general', comment='分类: security|auth|runtime|vector|general')
     is_editable = Column(Integer, default=1, comment='是否可通过设置页修改(1/0)')
-    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment='更新时间')
+    updated_at = Column(DateTime, default=now_beijing, onupdate=now_beijing, comment='更新时间（北京时间）')
 
 
 # 兼容别名：旧脚本（download_model.py / scripts/demo.py 等）仍引用 SystemConfig

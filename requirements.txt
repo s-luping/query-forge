@@ -13,10 +13,10 @@ python-multipart>=0.0.5
 pydantic>=2.0.0
 PyJWT>=2.0.0
 cryptography>=41.0.0
+bcrypt>=4.0.0
 
 # --- 数据库 ---
 sqlalchemy>=2.0.0
-dbutils>=3.0.0
 # 外部数据库连接驱动（元数据同步：MySQL / PostgreSQL）
 pymysql>=1.1.0
 psycopg2-binary>=2.9.0
@@ -33,11 +33,7 @@ requests>=2.28.0
 # --- 定时任务 ---
 apscheduler>=3.10.0
 
-# --- SOAP 客户端 ---
-suds-py3>=1.4.0
-
-# --- 数据处理 ---
-pandas>=2.0.0
+# --- 数值计算 ---
 numpy>=1.24.0,<2.0.0
 
 # --- 中文分词 ---
@@ -47,3 +43,5 @@ jieba>=0.42.0
 # torch 2.12.0 在 Windows + Python 3.10 下存在 DLL 兼容性问题，排除此版本
 torch==2.6.0
 sentence-transformers>=3.0.0,<4.0.0
+# 模型下载脚本（download_model.py）
+modelscope>=1.15.0

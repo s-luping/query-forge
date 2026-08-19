@@ -10,10 +10,18 @@
 import logging
 import os
 import traceback
-from logging.handlers import RotatingFileHandler
+from datetime import datetime
+from app.timezone import BEIJING_TZ
+from logging.handlers import RotatingFileHandler, TimedRotatingFileHandler
 
 LOG_DIR = "logs"
 os.makedirs(LOG_DIR, exist_ok=True)
+
+
+class BeijingFormatter(logging.Formatter):
+    """使用北京时间格式化日志时间。"""
+    converter = staticmethod(lambda timestamp: datetime.fromtimestamp(
+        timestamp, BEIJING_TZ).timetuple())
 
 
 def _create_logger(name, filename, level=logging.INFO, fmt=None, console=False):
@@ -21,7 +29,7 @@ def _create_logger(name, filename, level=logging.INFO, fmt=None, console=False):
     log_logger.setLevel(level)
     log_logger.propagate = False
     handler = RotatingFileHandler(os.path.join(LOG_DIR, filename), maxBytes=10 * 1024 * 1024, encoding="utf-8")
-    handler.setFormatter(logging.Formatter(
+    handler.setFormatter(BeijingFormatter(
         fmt or "%(asctime)s - %(levelname)s - %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S"))
     log_logger.addHandler(handler)
@@ -39,6 +47,19 @@ pipeline_logger = _create_logger("pipeline", "pipeline.log", level=logging.DEBUG
 sqlalchemy_logger = _create_logger("sqlalchemy.engine", "sqlalchemy.log",
                                    level=logging.WARNING, fmt="%(asctime)s %(message)s")
 audit_logger = _create_logger("audit", "audit.log", fmt="%(asctime)s | %(message)s")
+
+
+def setup_server_logging():
+    """将 Uvicorn 日志按天写入 server.log，同时保留控制台输出。"""
+    handler = TimedRotatingFileHandler(
+        os.path.join(LOG_DIR, 'server.log'), when='midnight',
+        backupCount=30, encoding='utf-8')
+    handler.setFormatter(BeijingFormatter('%(asctime)s | %(levelname)s | %(message)s'))
+    for name in ('uvicorn', 'uvicorn.error', 'uvicorn.access'):
+        uvicorn_logger = logging.getLogger(name)
+        if not any(isinstance(existing, TimedRotatingFileHandler)
+                   for existing in uvicorn_logger.handlers):
+            uvicorn_logger.addHandler(handler)
 
 
 def log_error(e: Exception, ctx: str = ""):

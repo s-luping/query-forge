@@ -6,6 +6,7 @@
 from datetime import datetime
 from sqlalchemy import Column, Integer, String, Text, DateTime
 from models.base import MainBase
+from app.timezone import now_beijing
 
 
 class VectorIndexMeta(MainBase):
@@ -20,4 +21,4 @@ class VectorIndexMeta(MainBase):
     file_path = Column(String(500), default='', comment='索引文件绝对路径')
     error_message = Column(Text, default='', comment='错误信息')
     built_at = Column(DateTime, default=None, comment='构建完成时间')
-    created_at = Column(DateTime, default=datetime.now, comment='创建时间')
+    created_at = Column(DateTime, default=now_beijing, comment='创建时间（北京时间）')

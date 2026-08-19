@@ -9,6 +9,7 @@ Token/对话数据放置架构：
 from datetime import datetime
 from sqlalchemy import Column, Integer, String, Text, Float, DateTime, Boolean, Date, UniqueConstraint
 from models.base import MainBase, TelemetryBase
+from app.timezone import now_beijing
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -35,8 +36,8 @@ class LLMConfig(MainBase):
     is_active = Column(Boolean, default=True, comment='是否启用')
     is_public = Column(Boolean, default=False, comment='是否公开(所有用户可见)')
     description = Column(Text, comment='备注')
-    created_at = Column(DateTime, default=datetime.now, comment='创建时间')
-    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment='更新时间')
+    created_at = Column(DateTime, default=now_beijing, comment='创建时间（北京时间）')
+    updated_at = Column(DateTime, default=now_beijing, onupdate=now_beijing, comment='更新时间（北京时间）')
 
 
 class LLMUsageStat(MainBase):
@@ -54,7 +55,7 @@ class LLMUsageStat(MainBase):
     completion_tokens = Column(Integer, default=0, comment='输出Token合计')
     total_tokens = Column(Integer, default=0, comment='总Token合计')
     cost = Column(Float, default=0.0, comment='成本合计')
-    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment='更新时间')
+    updated_at = Column(DateTime, default=now_beijing, onupdate=now_beijing, comment='更新时间（北京时间）')
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -71,7 +72,7 @@ class LLMPrompt(TelemetryBase):
     content_hash = Column(String(64), unique=True, nullable=False, index=True, comment='SHA-256 内容哈希')
     content = Column(Text, nullable=False, comment='完整 prompt 文本')
     length = Column(Integer, default=0, comment='文本长度')
-    created_at = Column(DateTime, default=datetime.now, comment='首次出现时间')
+    created_at = Column(DateTime, default=now_beijing, comment='首次出现时间（北京时间）')
 
 
 class LLMCall(TelemetryBase):
@@ -102,4 +103,4 @@ class LLMCall(TelemetryBase):
     cost = Column(Float, default=0.0, comment='调用成本')
     status = Column(String(20), default='success', comment='状态(success/warning/error)')
     error_message = Column(Text, comment='错误信息')
-    created_at = Column(DateTime, default=datetime.now, index=True, comment='创建时间')
+    created_at = Column(DateTime, default=now_beijing, index=True, comment='创建时间（北京时间）')

@@ -2,6 +2,7 @@
 from datetime import datetime
 from sqlalchemy import Column, Integer, String, DateTime, Text
 from models.base import MainBase
+from app.timezone import now_beijing
 
 
 class KnowledgeItem(MainBase):
@@ -12,5 +13,5 @@ class KnowledgeItem(MainBase):
     title = Column(String(200), comment='知识标题')
     content = Column(Text, comment='知识内容')
     is_active = Column(Integer, default=1, comment='启用状态(1/0，0=软删除)')
-    created_at = Column(DateTime, default=datetime.now, comment='创建时间')
-    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment='更新时间')
+    created_at = Column(DateTime, default=now_beijing, comment='创建时间（北京时间）')
+    updated_at = Column(DateTime, default=now_beijing, onupdate=now_beijing, comment='更新时间（北京时间）')

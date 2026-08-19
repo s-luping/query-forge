@@ -44,21 +44,14 @@
                     </div>
                 </div>
                 <div class="menu-group">
-                    <div class="menu-group-title" onclick="toggleMenu('security')">安全中心</div>
-                    <div id="menu-security" class="menu-items" style="display:none;">
-                        <div class="menu-item" onclick="openWindow('审计概览','/static/template/system/security_manage.html#overview')">审计概览</div>
-                        <div class="menu-item" onclick="openWindow('审计日志','/static/template/system/security_manage.html#logs')">审计日志</div>
-                        <div class="menu-item" onclick="openWindow('敏感字段','/static/template/system/security_manage.html#sensitive')">敏感字段</div>
-                        <div class="menu-item" onclick="openWindow('字段权限','/static/template/system/security_manage.html#columnperm')">字段权限</div>
-                        <div class="menu-item" onclick="openWindow('行级规则','/static/template/system/security_manage.html#rowscope')">行级规则</div>
-                    </div>
+                    <div class="menu-item" onclick="openWindow('安全中心','/static/template/system/security_manage.html#overview')">安全中心</div>
                 </div>
                 <div class="menu-group">
                     <div class="menu-group-title" onclick="toggleMenu('system')">系统管理</div>
                     <div id="menu-system" class="menu-items" style="display:none;">
                         <div class="menu-item" onclick="openWindow('用户管理','/static/template/system/user_manage.html')">用户管理</div>
                         <div class="menu-item" onclick="openWindow('驱动管理','/static/template/system/driver_manage.html')">驱动管理</div>
-                        <div class="menu-item" onclick="openWindow('权限管理','/static/template/system/permission_manage.html')">权限管理</div>
+                        <div class="menu-item" onclick="openWindow('角色与权限','/static/template/system/role_manage.html')">角色与权限</div>
                         <div class="menu-item" onclick="openWindow('知识库','/static/template/knowledge.html')">知识库</div>
                         <div class="menu-item" onclick="openWindow('系统设置','/static/template/system/system_settings.html')">系统设置</div>
                         <div class="menu-item" onclick="openWindow('接口文档','/docs')">接口文档</div>

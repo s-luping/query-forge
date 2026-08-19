@@ -12,9 +12,11 @@ from pydantic import BaseModel
 
 from app.auth import AdminUser, CurrentUser, hash_password, verify_password
 from app.logger import logger, log_audit
+from app.timezone import now_beijing
 from app.routers.auth_router import _validate_password_strength
 from models import SessionLocal
 from models.user import User
+from models.role import Role, UserRole
 
 router = APIRouter()
 
@@ -60,7 +62,7 @@ async def change_password(
         import time as _time
         user.password = hash_password(request.new_password)
         user.pwd_ts = _time.time()
-        user.last_login = datetime.now()
+        user.last_login = now_beijing()
         db.commit()
 
         logger.info(f"用户 {username} 密码修改成功")
@@ -110,7 +112,6 @@ class UserCreateRequest(BaseModel):
     username: str
     password: str
     email: Optional[str] = None
-    role: str = 'user'           # admin / user
     description: Optional[str] = None
     is_active: int = 1           # 1=启用 0=禁用
 
@@ -118,7 +119,6 @@ class UserCreateRequest(BaseModel):
 class UserUpdateRequest(BaseModel):
     """管理员编辑用户（字段均可选，只更新传入的字段）"""
     email: Optional[str] = None
-    role: Optional[str] = None
     description: Optional[str] = None
     is_active: Optional[int] = None
 
@@ -126,11 +126,6 @@ class UserUpdateRequest(BaseModel):
 class ResetPasswordRequest(BaseModel):
     """管理员重置用户密码"""
     new_password: str
-
-
-def _validate_role(role: str):
-    if role not in ('admin', 'user'):
-        raise HTTPException(status_code=400, detail="角色只能是 admin 或 user")
 
 
 def _count_admins(db) -> int:
@@ -166,10 +161,9 @@ def list_users(user: AdminUser):
 
 @router.post("/create")
 def create_user(req: UserCreateRequest, user: AdminUser):
-    """管理员：创建用户（用户名唯一 + 强密码策略；可指定角色与启用状态）"""
+    """管理员：创建用户；新用户默认绑定 user 角色。"""
     if len(req.username) < 3:
         raise HTTPException(status_code=400, detail="用户名至少需要3个字符")
-    _validate_role(req.role)
     if req.is_active not in (0, 1):
         raise HTTPException(status_code=400, detail="is_active 只能为 0 或 1")
     _validate_password_strength(req.password)
@@ -185,16 +179,20 @@ def create_user(req: UserCreateRequest, user: AdminUser):
             username=req.username,
             password=hash_password(req.password),
             email=req.email,
-            role=req.role,
+            role='user',
             description=req.description,
             is_active=req.is_active,
             pwd_ts=_time.time(),
         )
         db.add(new_user)
+        db.flush()
+        default_role = db.query(Role).filter(Role.code == 'user').first()
+        if default_role:
+            db.add(UserRole(user_id=new_user.id, role_id=default_role.id))
         db.commit()
-        logger.info(f"管理员 {user['username']} 创建用户: {req.username} role={req.role}")
+        logger.info(f"管理员 {user['username']} 创建用户: {req.username}")
         log_audit(user, "create_user",
-                  f"target={req.username} role={req.role} is_active={req.is_active}")
+                  f"target={req.username} is_active={req.is_active}")
         return {"message": "用户创建成功", "user_id": new_user.id}
     except HTTPException:
         raise
@@ -208,23 +206,11 @@ def create_user(req: UserCreateRequest, user: AdminUser):
 
 @router.put("/{user_id}")
 def update_user(user_id: int, req: UserUpdateRequest, user: AdminUser):
-    """管理员：编辑用户（角色/邮箱/描述/启用状态）
-
-    安全约束：不能把自己降级为普通用户或禁用自己，防止锁死系统。
-    """
+    """管理员：编辑用户资料和启用状态；角色由角色管理页面维护。"""
     db = SessionLocal()
     try:
         target = _get_user_or_404(db, user_id)
         is_self = (user_id == user['user_id'])
-
-        if req.role is not None:
-            _validate_role(req.role)
-            if is_self and req.role != 'admin':
-                raise HTTPException(status_code=400, detail="不能将自己的管理员角色降级")
-            # 最后一名管理员不能降级
-            if target.role == 'admin' and req.role != 'admin' and _count_admins(db) <= 1:
-                raise HTTPException(status_code=400, detail="系统至少需要保留一名管理员")
-            target.role = req.role
 
         if req.is_active is not None:
             if req.is_active not in (0, 1):
@@ -243,7 +229,7 @@ def update_user(user_id: int, req: UserUpdateRequest, user: AdminUser):
         db.commit()
         logger.info(f"管理员 {user['username']} 编辑用户: {target.username}")
         log_audit(user, "update_user",
-                  f"target={target.username} role={target.role} is_active={target.is_active}")
+              f"target={target.username} is_active={target.is_active}")
         return {"message": "用户信息已更新"}
     except HTTPException:
         raise
@@ -296,25 +282,21 @@ def delete_user(user_id: int, user: AdminUser):
 
         uid = target.id
         # 清理外键关联（主库开启 FOREIGN KEY，必须先删子表）
-        from models.security import UserColumnGrant, RowScopeRule, QueryAuditLog
+        from models.security import QueryAuditLog
+        from models.role import UserRole
         from models.conversation import Conversation, ConversationMessage
         from models.llm import LLMConfig
         from models.knowledge import KnowledgeItem
         from models.sync import DataSource
-        from models.user import UserSchemaGrant, UserKnowledgeGrant, UserTableGrant
-
-        # 用户授权（含表级白名单 — 主库外键约束开启，漏删会触发 IntegrityError）
-        db.query(UserSchemaGrant).filter(UserSchemaGrant.user_id == uid).delete()
-        db.query(UserKnowledgeGrant).filter(UserKnowledgeGrant.user_id == uid).delete()
-        db.query(UserTableGrant).filter(UserTableGrant.user_id == uid).delete()
-        db.query(UserColumnGrant).filter(UserColumnGrant.user_id == uid).delete()
-        db.query(RowScopeRule).filter(RowScopeRule.user_id == uid).delete()
-        # 其创建的知识被他人授权时，一并清掉对应授权
+        db.query(UserRole).filter(UserRole.user_id == uid).delete()
+        # 其创建的知识由角色资源权限引用时，一并清理相关授权
         owned_knowledge_ids = [k.id for k in db.query(KnowledgeItem).filter(
             KnowledgeItem.user_id == uid).all()]
         if owned_knowledge_ids:
-            db.query(UserKnowledgeGrant).filter(
-                UserKnowledgeGrant.knowledge_id.in_(owned_knowledge_ids)).delete()
+            from models.role import RolePermission
+            db.query(RolePermission).filter(
+                RolePermission.resource_type == 'knowledge',
+                RolePermission.resource_id.in_(owned_knowledge_ids)).delete()
         db.query(KnowledgeItem).filter(KnowledgeItem.user_id == uid).delete()
         # 对话与消息
         conv_ids = [c.id for c in db.query(Conversation).filter(Conversation.user_id == uid).all()]

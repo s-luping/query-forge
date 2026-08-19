@@ -5,11 +5,13 @@ import jwt
 from fastapi import Depends, HTTPException, Request
 
 from app.logger import logger
+from app.config import FALLBACK_EXPIRE_MINUTES
+from app.timezone import now_beijing_aware
 from models import SessionLocal
 from models.user import User
+from models.role import Role, UserRole
 
 ALGORITHM = 'HS256'
-_FALLBACK_EXPIRE_MINUTES = 4320  # 3 天
 
 try:
     import bcrypt
@@ -80,7 +82,7 @@ def _get_token_expire_minutes() -> int:
             db.close()
     except Exception:
         pass
-    return _FALLBACK_EXPIRE_MINUTES
+    return FALLBACK_EXPIRE_MINUTES
 
 
 def authenticate_user(username: str, password: str):
@@ -115,9 +117,9 @@ def create_access_token(data: dict, expires_delta=None):
     if expires_delta is None:
         expires_delta = _get_token_expire_minutes()
     if 0 < expires_delta < 60 * 60 * 24 * 7:
-        expire = datetime.utcnow() + timedelta(minutes=expires_delta)
+        expire = now_beijing_aware() + timedelta(minutes=expires_delta)
     else:
-        expire = datetime.utcnow() + timedelta(minutes=15)
+        expire = now_beijing_aware() + timedelta(minutes=15)
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, _get_secret_key(), algorithm=ALGORITHM)
     logger.debug(f"为用户 {data.get('username')} 创建访问令牌")
@@ -153,7 +155,13 @@ def resolve_token_user(token: Optional[str]) -> Optional[dict]:
         # pwd_ts 不匹配说明密码已修改，旧 token 全部失效
         if abs(float(payload.get('pwd_ts', 0)) - float(user.pwd_ts or 0)) > 1e-6:
             return None
-        return {"user_id": user.id, "username": user.username, "role": user.role}
+        role_codes = [r[0] for r in db.query(Role.code).join(
+            UserRole, UserRole.role_id == Role.id
+        ).filter(UserRole.user_id == user.id).all()]
+        if user.role == 'admin' and 'admin' not in role_codes:
+            role_codes.append('admin')
+        return {"user_id": user.id, "username": user.username,
+                "role": user.role, "roles": role_codes}
     finally:
         db.close()
 
@@ -179,11 +187,18 @@ async def get_current_user(request: Request):
 
 
 async def get_current_admin(request: Request) -> dict:
-    """管理员依赖：未登录 → 401；已登录但非 admin → 403。
+    """管理接口权限依赖：管理员直通，其他用户按角色路由权限校验。
 
     用法：def xxx(..., user: AdminUser): 由框架自动注入并完成鉴权。
     """
     user = await get_current_user(request)
+    if user.get('role') == 'admin' or 'admin' in user.get('roles', []):
+        return user
+    from app.permissions import has_permission
+    path = request.url.path
+    if has_permission(user, path, 'route', path) or has_permission(
+            user, 'route.view', 'route', path):
+        return user
     if user.get('role') != 'admin':
         logger.warning(f"越权访问: user_id={user.get('user_id')} username={user.get('username')} 尝试访问管理员接口")
         raise HTTPException(status_code=403, detail="需要管理员权限")
