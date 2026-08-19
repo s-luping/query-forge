@@ -1,8 +1,8 @@
 # -*- coding: UTF-8 -*-
-"""元数据同步模型 — 数据源 + 同步任务 + 执行历史 + 变更记录
+"""元数据同步模型 — 同步任务 + 执行历史 + 变更记录
 
 架构层次：
-    DataSource (外部数据库连接配置)
+    DataSource (外部数据库连接配置，见 models/datasource.py)
         └── SyncJobConfig (同步任务：数据源 → 目标 schema)
                 └── SyncRunLog (每次执行的历史记录)
                         └── SchemaChangeLog (检测到的变更明细)
@@ -13,30 +13,9 @@
     - 删除表/字段 → pending（需管理员审批后才执行删除）
     - 管理员拒绝删除 → ignored（保留元数据，标记源库已移除）
 """
-from datetime import datetime
 from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime, ForeignKey, UniqueConstraint
 from models.base import MainBase
 from app.timezone import now_beijing
-
-
-class DataSource(MainBase):
-    """外部数据源 — 连接配置（密码加密存储，只读账号）"""
-    __tablename__ = 'data_sources'
-    id = Column(Integer, primary_key=True, autoincrement=True, comment='主键')
-    name = Column(String(100), unique=True, nullable=False, comment='数据源名称')
-    db_type = Column(String(30), nullable=False, comment='数据库类型: mysql/postgresql/sqlite/...')
-    host = Column(String(200), default='localhost', comment='主机地址')
-    port = Column(Integer, default=3306, comment='端口')
-    database = Column(String(200), default='', comment='数据库名/schema名')
-    username = Column(String(100), default='', comment='连接用户名(应只读)')
-    password_enc = Column(Text, default='', comment='加密的密码(enc::前缀)')
-    extra_params = Column(Text, default='{}', comment='额外连接参数(JSON)')
-    status = Column(String(20), default='active', comment='状态: active/inactive/error')
-    last_error = Column(Text, default='', comment='最近一次连接错误')
-    last_tested_at = Column(DateTime, comment='最后测试时间')
-    created_by = Column(Integer, ForeignKey('users.id'), nullable=True, comment='创建者')
-    created_at = Column(DateTime, default=now_beijing, comment='创建时间（北京时间）')
-    updated_at = Column(DateTime, default=now_beijing, onupdate=now_beijing, comment='更新时间（北京时间）')
 
 
 class SyncJobConfig(MainBase):

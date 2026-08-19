@@ -10,17 +10,16 @@
 from datetime import datetime
 from typing import Optional, Dict
 from app.timezone import now_beijing
+from curd.base import session_scope
 
 
 def set_index_meta(schema_name: str, status: str, field_count: int = 0,
                    table_count: int = 0, file_path: str = '', error_msg: str = ''):
     """写入向量索引元数据到数据库"""
     try:
-        from models import SessionLocal
         from models.vector_index import VectorIndexMeta
 
-        db = SessionLocal()
-        try:
+        with session_scope() as db:
             row = db.query(VectorIndexMeta).filter(
                 VectorIndexMeta.schema_name == schema_name
             ).first()
@@ -52,8 +51,6 @@ def set_index_meta(schema_name: str, status: str, field_count: int = 0,
                     built_at=now_beijing() if status == 'ready' else None
                 ))
             db.commit()
-        finally:
-            db.close()
     except Exception:
         pass  # 元数据写入失败不影响索引构建
 
@@ -61,11 +58,9 @@ def set_index_meta(schema_name: str, status: str, field_count: int = 0,
 def get_index_meta(schema_name: str) -> Optional[dict]:
     """从数据库读取向量索引元数据"""
     try:
-        from models import SessionLocal
         from models.vector_index import VectorIndexMeta
 
-        db = SessionLocal()
-        try:
+        with session_scope() as db:
             row = db.query(VectorIndexMeta).filter(
                 VectorIndexMeta.schema_name == schema_name
             ).first()
@@ -81,8 +76,6 @@ def get_index_meta(schema_name: str) -> Optional[dict]:
                     'error_message': str(row.error_message),
                     'built_at': built
                 }
-        finally:
-            db.close()
     except Exception:
         pass
     return None

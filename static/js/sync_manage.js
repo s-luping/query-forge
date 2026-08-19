@@ -118,12 +118,16 @@ function showDsModal(id) {
 
 async function saveDs() {
     const id = document.getElementById('dsId').value;
+    const name = document.getElementById('dsName').value.trim();
+    const database = document.getElementById('dsDatabase').value.trim();
+    if (!name) return alert('数据源名称必填');
+    if (!database) return alert('数据库名必填');
     const body = {
-        name: document.getElementById('dsName').value,
+        name,
         db_type: document.getElementById('dsDbType').value,
         host: document.getElementById('dsHost').value,
         port: parseInt(document.getElementById('dsPort').value),
-        database: document.getElementById('dsDatabase').value,
+        database,
         username: document.getElementById('dsUsername').value,
     };
     const pwd = document.getElementById('dsPassword').value;
@@ -171,7 +175,7 @@ async function loadJobs() {
         if (!jobList.length) { tbody.innerHTML = '<tr><td colspan="8" class="empty-state">暂无同步任务</td></tr>'; return; }
         tbody.innerHTML = jobList.map(j => `<tr>
             <td>${j.datasource_name || '-'}</td>
-            <td>${j.target_schema_name}</td>
+            <td>${e(j.database || '-')}</td>
             <td>${j.schedule_type === 'interval' ? '每' + j.schedule_value + '分钟' : j.schedule_type}</td>
             <td>${j.auto_classify ? '<i class="fas fa-check text-success"></i>' : '<i class="fas fa-times text-muted"></i>'}</td>
             <td>${j.is_enabled ? '<span class="badge badge-active">启用</span>' : '<span class="badge badge-inactive">禁用</span>'}</td>
@@ -205,7 +209,6 @@ async function showJobModal(id) {
         const j = jobList.find(x => x.id === id);
         if (j) {
             sel.value = j.datasource_id;
-            document.getElementById('jobSchema').value = j.target_schema_name;
             document.getElementById('jobSchedType').value = j.schedule_type;
             document.getElementById('jobSchedValue').value = j.schedule_value;
             document.getElementById('jobAutoClassify').checked = j.auto_classify;
@@ -213,15 +216,22 @@ async function showJobModal(id) {
             document.getElementById('jobExclude').value = j.exclude_tables || '';
         }
     } else {
-        document.getElementById('jobSchema').value = '';
         document.getElementById('jobSchedType').value = 'interval';
         document.getElementById('jobSchedValue').value = '360';
         document.getElementById('jobAutoClassify').checked = true;
         document.getElementById('jobInclude').value = '';
         document.getElementById('jobExclude').value = '';
     }
+    syncTargetPreview();
     toggleSchedInput();
     m.show();
+}
+
+// 目标库名自动取数据源「数据库名」（不再手动填 Schema 名称）
+function syncTargetPreview() {
+    const sel = document.getElementById('jobDsId');
+    const ds = dsList.find(d => d.id === parseInt(sel.value));
+    document.getElementById('jobSchema').value = (ds && ds.database) ? ds.database : '';
 }
 
 function toggleSchedInput() {
@@ -231,9 +241,11 @@ function toggleSchedInput() {
 
 async function saveJob() {
     const id = document.getElementById('jobId').value;
+    const dsId = parseInt(document.getElementById('jobDsId').value);
+    const ds = dsList.find(d => d.id === dsId);
+    if (!ds || !ds.database) return alert('请先在数据源中填写数据库名');
     const body = {
-        datasource_id: parseInt(document.getElementById('jobDsId').value),
-        target_schema_name: document.getElementById('jobSchema').value,
+        datasource_id: dsId,
         schedule_type: document.getElementById('jobSchedType').value,
         schedule_value: document.getElementById('jobSchedValue').value || '0',
         auto_classify: document.getElementById('jobAutoClassify').checked,

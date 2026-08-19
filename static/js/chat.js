@@ -118,6 +118,31 @@ function renderMessage(msg) {
             }
         }
 
+        // 查询结果表格（query_result: {columns, rows, row_count, error, duration_ms}）
+        // 会话内只显示前 N 行，完整结果在弹窗中分页查看
+        if (msg.query_result) {
+            const qr = msg.query_result;
+            if (qr.error) {
+                html += `<div class="msg-error" style="margin-top:8px;">⚠ 查询失败: ${escapeHtml(qr.error)}</div>`;
+            } else if (qr.columns && qr.columns.length) {
+                const PREVIEW_ROWS = 10;
+                const total = qr.row_count != null ? qr.row_count : (qr.rows || []).length;
+                const preview = (qr.rows || []).slice(0, PREVIEW_ROWS);
+                html += `<div style="margin-top:8px;font-size:12px;color:#6c757d;">查询结果：共 ${total} 行${qr.duration_ms != null ? ` · ${qr.duration_ms}ms` : ''}</div>`;
+                html += `<div style="overflow-x:auto;margin-top:4px;"><table class="table table-sm table-bordered mb-0" style="font-size:12px;"><thead><tr>${qr.columns.map(c => `<th>${escapeHtml(c)}</th>`).join('')}</tr></thead><tbody>`;
+                html += preview.map(r => `<tr>${r.map(v => `<td>${escapeHtml(v ?? '')}</td>`).join('')}</tr>`).join('');
+                html += `</tbody></table></div>`;
+                if (total > PREVIEW_ROWS) {
+                    const msgId = msg.id || ('m' + Math.random().toString(36).slice(2, 8));
+                    window._queryResults = window._queryResults || {};
+                    window._queryResults[msgId] = qr;
+                    html += `<div style="margin-top:6px;"><button class="btn btn-sm btn-outline-primary" onclick="showFullResult('${msgId}')">查看完整结果（共 ${total} 行）</button></div>`;
+                }
+            } else {
+                html += `<div class="msg-error" style="margin-top:8px;">⚠ 无查询结果</div>`;
+            }
+        }
+
         html += '</div>';
         row.innerHTML = html;
         container.appendChild(row);
@@ -180,7 +205,8 @@ async function sendMsg() {
             sql: data.assistant_message.sql,
             is_valid: data.assistant_message.is_valid,
             error_message: data.assistant_message.error_message,
-            columns: data.assistant_message.columns
+            columns: data.assistant_message.columns,
+            query_result: data.assistant_message.query_result
         });
 
         loadConvList(); // refresh sidebar
@@ -229,6 +255,7 @@ function setNewConvError(msg) {
     if (!el) return;
     el.textContent = msg;
     el.style.display = msg ? 'block' : 'none';
+    if (!msg) el.style.color = '#dc3545';   // 清空时恢复默认红色
 }
 
 // 选库即确定数据库类型（类型由库本身存储，后端也会兜底取库的类型）
@@ -248,54 +275,84 @@ async function createConv() {
     const llmConfigId = document.getElementById('newConvLlmConfig').value || null;
     const knowledgeId = document.getElementById('newConvKnowledge').value || null;
 
-    // 提交期间：锁定按钮，保留弹窗与输入（失败可恢复）
     _convSubmitting = true;
     const submitBtn = document.getElementById('newConvSubmit');
-    if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = '生成中...'; }
+    if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = '开始对话'; }
     setNewConvError('');
 
-    // 不提前清空消息区：仅成功后切换为新对话内容，失败时原有内容保留
+    // ── 立即关闭弹窗、进入对话界面，显示加载中 ──
+    hideNewConvModal();
+    resetNewConvForm();
     const msgContainer = document.getElementById('chatMessages');
+    msgContainer.innerHTML = '';
+    const emptyEl = document.getElementById('chatEmpty');
+    if (emptyEl) emptyEl.style.display = 'none';
+    document.getElementById('chatInputArea').style.display = 'block';
+    document.getElementById('chatHeader').textContent = '生成中... — 连续对话';
+
+    // 用户问题气泡
+    renderMessage({ role: 'user', content: query });
+    // 加载中气泡
+    const loadingRow = document.createElement('div');
+    loadingRow.className = 'msg-row assistant';
+    loadingRow.id = 'convLoading';
+    loadingRow.innerHTML = '<div class="msg-bubble"><div class="loading-dots"><span></span><span></span><span></span></div><div style="font-size:12px;color:#888;margin-top:4px;">正在生成 SQL 并查询结果，请稍候...</div></div>';
+    msgContainer.appendChild(loadingRow);
+    scrollToBottom();
 
     try {
-        const resp = await apiRequest('/api/conversation', {
+        // 60 秒超时兜底（含模型加载 + LLM 调用 + 查询执行）
+        const timeoutCtrl = new AbortController();
+        const timer = setTimeout(() => timeoutCtrl.abort(), 60000);
+        const resp = await fetch('/api/conversation', {
             method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
             body: JSON.stringify({
                 query, schema_name: schemaName, db_type: dbType,
                 llm_config_id: llmConfigId ? parseInt(llmConfigId) : null,
                 knowledge_id: knowledgeId ? parseInt(knowledgeId) : null
-            })
+            }),
+            signal: timeoutCtrl.signal
         });
+        clearTimeout(timer);
+        if (resp.status === 401) {
+            window.top.location.href = '/login';
+            throw new Error('登录已过期');
+        }
         if (!resp.ok) throw new Error((await resp.json()).detail || '创建失败');
 
         const data = await resp.json();
 
-        // 成功：关闭弹窗、重置表单、切换为新对话内容
-        hideNewConvModal();
-        resetNewConvForm();
-        msgContainer.innerHTML = '';
-        const emptyEl = document.getElementById('chatEmpty');
-        if (emptyEl) emptyEl.style.display = 'none';
-        document.getElementById('chatInputArea').style.display = 'block';
+        // 移除加载中气泡
+        document.getElementById('convLoading')?.remove();
 
         currentConvId = data.conversation.id;
         document.getElementById('chatHeader').textContent =
             data.conversation.title + ' — 连续对话';
 
-        // Render messages
-        renderMessage({ role: 'user', content: query });
+        // Render messages（对话界面内展示结果）
         renderMessage({
             role: 'assistant',
             sql: data.message.sql,
             is_valid: data.message.is_valid,
             error_message: data.message.error_message,
-            columns: data.message.columns
+            columns: data.message.columns,
+            query_result: data.message.query_result
         });
 
         loadConvList();
     } catch (e) {
-        // 失败：弹窗保留、输入保留，仅提示错误，不做任何清空
-        setNewConvError('创建对话失败: ' + e.message);
+        // 失败：对话界面内展示错误（弹窗已关）
+        document.getElementById('convLoading')?.remove();
+        const isTimeout = (e && e.name === 'AbortError');
+        renderMessage({
+            role: 'assistant',
+            sql: '',
+            is_valid: false,
+            error_message: isTimeout ? '生成超时（60秒），请重试' : ('创建对话失败: ' + e.message)
+        });
+        document.getElementById('chatHeader').textContent = '生成失败 — 连续对话';
     } finally {
         _convSubmitting = false;
         if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = '开始对话'; }
@@ -392,4 +449,50 @@ document.getElementById('newConvQuery').addEventListener('keydown', function (e)
     } else if (e.key === 'Escape') {
         hideNewConvModal();
     }
+});
+
+// ── 完整查询结果弹窗（分页） ────────────────────────────────
+const RESULT_PAGE_SIZE = 50;
+let _resultData = null;      // 当前完整结果 {columns, rows, row_count}
+let _resultPage = 1;
+
+function showFullResult(key) {
+    const qr = (window._queryResults || {})[key];
+    if (!qr) { alert('结果数据不存在，请重新查询'); return; }
+    _resultData = qr;
+    _resultPage = 1;
+    renderResultPage();
+    document.getElementById('resultModalTitle').textContent =
+        `查询结果（共 ${qr.row_count != null ? qr.row_count : (qr.rows || []).length} 行）`;
+    document.getElementById('resultModal').classList.add('show');
+}
+function hideResultModal() {
+    document.getElementById('resultModal').classList.remove('show');
+}
+function renderResultPage() {
+    if (!_resultData) return;
+    const { columns = [], rows = [], row_count } = _resultData;
+    const total = row_count != null ? row_count : rows.length;
+    const maxPage = Math.max(1, Math.ceil(total / RESULT_PAGE_SIZE));
+    if (_resultPage > maxPage) _resultPage = maxPage;
+    const start = (_resultPage - 1) * RESULT_PAGE_SIZE;
+    const pageRows = rows.slice(start, start + RESULT_PAGE_SIZE);
+    document.getElementById('resultModalBody').innerHTML = `
+        <table class="table table-sm table-bordered mb-0" style="font-size:12px;">
+            <thead><tr>${columns.map(c => `<th>${escapeHtml(c)}</th>`).join('')}</tr></thead>
+            <tbody>${pageRows.map(r => `<tr>${r.map(v => `<td>${escapeHtml(v ?? '')}</td>`).join('')}</tr>`).join('') || '<tr><td colspan="' + columns.length + '" class="text-center text-muted">无数据</td></tr>'}</tbody>
+        </table>`;
+    document.getElementById('resultPageInfo').textContent = `第 ${_resultPage} / ${maxPage} 页 · 共 ${total} 行`;
+    document.getElementById('resultPrev').disabled = _resultPage <= 1;
+    document.getElementById('resultNext').disabled = _resultPage >= maxPage;
+}
+function resultPageNav(delta) {
+    const next = _resultPage + delta;
+    if (next < 1) return;
+    _resultPage = next;
+    renderResultPage();
+}
+// 点击遮罩关闭
+document.getElementById('resultModal').addEventListener('click', function (e) {
+    if (e.target === this) hideResultModal();
 });

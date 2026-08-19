@@ -29,6 +29,47 @@
     window.fmtTime = window.QF.fmtTime;
     window.fmt = window.QF.fmtTime;
 
+    // 全局浮动提示（右上角 toast，自动消失）：
+    //   QF.toast('保存成功', 'success' | 'danger' | 'warning' | 'info')
+    // 不依赖 Bootstrap 组件，任何页面引用 app_common.js 后即可使用。
+    window.QF.toast = function (message, type) {
+        type = type || 'info';
+        const colors = { success: '#28a745', danger: '#dc3545', warning: '#ffc107', info: '#0d6efd' };
+        const color = colors[type] || colors.info;
+        const container = document.getElementById('qf-toast-container');
+        const host = container || (function () {
+            const el = document.createElement('div');
+            el.id = 'qf-toast-container';
+            el.style.cssText = 'position:fixed;top:16px;right:16px;z-index:9999;display:flex;flex-direction:column;gap:8px;max-width:360px;';
+            document.body.appendChild(el);
+            return el;
+        })();
+        const toast = document.createElement('div');
+        toast.style.cssText =
+            'background:#fff;border-left:4px solid ' + color + ';border-radius:6px;' +
+            'box-shadow:0 2px 12px rgba(0,0,0,.15);padding:10px 14px;font-size:13px;color:#333;' +
+            'display:flex;align-items:center;gap:8px;word-break:break-all;' +
+            'animation:qfToastIn .2s ease;';
+        toast.innerHTML =
+            '<span style="width:8px;height:8px;border-radius:50%;background:' + color + ';flex:none;"></span>' +
+            '<span>' + window.e(message) + '</span>';
+        if (!document.getElementById('qf-toast-style')) {
+            const style = document.createElement('style');
+            style.id = 'qf-toast-style';
+            style.textContent =
+                '@keyframes qfToastIn{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:none}}' +
+                '@keyframes qfToastOut{from{opacity:1}to{opacity:0;transform:translateX(20px)}}';
+            document.head.appendChild(style);
+        }
+        host.appendChild(toast);
+        setTimeout(function () {
+            toast.style.animation = 'qfToastOut .2s ease';
+            setTimeout(function () { toast.remove(); }, 220);
+        }, 2600);
+    };
+    // 兼容历史命名
+    window.showToast = window.QF.toast;
+
     // 统一 API 请求：兼容主界面 iframe（window.apiRequest 由 index.html 注入）
     // 与独立打开（token 为 HttpOnly cookie，fetch 同源自动携带）
     // FormData（文件上传）由浏览器自动设置 multipart 边界，不能强制 JSON Content-Type

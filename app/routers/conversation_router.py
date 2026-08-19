@@ -20,11 +20,14 @@ from app.security.crypto import decrypt_secret
 from core.llm import LLMClient
 from core.generation.sql_generator import SqlGenerator
 from core.generation.chat import ChatSession
-from models import SessionLocal
 from app.timezone import now_beijing
 from models.conversation import Conversation, ConversationMessage
 from services.llm import telemetry
 from services.schema import service as schema_service
+from services.sql.executor import execute_sql, SqlExecutionError
+from curd.base import session_scope
+from curd.conversation import conversation_crud
+from curd.schema import schema_crud
 
 router = APIRouter()
 
@@ -63,6 +66,7 @@ class MessageItem(BaseModel):
     is_valid: bool
     error_message: Optional[str]
     columns: Optional[list]
+    query_result: Optional[dict] = None
     created_at: str
 
 
@@ -72,8 +76,7 @@ def _get_user_llm_config(user_id: int, config_id: Optional[int] = None) -> Optio
     """获取用户的LLM配置（api_key 解密后供客户端使用）"""
     from models.llm import LLMConfig
 
-    db = SessionLocal()
-    try:
+    with session_scope() as db:
         if config_id:
             config = db.query(LLMConfig).filter(
                 LLMConfig.id == config_id,
@@ -86,7 +89,7 @@ def _get_user_llm_config(user_id: int, config_id: Optional[int] = None) -> Optio
                 LLMConfig.is_default == True,
                 LLMConfig.is_active == True
             ).first()
-
+    
         if config:
             return {
                 'id': config.id,
@@ -99,10 +102,6 @@ def _get_user_llm_config(user_id: int, config_id: Optional[int] = None) -> Optio
                 'timeout': config.timeout or 300
             }
         return None
-    finally:
-        db.close()
-
-
 def _build_llm_client(user_id: int, llm_config_id: Optional[int] = None) -> LLMClient:
     """构建 LLM 客户端"""
     llm_config = _get_user_llm_config(user_id, llm_config_id)
@@ -130,6 +129,19 @@ def _safe_parse_columns(raw) -> Optional[list]:
     try:
         parsed = json.loads(raw)
         if isinstance(parsed, list):
+            return parsed
+        return None
+    except (json.JSONDecodeError, TypeError):
+        return None
+
+
+def _safe_parse_result(raw) -> Optional[dict]:
+    """安全解析 result_data JSON（查询结果持久化）"""
+    if not raw:
+        return None
+    try:
+        parsed = json.loads(raw)
+        if isinstance(parsed, dict):
             return parsed
         return None
     except (json.JSONDecodeError, TypeError):
@@ -177,6 +189,20 @@ def _record_telemetry(user_id: int, llm_client: LLMClient, question: str,
 
 # ── API Endpoints ─────────────────────────────────────────────────
 
+def _execute_generated_sql(sql: str, schema_name: Optional[str],
+                           db_type: str) -> dict:
+    """执行生成的 SQL 并返回查询结果；SQL 为空或执行失败时返回错误信息。
+
+    查询前校验 SQL 非空；仅允许 SELECT（执行器内部二次校验）。
+    """
+    if not sql or not sql.strip():
+        return {"error": "生成的 SQL 为空，未执行查询", "columns": [], "rows": [], "row_count": 0}
+    try:
+        return execute_sql(sql, schema_name=schema_name, db_type=db_type)
+    except SqlExecutionError as e:
+        return {"error": str(e), "columns": [], "rows": [], "row_count": 0}
+
+
 @router.post("")
 def create_conversation(
     request: CreateConversationRequest,
@@ -194,12 +220,9 @@ def create_conversation(
     # 库未设置类型时才回退请求参数
     db_type = request.db_type
     if request.schema_name:
-        db_cfg = SessionLocal()
-        try:
+        with session_scope() as db_cfg:
             db_type = schema_service.get_schema_type_by_name(
                 db_cfg, request.schema_name) or db_type
-        finally:
-            db_cfg.close()
 
     try:
         llm_client = _build_llm_client(user_id, request.llm_config_id)
@@ -220,13 +243,16 @@ def create_conversation(
             knowledge_content=knowledge_content
         )
 
+        # 执行生成的 SQL：查询前校验非空，直接查库返回结果
+        query_result = _execute_generated_sql(
+            result.get('sql', ''), request.schema_name, db_type)
+
         # 保存到数据库
-        db = SessionLocal()
-        try:
+        with session_scope() as db:
             title = request.query[:80] + ("..." if len(request.query) > 80 else "")
-
+    
             schema_id = schema_service.get_schema_id_by_name(db, request.schema_name)
-
+    
             conversation = Conversation(
                 user_id=user_id,
                 title=title,
@@ -237,7 +263,7 @@ def create_conversation(
             )
             db.add(conversation)
             db.flush()
-
+    
             # 用户消息
             user_msg = ConversationMessage(
                 conversation_id=conversation.id,
@@ -245,7 +271,7 @@ def create_conversation(
                 content=request.query
             )
             db.add(user_msg)
-
+    
             # 助手消息
             columns_json = json.dumps(result.get('columns') or [], ensure_ascii=False)
             assistant_msg = ConversationMessage(
@@ -255,16 +281,16 @@ def create_conversation(
                 sql=result['sql'],
                 is_valid=result['is_valid'],
                 error_message=result.get('error_message'),
-                columns=columns_json
+                columns=columns_json,
+                result_data=json.dumps(query_result, ensure_ascii=False) if query_result else None
             )
             db.add(assistant_msg)
-            db.commit()
+            db.flush()
 
+            # flush 后 id 已分配，先取回再 commit（避免 commit expire 后属性刷新异常）
             conversation_id = cast(int, conversation.id)
             assistant_msg_id = cast(int, assistant_msg.id)
-        finally:
-            db.close()
-
+            db.commit()
         # 保存 LLM 调用记录（遥测库）+ 回填关联键（主库）
         call_id = _record_telemetry(
             user_id, llm_client, request.query,
@@ -276,20 +302,7 @@ def create_conversation(
         prompt_id = telemetry.get_or_create_prompt(prompt_text) if prompt_text else None
 
         if call_id or prompt_id:
-            db = SessionLocal()
-            try:
-                if call_id:
-                    db.query(ConversationMessage).filter(
-                        ConversationMessage.id == assistant_msg_id
-                    ).update({'llm_call_id': call_id})
-                if prompt_id:
-                    db.query(Conversation).filter(
-                        Conversation.id == conversation_id
-                    ).update({'context_prompt_id': prompt_id})
-                db.commit()
-            finally:
-                db.close()
-
+            conversation_crud.bind_telemetry(conversation_id, assistant_msg_id, call_id, prompt_id)
         logger.info(f"对话创建成功: id={conversation_id}, user_id={user_id}")
 
         return {
@@ -307,7 +320,8 @@ def create_conversation(
                 "error_message": result.get('error_message'),
                 "columns": result.get('columns'),
                 "raw_response": result.get('raw_response', ''),
-                "tokens": result.get('tokens', {})
+                "tokens": result.get('tokens', {}),
+                "query_result": query_result
             }
         }
 
@@ -328,8 +342,7 @@ def send_message(
     user_id = user['user_id']
 
     try:
-        db = SessionLocal()
-        try:
+        with session_scope() as db:
             # 验证对话归属
             conversation = db.query(Conversation).filter(
                 Conversation.id == conversation_id,
@@ -337,22 +350,23 @@ def send_message(
             ).first()
             if not conversation:
                 raise HTTPException(status_code=404, detail="对话不存在")
-
-            # 获取历史消息
-            history = db.query(ConversationMessage).filter(
+    
+            # 获取历史消息（转 dict 供会话外使用，避免 detached ORM 对象）
+            history = [{
+                'role': m.role,
+                'content': m.content or '',
+                'sql': m.sql,
+            } for m in db.query(ConversationMessage).filter(
                 ConversationMessage.conversation_id == conversation_id
-            ).order_by(ConversationMessage.created_at.asc()).all()
-
+            ).order_by(ConversationMessage.created_at.asc()).all()]
+    
             if not history:
                 raise HTTPException(status_code=400, detail="对话无历史消息")
-
+    
             schema_name = schema_service.get_schema_name_by_id(db, conversation.schema_id)
             conv_db_type = conversation.db_type
             conv_llm_config_id = conversation.llm_config_id
             conv_knowledge_id = conversation.knowledge_id
-        finally:
-            db.close()
-
         # 从三层模型重建 schema CSV（用于 context）
         schema_csv = _rebuild_schema_csv(schema_name)
 
@@ -372,19 +386,23 @@ def send_message(
             new_user_content=request.content,
             schema_csv=schema_csv,
             db_type=conv_db_type,
+            schema_name=schema_name,
             knowledge_content=knowledge_content
         )
 
+        # 执行生成的 SQL：查询前校验非空，直接查库返回结果
+        query_result = _execute_generated_sql(
+            result.get('sql', ''), schema_name, conv_db_type)
+
         # 保存消息
-        db = SessionLocal()
-        try:
+        with session_scope() as db:
             user_msg = ConversationMessage(
                 conversation_id=conversation_id,
                 role="user",
                 content=request.content
             )
             db.add(user_msg)
-
+    
             columns_json = json.dumps(result.get('columns') or [], ensure_ascii=False)
             assistant_msg = ConversationMessage(
                 conversation_id=conversation_id,
@@ -393,22 +411,21 @@ def send_message(
                 sql=result['sql'],
                 is_valid=result['is_valid'],
                 error_message=result.get('error_message'),
-                columns=columns_json
+                columns=columns_json,
+                result_data=json.dumps(query_result, ensure_ascii=False) if query_result else None
             )
             db.add(assistant_msg)
-
+            db.flush()
+    
             # 更新会话时间
             db.query(Conversation).filter(
                 Conversation.id == conversation_id
             ).update({'updated_at': now_beijing()})
-
-            db.commit()
-
+    
+            # flush 后 id 已分配，先取回再 commit（避免 commit expire 后属性刷新异常）
             user_msg_id = user_msg.id
             assistant_msg_id = assistant_msg.id
-        finally:
-            db.close()
-
+            db.commit()
         # 保存 LLM 调用记录（遥测库）+ 回填消息关联
         call_id = _record_telemetry(
             user_id, llm_client, request.content,
@@ -419,15 +436,11 @@ def send_message(
         telemetry.bind_message(call_id, conversation_id, assistant_msg_id)
 
         if call_id:
-            db = SessionLocal()
-            try:
+            with session_scope() as db:
                 db.query(ConversationMessage).filter(
                     ConversationMessage.id == assistant_msg_id
                 ).update({'llm_call_id': call_id})
                 db.commit()
-            finally:
-                db.close()
-
         logger.info(f"对话消息已发送: conversation_id={conversation_id}")
 
         return {
@@ -444,7 +457,8 @@ def send_message(
                 "error_message": result.get('error_message'),
                 "columns": result.get('columns'),
                 "raw_response": result.get('raw_response', ''),
-                "tokens": result.get('tokens', {})
+                "tokens": result.get('tokens', {}),
+                "query_result": query_result
             }
         }
 
@@ -463,36 +477,31 @@ def list_conversations(
     user_id = user['user_id']
     is_admin = user.get('role') == 'admin'
 
-    db = SessionLocal()
-    try:
-        query = db.query(Conversation)
-        if not is_admin:
-            query = query.filter(Conversation.user_id == user_id)
-        conversations = query.order_by(Conversation.updated_at.desc()).all()
+    conversations = conversation_crud.list_all() if is_admin else conversation_crud.list_by_user(user_id)
+    # schema id → name 映射（一次查询）
+    schema_names = schema_crud.name_map()
+    # 各对话消息数（一次 GROUP BY 聚合，避免 N+1 count）
+    from curd.conversation import message_crud
+    from sqlalchemy import func
+    with session_scope() as db:
+        conv_ids = [c.id for c in conversations]
+        msg_counts = dict(db.query(ConversationMessage.conversation_id, func.count(ConversationMessage.id))
+                          .filter(ConversationMessage.conversation_id.in_(conv_ids))
+                          .group_by(ConversationMessage.conversation_id).all()) if conv_ids else {}
 
-        # schema id → name 映射（一次查询）
-        schema_names = schema_service.get_schema_name_map(db)
+    result = []
+    for conv in conversations:
+        result.append(ConversationItem(
+            id=conv.id,
+            title=conv.title,
+            schema_name=schema_names.get(conv.schema_id),
+            db_type=conv.db_type or "sqlite",
+            created_at=conv.created_at.isoformat() if conv.created_at else "",
+            updated_at=conv.updated_at.isoformat() if conv.updated_at else "",
+            message_count=msg_counts.get(conv.id, 0)
+        ))
 
-        result = []
-        for conv in conversations:
-            msg_count = db.query(ConversationMessage).filter(
-                ConversationMessage.conversation_id == conv.id
-            ).count()
-            result.append(ConversationItem(
-                id=conv.id,
-                title=conv.title,
-                schema_name=schema_names.get(conv.schema_id),
-                db_type=conv.db_type or "sqlite",
-                created_at=conv.created_at.isoformat() if conv.created_at else "",
-                updated_at=conv.updated_at.isoformat() if conv.updated_at else "",
-                message_count=msg_count
-            ))
-
-        return result
-    finally:
-        db.close()
-
-
+    return result
 @router.get("/{conversation_id}/messages")
 def get_messages(
     conversation_id: int,
@@ -501,19 +510,18 @@ def get_messages(
     """获取对话消息历史"""
     user_id = user['user_id']
 
-    db = SessionLocal()
-    try:
+    with session_scope() as db:
         conversation = db.query(Conversation).filter(
             Conversation.id == conversation_id,
             Conversation.user_id == user_id
         ).first()
         if not conversation:
             raise HTTPException(status_code=404, detail="对话不存在")
-
+    
         messages = db.query(ConversationMessage).filter(
             ConversationMessage.conversation_id == conversation_id
         ).order_by(ConversationMessage.created_at.asc()).all()
-
+    
         return [
             MessageItem(
                 id=msg.id,
@@ -523,14 +531,11 @@ def get_messages(
                 is_valid=msg.is_valid,
                 error_message=msg.error_message,
                 columns=_safe_parse_columns(msg.columns),
+                query_result=_safe_parse_result(msg.result_data),
                 created_at=msg.created_at.isoformat() if msg.created_at else ""
             )
             for msg in messages
         ]
-    finally:
-        db.close()
-
-
 @router.delete("/{conversation_id}")
 def delete_conversation(
     conversation_id: int,
@@ -539,28 +544,23 @@ def delete_conversation(
     """删除对话"""
     user_id = user['user_id']
 
-    db = SessionLocal()
-    try:
+    with session_scope() as db:
         conversation = db.query(Conversation).filter(
             Conversation.id == conversation_id,
             Conversation.user_id == user_id
         ).first()
         if not conversation:
             raise HTTPException(status_code=404, detail="对话不存在")
-
+    
         # 删除关联消息
         db.query(ConversationMessage).filter(
             ConversationMessage.conversation_id == conversation_id
         ).delete()
-
+    
         db.delete(conversation)
         db.commit()
-
+    
         return {"success": True, "message": "对话已删除"}
-    finally:
-        db.close()
-
-
 # ── Internal helpers ──────────────────────────────────────────────
 
 def _rebuild_schema_csv(schema_name: Optional[str] = None) -> str:

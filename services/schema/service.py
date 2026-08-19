@@ -11,9 +11,9 @@ from typing import List, Optional, Tuple, Dict
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
-from models import SessionLocal
 from models.schema import DbSchema, DbTable, DbColumn
-from models.sync import DataSource
+from models.datasource import DataSource
+from curd.base import session_scope
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -299,23 +299,17 @@ def list_tables(db: Session, schema_name=None, visible_schema_ids=None,
 
 def field_count(schema_name: Optional[str] = None) -> int:
     """字段总数（供向量索引阈值判断）"""
-    db = SessionLocal()
-    try:
+    with session_scope() as db:
         q = db.query(func.count(DbColumn.id)).join(DbTable, DbColumn.table_id == DbTable.id)
         if schema_name:
             q = q.join(DbSchema, DbTable.schema_id == DbSchema.id).filter(DbSchema.name == schema_name)
         return q.scalar() or 0
-    finally:
-        db.close()
-
-
 def iter_field_rows(schema_name: Optional[str] = None,
                     table_names: Optional[List[str]] = None,
                     visible_schema_ids=None,
                     table_grants_by_schema=None) -> List[FieldRow]:
     """字段行列表（旧 Schema ORM 属性形状），供 core 流水线使用"""
-    db = SessionLocal()
-    try:
+    with session_scope() as db:
         q = (db.query(DbSchema.name, DbTable.name, DbColumn.name, DbColumn.data_type,
                       DbColumn.description, DbColumn.column_key, DbColumn.foreign_key,
                       DbColumn.sample_values, DbColumn.id, DbColumn.sensitive_level)
@@ -343,10 +337,6 @@ def iter_field_rows(schema_name: Optional[str] = None,
             sample_values=r[7] or '', column_id=r[8],
             sensitive_level=r[9] or 'public',
         ) for r in q.all()]
-    finally:
-        db.close()
-
-
 # ═══════════════════════════════════════════════════════════════════
 # 删除 / 更新
 # ═══════════════════════════════════════════════════════════════════

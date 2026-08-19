@@ -37,5 +37,6 @@ class ConversationMessage(MainBase):
     is_valid = Column(Boolean, default=True, comment='SQL是否有效')
     error_message = Column(Text, nullable=True, comment='错误信息')
     columns = Column(Text, nullable=True, comment='结果列名(JSON数组)')
+    result_data = Column(Text, nullable=True, comment='查询结果持久化(JSON: {columns,rows,row_count,error})')
     llm_call_id = Column(Integer, nullable=True, index=True, comment='关联的LLM调用ID(→llm_calls，跨库逻辑引用)')
     created_at = Column(DateTime, default=now_beijing, comment='创建时间（北京时间）')

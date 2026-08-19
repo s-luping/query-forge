@@ -50,21 +50,20 @@ python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
 ```
 
-### 3. 配置环境变量（安全必填）
+### 3. 配置（默认即可启动）
 
-编辑 `.env` 或设置系统环境变量（推荐 `.env`，应用启动时自动加载）：
+所有配置集中在 `app/config.py`（Django 风格，`键 = 值` 直接赋值），也可用同名环境变量覆盖：
 
-```env
-# JWT 签名密钥（必填；两处都没有时应用拒绝启动）
-QUERYFORGE_SECRET_KEY=your_secret_key_here
-# 数据源密码加密密钥（可选，缺省从 SECRET_KEY 派生）
-QUERYFORGE_FERNET_KEY=
-# 数据库路径（默认即可）
-QUERYFORGE_MAIN_DB=db/queryforge.db
-QUERYFORGE_TELEMETRY_DB=db/llm_telemetry.db
-# iframe 嵌入白名单（默认仅同源；需被外部页面嵌入时配置，见 FAQ）
-QUERYFORGE_FRAME_ANCESTORS=
+```python
+# app/config.py 中可直接修改的值
+HOST = '0.0.0.0'              # 监听地址
+PORT = 8888                   # 监听端口
+MAIN_DB_PATH = ...            # 主库路径（默认 db/queryforge.db）
+TELEMETRY_DB_PATH = ...       # 遥测库路径（默认 db/llm_telemetry.db）
 ```
+
+安全密钥无需手动配置：启动时自动检查环境变量 `QUERYFORGE_SECRET_KEY` /
+`QUERYFORGE_FERNET_KEY`，未设置则生成随机字符串并写入 `.runtime_secrets`（已设置则直接使用）。
 
 ### 4. 下载向量模型（推荐）
 

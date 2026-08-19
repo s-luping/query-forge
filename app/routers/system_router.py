@@ -14,34 +14,25 @@ from pydantic import BaseModel
 
 from app.auth import AdminUser, CurrentUser
 from app.logger import logger
-from models import SessionLocal
 from models.system import SystemSetting
+from curd.base import session_scope
 
 router = APIRouter()
 
 
 def _get_setting(key: str) -> str:
-    db = SessionLocal()
-    try:
+    with session_scope() as db:
         row = db.query(SystemSetting).filter(SystemSetting.key == key).first()
         return row.value if row else ''
-    finally:
-        db.close()
 
 
 def _set_setting(key: str, value: str, category: str = 'runtime'):
-    db = SessionLocal()
-    try:
+    with session_scope() as db:
         row = db.query(SystemSetting).filter(SystemSetting.key == key).first()
         if row:
             row.value = value
         else:
             db.add(SystemSetting(key=key, value=value, category=category))
-        db.commit()
-    finally:
-        db.close()
-
-
 def _find_embedding_path() -> Optional[str]:
     """查找 embedding 模型实际路径"""
     project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -70,20 +61,17 @@ def check_embedding_downloaded() -> bool:
     """检查模型是否已下载，并同步数据库状态"""
     found = _find_embedding_path() is not None
     if found:
-        db = SessionLocal()
         try:
-            row = db.query(SystemSetting).filter(SystemSetting.key == 'EMBEDDING_MODEL_READY').first()
-            if row is None or str(row.value) != 'true':
-                if row:
-                    row.value = 'true'
-                else:
-                    db.add(SystemSetting(key='EMBEDDING_MODEL_READY', value='true', category='runtime'))
-                db.commit()
-                logger.info("自动同步: EMBEDDING_MODEL_READY 更新为 true")
+            with session_scope() as db:
+                row = db.query(SystemSetting).filter(SystemSetting.key == 'EMBEDDING_MODEL_READY').first()
+                if row is None or str(row.value) != 'true':
+                    if row:
+                        row.value = 'true'
+                    else:
+                        db.add(SystemSetting(key='EMBEDDING_MODEL_READY', value='true', category='runtime'))
+                    logger.info("自动同步: EMBEDDING_MODEL_READY 更新为 true")
         except Exception as e:
             logger.warning(f"同步 EMBEDDING_MODEL_READY 失败: {e}")
-        finally:
-            db.close()
     return found
 
 
@@ -164,8 +152,7 @@ def get_site_branding():
 @router.get("/settings", response_model=List[SystemSettingItem])
 def get_settings(user: AdminUser):
     """获取所有系统配置（密钥类 value 脱敏；仅管理员）"""
-    db = SessionLocal()
-    try:
+    with session_scope() as db:
         rows = db.query(SystemSetting).all()
         result = []
         for r in rows:
@@ -175,27 +162,21 @@ def get_settings(user: AdminUser):
                 value = value[:8] + '****' + value[-4:] if len(value) > 12 else '****'
             result.append(SystemSettingItem(key=r.key, value=value, category=r.category))
         return result
-    finally:
-        db.close()
 
 
 @router.put("/settings")
 def update_setting(req: UpdateSettingRequest, user: AdminUser):
     """更新系统配置（仅 auth/vector 分类可改；仅管理员）"""
     # 仅允许编辑标记为 is_editable 的配置项（排除 security / runtime）
-    db = SessionLocal()
     try:
-        row = db.query(SystemSetting).filter(SystemSetting.key == req.key).first()
-        if not row or not row.is_editable:
-            raise HTTPException(status_code=400, detail=f"不可修改的配置项: {req.key}")
-        row.value = req.value
-        db.commit()
+        with session_scope() as db:
+            row = db.query(SystemSetting).filter(SystemSetting.key == req.key).first()
+            if not row or not row.is_editable:
+                raise HTTPException(status_code=400, detail=f"不可修改的配置项: {req.key}")
+            row.value = req.value
     except HTTPException:
         raise
     except Exception as e:
-        db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        db.close()
     logger.info(f"系统配置已更新: {req.key}")
     return {"success": True, "message": f"{req.key} 已更新"}

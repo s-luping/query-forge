@@ -18,13 +18,13 @@ from pydantic import BaseModel
 from app.auth import AdminUser, CurrentUser
 from app.logger import logger, log_audit
 from app.permissions import get_visible_schema_ids, get_table_grants_by_schema
-from models import SessionLocal
 from models.schema import DbSchema, DbColumn
-from models.sync import DataSource
+from models.datasource import DataSource
 from services.schema.parsers import (
     parse_json_schema, parse_schema_csv, DDLParseError, SUPPORTED_DB_TYPES,
 )
 from services.schema import service as schema_service
+from curd.base import session_scope
 
 router = APIRouter()
 
@@ -198,8 +198,7 @@ def _items_in_schemas(db, schema_names: List[str], fallback_schema: str) -> List
 def _ingest_and_respond(parsed_results, user, db_type, source, fallback_schema,
                         extra_fk_line=False, datasource_id=None) -> SchemaListResponse:
     """解析结果入库 + 触发自动索引 + 组装响应（/parse-csv /parse-json /upload 共用）"""
-    db = SessionLocal()
-    try:
+    with session_scope() as db:
         if datasource_id is not None:
             ds = db.query(DataSource).filter(DataSource.id == datasource_id).first()
             if not ds:
@@ -207,7 +206,7 @@ def _ingest_and_respond(parsed_results, user, db_type, source, fallback_schema,
         new_count, duplicate_count, schema_names = schema_service.save_parsed_results(
             parsed_results, user['user_id'], db, db_type=db_type, source=source,
             datasource_id=datasource_id)
-
+    
         message = f"成功插入 {new_count} 条记录"
         if duplicate_count > 0:
             message += f"，跳过 {duplicate_count} 条重复记录"
@@ -217,24 +216,20 @@ def _ingest_and_respond(parsed_results, user, db_type, source, fallback_schema,
             fk_count = sum(1 for r in parsed_results if r.get('foreign_key'))
             if fk_count > 0:
                 message += f"，外键 {fk_count} 条"
-
+    
         items = _items_in_schemas(db, schema_names, fallback_schema)
-
+    
         index_messages = []
         for schema_name in schema_names:
             schema_field_count = schema_service.field_count(schema_name)
             index_message = _auto_build_vector_index(schema_name, schema_field_count)
             if index_message:
                 index_messages.append(index_message)
-
+    
         if index_messages:
             message += "。" + "；".join(index_messages)
-
+    
         return SchemaListResponse(items=items, total=len(items), message=message)
-    finally:
-        db.close()
-
-
 # ═══════════════════════════════════════════════════════════════════
 # 解析与导入端点
 # ═══════════════════════════════════════════════════════════════════
@@ -351,21 +346,18 @@ def get_schema_list(
 ):
     """获取用户的 Schema 解析列表，支持按库名、表名、字段名、描述模糊搜索"""
     try:
-        db = SessionLocal()
-        try:
+        with session_scope() as db:
             visible_ids = get_visible_schema_ids(user)
             rows, total = schema_service.query_flat(
                 db, schema_name=schema_name, table_name=table_name, search=search,
                 visible_schema_ids=visible_ids,
                 table_grants_by_schema=get_table_grants_by_schema(user),
                 limit=limit, offset=offset)
-
+    
             return SchemaListResponse(
                 items=[SchemaItem.model_validate(r) for r in rows],
                 total=total
             )
-        finally:
-            db.close()
     except Exception as e:
         logger.error(f"获取 Schema 列表失败：{e}")
         raise HTTPException(status_code=500, detail=f"获取失败：{str(e)}")
@@ -375,13 +367,10 @@ def get_schema_list(
 def get_schema_stats(user: CurrentUser):
     """获取用户 Schema 统计数据"""
     try:
-        db = SessionLocal()
-        try:
+        with session_scope() as db:
             return schema_service.stats(
                 db, get_visible_schema_ids(user),
                 table_grants_by_schema=get_table_grants_by_schema(user))
-        finally:
-            db.close()
     except Exception as e:
         logger.error(f"获取 Schema 统计失败：{e}")
         raise HTTPException(status_code=500, detail=f"统计失败：{str(e)}")
@@ -391,8 +380,7 @@ def get_schema_stats(user: CurrentUser):
 def check_schema(user: CurrentUser):
     """检查用户是否有 Schema 数据"""
     try:
-        db = SessionLocal()
-        try:
+        with session_scope() as db:
             s = schema_service.stats(
                 db, get_visible_schema_ids(user),
                 table_grants_by_schema=get_table_grants_by_schema(user))
@@ -401,8 +389,6 @@ def check_schema(user: CurrentUser):
                 schema_count=s["schema_count"],
                 table_count=s["table_count"]
             )
-        finally:
-            db.close()
     except Exception as e:
         logger.error(f"检查 Schema 失败：{e}")
         raise HTTPException(status_code=500, detail=f"检查失败：{str(e)}")
@@ -416,22 +402,21 @@ def export_schema(
 ):
     """导出 Schema 为 CSV"""
     try:
-        db = SessionLocal()
-        try:
+        with session_scope() as db:
             rows, _total = schema_service.query_flat(
                 db, schema_name=schema_name, table_name=table_name,
                 visible_schema_ids=get_visible_schema_ids(user),
                 table_grants_by_schema=get_table_grants_by_schema(user))
-
+    
             output = io.StringIO()
             writer = csv.writer(output)
-
+    
             writer.writerow([
                 'schema_name', 'table_name', 'table_description',
                 'column_name', 'column_type', 'column_description',
                 'column_key', 'is_nullable', 'default_value', 'sample_values'
             ])
-
+    
             for item in rows:
                 writer.writerow([
                     item.schema_name,
@@ -445,16 +430,14 @@ def export_schema(
                     item.default_value or '',
                     item.sample_values or ''
                 ])
-
+    
             output.seek(0)
-
+    
             return StreamingResponse(
                 io.BytesIO(output.getvalue().encode('utf-8')),
                 media_type='text/csv',
                 headers={'Content-Disposition': f'attachment; filename="schema_{schema_name or "all"}.csv"'}
             )
-        finally:
-            db.close()
     except Exception as e:
         logger.error(f"导出 Schema 失败：{e}")
         raise HTTPException(status_code=500, detail=f"导出失败：{str(e)}")
@@ -464,13 +447,12 @@ def export_schema(
 def get_schemas(user: CurrentUser):
     """获取用户可见的 schema 列表（含 db_type 映射与数据源分组，供级联选择）"""
     try:
-        db = SessionLocal()
-        try:
+        with session_scope() as db:
             visible = get_visible_schema_ids(user)
             names = schema_service.list_schema_names(db, visible)
             types = schema_service.list_schema_types(db, visible)
             rows = schema_service.list_schemas_with_datasource(db, visible)
-
+    
             # 数据源 → 库 分组（datasource_id 为空 = 手动导入/未关联）
             groups: dict = {}
             for r in rows:
@@ -482,10 +464,8 @@ def get_schemas(user: CurrentUser):
                 })
                 g["schemas"].append(r['name'])
             datasources = [groups[k] for k in sorted(groups.keys())]
-
+    
             return {"schemas": names, "schema_types": types, "datasources": datasources}
-        finally:
-            db.close()
     except Exception as e:
         logger.error(f"获取 schema 列表失败：{e}")
         raise HTTPException(status_code=500, detail=f"获取失败：{str(e)}")
@@ -498,21 +478,18 @@ def get_tables(
 ):
     """获取指定 schema 下的表名列表"""
     try:
-        db = SessionLocal()
-        try:
+        with session_scope() as db:
             tables = schema_service.list_tables(
                 db, schema_name=schema_name,
                 visible_schema_ids=get_visible_schema_ids(user),
                 table_grants_by_schema=get_table_grants_by_schema(user))
-
+    
             return {
                 "tables": [
                     {"name": t[0], "description": t[1]}
                     for t in tables
                 ]
             }
-        finally:
-            db.close()
     except Exception as e:
         logger.error(f"获取表列表失败：{e}")
         raise HTTPException(status_code=500, detail=f"获取失败：{str(e)}")
@@ -550,12 +527,9 @@ def delete_schema(
     """删除指定 schema 的所有数据（仅管理员）"""
     # (权限由 AdminUser 依赖统一校验)
     try:
-        db = SessionLocal()
-        try:
+        with session_scope() as db:
             count = schema_service.delete_schema_by_name(db, schema_name)
             return {"success": True, "message": f"已删除 schema '{schema_name}' 的 {count} 条记录"}
-        finally:
-            db.close()
     except Exception as e:
         logger.error(f"删除 schema 失败：{e}")
         raise HTTPException(status_code=500, detail=f"删除失败：{str(e)}")
@@ -570,12 +544,9 @@ def delete_table(
     """删除指定表的所有字段（仅管理员）"""
     # (权限由 AdminUser 依赖统一校验)
     try:
-        db = SessionLocal()
-        try:
+        with session_scope() as db:
             count = schema_service.delete_table(db, schema_name, table_name)
             return {"success": True, "message": f"已删除表 '{table_name}' 的 {count} 条记录"}
-        finally:
-            db.close()
     except Exception as e:
         logger.error(f"删除表失败：{e}")
         raise HTTPException(status_code=500, detail=f"删除失败：{str(e)}")
@@ -589,13 +560,10 @@ def delete_schema_item(
     """删除单个字段（仅管理员）"""
     # (权限由 AdminUser 依赖统一校验)
     try:
-        db = SessionLocal()
-        try:
+        with session_scope() as db:
             if not schema_service.delete_column_by_id(db, schema_id):
                 raise HTTPException(status_code=404, detail="Schema 项不存在")
             return {"success": True, "message": "删除成功"}
-        finally:
-            db.close()
     except HTTPException:
         raise
     except Exception as e:
@@ -612,13 +580,10 @@ def update_sample_values(
     """更新字段的示例值（仅管理员）"""
     # (权限由 AdminUser 依赖统一校验)
     try:
-        db = SessionLocal()
-        try:
+        with session_scope() as db:
             if not schema_service.update_sample_values(db, schema_id, request.sample_values):
                 raise HTTPException(status_code=404, detail="Schema 项不存在")
             return {"success": True, "message": "更新成功"}
-        finally:
-            db.close()
     except HTTPException:
         raise
     except Exception as e:
@@ -686,8 +651,7 @@ def list_vector_indexes(user: AdminUser):
     try:
         from models.vector_index import VectorIndexMeta
 
-        db = SessionLocal()
-        try:
+        with session_scope() as db:
             rows = db.query(VectorIndexMeta).order_by(
                 VectorIndexMeta.schema_name.asc()
             ).all()
@@ -703,8 +667,6 @@ def list_vector_indexes(user: AdminUser):
                 'built_at': r.built_at.isoformat() if r.built_at else None,
                 'created_at': r.created_at.isoformat() if r.created_at else None
             } for r in rows]
-        finally:
-            db.close()
     except Exception as e:
         logger.error(f"获取向量索引列表失败：{e}")
         raise HTTPException(status_code=500, detail=f"获取失败：{str(e)}")

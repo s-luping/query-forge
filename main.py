@@ -27,7 +27,7 @@ from app.routers.driver_router import router as driver_router
 from app.routers.docs_router import register_docs
 from app.routers.page_router import router as page_router
 from app.routers.scheduler_router import router as scheduler_router
-from models import init_database
+from db import init_database
 
 
 setup_server_logging()
@@ -41,6 +41,19 @@ async def lifespan(app: FastAPI):
     _get_secret_key()
     scheduler_manager.init_scheduler()
     scheduler_manager.start()
+    # 后台预热向量模型（首次生成需加载 bge-m3 embedding 模型，避免用户首问等待 10s+）
+    import threading as _threading
+
+    def _warmup_vector():
+        try:
+            from core.retrieval.vector_store import EmbeddingModel
+            # 编码一条文本强制加载 bge-m3 embedding 模型（模型加载是首问耗时大头）
+            EmbeddingModel.encode(['预热'])
+            logger.info("向量模型预热完成（后台加载成功）")
+        except Exception as e:
+            logger.warning(f"向量模型预热失败（首次生成时再加载）: {e}")
+
+    _threading.Thread(target=_warmup_vector, daemon=True).start()
     logger.info("应用启动完成")
     yield
     scheduler_manager.shutdown()

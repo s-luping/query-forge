@@ -13,7 +13,8 @@ from pydantic import BaseModel, field_validator
 from app.auth import CurrentUser
 from app.logger import logger, log_audit
 from app.permissions import get_visible_knowledge_ids, is_admin
-from models import SessionLocal
+from curd.base import session_scope
+from curd.knowledge import knowledge_crud
 from models.knowledge import KnowledgeItem
 from models.user import User
 
@@ -74,8 +75,7 @@ def _to_dict(item: KnowledgeItem) -> dict:
 
 def get_all_knowledge(user: dict, limit: int = 20, offset: int = 0) -> tuple:
     """获取知识库条目（按用户权限过滤）"""
-    db = SessionLocal()
-    try:
+    with session_scope() as db:
         query = db.query(KnowledgeItem).filter(KnowledgeItem.is_active == 1)
         visible_ids = get_visible_knowledge_ids(user)
         if visible_ids is not None:
@@ -85,8 +85,6 @@ def get_all_knowledge(user: dict, limit: int = 20, offset: int = 0) -> tuple:
         total = query.count()
         items = query.order_by(KnowledgeItem.updated_at.desc()).limit(limit).offset(offset).all()
         return items, total
-    finally:
-        db.close()
 
 
 def get_knowledge_safe(user_id: int, knowledge_id: int = None) -> dict:
@@ -95,8 +93,7 @@ def get_knowledge_safe(user_id: int, knowledge_id: int = None) -> dict:
         return {}
     if not isinstance(knowledge_id, int) or knowledge_id <= 0:
         return {}
-    db = SessionLocal()
-    try:
+    with session_scope() as db:
         item = db.query(KnowledgeItem).filter(
             KnowledgeItem.id == knowledge_id,
             KnowledgeItem.is_active == 1
@@ -117,10 +114,6 @@ def get_knowledge_safe(user_id: int, knowledge_id: int = None) -> dict:
             'title': item.title,
             'content': item.content or ''
         }
-    finally:
-        db.close()
-
-
 @router.get("", response_model=KnowledgeListResponse)
 def list_knowledge(
     user: CurrentUser,
@@ -138,26 +131,14 @@ def create_knowledge(
     user: CurrentUser
 ):
     """创建知识条目"""
-    db = SessionLocal()
     try:
-        item = KnowledgeItem(
-            user_id=user['user_id'],
-            title=data.title,
-            content=data.content or ''
-        )
-        db.add(item)
-        db.flush()
-        db.commit()
-        db.refresh(item)
+        item = knowledge_crud.create(
+            user_id=user['user_id'], title=data.title, content=data.content or '')
         log_audit(user, "create_knowledge", f"title={data.title}")
-
         return _to_dict(item)
     except Exception as e:
-        db.rollback()
         logger.error(f"创建知识失败: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        db.close()
 
 
 @router.get("/{knowledge_id}", response_model=KnowledgeResponse)
@@ -166,16 +147,12 @@ def get_knowledge(
     user: CurrentUser
 ):
     """获取单条知识（权限过滤）"""
-    db = SessionLocal()
     try:
         visible_ids = get_visible_knowledge_ids(user)
         if visible_ids is not None and knowledge_id not in visible_ids:
             raise HTTPException(status_code=404, detail="知识不存在或已删除")
 
-        item = db.query(KnowledgeItem).filter(
-            KnowledgeItem.id == knowledge_id,
-            KnowledgeItem.is_active == 1
-        ).first()
+        item = knowledge_crud.get_one(id=knowledge_id, is_active=1)
         if not item:
             raise HTTPException(status_code=404, detail="知识不存在或已删除")
 
@@ -185,8 +162,6 @@ def get_knowledge(
     except Exception as e:
         logger.error(f"获取知识失败: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        db.close()
 
 
 @router.put("/{knowledge_id}", response_model=KnowledgeResponse)
@@ -196,34 +171,25 @@ def update_knowledge(
     user: CurrentUser
 ):
     """更新知识（所有者或管理员）"""
-    db = SessionLocal()
     try:
-        item = db.query(KnowledgeItem).filter(
-            KnowledgeItem.id == knowledge_id
-        ).first()
+        item = knowledge_crud.get_by_id(knowledge_id)
         if not item:
             raise HTTPException(status_code=404, detail="知识不存在")
         if not is_admin(user) and item.user_id != user['user_id']:
             raise HTTPException(status_code=403, detail="只能修改自己创建的知识")
 
-        if data.title is not None:
-            item.title = data.title
-        if data.content is not None:
-            item.content = data.content
-
-        db.commit()
-        db.refresh(item)
+        knowledge_crud.update(
+            knowledge_id,
+            title=data.title if data.title is not None else item.title,
+            content=data.content if data.content is not None else item.content,
+        )
         log_audit(user, "update_knowledge", f"id={knowledge_id}")
-
-        return _to_dict(item)
+        return _to_dict(knowledge_crud.get_by_id(knowledge_id))
     except HTTPException:
         raise
     except Exception as e:
-        db.rollback()
         logger.error(f"更新知识失败: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        db.close()
 
 
 @router.delete("/{knowledge_id}")
@@ -232,26 +198,18 @@ def delete_knowledge(
     user: CurrentUser
 ):
     """删除知识（软删除，所有者或管理员）"""
-    db = SessionLocal()
     try:
-        item = db.query(KnowledgeItem).filter(
-            KnowledgeItem.id == knowledge_id
-        ).first()
+        item = knowledge_crud.get_by_id(knowledge_id)
         if not item:
             raise HTTPException(status_code=404, detail="知识不存在")
         if not is_admin(user) and item.user_id != user['user_id']:
             raise HTTPException(status_code=403, detail="只能删除自己创建的知识")
 
-        item.is_active = 0
-        db.commit()
+        knowledge_crud.update(knowledge_id, is_active=0)
         log_audit(user, "delete_knowledge", f"id={knowledge_id}")
-
-        return {'message': '删除成功'}
+        return {"message": "知识已删除"}
     except HTTPException:
         raise
     except Exception as e:
-        db.rollback()
         logger.error(f"删除知识失败: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        db.close()

@@ -17,8 +17,8 @@ from app.auth import CurrentUser
 from app.logger import logger, log_audit
 from app.security.crypto import encrypt_secret, decrypt_secret, mask_api_key
 from core.llm import LLMClient
-from models import SessionLocal, TelemetrySessionLocal
 from models.llm import LLMConfig, LLMCall, LLMPrompt
+from curd.base import session_scope
 
 log_router = APIRouter()
 config_router = APIRouter()
@@ -102,107 +102,99 @@ def get_llm_logs(user: CurrentUser,
                  status: Optional[str] = None):
     """获取LLM调用记录列表（管理员看全部，用户看自己）"""
     user_id = user['user_id']; is_admin = user.get('role') == 'admin'
-    db = TelemetrySessionLocal()
     try:
-        query = db.query(LLMCall, LLMPrompt.content).outerjoin(
-            LLMPrompt, LLMCall.prompt_id == LLMPrompt.id)
-        if not is_admin:
-            query = query.filter(LLMCall.user_id == user_id)
-        if status:
-            query = query.filter(LLMCall.status == status)
-        total = query.count()
-        rows = query.order_by(LLMCall.created_at.desc()).offset(offset).limit(limit).all()
-        items = [_call_to_item(c, p) for c, p in rows]
-        return LLMLogListResponse(items=items, total=total)
+        with session_scope(telemetry=True) as db:
+            query = db.query(LLMCall, LLMPrompt.content).outerjoin(
+                LLMPrompt, LLMCall.prompt_id == LLMPrompt.id)
+            if not is_admin:
+                query = query.filter(LLMCall.user_id == user_id)
+            if status:
+                query = query.filter(LLMCall.status == status)
+            total = query.count()
+            rows = query.order_by(LLMCall.created_at.desc()).offset(offset).limit(limit).all()
+            items = [_call_to_item(c, p) for c, p in rows]
+            return LLMLogListResponse(items=items, total=total)
     except Exception as e:
         logger.error(f"获取LLM调用记录失败: {e}")
         raise HTTPException(status_code=500, detail=f"获取记录失败: {str(e)}")
-    finally:
-        db.close()
 
 
 @log_router.get("/stats", response_model=LLMLogStats)
 def get_llm_stats(user: CurrentUser):
     """获取LLM调用统计（管理员看全部，用户看自己）"""
     user_id = user['user_id']; is_admin = user.get('role') == 'admin'
-    db = TelemetrySessionLocal()
     try:
-        from sqlalchemy import func
+        with session_scope(telemetry=True) as db:
+            from sqlalchemy import func
 
-        base = db.query(LLMCall)
-        if not is_admin:
-            base = base.filter(LLMCall.user_id == user_id)
-        total_calls = base.count()
+            base = db.query(LLMCall)
+            if not is_admin:
+                base = base.filter(LLMCall.user_id == user_id)
+            total_calls = base.count()
 
-        succ = db.query(LLMCall)
-        if not is_admin:
-            succ = succ.filter(LLMCall.user_id == user_id)
-        success_calls = succ.filter(LLMCall.status == 'success').count()
+            succ = db.query(LLMCall)
+            if not is_admin:
+                succ = succ.filter(LLMCall.user_id == user_id)
+            success_calls = succ.filter(LLMCall.status == 'success').count()
 
-        sq = db.query(func.sum(LLMCall.total_tokens), func.sum(LLMCall.prompt_tokens),
-                      func.sum(LLMCall.completion_tokens), func.avg(LLMCall.duration_ms),
-                      func.sum(LLMCall.cost))
-        if not is_admin:
-            sq = sq.filter(LLMCall.user_id == user_id)
-        st = sq.first()
-        return LLMLogStats(
-            total_calls=total_calls, total_tokens=st[0] or 0,
-            total_prompt_tokens=st[1] or 0, total_completion_tokens=st[2] or 0,
-            avg_duration_ms=round(st[3] or 0, 2),
-            success_rate=round(success_calls / total_calls * 100, 2) if total_calls > 0 else 0,
-            total_cost=round(st[4] or 0, 6))
+            sq = db.query(func.sum(LLMCall.total_tokens), func.sum(LLMCall.prompt_tokens),
+                          func.sum(LLMCall.completion_tokens), func.avg(LLMCall.duration_ms),
+                          func.sum(LLMCall.cost))
+            if not is_admin:
+                sq = sq.filter(LLMCall.user_id == user_id)
+            st = sq.first()
+            return LLMLogStats(
+                total_calls=total_calls, total_tokens=st[0] or 0,
+                total_prompt_tokens=st[1] or 0, total_completion_tokens=st[2] or 0,
+                avg_duration_ms=round(st[3] or 0, 2),
+                success_rate=round(success_calls / total_calls * 100, 2) if total_calls > 0 else 0,
+                total_cost=round(st[4] or 0, 6))
     except Exception as e:
         logger.error(f"获取LLM统计失败: {e}")
         raise HTTPException(status_code=500, detail=f"获取统计失败: {str(e)}")
-    finally:
-        db.close()
 
 
 @log_router.get("/{log_id}", response_model=LLMLogItem)
 def get_llm_log(log_id: int, user: CurrentUser):
     """获取单条LLM调用记录"""
     user_id = user['user_id']; is_admin = user.get('role') == 'admin'
-    db = TelemetrySessionLocal()
     try:
-        row = (db.query(LLMCall, LLMPrompt.content)
-               .outerjoin(LLMPrompt, LLMCall.prompt_id == LLMPrompt.id)
-               .filter(LLMCall.id == log_id).first())
-        if not row:
-            raise HTTPException(status_code=404, detail="记录不存在")
-        call, prompt_content = row
-        if not is_admin and call.user_id != user_id:
-            raise HTTPException(status_code=404, detail="记录不存在")
-        return _call_to_item(call, prompt_content)
+        with session_scope(telemetry=True) as db:
+            row = (db.query(LLMCall, LLMPrompt.content)
+                   .outerjoin(LLMPrompt, LLMCall.prompt_id == LLMPrompt.id)
+                   .filter(LLMCall.id == log_id).first())
+            if not row:
+                raise HTTPException(status_code=404, detail="记录不存在")
+            call, prompt_content = row
+            if not is_admin and call.user_id != user_id:
+                raise HTTPException(status_code=404, detail="记录不存在")
+            return _call_to_item(call, prompt_content)
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"获取LLM调用记录失败: {e}")
         raise HTTPException(status_code=500, detail=f"获取记录失败: {str(e)}")
-    finally:
-        db.close()
 
 
 @log_router.delete("/{log_id}")
 def delete_llm_log(log_id: int, user: CurrentUser):
     """删除单条LLM调用记录"""
     user_id = user['user_id']; is_admin = user.get('role') == 'admin'
-    db = TelemetrySessionLocal()
     try:
-        q = db.query(LLMCall).filter(LLMCall.id == log_id)
-        if not is_admin:
-            q = q.filter(LLMCall.user_id == user_id)
-        log = q.first()
-        if not log:
-            raise HTTPException(status_code=404, detail="记录不存在")
-        db.delete(log); db.commit()
-        return {"message": "删除成功"}
+        with session_scope(telemetry=True) as db:
+            q = db.query(LLMCall).filter(LLMCall.id == log_id)
+            if not is_admin:
+                q = q.filter(LLMCall.user_id == user_id)
+            log = q.first()
+            if not log:
+                raise HTTPException(status_code=404, detail="记录不存在")
+            db.delete(log)
+            return {"message": "删除成功"}
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"删除LLM调用记录失败: {e}")
         raise HTTPException(status_code=500, detail=f"删除失败: {str(e)}")
-    finally:
-        db.close()
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -260,8 +252,7 @@ def _get_editable_config(db, config_id: int, user: dict):
 @config_router.get("/list", response_model=LLMConfigListResponse)
 def get_configs(user: CurrentUser):
     try:
-        db = SessionLocal()
-        try:
+        with session_scope() as db:
             configs = _get_visible_configs(db, user['user_id'])
             items = [LLMConfigItem(
                 id=c.id, user_id=c.user_id, provider=c.provider, model=c.model,
@@ -272,8 +263,6 @@ def get_configs(user: CurrentUser):
                 created_at=c.created_at, updated_at=c.updated_at
             ) for c in configs]
             return LLMConfigListResponse(items=items, total=len(items))
-        finally:
-            db.close()
     except Exception as e:
         logger.error(f"获取LLM配置失败: {e}")
         raise HTTPException(status_code=500, detail=f"获取配置失败: {str(e)}")
@@ -282,8 +271,8 @@ def get_configs(user: CurrentUser):
 @config_router.post("/create")
 def create_config(request: LLMConfigCreate, user: CurrentUser):
     try:
-        user_id = user['user_id']; db = SessionLocal()
-        try:
+        user_id = user['user_id']
+        with session_scope() as db:
             if request.is_public and not _is_admin(user):
                 raise HTTPException(status_code=403, detail="仅管理员可创建公共配置")
             if db.query(LLMConfig).filter(LLMConfig.user_id == user_id,
@@ -299,11 +288,10 @@ def create_config(request: LLMConfigCreate, user: CurrentUser):
                 max_tokens=request.max_tokens, temperature=request.temperature,
                 timeout=request.timeout, is_default=request.is_default,
                 is_public=request.is_public and _is_admin(user), description=request.description)
-            db.add(config); db.commit()
+            db.add(config)
+            db.flush()   # 立即取回自增 id
             log_audit(user, "create_config", f"{request.provider}/{request.model}")
             return {"message": "配置创建成功", "id": config.id}
-        finally:
-            db.close()
     except HTTPException:
         raise
     except Exception as e:
@@ -314,8 +302,7 @@ def create_config(request: LLMConfigCreate, user: CurrentUser):
 @config_router.put("/{config_id}")
 def update_config(config_id: int, request: LLMConfigUpdate, user: CurrentUser):
     try:
-        db = SessionLocal()
-        try:
+        with session_scope() as db:
             config = _get_editable_config(db, config_id, user)
             if not config:
                 raise HTTPException(status_code=404, detail="配置不存在或无权修改")
@@ -336,11 +323,8 @@ def update_config(config_id: int, request: LLMConfigUpdate, user: CurrentUser):
                     LLMConfig.is_default == True, LLMConfig.id != config_id
                 ).update({'is_default': False})
                 config.is_default = True
-            db.commit()
             log_audit(user, "update_config", f"id={config_id}")
             return {"message": "配置更新成功"}
-        finally:
-            db.close()
     except HTTPException:
         raise
     except Exception as e:
@@ -351,16 +335,13 @@ def update_config(config_id: int, request: LLMConfigUpdate, user: CurrentUser):
 @config_router.delete("/{config_id}")
 def delete_config(config_id: int, user: CurrentUser):
     try:
-        db = SessionLocal()
-        try:
+        with session_scope() as db:
             config = _get_editable_config(db, config_id, user)
             if not config:
                 raise HTTPException(status_code=404, detail="配置不存在或无权删除")
-            db.delete(config); db.commit()
+            db.delete(config)
             log_audit(user, "delete_config", f"id={config_id}")
             return {"message": "配置删除成功"}
-        finally:
-            db.close()
     except HTTPException:
         raise
     except Exception as e:
@@ -373,14 +354,11 @@ def test_connection(request: TestConnectionRequest, user: CurrentUser):
     try:
         api_key = request.api_key; base_url = request.base_url
         if not api_key and request.config_id:
-            db = SessionLocal()
-            try:
+            with session_scope() as db:
                 config = _get_editable_config(db, request.config_id, user)
                 if config:
                     api_key = decrypt_secret(config.api_key)
                     base_url = base_url or config.base_url
-            finally:
-                db.close()
         if not api_key:
             return {"success": False, "message": "API密钥未配置"}
         client = LLMClient(provider=request.provider, api_key=api_key, model=request.model,
@@ -394,8 +372,8 @@ def test_connection(request: TestConnectionRequest, user: CurrentUser):
 @config_router.post("/set-default/{config_id}")
 def set_default_config(config_id: int, user: CurrentUser):
     try:
-        user_id = user['user_id']; db = SessionLocal()
-        try:
+        user_id = user['user_id']
+        with session_scope() as db:
             config = db.query(LLMConfig).filter(
                 LLMConfig.id == config_id,
                 (LLMConfig.is_public == True) | (LLMConfig.user_id == user_id)).first()
@@ -404,10 +382,8 @@ def set_default_config(config_id: int, user: CurrentUser):
             db.query(LLMConfig).filter(
                 LLMConfig.user_id == user_id, LLMConfig.is_default == True
             ).update({'is_default': False})
-            config.is_default = True; config.is_active = True; db.commit()
+            config.is_default = True; config.is_active = True
             return {"message": "已设置为默认配置"}
-        finally:
-            db.close()
     except HTTPException:
         raise
     except Exception as e:
@@ -418,8 +394,8 @@ def set_default_config(config_id: int, user: CurrentUser):
 @config_router.get("/default")
 def get_default_config(user: CurrentUser):
     try:
-        user_id = user['user_id']; db = SessionLocal()
-        try:
+        user_id = user['user_id']
+        with session_scope() as db:
             config = db.query(LLMConfig).filter(
                 LLMConfig.user_id == user_id,
                 LLMConfig.is_default == True, LLMConfig.is_active == True).first()
@@ -431,8 +407,6 @@ def get_default_config(user: CurrentUser):
                 "base_url": config.base_url,
                 "max_tokens": config.max_tokens or 8000, "temperature": config.temperature or 0.7,
                 "timeout": config.timeout or 300}}
-        finally:
-            db.close()
     except Exception as e:
         logger.error(f"获取默认配置失败: {e}")
         raise HTTPException(status_code=500, detail=f"获取配置失败: {str(e)}")

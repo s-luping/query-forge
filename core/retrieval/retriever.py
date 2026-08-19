@@ -17,6 +17,7 @@ from app.logger import logger
 from app.permissions import filter_fields_by_permission, get_table_grants_by_schema
 from services.schema import service as schema_service
 from core.retrieval.vector_store import SchemaVectorStore, get_vector_config
+from curd.base import session_scope
 
 
 class SchemaRetriever:
@@ -136,16 +137,11 @@ class SchemaRetriever:
 
         if not table_names:
             # 未召回任何表时兜底：取前 N 张表（同样受表级权限约束）
-            from models import SessionLocal
-            db = SessionLocal()
-            try:
+            with session_scope() as db:
                 tables = schema_service.list_tables(
                     db, schema_name=schema_name,
                     table_grants_by_schema=get_table_grants_by_schema(self.user))
                 table_names = [t[0] for t in tables][:max_tables]
-            finally:
-                db.close()
-
         all_fields: Dict[str, Dict] = {}
         if table_names:
             for r in self.get_field_rows(schema_name, table_names):

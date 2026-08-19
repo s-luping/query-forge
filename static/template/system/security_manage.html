@@ -31,15 +31,50 @@
     </section>
     <section id="tab-logs" hidden>
         <div class="card"><div class="card-header d-flex justify-content-between"><span>查询审计日志</span><button class="btn btn-sm btn-outline-secondary" onclick="loadLogs()">刷新</button></div>
-            <div class="card-body p-0"><table class="table table-sm mb-0"><thead><tr><th>时间</th><th>用户</th><th>问题</th><th>生成 SQL</th><th>状态</th></tr></thead><tbody id="logs"></tbody></table></div>
+            <div class="card-body p-0"><table class="table table-sm mb-0"><thead><tr><th>时间</th><th>用户</th><th>问题</th><th>生成 SQL</th><th>状态</th><th>链路</th></tr></thead><tbody id="logs"></tbody></table></div>
         </div>
     </section>
     <section id="tab-sensitive" hidden>
-        <div class="card"><div class="card-header">敏感字段</div><div class="card-body p-0">
-            <table class="table table-sm mb-0"><thead><tr><th>数据库</th><th>表</th><th>字段</th><th>当前等级</th><th>修改</th></tr></thead><tbody id="sensitive"></tbody></table>
+        <div class="card"><div class="card-header d-flex justify-content-between align-items-center">
+            <span>敏感字段</span>
+            <div class="d-flex gap-2 align-items-center">
+                <select id="sensitiveLevelFilter" class="form-select form-select-sm" style="width:140px;" onchange="sensitiveCur=1; loadSensitive()">
+                    <option value="">全部等级</option>
+                    <option value="public">公开</option>
+                    <option value="internal">内部</option>
+                    <option value="sensitive">敏感</option>
+                    <option value="confidential">机密</option>
+                </select>
+                <input type="text" id="sensitiveSearch" class="form-control form-control-sm" style="width:200px;" placeholder="搜索数据库 / 表 / 字段..." oninput="sensitiveCur=1; loadSensitive()">
+                <button class="btn btn-sm btn-outline-secondary" onclick="sensitiveCur=1; loadSensitive()">搜索</button>
+            </div>
+        </div><div class="card-body p-0">
+            <table class="table table-sm mb-0"><thead><tr><th>数据库</th><th>表</th><th>字段</th><th>注释</th><th>当前等级</th><th>修改</th></tr></thead><tbody id="sensitive"></tbody></table>
+        </div>
+        <div class="card-footer d-flex justify-content-between align-items-center py-2">
+            <span class="text-muted" style="font-size:12px;" id="sensitiveCount"></span>
+            <div class="d-flex gap-2 align-items-center">
+                <button class="btn btn-sm btn-outline-secondary" onclick="sensitivePage(-1)" id="sensitivePrev">‹ 上一页</button>
+                <span style="font-size:13px;" id="sensitivePageInfo">1 / 1</span>
+                <button class="btn btn-sm btn-outline-secondary" onclick="sensitivePage(1)" id="sensitiveNext">下一页 ›</button>
+            </div>
         </div></div>
     </section>
 </div>
+
+<!-- 链路追踪详情弹窗 -->
+<div class="modal fade" id="pipelineModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h6 class="modal-title">链路追踪 — 问题 → 关键词 → 召回 → 生成</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="pipelineDetail" style="max-height:70vh;overflow-y:auto;"></div>
+        </div>
+    </div>
+</div>
+<script src="/static/js/bootstrap.bundle.min.js"></script>
 <script src="/static/js/app_common.js"></script>
 <script>
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -52,11 +87,71 @@ async function loadStats() {
 }
 async function loadLogs() {
     const data = await get('/api/audit/logs?limit=100');
-    document.getElementById('logs').innerHTML = data.items.map(item => `<tr><td>${esc(item.created_at)}</td><td>${esc(item.username)}</td><td>${esc(item.query)}</td><td class="sql-cell" title="${esc(item.generated_sql)}">${esc(item.generated_sql)}</td><td>${item.was_blocked ? '已拦截' : '通过'}</td></tr>`).join('');
+    document.getElementById('logs').innerHTML = data.items.map(item => `<tr><td>${esc(item.created_at)}</td><td>${esc(item.username)}</td><td>${esc(item.query)}</td><td class="sql-cell" title="${esc(item.generated_sql)}">${esc(item.generated_sql)}</td><td>${item.was_blocked ? '已拦截' : '通过'}</td><td>${item.pipeline_log ? `<button class="btn btn-sm btn-outline-primary" onclick="showPipeline(${item.id})">查看</button>` : '<span class="text-muted">-</span>'}</td></tr>`).join('') || '<tr><td colspan="6" class="text-center text-muted">暂无记录</td></tr>';
+}
+// 链路追踪查看：从日志列表定位并解析 pipeline_log JSON
+let _logsCache = [];
+async function showPipeline(logId) {
+    let item = _logsCache.find(x => x.id === logId);
+    if (!item) {
+        const data = await get('/api/audit/logs?limit=200');
+        _logsCache = data.items;
+        item = _logsCache.find(x => x.id === logId);
+    }
+    if (!item || !item.pipeline_log) { alert('该记录无链路数据'); return; }
+    let steps = [];
+    try { steps = JSON.parse(item.pipeline_log); } catch (e) { steps = []; }
+    const STEP_CN = {
+        'PIPELINE_START': '流程开始', 'VECTOR_LOAD': '向量索引加载', 'VECTOR_CHECK': '向量检查',
+        'STEP1_KEYWORDS': '① 关键词提取', 'STEP2_VECTOR_RECALL': '② 向量召回字段',
+        'STEP2_DB_RECALL': '② 数据库召回字段', 'STEP2_RECALL': '② 字段召回',
+        'STEP3_AGGREGATE': '③ 表聚合', 'STEP4_CONTEXT': '④ 上下文构建',
+        'STEP5_PROMPT': '⑤ Prompt 构建', 'STEP5_RESULT': '⑤ LLM 生成',
+        'STEP6_VALIDATE': '⑥ SQL 校验', 'STEP7_GATEWAY': '⑦ 权限网关',
+        'STEP7_GATEWAY_ERROR': '⑦ 网关异常', 'PIPELINE_END': '流程结束',
+    };
+    document.getElementById('pipelineDetail').innerHTML = steps.length ? steps.map((s, i) => `
+        <div class="card mb-2">
+            <div class="card-header py-1 d-flex justify-content-between" style="font-size:13px;">
+                <span><strong>${esc(STEP_CN[s.step] || s.step)}</strong></span>
+                <span class="text-muted">${esc(s.timestamp || '')}</span>
+            </div>
+            <div class="card-body py-2" style="font-size:12px;"><pre class="mb-0" style="white-space:pre-wrap;word-break:break-all;background:#f8f9fa;padding:8px;border-radius:4px;">${esc(JSON.stringify(s.data, null, 2))}</pre></div>
+        </div>`).join('') : '<div class="text-muted">链路数据为空</div>';
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('pipelineModal')).show();
+}
+const SENSITIVE_PAGE_SIZE = 50;
+let sensitiveCur = 1, sensitiveTotal = 0;
+const LEVEL_CN = { public: '公开', internal: '内部', sensitive: '敏感', confidential: '机密' };
+const LEVELS = [
+    ['public', '公开'], ['internal', '内部'], ['sensitive', '敏感'], ['confidential', '机密']
+];
+function levelSelect(item) {
+    return `<select class="form-select form-select-sm" onchange="updateSensitive(${item.column_id}, this.value)">` +
+        LEVELS.map(([v, label]) => `<option value="${v}" ${item.sensitive_level === v ? 'selected' : ''}>${label}</option>`).join('') + `</select>`;
 }
 async function loadSensitive() {
-    const data = await get('/api/audit/all-columns');
-    document.getElementById('sensitive').innerHTML = data.items.map(item => `<tr><td>${esc(item.schema_name)}</td><td>${esc(item.table_name)}</td><td>${esc(item.column_name)}</td><td>${esc(item.sensitive_level)}</td><td><select class="form-select form-select-sm" onchange="updateSensitive(${item.column_id}, this.value)"><option value="public" ${item.sensitive_level === 'public' ? 'selected' : ''}>public</option><option value="internal" ${item.sensitive_level === 'internal' ? 'selected' : ''}>internal</option><option value="sensitive" ${item.sensitive_level === 'sensitive' ? 'selected' : ''}>sensitive</option><option value="confidential" ${item.sensitive_level === 'confidential' ? 'selected' : ''}>confidential</option></select></td></tr>`).join('');
+    const keyword = document.getElementById('sensitiveSearch').value.trim();
+    const level = document.getElementById('sensitiveLevelFilter').value;
+    const offset = (sensitiveCur - 1) * SENSITIVE_PAGE_SIZE;
+    const params = new URLSearchParams({ limit: SENSITIVE_PAGE_SIZE, offset });
+    if (keyword) params.set('search', keyword);
+    if (level) params.set('sensitive_level', level);
+    const data = await get('/api/audit/all-columns?' + params.toString());
+    sensitiveTotal = data.total || 0;
+    const maxPage = Math.max(1, Math.ceil(sensitiveTotal / SENSITIVE_PAGE_SIZE));
+    if (sensitiveCur > maxPage) { sensitiveCur = maxPage; return loadSensitive(); }
+    document.getElementById('sensitive').innerHTML = data.items.map(item => `<tr><td>${esc(item.schema_name)}</td><td>${esc(item.table_name)}</td><td>${esc(item.column_name)}</td><td style="max-width:260px;">${esc(item.description || '')}</td><td>${esc(LEVEL_CN[item.sensitive_level] || item.sensitive_level)}</td><td>${levelSelect(item)}</td></tr>`).join('') || '<tr><td colspan="6" class="text-center text-muted">无匹配字段</td></tr>';
+    document.getElementById('sensitiveCount').textContent = `共 ${sensitiveTotal} 个字段`;
+    document.getElementById('sensitivePageInfo').textContent = `${sensitiveCur} / ${maxPage}`;
+    document.getElementById('sensitivePrev').disabled = sensitiveCur <= 1;
+    document.getElementById('sensitiveNext').disabled = sensitiveCur >= maxPage;
+}
+function sensitivePage(delta) {
+    const next = sensitiveCur + delta;
+    if (next < 1) return;
+    sensitiveCur = next;
+    loadSensitive();
 }
 async function updateSensitive(columnId, level) { await get('/api/audit/sensitive-level', { method: 'PUT', body: JSON.stringify({column_id: columnId, sensitive_level: level}) }); }
 document.querySelectorAll('[data-tab]').forEach(button => button.addEventListener('click', () => { document.querySelectorAll('[data-tab]').forEach(item => item.classList.remove('active')); button.classList.add('active'); ['overview','logs','sensitive'].forEach(tab => document.getElementById('tab-' + tab).hidden = tab !== button.dataset.tab); if (button.dataset.tab === 'logs') loadLogs(); if (button.dataset.tab === 'sensitive') loadSensitive(); }));

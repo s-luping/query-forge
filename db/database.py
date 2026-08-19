@@ -7,20 +7,23 @@
 - synchronous=NORMAL（WAL 下的安全性与性能平衡点）
 - 主库开启 FOREIGN KEY 约束
 - 业务代码保持短事务：一个请求内多次小 commit，避免长事务持锁
+
+连接池复用（SQLAlchemy QueuePool）：
+- 主库 / 遥测库各自独立的连接池，参数取自 app/config.py（DB_POOL_SIZE 等）
+- 连接复用避免高频短事务场景下反复建立/断开 sqlite 连接的损耗
+- pool_recycle 定期回收，防止陈旧连接；pool_timeout 限制等待，避免请求堆积
 """
 import os
+import secrets
+import string
 import time
-from datetime import datetime
 
 from sqlalchemy import create_engine, event, text
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import QueuePool
 
-from app.config import (
-    MAIN_DB_PATH,
-    TELEMETRY_DB_PATH,
-    SYSTEM_SETTING_DEFAULTS,
-    initialize_runtime_secrets,
-)
+import app.config as config
+from app.config import MAIN_DB_PATH, TELEMETRY_DB_PATH
 from app.logger import logger
 from app.timezone import now_beijing
 
@@ -32,6 +35,9 @@ def _make_pragma(foreign_keys: bool):
         cursor.execute("PRAGMA synchronous=NORMAL")
         cursor.execute("PRAGMA busy_timeout=5000")
         cursor.execute("PRAGMA cache_size=-64000")
+        # 读性能：内存映射 + 临时表走内存
+        cursor.execute("PRAGMA mmap_size=268435456")   # 256MB 内存映射
+        cursor.execute("PRAGMA temp_store=MEMORY")
         if foreign_keys:
             cursor.execute("PRAGMA foreign_keys=ON")
         cursor.close()
@@ -39,10 +45,20 @@ def _make_pragma(foreign_keys: bool):
 
 
 def _create_engine_with_wal(db_path: str, foreign_keys: bool = False):
+    """创建启用 WAL + 连接池复用的 SQLite 引擎。
+
+    显式使用 QueuePool（而非默认池），池参数来自 config，
+    高频短事务场景下复用连接，避免每次建连开销。
+    """
     engine = create_engine(
         f'sqlite:///{db_path}',
-        echo=False,
-        connect_args={'check_same_thread': False, 'timeout': 30}
+        echo=config.DB_ECHO,
+        connect_args={'check_same_thread': False, 'timeout': 30},
+        poolclass=QueuePool,
+        pool_size=config.DB_POOL_SIZE,
+        max_overflow=config.DB_MAX_OVERFLOW,
+        pool_timeout=config.DB_POOL_TIMEOUT,
+        pool_recycle=config.DB_POOL_RECYCLE,
     )
     event.listen(engine, 'connect', _make_pragma(foreign_keys))
     return engine
@@ -67,19 +83,51 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine_main)
 TelemetrySessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine_telemetry)
 
 
+def get_setting(key: str, default: str = '') -> str:
+    """读取系统配置：数据库 system_settings 优先（前台用户改过的值），
+    其次回落 config 中同名变量的初始值；都没有则返回 default。"""
+    from models.system import SystemSetting
+    db = SessionLocal()
+    try:
+        row = db.query(SystemSetting).filter(SystemSetting.key == key).first()
+        if row is not None and str(row.value) not in ('', 'None'):
+            return str(row.value)
+    finally:
+        db.close()
+    return str(getattr(config, key, '') or default)
+
+
 # ═══════════════════════════════════════════════════════════════════
 # 初始化与种子数据
 # ═══════════════════════════════════════════════════════════════════
+
+# 系统设置种子元信息：key -> (分类, 是否可编辑)
+# 初始值统一取自 app/config.py 中的同名变量（config 包含全部变量初始值）。
+SETTING_META = {
+    'SECRET_KEY': ('security', 0),
+    'ACCESS_TOKEN_EXPIRE_MINUTES': ('auth', 1),
+    'ALLOW_REGISTER': ('auth', 1),
+    'EMBEDDING_MODEL_READY': ('runtime', 0),
+    'EMBEDDING_MODEL_PATH': ('runtime', 0),
+    'VECTOR_INDEX_THRESHOLD': ('vector', 1),
+    'FIELD_RECALL_TOP_K': ('vector', 1),
+    'MAX_TABLES': ('vector', 1),
+}
+
 
 def _seed_system_settings():
     from models.system import SystemSetting
 
     db = SessionLocal()
     try:
-        for key, (default_value, category, editable) in SYSTEM_SETTING_DEFAULTS.items():
+        for key, (category, editable) in SETTING_META.items():
             if db.query(SystemSetting).filter(SystemSetting.key == key).first():
                 continue
-            db.add(SystemSetting(key=key, value=default_value,
+            value = str(getattr(config, key, '') or '')
+            # 密钥类：config 未配置时首次初始化自动生成随机字符串并持久化
+            if key == 'SECRET_KEY' and not value:
+                value = secrets.token_urlsafe(36)
+            db.add(SystemSetting(key=key, value=value,
                                  category=category, is_editable=editable))
             logger.info(f"已初始化系统配置 {key} (category={category})")
         db.commit()
@@ -153,15 +201,33 @@ def create_default_admin():
         db.close()
 
 
+def _ensure_column(db_path: str, table: str, column: str, ddl: str) -> None:
+    """轻量迁移：SQLite 已存在的表补列（幂等，重复执行无害）"""
+    import sqlite3 as _sqlite3
+    try:
+        conn = _sqlite3.connect(db_path)
+        try:
+            cols = [r[1] for r in conn.execute(f'PRAGMA table_info({table})').fetchall()]
+            if column not in cols:
+                conn.execute(f'ALTER TABLE {table} ADD COLUMN {column} {ddl}')
+                conn.commit()
+                logger.info(f"迁移: {table} 新增列 {column}")
+        finally:
+            conn.close()
+    except Exception as e:
+        logger.warning(f"迁移失败 {table}.{column}: {e}")
+
+
 def init_database():
     """初始化双库表结构 + 种子数据"""
-    initialize_runtime_secrets()
     from models.base import MainBase, TelemetryBase
     # 触发所有模型注册
-    from models import user, role, schema, knowledge, conversation, llm, system, vector_index, security, sync  # noqa: F401
+    from models import user, role, schema, knowledge, conversation, llm, system, vector_index, security, sync, datasource  # noqa: F401
 
     MainBase.metadata.create_all(engine_main)
     TelemetryBase.metadata.create_all(engine_telemetry)
+    # 轻量迁移：历史库补列
+    _ensure_column(MAIN_DB_PATH, 'conversation_messages', 'result_data', 'TEXT')
     logger.info(f"主库表创建/检查完成: {MAIN_DB_PATH}")
     logger.info(f"遥测库表创建/检查完成: {TELEMETRY_DB_PATH}")
 
