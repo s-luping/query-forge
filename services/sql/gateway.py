@@ -16,8 +16,8 @@ from typing import Dict, List, Optional, Tuple
 import sqlglot
 from sqlglot import exp
 
-from models import SessionLocal
 from models.schema import DbColumn, DbTable, DbSchema
+from curd.base import session_scope
 from app.permissions import (is_admin, get_column_access_map, get_row_scope_rules,
                              get_table_grants_by_schema)
 
@@ -185,8 +185,7 @@ class SqlGateway:
         self._row_scopes = get_row_scope_rules(self.user, table_names=table_names or None)
 
         # 构建 (table_name, column_name) → (column_id, sensitive_level) 查找表
-        db = SessionLocal()
-        try:
+        with session_scope() as db:
             q = (db.query(DbColumn.id, DbColumn.name, DbColumn.sensitive_level, DbTable.name)
                  .join(DbTable, DbColumn.table_id == DbTable.id)
                  .join(DbSchema, DbTable.schema_id == DbSchema.id))
@@ -196,7 +195,7 @@ class SqlGateway:
                 q = q.filter(DbTable.name.in_(table_names))
             for row in q.all():
                 self._col_lookup[(row[3], row[1])] = (row[0], row[2] or 'public')
-
+    
             # 表名 → schema_id 映射（表级权限判定用）
             tq = db.query(DbTable.name, DbTable.schema_id)
             if schema_name:
@@ -206,7 +205,7 @@ class SqlGateway:
                 tq = tq.filter(DbTable.name.in_(table_names))
             for name, sid in tq.all():
                 self._table_schema[name] = sid
-
+    
             # 表级白名单 {schema_id: {table_name,...}}（表名形式便于 SQL 表名校验）
             grants = get_table_grants_by_schema(self.user)
             if grants:
@@ -215,9 +214,6 @@ class SqlGateway:
                     for name, sid in db.query(DbTable.name, DbTable.schema_id).filter(
                             DbTable.id.in_(grant_ids)).all():
                         self._table_grants_by_name.setdefault(sid, set()).add(name)
-        finally:
-            db.close()
-
     def _check_table_permissions(self, tree: exp.Expression, result: SqlGatewayResult) -> bool:
         """校验表级权限：受限 schema 中白名单外的表 → 拦截。返回 True 表示被拦截"""
         if not self._table_grants_by_name:
@@ -323,8 +319,7 @@ class SqlGateway:
 
     def _get_authorized_columns(self, table_names: List[str]) -> Dict[str, List[str]]:
         """获取表的授权字段列表（SELECT 级别）"""
-        db = SessionLocal()
-        try:
+        with session_scope() as db:
             q = (db.query(DbColumn.name, DbColumn.id, DbTable.name)
                  .join(DbTable, DbColumn.table_id == DbTable.id)
                  .filter(DbTable.name.in_(table_names)))
@@ -335,9 +330,6 @@ class SqlGateway:
                 if access == 'SELECT':
                     result.setdefault(tbl_name, []).append(col_name)
             return result
-        finally:
-            db.close()
-
     def _inject_row_scope(self, tree: exp.Expression, result: SqlGatewayResult) -> exp.Expression:
         """注入行级过滤条件，返回修改后的 tree"""
         if not self._row_scopes:

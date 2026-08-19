@@ -12,8 +12,8 @@ from app.config import COOKIE_SECURE
 from app.limiter import limiter
 from app.logger import logger
 from app.timezone import now_beijing
-from models import AppSessionLocal
-from models.system import SystemSetting
+from curd.base import session_scope
+from curd.system import system_setting_crud
 from models.user import User
 
 router = APIRouter()
@@ -60,14 +60,10 @@ def login(request: LoginRequest):
             logger.warning(f"登录失败 - 用户未激活: {username}")
             raise HTTPException(status_code=401, detail="用户未激活")
 
-        db = AppSessionLocal()
-        try:
+        with session_scope() as db:
             db_user = db.query(User).filter(User.id == user.id).first()
             if db_user:
                 db_user.last_login = now_beijing()
-                db.commit()
-        finally:
-            db.close()
 
         token_data = {"user_id": user.id, "username": user.username, "role": user.role,
                       "pwd_ts": float(user.pwd_ts or 0)}
@@ -98,12 +94,7 @@ def register(request: RegisterRequest):
     """注册（受 ALLOW_REGISTER 系统设置控制；企业内部可关闭，改由管理员创建账号）"""
     try:
         # 注册开关：管理员可在 系统设置 中关闭自助注册
-        db_cfg = AppSessionLocal()
-        try:
-            allow = db_cfg.query(SystemSetting).filter(
-                SystemSetting.key == 'ALLOW_REGISTER').first()
-        finally:
-            db_cfg.close()
+        allow = system_setting_crud.get_one(key='ALLOW_REGISTER')
         if allow is None or str(allow.value).lower() not in ('1', 'true', 'yes'):
             logger.warning(f"注册被管理员关闭: username={request.username}")
             raise HTTPException(status_code=403, detail="系统已关闭自助注册，请联系管理员开通账号")
@@ -119,8 +110,7 @@ def register(request: RegisterRequest):
         _validate_password_strength(password)
 
         import time as _time
-        db = AppSessionLocal()
-        try:
+        with session_scope() as db:
             existing_user = db.query(User).filter(User.username == username).first()
             if existing_user:
                 logger.warning(f"注册失败 - 用户名已存在: {username}")
@@ -135,12 +125,9 @@ def register(request: RegisterRequest):
                 pwd_ts=_time.time(),
             )
             db.add(new_user)
-            db.commit()
 
             logger.info(f"注册成功(待激活) - username={username} email={email}")
             return {"message": "注册成功，账号需管理员激活后方可登录", "username": username}
-        finally:
-            db.close()
 
     except HTTPException:
         raise

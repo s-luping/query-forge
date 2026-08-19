@@ -5,9 +5,10 @@ import jwt
 from fastapi import Depends, HTTPException, Request
 
 from app.logger import logger
-from app.config import FALLBACK_EXPIRE_MINUTES
+from app.config import SECRET_KEY, ACCESS_TOKEN_EXPIRE_MINUTES
 from app.timezone import now_beijing_aware
-from models import SessionLocal
+from curd.base import session_scope, tx_scope
+from db import get_setting
 from models.user import User
 from models.role import Role, UserRole
 
@@ -47,49 +48,28 @@ def verify_password(plain: str, stored: str) -> bool:
 
 
 def _get_secret_key() -> str:
-    """读取签名密钥：环境变量 QUERYFORGE_SECRET_KEY 优先，其次系统配置表。
-    两处都没有时直接抛错拒绝服务，绝不回落到硬编码值。"""
-    from app.config import SECRET_KEY as ENV_SECRET_KEY
-    if ENV_SECRET_KEY:
-        return ENV_SECRET_KEY
-    try:
-        from models.system import SystemSetting
-        db = SessionLocal()
-        try:
-            row = db.query(SystemSetting).filter(SystemSetting.key == 'SECRET_KEY').first()
-            if row is not None and str(row.value):
-                return row.value
-        finally:
-            db.close()
-    except Exception as e:
-        raise RuntimeError(f'读取 SECRET_KEY 失败: {e}')
+    """读取签名密钥：数据库 system_settings 优先（前台改过的值），
+    其次 config.SECRET_KEY；两处都没有时直接抛错拒绝服务，绝不回落到硬编码值。"""
+    key = get_setting('SECRET_KEY') or SECRET_KEY
+    if key:
+        return key
     raise RuntimeError(
-        'SECRET_KEY 未配置：请设置环境变量 QUERYFORGE_SECRET_KEY，'
-        '或在系统设置表中写入 SECRET_KEY')
+        'SECRET_KEY 未配置：请设置 app/config.py 的 SECRET_KEY，'
+        '或删除数据库 system_settings 中的 SECRET_KEY 后重新初始化')
 
 
 def _get_token_expire_minutes() -> int:
-    """从系统配置表读取 ACCESS_TOKEN_EXPIRE_MINUTES"""
+    """读取令牌有效期：数据库 ACCESS_TOKEN_EXPIRE_MINUTES 优先，其次 config 初始值"""
     try:
-        from models.system import SystemSetting
-        db = SessionLocal()
-        try:
-            row = db.query(SystemSetting).filter(
-                SystemSetting.key == 'ACCESS_TOKEN_EXPIRE_MINUTES').first()
-            if row is not None and str(row.value):
-                return int(row.value)
-        finally:
-            db.close()
-    except Exception:
-        pass
-    return FALLBACK_EXPIRE_MINUTES
+        return int(get_setting('ACCESS_TOKEN_EXPIRE_MINUTES', str(ACCESS_TOKEN_EXPIRE_MINUTES)))
+    except (TypeError, ValueError):
+        return int(ACCESS_TOKEN_EXPIRE_MINUTES)
 
 
 def authenticate_user(username: str, password: str):
     """验证用户（bcrypt 哈希；历史明文命中后自动升级为哈希）"""
     logger.debug(f"尝试验证用户: {username}")
-    db = SessionLocal()
-    try:
+    with session_scope() as db:
         login_user = db.query(User).filter(User.username == username).first()
         if login_user is None:
             # 恒定时间路径：也做一次哈希运算，避免用户名枚举计时差异
@@ -98,12 +78,9 @@ def authenticate_user(username: str, password: str):
         elif verify_password(password, login_user.password or ''):
             if not is_hashed(login_user.password):
                 login_user.password = hash_password(password)
-                db.commit()
                 logger.info(f"用户 {username} 密码已自动升级为 bcrypt 哈希")
         else:
             login_user = None
-    finally:
-        db.close()
     if login_user:
         logger.info(f"用户验证成功: {username}")
     else:
@@ -143,8 +120,7 @@ def resolve_token_user(token: Optional[str]) -> Optional[dict]:
     if not user_id or not username:
         return None
 
-    db = SessionLocal()
-    try:
+    with session_scope() as db:
         user = db.query(User).filter(
             User.id == user_id,
             User.username == username,
@@ -162,8 +138,6 @@ def resolve_token_user(token: Optional[str]) -> Optional[dict]:
             role_codes.append('admin')
         return {"user_id": user.id, "username": user.username,
                 "role": user.role, "roles": role_codes}
-    finally:
-        db.close()
 
 
 async def get_current_user(request: Request):

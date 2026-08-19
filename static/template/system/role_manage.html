@@ -8,132 +8,346 @@
     <link rel="stylesheet" href="/static/css/common.css">
     <style>
         body { background: #f6f8fb; }
-        .role-list { max-height: 520px; overflow-y: auto; }
-        .role-item { cursor: pointer; border-bottom: 1px solid #edf0f4; padding: 12px 14px; }
-        .role-item:hover, .role-item.active { background: #eaf2ff; }
-        .role-item.active { border-left: 3px solid #0d6efd; padding-left: 11px; }
-        .permission-table input, .permission-table select { min-width: 110px; }
+        .permission-table input, .permission-table select { min-width: 120px; }
         .muted { color: #7b8492; font-size: 12px; }
         .sticky-head { position: sticky; top: 0; z-index: 1; background: #fff; }
+        .picker-panel { position: absolute; z-index: 1050; background: #fff; border: 1px solid #dde3ea;
+            border-radius: 6px; box-shadow: 0 4px 16px rgba(0,0,0,.12); padding: 6px; width: 320px; }
+        .picker-item { padding: 5px 8px; border-radius: 4px; cursor: pointer; font-size: 13px;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .picker-item:hover { background: #eaf2ff; }
+        .picker-item.active { background: #0d6efd; color: #fff; }
     </style>
 </head>
 <body>
 <div class="container-fluid py-3">
-    <div class="row g-3">
-        <div class="col-lg-3">
-            <div class="card">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <strong>角色</strong><button class="btn btn-primary btn-sm" onclick="createRole()">新建</button>
-                </div>
-                <div id="roleList" class="role-list"><div class="p-3 text-muted">加载中...</div></div>
+    <!-- 上方：角色选择 + 新建 + 说明（左右显示） -->
+    <div class="card mb-3">
+        <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <strong id="roleTitle">角色与权限</strong>
+            <div class="d-flex gap-2 align-items-center">
+                <select id="roleSelect" class="form-select form-select-sm" style="width:260px;" onchange="selectRole(this.value)">
+                    <option value="">请选择角色...</option>
+                </select>
+                <button class="btn btn-primary btn-sm" onclick="openCreateRole()">＋ 新建</button>
+                <button class="btn btn-outline-danger btn-sm" onclick="deleteRole()" id="btnDeleteRole" style="display:none;">删除角色</button>
             </div>
         </div>
-        <div class="col-lg-9">
-            <div class="card mb-3">
-                <div class="card-header"><strong id="roleTitle">请选择角色</strong></div>
-                <div class="card-body">
-                    <div class="row g-2 align-items-end">
-                        <div class="col-md-5"><label class="form-label">角色说明</label><input id="roleDescription" class="form-control"></div>
-                        <div class="col-md-7"><span class="muted">权限按角色统一配置，用户仅通过角色继承权限。</span></div>
-                    </div>
+        <div class="card-body">
+            <div class="row g-2 align-items-end">
+                <div class="col-md-9"><label class="form-label">角色说明</label><input id="roleDescription" class="form-control" placeholder="角色职责与用途说明"></div>
+                <div class="col-md-3"><button class="btn btn-outline-primary w-100" onclick="saveDescription()">保存说明</button></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 下方：角色资源权限 -->
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <strong>角色资源权限</strong>
+            <div class="d-flex gap-2">
+                <button class="btn btn-outline-secondary btn-sm" onclick="addPermission()">添加权限项</button>
+                <button class="btn btn-primary btn-sm" onclick="savePermissions()">保存权限</button>
+            </div>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive" style="overflow:visible;">
+                <table class="table table-sm table-hover align-middle mb-0 permission-table">
+                    <thead class="sticky-head"><tr><th style="width:110px;">资源类型</th><th>资源</th><th style="width:120px;">权限级别</th><th style="width:60px;"></th></tr></thead>
+                    <tbody id="permissionRows"></tbody>
+                </table>
+            </div>
+            <div class="card-footer d-flex justify-content-between align-items-center py-2" id="permPager" style="display:none;">
+                <span class="text-muted" style="font-size:12px;" id="permCount"></span>
+                <div class="d-flex gap-2 align-items-center">
+                    <button class="btn btn-sm btn-outline-secondary" onclick="permPageNav(-1)" id="permPrev">‹ 上一页</button>
+                    <span style="font-size:13px;" id="permPageInfo">1 / 1</span>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="permPageNav(1)" id="permNext">下一页 ›</button>
                 </div>
             </div>
-            <div class="card">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <strong>角色资源权限</strong>
-                    <div class="d-flex gap-2">
-                        <button class="btn btn-outline-secondary btn-sm" onclick="addPermission()">添加权限项</button>
-                        <button class="btn btn-primary btn-sm" onclick="savePermissions()">保存权限</button>
-                    </div>
-                </div>
-                <div class="card-body p-0">
-                    <div class="table-responsive">
-                        <table class="table table-sm table-hover align-middle mb-0 permission-table">
-                            <thead class="sticky-head"><tr><th>资源类型</th><th>资源</th><th>权限级别</th><th></th></tr></thead>
-                            <tbody id="permissionRows"></tbody>
-                        </table>
-                    </div>
-                </div>
+            <div class="card-body pt-2 text-muted" style="font-size:12px;">
+                资源按类型选择：数据源 / 数据库 / 表 / 字段（名称含完整路径），知识条目与指标独立选择。
             </div>
         </div>
     </div>
 </div>
+
+<!-- 新建角色弹窗 -->
+<div class="modal fade" id="createRoleModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h6 class="modal-title">新建角色</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-2"><label class="form-label">角色名称 <span class="text-danger">*</span></label>
+                    <input id="crName" class="form-control" placeholder="如：数据分析师"></div>
+                <div class="mb-2"><label class="form-label">角色编码 <span class="text-danger">*</span>（英文/数字/下划线）</label>
+                    <input id="crCode" class="form-control" placeholder="如：analyst"></div>
+                <div class="mb-2"><label class="form-label">角色说明</label>
+                    <input id="crDesc" class="form-control"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary btn-sm" onclick="submitCreateRole()">创建</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="/static/js/bootstrap.bundle.min.js"></script>
 <script src="/static/js/app_common.js"></script>
 <script>
 let roles = [], selectedRole = null, permissions = [], catalog = {};
 const types = [
     ['datasource', '数据源'], ['schema', '数据库'], ['table', '表'],
-    ['column', '字段'], ['knowledge', '知识库'], ['metric', '指标']
+    ['knowledge', '知识条目']
 ];
-const levels = ['ALLOW', 'SELECT', 'FILTER', 'NONE', 'DENY'];
+const LEVELS = [
+    ['ALLOW', '允许'], ['SELECT', '可读'], ['FILTER', '过滤'], ['NONE', '无权限'], ['DENY', '拒绝']
+];
+const TYPE_LABEL = Object.fromEntries(types);
+const LEVEL_LABEL = Object.fromEntries(LEVELS);
 
 async function load() {
     [roles, catalog] = await Promise.all([
-        apiRequest('/api/permission/roles').then(response => response.json()),
-        apiRequest('/api/permission/permission-catalog').then(response => response.json())
+        apiRequest('/api/permission/roles').then(r => r.json()),
+        apiRequest('/api/permission/permission-catalog').then(r => r.json())
     ]);
+    buildCatalog();
     renderRoles();
     if (roles.length) selectRole(roles[0].id);
 }
+
+// ── catalog 预处理：为库/表/字段拼接完整路径显示名（区分同名资源） ──
+function buildCatalog() {
+    const dsName = id => { const d = (catalog.datasources || []).find(x => x.id === id); return d ? d.name : ''; };
+    const schName = id => { const s = (catalog.schemas || []).find(x => x.id === id); return s ? s.name : ''; };
+    const tbName = id => { const t = (catalog.tables || []).find(x => x.id === id); return t ? t.name : ''; };
+    // 数据库：数据源名/库名
+    (catalog.schemas || []).forEach(s => {
+        s.display = (dsName(s.datasource_id) ? dsName(s.datasource_id) + '/' : '') + s.name;
+    });
+    // 表：数据源名/库名.表名
+    (catalog.tables || []).forEach(t => {
+        const s = (catalog.schemas || []).find(x => x.id === t.schema_id);
+        const prefix = s ? (s.display || s.name) : '';
+        t.display = (prefix ? prefix + '.' : '') + t.name;
+    });
+    // 字段：数据源名/库名.表名.字段名
+    (catalog.columns || []).forEach(c => {
+        const t = (catalog.tables || []).find(x => x.id === c.table_id);
+        const prefix = t ? (t.display || t.name) : '';
+        c.display = (prefix ? prefix + '.' : '') + c.name;
+    });
+    // 指标：数据源名/库名.表名.字段名
+    (catalog.metrics || []).forEach(m => {
+        const t = (catalog.tables || []).find(x => x.id === m.table_id);
+        const prefix = t ? (t.display || t.name) : '';
+        m.display = (prefix ? prefix + '.' : '') + m.name;
+    });
+}
+
+// ── 角色下拉 ──────────────────────────────────────────────
 function renderRoles() {
-    document.getElementById('roleList').innerHTML = roles.map(r => `
-        <div class="role-item ${selectedRole && selectedRole.id === r.id ? 'active' : ''}" onclick="selectRole(${r.id})">
-            <div><strong>${esc(r.name)}</strong> <span class="badge bg-secondary">${esc(r.code)}</span></div>
-            <div class="muted">${r.user_count} 用户 · ${r.permission_count} 权限</div>
-        </div>`).join('') || '<div class="p-3 text-muted">暂无角色</div>';
+    const sel = document.getElementById('roleSelect');
+    sel.innerHTML = '<option value="">请选择角色...</option>' + roles.map(r =>
+        `<option value="${r.id}" ${selectedRole && selectedRole.id === r.id ? 'selected' : ''}>${esc(r.name)}（${esc(r.code)}）· ${r.user_count}用户</option>`).join('');
 }
 async function selectRole(id) {
     selectedRole = roles.find(r => r.id === id);
     if (!selectedRole) return;
-    renderRoles();
     document.getElementById('roleTitle').textContent = `${selectedRole.name}（${selectedRole.code}）`;
     document.getElementById('roleDescription').value = selectedRole.description || '';
+    document.getElementById('btnDeleteRole').style.display = selectedRole.is_system ? 'none' : '';
+    renderRoles();
     const assigned = await (await apiRequest(`/api/permission/roles/${id}/permissions`)).json();
-    permissions = assigned.filter(item => types.some(type => type[0] === item.resource_type)).map(normalizePermission);
+    permissions = assigned.filter(item => types.some(t => t[0] === item.resource_type)).map(normalizePermission);
+    permPage = 1;
     renderPermissions();
 }
+async function saveDescription() {
+    if (!selectedRole) return;
+    const resp = await apiRequest(`/api/permission/roles/${selectedRole.id}/permissions`, {
+        method: 'PUT', body: JSON.stringify({ permissions })
+    });
+    if (!resp.ok) return alert((await resp.json()).detail || '保存失败');
+    selectedRole.description = document.getElementById('roleDescription').value;
+    QF.toast('角色说明已保存', 'success');
+}
+async function deleteRole() {
+    if (!selectedRole) return;
+    if (!confirm(`确认删除角色「${selectedRole.name}」？其授权关系将一并清除。`)) return;
+    const resp = await apiRequest(`/api/permission/roles/${selectedRole.id}`, { method: 'DELETE' });
+    if (!resp.ok) return alert((await resp.json()).detail || '删除失败');
+    QF.toast('角色已删除', 'success');
+    selectedRole = null; permissions = [];
+    load();
+}
+
+// ── 新建角色弹窗 ──────────────────────────────────────────
+let createRoleModal = null;
+function openCreateRole() {
+    document.getElementById('crName').value = '';
+    document.getElementById('crCode').value = '';
+    document.getElementById('crDesc').value = '';
+    if (!createRoleModal) createRoleModal = new bootstrap.Modal(document.getElementById('createRoleModal'));
+    createRoleModal.show();
+}
+async function submitCreateRole() {
+    const name = document.getElementById('crName').value.trim();
+    const code = document.getElementById('crCode').value.trim();
+    const desc = document.getElementById('crDesc').value.trim();
+    if (!name || !code) return alert('角色名称和编码必填');
+    const resp = await apiRequest('/api/permission/roles', { method: 'POST', body: JSON.stringify({ name, code, description: desc || null }) });
+    const data = await resp.json();
+    if (!resp.ok) return alert(data.detail || '创建失败');
+    QF.toast('角色创建成功', 'success');
+    createRoleModal.hide();
+    load();
+}
+
+// ── 权限编辑（分页显示，行内索引均为全局 permissions 下标） ──
+const PERM_PAGE_SIZE = 10;
+let permPage = 1;
 function normalizePermission(p) {
     return { permission_code: 'access', resource_type: p.resource_type || 'datasource',
         resource_id: p.resource_id || null, resource_key: p.resource_key || '',
-        access_type: p.access_type || 'ALLOW', filter_expression: p.filter_expression || '', resource_search: '' };
+        access_type: p.access_type || 'ALLOW', filter_expression: p.filter_expression || '',
+        _search: '' };
 }
-function optionList(items, value, label, empty = '请选择') {
-    return `<option value="">${empty}</option>` + (items || []).map(item =>
-        `<option value="${item[value]}" ${String(item[value]) === String(label) ? 'selected' : ''}>${esc(item.name || item[label])}</option>`).join('');
-}
-function resourceOptions(p) {
-    const index = permissions.indexOf(p);
-    let items = catalog[p.resource_type + 's'] || [];
-    if (p.resource_type === 'schema') items = catalog.schemas || [];
-    if (p.resource_type === 'knowledge') items = catalog.knowledge || [];
-    if (p.resource_type === 'metric') items = catalog.metrics || [];
-    const search = (p.resource_search || '').toLowerCase();
-    if (search) items = items.filter(item => String(item.name || '').toLowerCase().includes(search));
-    const searchBox = ['column', 'metric'].includes(p.resource_type) ?
-        `<input class="form-control form-control-sm mb-1" placeholder="搜索${p.resource_type === 'metric' ? '指标' : '字段'}" value="${esc(p.resource_search || '')}" oninput="setPermission(${index}, 'resource_search', this.value)">` : '';
-    return `${searchBox}<select class="form-select form-select-sm" onchange="setPermission(${index}, 'resource_id', this.value ? +this.value : null)">${optionList(items, 'id', p.resource_id, '请选择' + (p.resource_type === 'datasource' ? '数据源' : p.resource_type === 'schema' ? '数据库' : p.resource_type === 'table' ? '表' : p.resource_type === 'column' ? '字段' : p.resource_type === 'metric' ? '指标' : '知识库'))}</select>`;
-}
-function setPermission(index, key, value) { permissions[index][key] = value; renderPermissions(); }
+function setPermission(index, key, value) { permissions[index][key] = value; }
 function renderPermissions() {
-    document.getElementById('permissionRows').innerHTML = permissions.map((p, i) => `<tr>
-        <td><select class="form-select form-select-sm" onchange="permissions[${i}].resource_type=this.value; permissions[${i}].resource_id=null; permissions[${i}].resource_key=''; renderPermissions()">${types.map(([value, label]) => `<option value="${value}" ${value === p.resource_type ? 'selected' : ''}>${label}</option>`).join('')}</select></td>
-        <td>${resourceOptions(p)}</td>
-        <td><select class="form-select form-select-sm" onchange="permissions[${i}].access_type=this.value">${levels.map(x => `<option ${x === p.access_type ? 'selected' : ''}>${x}</option>`).join('')}</select></td>
-        <td><button class="btn btn-outline-danger btn-sm" onclick="permissions.splice(${i}, 1); renderPermissions()">删除</button></td>
-    </tr>`).join('');
+    const total = permissions.length;
+    const maxPage = Math.max(1, Math.ceil(total / PERM_PAGE_SIZE));
+    if (permPage > maxPage) permPage = maxPage;
+    const start = (permPage - 1) * PERM_PAGE_SIZE;
+    const pageItems = permissions.slice(start, start + PERM_PAGE_SIZE);
+    document.getElementById('permissionRows').innerHTML = pageItems.map((p, i) => {
+        const gi = start + i;   // 全局索引
+        return `<tr>
+        <td><select class="form-select form-select-sm" onchange="changeType(${gi}, this.value)">${types.map(([v, label]) => `<option value="${v}" ${v === p.resource_type ? 'selected' : ''}>${label}</option>`).join('')}</select></td>
+        <td style="position:relative;">${resourceSelector(p, gi)}</td>
+        <td><select class="form-select form-select-sm" onchange="setPermission(${gi}, 'access_type', this.value)">${LEVELS.map(([v, label]) => `<option value="${v}" ${v === p.access_type ? 'selected' : ''}>${label}</option>`).join('')}</select></td>
+        <td><button class="btn btn-outline-danger btn-sm" onclick="permissions.splice(${gi}, 1); renderPermissions()">✕</button></td>
+    </tr>`;
+    }).join('') || '<tr><td colspan="4" class="text-center text-muted py-3">暂无权限项，点击右上角「添加权限项」</td></tr>';
+    // 分页条
+    const pager = document.getElementById('permPager');
+    if (total > PERM_PAGE_SIZE) {
+        pager.style.display = '';
+        document.getElementById('permCount').textContent = `共 ${total} 项权限`;
+        document.getElementById('permPageInfo').textContent = `${permPage} / ${maxPage}`;
+        document.getElementById('permPrev').disabled = permPage <= 1;
+        document.getElementById('permNext').disabled = permPage >= maxPage;
+    } else {
+        pager.style.display = 'none';
+    }
 }
-function addPermission() { permissions.push(normalizePermission({})); renderPermissions(); }
+function permPageNav(delta) {
+    const next = permPage + delta;
+    if (next < 1) return;
+    permPage = next;
+    renderPermissions();
+}
+function changeType(index, value) {
+    permissions[index].resource_type = value;
+    permissions[index].resource_id = null;
+    permissions[index].resource_key = '';
+    renderPermissions();
+}
+
+// ── 资源选择（弹出式搜索选择，列表再多也好找） ──
+const RESOURCE_LISTS = {
+    datasource: ['datasources', '选择数据源'],
+    schema: ['schemas', '选择数据库'],
+    table: ['tables', '选择表'],
+    knowledge: ['knowledge', '选择知识条目'],
+};
+// 点击外部关闭搜索弹层
+let _pickerActive = false;
+function resourceSelector(p, index) {
+    const [listKey, emptyText] = RESOURCE_LISTS[p.resource_type] || RESOURCE_LISTS.datasource;
+    const items = catalog[listKey] || [];
+    const sel = items.find(x => x.id === p.resource_id);
+    const shown = sel ? (sel.display || sel.name) : '';
+    return `<div class="d-flex gap-1">
+        <button type="button" class="btn btn-sm btn-outline-primary flex-grow-1 text-start text-truncate"
+            onclick="openPicker(${index})" id="pick-${index}" style="max-width:300px;">
+            ${shown ? esc(shown) : `<span class="text-muted">${emptyText}...</span>`}
+        </button>
+        ${p.resource_id ? `<button type="button" class="btn btn-sm btn-outline-danger" title="清除" onclick="clearResource(${index})">✕</button>` : ''}
+    </div>
+    <div id="picker-${index}" class="picker-panel" style="display:none;">
+        <input class="form-control form-control-sm mb-1 picker-search" placeholder="输入关键字过滤..." data-idx="${index}" oninput="filterPicker(${index}, this.value)">
+        <div class="picker-list" id="picker-list-${index}" style="max-height:200px;overflow-y:auto;"></div>
+    </div>`;
+}
+function openPicker(index) {
+    document.querySelectorAll('.picker-panel').forEach(el => el.style.display = 'none');
+    const panel = document.getElementById('picker-' + index);
+    const visible = panel.style.display === 'block';
+    panel.style.display = visible ? 'none' : 'block';
+    if (!visible) {
+        const input = panel.querySelector('.picker-search');
+        input.value = '';
+        filterPicker(index, '');
+        input.focus();
+    }
+}
+function filterPicker(index, keyword) {
+    const p = permissions[index];
+    const [listKey] = RESOURCE_LISTS[p.resource_type] || RESOURCE_LISTS.datasource;
+    const items = catalog[listKey] || [];
+    const kw = (keyword || '').toLowerCase();
+    const filtered = kw ? items.filter(x => (x.display || x.name || '').toLowerCase().includes(kw)) : items;
+    const listEl = document.getElementById('picker-list-' + index);
+    listEl.innerHTML = filtered.slice(0, 200).map(x =>
+        `<div class="picker-item ${x.id === p.resource_id ? 'active' : ''}" onclick="pickResource(${index}, ${x.id})" title="${esc(x.display || x.name)}">${esc(x.display || x.name)}</div>`
+    ).join('') || '<div class="text-muted p-2" style="font-size:12px;">无匹配项</div>';
+    // 显示总数提示
+    if (filtered.length > 200) {
+        listEl.innerHTML += `<div class="text-muted p-1" style="font-size:11px;">仅显示前 200 条，请输入关键字缩小范围</div>`;
+    }
+}
+function pickResource(index, id) {
+    permissions[index].resource_id = id;
+    const panel = document.getElementById('picker-' + index);
+    if (panel) panel.style.display = 'none';
+    renderPermissions();
+}
+function clearResource(index) {
+    permissions[index].resource_id = null;
+    renderPermissions();
+}
+// 点击页面其他位置关闭搜索弹层
+document.addEventListener('click', function (e) {
+    if (!e.target.closest('.picker-panel') && !e.target.closest('[id^="pick-"]')) {
+        document.querySelectorAll('.picker-panel').forEach(el => el.style.display = 'none');
+    }
+});
+
+function addPermission() {
+    permissions.push(normalizePermission({ resource_type: 'datasource' }));
+    permPage = Math.max(1, Math.ceil(permissions.length / PERM_PAGE_SIZE));   // 跳到末页看到新项
+    renderPermissions();
+}
 async function savePermissions() {
     if (!selectedRole) return;
-    const resp = await apiRequest(`/api/permission/roles/${selectedRole.id}/permissions`, { method: 'PUT', body: JSON.stringify({ permissions }) });
-    const data = await resp.json(); if (!resp.ok) return alert(data.detail || '保存失败');
-    alert(data.message || '已保存'); load();
-}
-async function createRole() {
-    const name = prompt('角色名称'); if (!name) return;
-    const code = prompt('角色编码（英文/数字/下划线）'); if (!code) return;
-    const resp = await apiRequest('/api/permission/roles', { method: 'POST', body: JSON.stringify({ name, code }) });
-    const data = await resp.json(); if (!resp.ok) return alert(data.detail || '创建失败'); load();
+    const payload = permissions.map(p => ({
+        permission_code: 'access', resource_type: p.resource_type,
+        resource_id: p.resource_id, resource_key: p.resource_key || null,
+        access_type: p.access_type, filter_expression: p.filter_expression || null,
+    }));
+    // 资源型权限必须选到具体资源
+    const incomplete = payload.find(p => ['datasource', 'schema', 'table'].includes(p.resource_type) && !p.resource_id);
+    if (incomplete) return alert(`请为「${TYPE_LABEL[incomplete.resource_type]}」权限选择具体资源`);
+    const resp = await apiRequest(`/api/permission/roles/${selectedRole.id}/permissions`, { method: 'PUT', body: JSON.stringify({ permissions: payload }) });
+    const data = await resp.json();
+    if (!resp.ok) return alert(data.detail || '保存失败');
+    QF.toast(data.message || '已保存', 'success');
+    load();
 }
 function esc(v) { return String(v || '').replace(/[&<>"']/g, x => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[x])); }
 load();

@@ -72,7 +72,6 @@
                     🔄 刷新状态
                 </button>
             </div>
-            <div id="msgBox" class="mt-2" style="display:none;"></div>
         </div>
     </div>
 </div>
@@ -80,13 +79,6 @@
 <script src="/static/js/bootstrap.bundle.min.js"></script>
 <script src="/static/js/app_common.js"></script>
 <script>
-function showMsg(text, type) {
-    const box = document.getElementById('msgBox');
-    box.style.display = 'block';
-    box.className = 'mt-2 alert alert-' + (type || 'info');
-    box.textContent = text;
-}
-
 async function checkAll() {
     await checkEmbedding();
     await loadSettings();
@@ -192,14 +184,14 @@ async function saveSetting(key) {
             method: 'PUT',
             body: JSON.stringify({ key, value: input.value })
         });
-        const data = await resp.json();
+        const data = await resp.json().catch(() => ({}));
         if (resp.ok) {
-            showMsg(data.message + '（重启服务后生效）', 'success');
+            QF.toast(data.message ? data.message + '（重启服务后生效）' : '保存成功', 'success');
         } else {
-            showMsg((await resp.json()).detail || '保存失败', 'danger');
+            QF.toast(data.detail || '保存失败', 'danger');
         }
     } catch (e) {
-        showMsg('保存失败: ' + e.message, 'danger');
+        QF.toast('保存失败: ' + e.message, 'danger');
     }
 }
 
@@ -208,10 +200,10 @@ async function downloadEmbedding() {
     btn.disabled = true; btn.textContent = '⏳ 正在启动下载...';
     try {
         const resp = await apiRequest('/api/system/download-embedding', { method: 'POST' });
-        const data = await resp.json();
-        showMsg(data.message, data.success ? 'info' : 'danger');
+        const data = await resp.json().catch(() => ({}));
+        QF.toast(data.message || '下载已启动', data.success ? 'info' : 'danger');
     } catch (e) {
-        showMsg('下载失败: ' + e.message, 'danger');
+        QF.toast('下载失败: ' + e.message, 'danger');
     }
     btn.disabled = false; btn.textContent = '📥 下载 Embedding 模型';
 }

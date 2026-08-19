@@ -7,7 +7,7 @@
 """
 from typing import Optional
 
-from app.logger import logger
+from app.logger import logger, pipeline_logger
 from app.timezone import now_beijing
 from core.llm.client import LLMClient
 from core.generation.sql_generator import SqlGenerator
@@ -28,6 +28,15 @@ class ChatSession:
         self.retriever = SchemaRetriever(user=user, user_id=user_id)
         self.user = user or {'user_id': user_id, 'role': 'user'}
 
+    # ---------- 链路日志（与 pipeline 对齐，供审计查看） ----------
+
+    def _log_step(self, steps: list, step_name: str, data: dict):
+        steps.append({
+            "step": step_name,
+            "timestamp": now_beijing().strftime("%Y-%m-%d %H:%M:%S"),
+            "data": data,
+        })
+
     # ---------- 消息处理 ----------
 
     def process_first_message(
@@ -42,17 +51,33 @@ class ChatSession:
         Returns:
             {"sql": ..., "is_valid": ..., "schema_csv": ..., "messages": [...]}
         """
-        from datetime import datetime
+        import json
         start_time = now_beijing()
+        pipeline_log = []
+        self._log_step(pipeline_log, "PIPELINE_START", {
+            "user_id": self.user_id, "query": query,
+            "schema_name": schema_name or "全部",
+        })
 
         # Step 1: 关键词提取
         keywords = self.keyword_extractor.extract(query, top_k=10)
+        self._log_step(pipeline_log, "STEP1_KEYWORDS", {
+            "query": query, "keywords": keywords, "count": len(keywords)})
 
         # Step 2: 字段召回（向量优先，DB 降级）
         recalled_fields = self.retriever.recall_fields(keywords, schema_name)
+        self._log_step(pipeline_log, "STEP2_RECALL", {
+            "method": "vector" if self.retriever.vector_loaded else "database_query",
+            "keywords": keywords, "recalled_count": len(recalled_fields),
+            "recalled_fields": [{"table": f.get("table_name"), "column": f.get("column_name")}
+                                for f in recalled_fields[:10]]})
 
         # Step 3: 按表聚合，获取完整表结构
         aggregation = self.retriever.aggregate_tables(recalled_fields, schema_name)
+        self._log_step(pipeline_log, "STEP3_AGGREGATE", {
+            "recalled_table_count": len(aggregation.get('tables', [])),
+            "tables": aggregation.get('tables', []),
+            "total_field_count": len(aggregation.get('all_fields', {}))})
 
         # 构建 schema CSV（会保存到对话上下文，供后续轮次复用）
         schema_csv = SchemaRetriever.build_schema_csv(aggregation)
@@ -65,9 +90,15 @@ class ChatSession:
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": query}
         ]
+        self._log_step(pipeline_log, "STEP4_CONTEXT", {
+            "has_knowledge": bool(knowledge_content),
+            "schema_csv_lines": len(schema_csv.split('\n'))})
 
         # Step 5: 调用 LLM
         llm_result = self.llm_client.chat(messages)
+        self._log_step(pipeline_log, "STEP5_RESULT", {
+            "sql": llm_result.get('sql', ''),
+            "total_tokens": llm_result.get("total_tokens", 0)})
 
         # Step 6-7: 验证 + 权限网关
         sql = llm_result.get('sql', '')
@@ -75,12 +106,23 @@ class ChatSession:
         generated_sql = sql
         sql, is_valid, error_msg, gateway_info = self._apply_gateway(
             sql, is_valid, error_msg, db_type, schema_name)
+        self._log_step(pipeline_log, "STEP6_VALIDATE", {
+            "is_valid": is_valid, "error_message": error_msg,
+            "columns": columns[:10] if columns else None})
+        if gateway_info:
+            self._log_step(pipeline_log, "STEP7_GATEWAY", {
+                "is_allowed": gateway_info.get("is_allowed"),
+                "block_reason": gateway_info.get("block_reason"),
+                "was_modified": gateway_info.get("was_modified"),
+                "tables": gateway_info.get("tables", []),
+                "hit_sensitive": gateway_info.get("hit_sensitive", False)})
 
         # Step 8: 审计日志
         duration_ms = int((now_beijing() - start_time).total_seconds() * 1000)
         write_query_audit_log(
             self.user_id, self.user, query, generated_sql, sql,
-            gateway_result=gateway_info, duration_ms=duration_ms
+            gateway_result=gateway_info, duration_ms=duration_ms,
+            pipeline_log=json.dumps(pipeline_log, ensure_ascii=False, default=str)
         )
 
         return {
@@ -94,6 +136,7 @@ class ChatSession:
             "duration_ms": duration_ms,
             "raw_response": llm_result.get("raw_response", ""),
             "gateway": gateway_info,
+            "pipeline_log": pipeline_log,
             "tokens": {
                 "prompt_tokens": llm_result.get("prompt_tokens", 0),
                 "completion_tokens": llm_result.get("completion_tokens", 0),
@@ -107,6 +150,7 @@ class ChatSession:
         new_user_content: str,
         schema_csv: str,
         db_type: str = "sqlite",
+        schema_name: Optional[str] = None,
         knowledge_content: str = ""
     ) -> dict:
         """后续轮次消息：使用对话历史 + 已保存的 schema 上下文
@@ -116,11 +160,48 @@ class ChatSession:
             new_user_content: 用户的新消息（修改意见）
             schema_csv: 第一轮保存的 schema CSV
             db_type: 数据库类型
+            schema_name: 数据源/schema 名（用于追问召回追踪）
             knowledge_content: 创建对话时关联的知识库内容
 
         Returns:
             {"sql": ..., "is_valid": ..., "messages": [...]}
         """
+        import json
+        start_time = now_beijing()
+        pipeline_log = []
+        self._log_step(pipeline_log, "PIPELINE_START", {
+            "user_id": self.user_id, "query": new_user_content,
+            "schema_name": schema_name or "复用上一轮", "mode": "followup",
+        })
+
+        # Step 1: 关键词提取（对追问重新提取，保证链路完整）
+        keywords = self.keyword_extractor.extract(new_user_content, top_k=10)
+        self._log_step(pipeline_log, "STEP1_KEYWORDS", {
+            "query": new_user_content, "keywords": keywords,
+            "count": len(keywords), "mode": "followup"})
+
+        # Step 2-3: 针对新问题重新召回/聚合（仅链路追踪；失败降级不阻断主流程）
+        try:
+            recalled_fields = self.retriever.recall_fields(keywords, schema_name)
+            self._log_step(pipeline_log, "STEP2_RECALL", {
+                "method": "vector" if self.retriever.vector_loaded else "database_query",
+                "keywords": keywords, "recalled_count": len(recalled_fields),
+                "recalled_fields": [{"table": f.get("table_name"), "column": f.get("column_name")}
+                                    for f in recalled_fields[:10]]})
+            aggregation = self.retriever.aggregate_tables(recalled_fields, schema_name)
+            self._log_step(pipeline_log, "STEP3_AGGREGATE", {
+                "recalled_table_count": len(aggregation.get('tables', [])),
+                "tables": aggregation.get('tables', []),
+                "total_field_count": len(aggregation.get('all_fields', {}))})
+        except Exception as e:
+            logger.warning(f"[ChatSession] 追问召回失败，降级复用上一轮上下文: {e}")
+            self._log_step(pipeline_log, "STEP2_RECALL", {
+                "method": "reuse_previous_context", "keywords": keywords,
+                "recalled_count": 0, "recalled_fields": []})
+            self._log_step(pipeline_log, "STEP3_AGGREGATE", {
+                "reuse_schema_csv": True,
+                "schema_csv_lines": len(schema_csv.split('\n'))})
+
         messages = self._build_messages_from_history(
             conversation_messages, schema_csv, db_type, knowledge_content
         )
@@ -130,14 +211,44 @@ class ChatSession:
 
         logger.info(f"[ChatSession] 跟进消息 - 历史轮次: {len(conversation_messages)}，总消息: {len(messages)}")
 
-        # 调用 LLM
-        llm_result = self.llm_client.chat(messages)
+        # Step 4: 上下文
+        self._log_step(pipeline_log, "STEP4_CONTEXT", {
+            "has_knowledge": bool(knowledge_content),
+            "history_rounds": len(conversation_messages),
+            "schema_csv_lines": len(schema_csv.split('\n'))})
 
-        # 验证 + 权限网关
+        # Step 5: 调用 LLM
+        llm_result = self.llm_client.chat(messages)
+        self._log_step(pipeline_log, "STEP5_RESULT", {
+            "sql": llm_result.get('sql', ''),
+            "total_tokens": llm_result.get("total_tokens", 0)})
+
+        # Step 6-7: 验证 + 权限网关
         sql = llm_result.get('sql', '')
         is_valid, error_msg, columns = self.sql_generator.validate_sql(sql)
-        sql, is_valid, error_msg, _ = self._apply_gateway(
-            sql, is_valid, error_msg, db_type)
+        generated_sql = sql
+        sql, is_valid, error_msg, gateway_info = self._apply_gateway(
+            sql, is_valid, error_msg, db_type, schema_name)
+        self._log_step(pipeline_log, "STEP6_VALIDATE", {
+            "is_valid": is_valid, "error_message": error_msg,
+            "columns": columns[:10] if columns else None})
+        if gateway_info:
+            self._log_step(pipeline_log, "STEP7_GATEWAY", {
+                "is_allowed": gateway_info.get("is_allowed"),
+                "block_reason": gateway_info.get("block_reason"),
+                "was_modified": gateway_info.get("was_modified"),
+                "tables": gateway_info.get("tables", []),
+                "hit_sensitive": gateway_info.get("hit_sensitive", False)})
+
+        # Step 8: 审计日志（与首轮一致：完整链路 问题→关键词→召回→生成）
+        duration_ms = int((now_beijing() - start_time).total_seconds() * 1000)
+        try:
+            write_query_audit_log(
+                self.user_id, self.user, new_user_content, generated_sql, sql,
+                gateway_result=gateway_info, duration_ms=duration_ms,
+                pipeline_log=json.dumps(pipeline_log, ensure_ascii=False, default=str))
+        except Exception:
+            logger.warning("跟进消息审计日志写入失败（不影响主流程）")
 
         return {
             "sql": sql,
@@ -145,8 +256,10 @@ class ChatSession:
             "error_message": error_msg,
             "columns": columns,
             "messages": messages,
-            "duration_ms": llm_result.get("duration_ms", 0),
+            "duration_ms": duration_ms,
             "raw_response": llm_result.get("raw_response", ""),
+            "gateway": gateway_info,
+            "pipeline_log": pipeline_log,
             "tokens": {
                 "prompt_tokens": llm_result.get("prompt_tokens", 0),
                 "completion_tokens": llm_result.get("completion_tokens", 0),
@@ -214,11 +327,15 @@ class ChatSession:
         ]
 
         for msg in conversation_messages:
-            if msg.role == "user":
-                messages.append({"role": "user", "content": msg.content})
-            elif msg.role == "assistant":
+            # 兼容 dict（router 传入）与 ORM 对象两种形态
+            role = msg.get('role') if isinstance(msg, dict) else getattr(msg, 'role', None)
+            content = msg.get('content') if isinstance(msg, dict) else getattr(msg, 'content', '')
+            sql = msg.get('sql') if isinstance(msg, dict) else getattr(msg, 'sql', None)
+            if role == "user":
+                messages.append({"role": "user", "content": content})
+            elif role == "assistant":
                 # 助理消息使用提取的 SQL 作为 content
-                assistant_content = msg.sql or msg.content
+                assistant_content = sql or content
                 messages.append({"role": "assistant", "content": assistant_content})
 
         return messages

@@ -14,9 +14,10 @@ from typing import List, Optional, Tuple
 from app.logger import logger
 from app.timezone import now_beijing
 from app.security.crypto import decrypt_secret
-from models import SessionLocal
+from curd.base import tx_scope
 from models.schema import DbSchema, DbTable, DbColumn
-from models.sync import DataSource, SyncJobConfig, SyncRunLog, SchemaChangeLog
+from models.datasource import DataSource
+from models.sync import SyncJobConfig, SyncRunLog, SchemaChangeLog
 from services.sync.connectors import get_connector
 from services.sync.connectors.base import BaseConnector
 from services.sync.diff import diff_metadata, ChangeRecord
@@ -38,84 +39,85 @@ class SyncEngine:
 
     def run(self) -> SyncRunLog:
         """执行同步，返回 SyncRunLog"""
-        db = SessionLocal()
         start = time.time()
         try:
-            # 1. 创建执行记录
-            run_log = SyncRunLog(
-                job_id=self.job.id,
-                triggered_by=self.triggered_by,
-                started_at=now_beijing(),
-                status='running',
-            )
-            db.add(run_log)
-            db.commit()
-            db.refresh(run_log)
-            self._run_log = run_log
+            with tx_scope() as db:
+                # 1. 创建执行记录
+                run_log = SyncRunLog(
+                    job_id=self.job.id,
+                    triggered_by=self.triggered_by,
+                    started_at=now_beijing(),
+                    status='running',
+                )
+                db.add(run_log)
+                db.commit()
+                db.refresh(run_log)
+                self._run_log = run_log
 
-            # 2. 解密密码 + 创建连接器
-            password = decrypt_secret(self.datasource.password_enc)
-            self._connector = get_connector(
-                self.datasource.db_type,
-                host=self.datasource.host,
-                port=self.datasource.port,
-                database=self.datasource.database,
-                username=self.datasource.username,
-                password=password,
-            )
+                # 2. 解密密码 + 创建连接器
+                password = decrypt_secret(self.datasource.password_enc)
+                self._connector = get_connector(
+                    self.datasource.db_type,
+                    host=self.datasource.host,
+                    port=self.datasource.port,
+                    database=self.datasource.database,
+                    username=self.datasource.username,
+                    password=password,
+                )
 
-            # 3. 读取源库元数据
-            include_tables = _parse_csv(self.job.include_tables)
-            exclude_tables = _parse_csv(self.job.exclude_tables)
-            source_tables = self._connector.read_metadata(
-                include_tables=include_tables or None,
-                exclude_tables=exclude_tables or None,
-            )
-            logger.info(f"同步[{self.job.target_schema_name}]: 源库读取 {len(source_tables)} 张表")
+                # 3. 读取源库元数据
+                include_tables = _parse_csv(self.job.include_tables)
+                exclude_tables = _parse_csv(self.job.exclude_tables)
+                source_tables = self._connector.read_metadata(
+                    include_tables=include_tables or None,
+                    exclude_tables=exclude_tables or None,
+                )
+                logger.info(f"同步[{self.job.target_schema_name}]: 源库读取 {len(source_tables)} 张表")
 
-            # 4. 获取存储的元数据
-            stored_schema, stored_tables, stored_cols_map = self._get_stored_metadata(db)
-            if stored_schema is None:
-                stored_schema = self._create_target_schema(db)
+                # 4. 获取存储的元数据
+                stored_schema, stored_tables, stored_cols_map = self._get_stored_metadata(db)
+                if stored_schema is None:
+                    stored_schema = self._create_target_schema(db)
 
-            # 5. Diff
-            changes = diff_metadata(source_tables, stored_tables, stored_cols_map)
-            logger.info(f"同步[{self.job.target_schema_name}]: 检测到 {len(changes)} 条变更")
+                # 5. Diff
+                changes = diff_metadata(source_tables, stored_tables, stored_cols_map)
+                logger.info(f"同步[{self.job.target_schema_name}]: 检测到 {len(changes)} 条变更")
 
-            # 6. 应用变更
-            stats = self._apply_changes(db, stored_schema, changes)
+                # 6. 应用变更
+                stats = self._apply_changes(db, stored_schema, changes)
 
-            # 7. 记录变更日志
-            self._log_changes(db, run_log.id, changes)
+                # 7. 记录变更日志
+                self._log_changes(db, run_log.id, changes)
 
-            # 8. 完成
-            run_log.finished_at = now_beijing()
-            run_log.status = 'success'
-            run_log.tables_total = len(source_tables)
-            run_log.tables_synced = stats['tables_touched']
-            run_log.columns_added = stats['columns_added']
-            run_log.columns_modified = stats['columns_modified']
-            run_log.columns_removed = stats['columns_removed']
-            run_log.changes_auto = stats['changes_auto']
-            run_log.changes_pending = stats['changes_pending']
-            run_log.duration_ms = int((time.time() - start) * 1000)
-            run_log.summary = json.dumps({
-                'source_tables': len(source_tables),
-                'changes': len(changes),
-                **stats,
-            }, ensure_ascii=False)
-            db.commit()
+                # 8. 完成
+                run_log.finished_at = now_beijing()
+                run_log.status = 'success'
+                run_log.tables_total = len(source_tables)
+                run_log.tables_synced = stats['tables_touched']
+                run_log.columns_added = stats['columns_added']
+                run_log.columns_modified = stats['columns_modified']
+                run_log.columns_removed = stats['columns_removed']
+                run_log.changes_auto = stats['changes_auto']
+                run_log.changes_pending = stats['changes_pending']
+                run_log.duration_ms = int((time.time() - start) * 1000)
+                run_log.summary = json.dumps({
+                    'source_tables': len(source_tables),
+                    'changes': len(changes),
+                    **stats,
+                }, ensure_ascii=False)
+                db.commit()
 
-            # 9. 更新任务状态
-            self.job.last_synced_at = now_beijing()
-            self.job.last_sync_status = 'success'
-            db.commit()
+                # 9. 更新任务状态
+                self.job.last_synced_at = now_beijing()
+                self.job.last_sync_status = 'success'
+                db.merge(self.job)
+                db.commit()
 
-            # 10. 触发索引重建
-            self._trigger_index_rebuild(stored_schema.name)
+                # 10. 触发索引重建
+                self._trigger_index_rebuild(stored_schema.name)
 
-            logger.info(f"同步完成: {run_log.summary}")
-            return run_log
+                logger.info(f"同步完成: {run_log.summary}")
+                return run_log
 
         except Exception as e:
             logger.error(f"同步失败: {e}", exc_info=True)
@@ -124,14 +126,15 @@ class SyncEngine:
                 self._run_log.error_message = str(e)[:2000]
                 self._run_log.finished_at = now_beijing()
                 self._run_log.duration_ms = int((time.time() - start) * 1000)
-                db.commit()
-            self.job.last_sync_status = 'failed'
-            db.commit()
+                with tx_scope() as db:
+                    db.add(self._run_log)
+                    db.merge(self.job)
+                    db.commit()
+                self.job.last_sync_status = 'failed'
             return self._run_log
         finally:
             if self._connector:
                 self._connector.close()
-            db.close()
 
     # ── 内部方法 ──────────────────────────────────────────────────
 

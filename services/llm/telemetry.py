@@ -10,8 +10,8 @@ import hashlib
 from typing import Optional
 
 from app.logger import logger
-from models import TelemetrySessionLocal
 from models.llm import LLMCall, LLMPrompt
+from curd.base import session_scope
 
 
 def get_or_create_prompt(content: Optional[str]) -> Optional[int]:
@@ -19,20 +19,17 @@ def get_or_create_prompt(content: Optional[str]) -> Optional[int]:
     if not content:
         return None
     content_hash = hashlib.sha256(content.encode('utf-8')).hexdigest()
-    db = TelemetrySessionLocal()
     try:
-        row = db.query(LLMPrompt).filter(LLMPrompt.content_hash == content_hash).first()
-        if row:
-            return row.id
-        prompt = LLMPrompt(content_hash=content_hash, content=content, length=len(content))
-        db.add(prompt)
-        db.commit()
-        return prompt.id
+        with session_scope(telemetry=True) as db:
+            row = db.query(LLMPrompt).filter(LLMPrompt.content_hash == content_hash).first()
+            if row:
+                return row.id
+            prompt = LLMPrompt(content_hash=content_hash, content=content, length=len(content))
+            db.add(prompt)
+            db.flush()   # 立即取回自增 id
+            return prompt.id
     except Exception:
-        db.rollback()
         return None
-    finally:
-        db.close()
 
 
 def record_call(
@@ -61,64 +58,54 @@ def record_call(
     except Exception:
         prompt_id = None
 
-    db = TelemetrySessionLocal()
     try:
-        call = LLMCall(
-            user_id=user_id,
-            conversation_id=conversation_id,
-            message_id=message_id,
-            config_id=config_id,
-            provider=provider or '',
-            model=model or 'unknown',
-            purpose=purpose,
-            question=question,
-            conditions=conditions,
-            prompt_id=prompt_id,
-            result=result,
-            duration_ms=duration_ms,
-            prompt_tokens=prompt_tokens or 0,
-            completion_tokens=completion_tokens or 0,
-            total_tokens=total_tokens or 0,
-            cost=cost or 0.0,
-            status=status,
-            error_message=error_message,
-        )
-        db.add(call)
-        db.commit()
-        logger.info(f"LLM调用已记录: user_id={user_id}, model={model}, purpose={purpose}")
-        return call.id
+        with session_scope(telemetry=True) as db:
+            call = LLMCall(
+                user_id=user_id,
+                conversation_id=conversation_id,
+                message_id=message_id,
+                config_id=config_id,
+                provider=provider or '',
+                model=model or 'unknown',
+                purpose=purpose,
+                question=question,
+                conditions=conditions,
+                prompt_id=prompt_id,
+                result=result,
+                duration_ms=duration_ms,
+                prompt_tokens=prompt_tokens or 0,
+                completion_tokens=completion_tokens or 0,
+                total_tokens=total_tokens or 0,
+                cost=cost or 0.0,
+                status=status,
+                error_message=error_message,
+            )
+            db.add(call)
+            db.flush()   # 立即取回自增 id
+            logger.info(f"LLM调用已记录: user_id={user_id}, model={model}, purpose={purpose}")
+            return call.id
     except Exception as e:
         logger.error(f"保存LLM调用记录失败: {e}")
-        db.rollback()
         return None
-    finally:
-        db.close()
 
 
 def bind_message(call_id: Optional[int], conversation_id: Optional[int], message_id: Optional[int]):
     """把已落库的调用回填到消息关联键（关联层）"""
     if not call_id:
         return
-    db = TelemetrySessionLocal()
     try:
-        call = db.query(LLMCall).filter(LLMCall.id == call_id).first()
-        if call:
-            call.conversation_id = conversation_id
-            call.message_id = message_id
-            db.commit()
+        with session_scope(telemetry=True) as db:
+            call = db.query(LLMCall).filter(LLMCall.id == call_id).first()
+            if call:
+                call.conversation_id = conversation_id
+                call.message_id = message_id
     except Exception as e:
         logger.error(f"回填消息关联失败: {e}")
-        db.rollback()
-    finally:
-        db.close()
 
 
 def get_prompt_content(prompt_id: Optional[int]) -> Optional[str]:
     if not prompt_id:
         return None
-    db = TelemetrySessionLocal()
-    try:
+    with session_scope(telemetry=True) as db:
         row = db.query(LLMPrompt).filter(LLMPrompt.id == prompt_id).first()
         return row.content if row else None
-    finally:
-        db.close()

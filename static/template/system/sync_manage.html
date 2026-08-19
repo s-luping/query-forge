@@ -91,7 +91,7 @@
             </div>
             <div class="card-body p-0">
                 <table class="table table-hover table-sm mb-0">
-                    <thead><tr><th>数据源</th><th>目标Schema</th><th>调度</th><th>自动分类</th><th>启用</th><th>最后同步</th><th>状态</th><th>操作</th></tr></thead>
+                    <thead><tr><th>数据源</th><th>数据库名</th><th>调度</th><th>自动分类</th><th>启用</th><th>最后同步</th><th>状态</th><th>操作</th></tr></thead>
                     <tbody id="jobTable"><tr><td colspan="8" class="empty-state">加载中...</td></tr></tbody>
                 </table>
             </div>
@@ -153,14 +153,25 @@
             <div class="modal-header"><h5 class="modal-title">数据源配置</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
             <div class="modal-body">
                 <input type="hidden" id="dsId">
-                <div class="mb-3"><label class="form-label">名称</label><input type="text" class="form-control" id="dsName" placeholder="my-mysql-prod"></div>
+                <div class="mb-3"><label class="form-label">名称 <span class="text-danger">*</span></label><input type="text" class="form-control" id="dsName" placeholder="如 my-mysql-prod" required></div>
                 <div class="row">
-                    <div class="col-md-4 mb-3"><label class="form-label">数据库类型</label>
-                        <select class="form-select" id="dsDbType"><option value="mysql">MySQL</option><option value="postgresql">PostgreSQL</option><option value="sqlite">SQLite</option></select></div>
+                    <div class="col-md-4 mb-3"><label class="form-label">数据库类型 <span class="text-danger">*</span></label>
+                        <select class="form-select" id="dsDbType">
+                            <option value="mysql">MySQL</option>
+                            <option value="mariadb">MariaDB</option>
+                            <option value="postgresql">PostgreSQL</option>
+                            <option value="doris">Doris</option>
+                            <option value="sqlite">SQLite</option>
+                            <option value="sqlserver">SQL Server</option>
+                            <option value="oracle">Oracle</option>
+                            <option value="hive">Hive</option>
+                            <option value="clickhouse">ClickHouse</option>
+                        </select></div>
                     <div class="col-md-5 mb-3"><label class="form-label">主机</label><input type="text" class="form-control" id="dsHost" value="localhost"></div>
                     <div class="col-md-3 mb-3"><label class="form-label">端口</label><input type="number" class="form-control" id="dsPort" value="3306"></div>
                 </div>
-                <div class="mb-3"><label class="form-label">数据库名 / Schema</label><input type="text" class="form-control" id="dsDatabase" placeholder="如 mydb 或 public"></div>
+                <div class="mb-3"><label class="form-label">数据库名 <span class="text-danger">*</span></label><input type="text" class="form-control" id="dsDatabase" placeholder="如 mydb" required>
+                    <small class="text-muted">MySQL/Doris/Hive 填库名；PostgreSQL 填 schema 名（如 public）；SQLite 填文件路径。</small></div>
                 <div class="row">
                     <div class="col-md-6 mb-3"><label class="form-label">用户名（只读）</label><input type="text" class="form-control" id="dsUsername" placeholder="readonly_user"></div>
                     <div class="col-md-6 mb-3"><label class="form-label">密码</label><input type="password" class="form-control" id="dsPassword" placeholder="留空编辑时不修改"></div>
@@ -181,8 +192,10 @@
             <div class="modal-header"><h5 class="modal-title">同步任务配置</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
             <div class="modal-body">
                 <input type="hidden" id="jobId">
-                <div class="mb-3"><label class="form-label">数据源</label><select class="form-select" id="jobDsId"></select></div>
-                <div class="mb-3"><label class="form-label">目标 Schema 名称</label><input type="text" class="form-control" id="jobSchema" placeholder="如 synced_mysql_prod"></div>
+                <div class="mb-3"><label class="form-label">数据源</label><select class="form-select" id="jobDsId" onchange="syncTargetPreview()"></select></div>
+                <div class="mb-3"><label class="form-label">数据库名</label>
+                    <input type="text" class="form-control" id="jobSchema" readonly placeholder="选择数据源后自动使用其数据库名">
+                    <small class="text-muted">同步到本系统的目标库名 = 数据源的「数据库名」，无需手动填写。</small></div>
                 <div class="row">
                     <div class="col-md-6 mb-3"><label class="form-label">调度类型</label>
                         <select class="form-select" id="jobSchedType" onchange="toggleSchedInput()">

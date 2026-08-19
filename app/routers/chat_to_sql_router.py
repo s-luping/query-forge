@@ -18,9 +18,9 @@ from app.security.crypto import decrypt_secret
 from core.llm import LLMClient
 from core.generation.sql_generator import SqlGenerator
 from core.generation.pipeline import SQLPipeline
-from models import SessionLocal
 from models.llm import LLMConfig
 from services.llm import telemetry
+from curd.base import session_scope
 
 
 class TextToSqlRequest(BaseModel):
@@ -50,8 +50,7 @@ validation_cache = {}
 
 def get_user_llm_config(user_id: int, config_id: Optional[int] = None) -> Optional[dict]:
     """获取用户的LLM配置（自己的 + 公共配置，api_key 解密）"""
-    db = SessionLocal()
-    try:
+    with session_scope() as db:
         if config_id:
             config = db.query(LLMConfig).filter(
                 LLMConfig.id == config_id,
@@ -64,7 +63,7 @@ def get_user_llm_config(user_id: int, config_id: Optional[int] = None) -> Option
                 LLMConfig.is_default == True,
                 LLMConfig.is_active == True
             ).first()
-
+    
         if config:
             return {
                 'id': config.id,
@@ -77,10 +76,6 @@ def get_user_llm_config(user_id: int, config_id: Optional[int] = None) -> Option
                 'timeout': config.timeout or 300
             }
         return None
-    finally:
-        db.close()
-
-
 @router.post("/generate_sql")
 def generate_sql(
     request: TextToSqlRequest,

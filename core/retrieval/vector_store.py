@@ -12,6 +12,7 @@ import pickle
 import numpy as np
 from typing import List, Dict, Tuple, Optional
 from app.logger import logger
+from curd.base import session_scope
 
 
 # core/retrieval/vector_store.py → 上溯 3 级到项目根
@@ -30,15 +31,11 @@ _DEFAULT_VECTOR_CONFIG = {
 def get_vector_config(key: str):
     """从数据库读取向量参数，不存在则返回默认值"""
     try:
-        from models import SessionLocal
         from models.system import SystemSetting
-        db = SessionLocal()
-        try:
+        with session_scope() as db:
             row = db.query(SystemSetting).filter(SystemSetting.key == key).first()
             if row is not None and str(row.value).strip():
                 return int(str(row.value))
-        finally:
-            db.close()
     except Exception:
         pass
     return _DEFAULT_VECTOR_CONFIG.get(key, 0)
@@ -56,10 +53,8 @@ class EmbeddingModel:
     def _set_db_ready(cls, ready: bool):
         """更新数据库中的模型就绪状态"""
         try:
-            from models import SessionLocal
             from models.system import SystemSetting
-            db = SessionLocal()
-            try:
+            with session_scope() as db:
                 row = db.query(SystemSetting).filter(SystemSetting.key == 'EMBEDDING_MODEL_READY').first()
                 value = 'true' if ready else 'false'
                 if row:
@@ -71,8 +66,6 @@ class EmbeddingModel:
                     if path_row:
                         path_row.value = ''
                 db.commit()
-            finally:
-                db.close()
         except Exception as e:
             logger.warning(f"更新 EMBEDDING_MODEL_READY 状态失败: {e}")
 
@@ -80,15 +73,11 @@ class EmbeddingModel:
     def _get_db_path(cls) -> Optional[str]:
         """从数据库读取缓存的模型路径"""
         try:
-            from models import SessionLocal
             from models.system import SystemSetting
-            db = SessionLocal()
-            try:
+            with session_scope() as db:
                 row = db.query(SystemSetting).filter(SystemSetting.key == 'EMBEDDING_MODEL_PATH').first()
                 if row and str(row.value):
                     return str(row.value)
-            finally:
-                db.close()
         except Exception:
             pass
         return None
@@ -97,18 +86,14 @@ class EmbeddingModel:
     def _set_db_path(cls, path: str):
         """缓存模型路径到数据库"""
         try:
-            from models import SessionLocal
             from models.system import SystemSetting
-            db = SessionLocal()
-            try:
+            with session_scope() as db:
                 row = db.query(SystemSetting).filter(SystemSetting.key == 'EMBEDDING_MODEL_PATH').first()
                 if row:
                     row.value = path
                 else:
                     db.add(SystemSetting(key='EMBEDDING_MODEL_PATH', value=path))
                 db.commit()
-            finally:
-                db.close()
         except Exception as e:
             logger.warning(f"缓存模型路径失败: {e}")
 
@@ -116,15 +101,11 @@ class EmbeddingModel:
     def is_ready(cls) -> bool:
         """检查嵌入模型是否就绪（优先查数据库状态）"""
         try:
-            from models import SessionLocal
             from models.system import SystemSetting
-            db = SessionLocal()
-            try:
+            with session_scope() as db:
                 row = db.query(SystemSetting).filter(SystemSetting.key == 'EMBEDDING_MODEL_READY').first()
                 if row and str(row.value) == 'true':
                     return True
-            finally:
-                db.close()
         except Exception:
             pass
         # 数据库查询失败时，降级检查文件系统

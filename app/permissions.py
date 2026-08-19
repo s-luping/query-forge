@@ -19,7 +19,8 @@
 """
 from typing import Optional, Dict, List
 
-from models import SessionLocal
+from curd.base import session_scope
+from curd.role import role_permission_crud, user_role_crud
 from models.schema import DbColumn, DbTable, DbSchema
 from models.role import RolePermission, UserRole
 
@@ -47,8 +48,7 @@ def has_permission(user: dict, permission_code: str,
     """检查用户通过任一角色继承的功能权限。"""
     if is_admin(user):
         return True
-    db = SessionLocal()
-    try:
+    with session_scope() as db:
         query = db.query(RolePermission).filter(
             RolePermission.role_id.in_(_role_ids(db, user)),
             RolePermission.permission_code == permission_code,
@@ -57,16 +57,13 @@ def has_permission(user: dict, permission_code: str,
         if resource_key is not None:
             query = query.filter(RolePermission.resource_key == resource_key)
         return query.first() is not None
-    finally:
-        db.close()
 
 
 def get_visible_schema_ids(user: dict) -> Optional[list]:
     """获取用户可见的 schema_id 列表。None=全部。[]=无。"""
     if is_admin(user):
         return None
-    db = SessionLocal()
-    try:
+    with session_scope() as db:
         grants = [g for g in _role_grants(db, user, 'schema')
                   if g.access_type in ('ALLOW', 'SELECT')]
         datasource_grants = [g for g in _role_grants(db, user, 'datasource')
@@ -82,8 +79,6 @@ def get_visible_schema_ids(user: dict) -> Optional[list]:
                 DbSchema.datasource_id.in_(datasource_ids)).all()}
             schema_ids = schema_ids | datasource_schema_ids
         return list(schema_ids)
-    finally:
-        db.close()
 
 
 def is_schema_visible(user: dict, schema_name: Optional[str]) -> bool:
@@ -93,11 +88,8 @@ def is_schema_visible(user: dict, schema_name: Optional[str]) -> bool:
     visible = get_visible_schema_ids(user)
     if visible is None:
         return True
-    db = SessionLocal()
-    try:
+    with session_scope() as db:
         sid = db.query(DbSchema.id).filter(DbSchema.name == schema_name).first()
-    finally:
-        db.close()
     return sid is not None and sid[0] in visible
 
 
@@ -105,8 +97,7 @@ def get_visible_knowledge_ids(user: dict) -> Optional[list]:
     """获取用户可见的知识库条目 ID 列表。None=全部。[]=无。"""
     if is_admin(user):
         return None
-    db = SessionLocal()
-    try:
+    with session_scope() as db:
         grants = [g for g in _role_grants(db, user, 'knowledge')
                   if g.access_type in ('ALLOW', 'SELECT')]
         if not grants:
@@ -114,8 +105,6 @@ def get_visible_knowledge_ids(user: dict) -> Optional[list]:
         if any(g.resource_id is None for g in grants):
             return None
         return list({g.resource_id for g in grants})
-    finally:
-        db.close()
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -132,8 +121,7 @@ def get_table_grants_by_schema(user: dict) -> Dict[int, List[int]]:
     """
     if is_admin(user):
         return {}
-    db = SessionLocal()
-    try:
+    with session_scope() as db:
         rows = (db.query(DbTable.schema_id, RolePermission.resource_id)
             .join(RolePermission, RolePermission.resource_id == DbTable.id)
             .filter(RolePermission.role_id.in_(_role_ids(db, user)),
@@ -143,8 +131,6 @@ def get_table_grants_by_schema(user: dict) -> Dict[int, List[int]]:
         for schema_id, table_id in rows:
             result.setdefault(schema_id, []).append(table_id)
         return result
-    finally:
-        db.close()
 
 
 def is_table_visible(user: dict, schema_id: int, table_id: int,
@@ -196,8 +182,7 @@ def get_column_access_map(user: dict, schema_name: Optional[str] = None,
     if is_admin(user):
         return {}
 
-    db = SessionLocal()
-    try:
+    with session_scope() as db:
         q = (db.query(DbColumn.id, DbColumn.sensitive_level)
              .join(DbTable, DbColumn.table_id == DbTable.id)
              .join(DbSchema, DbTable.schema_id == DbSchema.id))
@@ -222,8 +207,6 @@ def get_column_access_map(user: dict, schema_name: Optional[str] = None,
                     result[grant.resource_id] = grant.access_type
 
         return result
-    finally:
-        db.close()
 
 
 def filter_fields_by_permission(rows, user: dict) -> list:
@@ -251,16 +234,18 @@ def get_row_scope_rules(user: dict, table_names: Optional[List[str]] = None) -> 
     if is_admin(user):
         return {}
 
-    db = SessionLocal()
-    try:
+    with session_scope() as db:
+        grants = [g for g in _role_grants(db, user, 'row')
+                  if g.resource_id is not None and g.filter_expression]
+        if not grants:
+            return {}
+        table_ids = [g.resource_id for g in grants]
+        # 一次 IN 查询取全部相关表名（避免 N+1）
+        table_map = {t.id: t.name for t in db.query(DbTable).filter(
+            DbTable.id.in_(table_ids)).all()}
         result = {}
-        grants = _role_grants(db, user, 'row')
         for grant in grants:
-            if grant.resource_id is None or not grant.filter_expression:
-                continue
-            table = db.query(DbTable).filter(DbTable.id == grant.resource_id).first()
-            if table and (not table_names or table.name in table_names):
-                result[table.name] = grant.filter_expression
+            name = table_map.get(grant.resource_id)
+            if name and (not table_names or name in table_names):
+                result[name] = grant.filter_expression
         return result
-    finally:
-        db.close()

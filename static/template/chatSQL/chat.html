@@ -439,6 +439,22 @@
     </div>
 </div>
 
+<!-- 完整查询结果弹窗（分页） -->
+<div class="modal-overlay" id="resultModal">
+    <div class="modal-dialog-custom" style="max-width:90vw;width:1100px;">
+        <div class="modal-header-custom" id="resultModalTitle">查询结果</div>
+        <div class="modal-body-custom" id="resultModalBody" style="max-height:70vh;overflow:auto;"></div>
+        <div class="modal-footer-custom" style="justify-content:space-between;">
+            <span style="font-size:12px;color:#888;" id="resultPageInfo"></span>
+            <div>
+                <button class="btn-secondary" onclick="resultPageNav(-1)" id="resultPrev">‹ 上一页</button>
+                <button class="btn-secondary" onclick="resultPageNav(1)" id="resultNext">下一页 ›</button>
+                <button class="btn-primary" onclick="hideResultModal()">关闭</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script src="/static/js/app_common.js"></script>
 <script src="/static/js/chat.js"></script>
 </body>

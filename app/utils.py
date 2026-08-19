@@ -5,21 +5,6 @@
 import os
 
 
-def _load_env_file():
-    """加载.env文件"""
-    env_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), '.env')
-    if os.path.exists(env_path):
-        with open(env_path, 'r', encoding='utf-8') as f:
-            for line in f:
-                line = line.strip()
-                if line and not line.startswith('#') and '=' in line:
-                    key, value = line.split('=', 1)
-                    key = key.strip()
-                    value = value.strip()
-                    if key and key not in os.environ:
-                        os.environ[key] = value
-
-
 def get_app_db_path() -> str:
     """获取应用数据库路径"""
     path = os.getenv('APP_DB_PATH', 'db/sys_app.db')

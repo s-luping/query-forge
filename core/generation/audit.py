@@ -7,6 +7,7 @@ gateway_result 兼容两种形态：
   - to_dict() 产物 dict（chat 传入）
 """
 from app.logger import logger, pipeline_logger
+from curd.base import session_scope
 
 
 def write_query_audit_log(user_id: int, user: dict, query: str,
@@ -15,7 +16,6 @@ def write_query_audit_log(user_id: int, user: dict, query: str,
                           pipeline_log: str = ''):
     """写入 QueryAuditLog；失败只记日志，不影响主流程"""
     try:
-        from models import SessionLocal
         from models.security import QueryAuditLog
 
         if gateway_result is not None and hasattr(gateway_result, 'to_dict'):
@@ -31,8 +31,7 @@ def write_query_audit_log(user_id: int, user: dict, query: str,
             tables = columns = block_reason = ''
             hit_sensitive = was_blocked = False
 
-        db = SessionLocal()
-        try:
+        with session_scope() as db:
             log = QueryAuditLog(
                 user_id=user_id,
                 username=str(user.get('username', '')),
@@ -49,8 +48,6 @@ def write_query_audit_log(user_id: int, user: dict, query: str,
             )
             db.add(log)
             db.commit()
-        finally:
-            db.close()
     except Exception as e:
         logger.warning(f"审计日志写入失败: {e}")
         pipeline_logger.error(f"审计日志写入失败: {e}")

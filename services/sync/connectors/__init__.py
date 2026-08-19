@@ -9,14 +9,19 @@ from services.sync.connectors.base import BaseConnector, TableMetadata, ColumnMe
 from services.sync.connectors import mysql, postgresql, sqlite_conn
 
 # db_type → 连接器类
+# 注：Doris 兼容 MySQL 协议，复用 MySQLConnector（information_schema 结构一致）
 CONNECTOR_REGISTRY = {
     'mysql': mysql.MySQLConnector,
     'mariadb': mysql.MySQLConnector,
+    'doris': mysql.MySQLConnector,
     'postgresql': postgresql.PostgreSQLConnector,
     'postgres': postgresql.PostgreSQLConnector,
     'sqlite': sqlite_conn.SQLiteConnector,
     'sqlite3': sqlite_conn.SQLiteConnector,
 }
+
+# 已在前端数据源下拉中展示、但连接器尚未实现的类型（驱动可装，同步能力待开发）
+PENDING_DB_TYPES = {'sqlserver', 'oracle', 'hive', 'clickhouse'}
 
 
 def get_connector(db_type: str, **conn_kwargs) -> BaseConnector:
@@ -24,6 +29,9 @@ def get_connector(db_type: str, **conn_kwargs) -> BaseConnector:
     db_type = (db_type or 'mysql').lower()
     cls = CONNECTOR_REGISTRY.get(db_type)
     if cls is None:
+        if db_type in PENDING_DB_TYPES:
+            raise ValueError(
+                f"数据库类型 {db_type} 的连接器尚未实现（驱动已支持安装，同步功能开发中）")
         raise ValueError(f"不支持的数据库类型: {db_type}，支持: {list(CONNECTOR_REGISTRY.keys())}")
     return cls(**conn_kwargs)
 

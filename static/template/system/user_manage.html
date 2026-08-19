@@ -69,29 +69,21 @@
     </div>
 </div>
 
-<!-- 编辑用户 -->
-<div class="modal fade" id="editModal" tabindex="-1">
+<!-- 分配角色 -->
+<div class="modal fade" id="roleModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h6 class="modal-title">编辑用户 — <span id="e-username-label"></span></h6>
+                <h6 class="modal-title">分配角色 — <span id="r-username-label2"></span></h6>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <form id="editForm" onsubmit="submitEdit(); return false;">
+            <form id="roleForm" onsubmit="submitRole(); return false;">
                 <div class="modal-body">
-                    <input type="hidden" id="e-user-id">
-                    <div class="mb-2"><label class="form-label mb-1">邮箱</label>
-                        <input type="email" id="e-email" class="form-control form-control-sm" autocomplete="email"></div>
-                    <div class="mb-2"><label class="form-label mb-1">角色</label>
-                        <div id="e-roles" class="border rounded p-2">加载中...</div>
-                        <small class="text-muted">用户通过角色继承权限，可选择多个角色。</small></div>
-                    <div class="mb-2"><label class="form-label mb-1">描述</label>
-                        <input type="text" id="e-desc" class="form-control form-control-sm" maxlength="255"></div>
-                    <div class="form-check">
-                        <input type="checkbox" id="e-active" class="form-check-input">
-                        <label class="form-check-label" for="e-active">启用（可登录）</label>
-                    </div>
-                    <div class="text-muted mt-2" style="font-size:12px;">提示：不能禁用/降级自己的账号，系统至少保留一名管理员。</div>
+                    <input type="hidden" id="role-user-id">
+                    <div class="mb-2"><label class="form-label mb-1">角色（可多选）</label>
+                        <div id="role-list" class="border rounded p-2">加载中...</div>
+                        <small class="text-muted">用户通过角色继承权限，可选择多个角色；勾选「管理员」即授予全部权限。</small></div>
+                    <div class="text-muted mt-2" style="font-size:12px;">提示：系统至少保留一名管理员，请勿移除最后一名管理员的角色。</div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">取消</button>
@@ -132,7 +124,7 @@
 <script src="/static/js/app_common.js"></script>
 <script>
 let users = [];
-let createModal = null, editModal = null, resetModal = null;
+let createModal = null, roleModal = null, resetModal = null;
 
 // 统一关闭：优先走 Bootstrap 实例（含遮罩/动画清理），再兜底移除样式
 function hideModal(id) {
@@ -175,7 +167,7 @@ function renderUserTable() {
             <td>${fmtDate(u.register_date)}</td>
             <td>${fmtDate(u.last_login)}</td>
             <td class="text-nowrap">
-                <button class="btn btn-outline-primary btn-sm" onclick="openEdit(${u.user_id})">编辑</button>
+                <button class="btn btn-outline-primary btn-sm" onclick="openRole(${u.user_id})">分配角色</button>
                 <button class="btn btn-outline-warning btn-sm" onclick="openReset(${u.user_id})">重置密码</button>
                 <button class="btn btn-outline-secondary btn-sm" onclick="toggleActive(${u.user_id})">${u.is_active === 1 ? '禁用' : '启用'}</button>
                 <button class="btn btn-outline-danger btn-sm" onclick="delUser(${u.user_id})">删除</button>
@@ -214,32 +206,26 @@ async function submitCreate() {
     loadUsers();
 }
 
-// ── 编辑 ──────────────────────────────────────────────
-async function openEdit(uid) {
+// ── 分配角色 ──────────────────────────────────────────
+async function openRole(uid) {
     const u = users.find(x => x.user_id === uid);
     if (!u) return;
-    document.getElementById('e-user-id').value = uid;
-    document.getElementById('e-username-label').textContent = u.username;
-    document.getElementById('e-email').value = u.email || '';
+    document.getElementById('role-user-id').value = uid;
+    document.getElementById('r-username-label2').textContent = u.username;
     await loadUserRoles(uid);
-    document.getElementById('e-desc').value = u.description || '';
-    document.getElementById('e-active').checked = u.is_active === 1;
-    editModal.show();
+    roleModal.show();
 }
 
-async function submitEdit() {
-    const uid = document.getElementById('e-user-id').value;
-    const body = {
-        email: document.getElementById('e-email').value.trim() || null,
-        description: document.getElementById('e-desc').value.trim() || null,
-        is_active: document.getElementById('e-active').checked ? 1 : 0,
-    };
-    const resp = await apiRequest(`/api/user/${uid}`, { method: 'PUT', body: JSON.stringify(body) });
+async function submitRole() {
+    const uid = document.getElementById('role-user-id').value;
+    const roleIds = [...document.querySelectorAll('.role-check:checked')].map(item => +item.value);
+    const resp = await apiRequest(`/api/permission/users/${uid}/roles`, {
+        method: 'PUT', body: JSON.stringify({ role_ids: roleIds })
+    });
     const data = await resp.json().catch(() => ({}));
-    if (!resp.ok) return alert(data.detail || '保存失败');
-    await saveUserRoles(uid);
-    alert(data.message || '已保存');
-    editModal.hide();
+    if (!resp.ok) return alert(data.detail || '角色保存失败');
+    alert(data.message || '角色已更新');
+    roleModal.hide();
     loadUsers();
 }
 
@@ -251,20 +237,9 @@ async function loadUserRoles(uid) {
     const roles = await rolesResp.json();
     const assigned = await assignedResp.json();
     const assignedIds = new Set(assigned.map(item => item.id));
-    document.getElementById('e-roles').innerHTML = roles.map(role =>
-        `<label class="form-check form-check-inline"><input class="form-check-input e-role" type="checkbox" value="${role.id}" ${assignedIds.has(role.id) ? 'checked' : ''}><span class="form-check-label">${e(role.name)}</span></label>`
+    document.getElementById('role-list').innerHTML = roles.map(role =>
+        `<label class="form-check form-check-inline"><input class="form-check-input role-check" type="checkbox" value="${role.id}" ${assignedIds.has(role.id) ? 'checked' : ''}><span class="form-check-label">${e(role.name)}</span></label>`
     ).join('') || '<span class="text-muted">暂无角色</span>';
-}
-
-async function saveUserRoles(uid) {
-    const roleIds = [...document.querySelectorAll('.e-role:checked')].map(item => +item.value);
-    const resp = await apiRequest(`/api/permission/users/${uid}/roles`, {
-        method: 'PUT', body: JSON.stringify({ role_ids: roleIds })
-    });
-    if (!resp.ok) {
-        const data = await resp.json().catch(() => ({}));
-        throw new Error(data.detail || '角色保存失败');
-    }
 }
 
 // ── 启用/禁用 ────────────────────────────────────────
@@ -335,7 +310,7 @@ document.querySelectorAll('.modal').forEach(m => m.addEventListener('click', ev 
 
 document.addEventListener('DOMContentLoaded', function () {
     createModal = new bootstrap.Modal(document.getElementById('createModal'));
-    editModal = new bootstrap.Modal(document.getElementById('editModal'));
+    roleModal = new bootstrap.Modal(document.getElementById('roleModal'));
     resetModal = new bootstrap.Modal(document.getElementById('resetModal'));
     loadUsers();
 });

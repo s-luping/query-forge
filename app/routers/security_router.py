@@ -3,13 +3,13 @@ from typing import List, Optional
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
-from sqlalchemy import func
+from sqlalchemy import func, or_
 
 from app.auth import AdminUser
 from app.logger import logger
-from models import SessionLocal
 from models.security import QueryAuditLog
 from models.schema import DbColumn, DbTable, DbSchema
+from curd.base import session_scope
 
 router = APIRouter(tags=['audit'])
 
@@ -26,7 +26,8 @@ class AuditLogItem(BaseModel):
     hit_sensitive: bool = False
     was_blocked: bool = False
     block_reason: str = ''
-    duration_ms: int = 0
+    duration_ms: float = 0
+    pipeline_log: Optional[str] = None    # 链路追踪 JSON（关键词→召回→聚合→生成→校验→网关）
     created_at: Optional[str] = None
 
 
@@ -43,8 +44,7 @@ class SensitiveLevelUpdate(BaseModel):
 @router.get('/logs', response_model=AuditLogListResponse)
 def list_audit_logs(user: AdminUser, limit: int = Query(50, le=200),
                     offset: int = Query(0), blocked_only: bool = Query(False)):
-    db = SessionLocal()
-    try:
+    with session_scope() as db:
         query = db.query(QueryAuditLog)
         if blocked_only:
             query = query.filter(QueryAuditLog.was_blocked == True)
@@ -56,32 +56,23 @@ def list_audit_logs(user: AdminUser, limit: int = Query(50, le=200),
             tables_accessed=row.tables_accessed or '', columns_accessed=row.columns_accessed or '',
             hit_sensitive=bool(row.hit_sensitive), was_blocked=bool(row.was_blocked),
             block_reason=row.block_reason or '', duration_ms=row.duration_ms or 0,
+            pipeline_log=row.pipeline_log,
             created_at=str(row.created_at) if row.created_at else None,
         ) for row in rows], total=total)
-    finally:
-        db.close()
-
-
 @router.get('/stats')
 def audit_stats(user: AdminUser):
-    db = SessionLocal()
-    try:
+    with session_scope() as db:
         total = db.query(func.count(QueryAuditLog.id)).scalar() or 0
         blocked = db.query(func.count(QueryAuditLog.id)).filter(QueryAuditLog.was_blocked == True).scalar() or 0
         sensitive = db.query(func.count(QueryAuditLog.id)).filter(QueryAuditLog.hit_sensitive == True).scalar() or 0
         return {'total_queries': total, 'blocked_queries': blocked,
                 'sensitive_hits': sensitive,
                 'block_rate': f'{blocked / total * 100:.1f}%' if total else '0%'}
-    finally:
-        db.close()
-
-
 @router.put('/sensitive-level')
 def update_sensitive_level(update: SensitiveLevelUpdate, user: AdminUser):
     if update.sensitive_level not in ('public', 'internal', 'sensitive', 'confidential'):
         raise HTTPException(400, f'无效的敏感等级: {update.sensitive_level}')
-    db = SessionLocal()
-    try:
+    with session_scope() as db:
         column = db.query(DbColumn).filter(DbColumn.id == update.column_id).first()
         if not column:
             raise HTTPException(404, '字段不存在')
@@ -91,14 +82,9 @@ def update_sensitive_level(update: SensitiveLevelUpdate, user: AdminUser):
         logger.info(f'字段 {column.name} 敏感等级: {old_level} -> {update.sensitive_level}')
         return {'success': True, 'column_id': column.id, 'old_level': old_level,
                 'new_level': update.sensitive_level}
-    finally:
-        db.close()
-
-
 @router.get('/sensitive-columns')
 def list_sensitive_columns(user: AdminUser, schema_name: Optional[str] = None):
-    db = SessionLocal()
-    try:
+    with session_scope() as db:
         query = (db.query(DbColumn.id, DbColumn.name, DbColumn.sensitive_level,
                           DbTable.name, DbSchema.name)
                  .join(DbTable, DbColumn.table_id == DbTable.id)
@@ -110,35 +96,41 @@ def list_sensitive_columns(user: AdminUser, schema_name: Optional[str] = None):
         return {'items': [{'column_id': row[0], 'column_name': row[1],
                            'sensitive_level': row[2], 'table_name': row[3],
                            'schema_name': row[4]} for row in rows], 'total': len(rows)}
-    finally:
-        db.close()
-
-
 @router.get('/all-columns')
 def list_all_columns(user: AdminUser, schema_name: Optional[str] = None,
-                     table_name: Optional[str] = None):
-    db = SessionLocal()
-    try:
+                     table_name: Optional[str] = None,
+                     search: Optional[str] = None,
+                     sensitive_level: Optional[str] = None,
+                     limit: int = Query(100, ge=1, le=1000),
+                     offset: int = Query(0, ge=0)):
+    with session_scope() as db:
         query = (db.query(DbColumn.id, DbColumn.name, DbColumn.sensitive_level,
-                          DbTable.name, DbSchema.name)
+                          DbColumn.description, DbTable.name, DbSchema.name)
                  .join(DbTable, DbColumn.table_id == DbTable.id)
                  .join(DbSchema, DbTable.schema_id == DbSchema.id))
         if schema_name:
             query = query.filter(DbSchema.name == schema_name)
         if table_name:
             query = query.filter(DbTable.name == table_name)
-        rows = query.order_by(DbSchema.name, DbTable.name, DbColumn.id).all()
+        if search:
+            pattern = f'%{search}%'
+            query = query.filter(or_(
+                DbSchema.name.like(pattern),
+                DbTable.name.like(pattern),
+                DbColumn.name.like(pattern),
+            ))
+        if sensitive_level:
+            query = query.filter(DbColumn.sensitive_level == sensitive_level)
+        total = query.count()
+        rows = (query.order_by(DbSchema.name, DbTable.name, DbColumn.id)
+                .offset(offset).limit(limit).all())
         return {'items': [{'column_id': row[0], 'column_name': row[1],
-                           'sensitive_level': row[2] or 'public', 'table_name': row[3],
-                           'schema_name': row[4]} for row in rows], 'total': len(rows)}
-    finally:
-        db.close()
-
-
+                           'sensitive_level': row[2] or 'public',
+                           'description': row[3] or '', 'table_name': row[4],
+                           'schema_name': row[5]} for row in rows], 'total': total}
 @router.get('/all-tables')
 def list_all_tables(user: AdminUser, schema_name: Optional[str] = None):
-    db = SessionLocal()
-    try:
+    with session_scope() as db:
         query = db.query(DbTable.id, DbTable.name, DbSchema.name).join(
             DbSchema, DbTable.schema_id == DbSchema.id)
         if schema_name:
@@ -146,5 +138,3 @@ def list_all_tables(user: AdminUser, schema_name: Optional[str] = None):
         rows = query.order_by(DbSchema.name, DbTable.name).all()
         return {'items': [{'table_id': row[0], 'table_name': row[1],
                            'schema_name': row[2]} for row in rows], 'total': len(rows)}
-    finally:
-        db.close()
