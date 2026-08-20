@@ -1,13 +1,9 @@
 """配置模块 — Django 风格：全部配置为模块级 键=值 赋值，不使用函数
 
-数据库切换（最简用法）：
-  编辑项目根目录 .env 文件（从 .env.example 复制），取消注释一行即可切换。
-  SQLite 默认，留空 DATABASE_URL 即可；填 MySQL/PG 连接串则自动切换。
-
-  示例：
-    SQLite（默认）:  不设置，或 DATABASE_URL=sqlite:///db/queryforge.db
-    MySQL:           DATABASE_URL=mysql+pymysql://user:pass@host:3306/queryforge?charset=utf8mb4
-    PostgreSQL:      DATABASE_URL=postgresql+psycopg2://user:pass@host:5432/queryforge
+数据库切换：直接修改下方 DATABASE_URL 的值即可，无需环境变量或 .env 文件。
+  留空 ''            = SQLite（默认，本地文件，无需安装数据库）
+  MySQL 连接串       = 'mysql+pymysql://用户名:密码@主机:3306/queryforge?charset=utf8mb4'
+  PostgreSQL 连接串  = 'postgresql+psycopg2://用户名:密码@主机:5432/queryforge'
   遥测库可单独指定 TELEMETRY_DATABASE_URL；留空时与主库同址（外部数据库）
   或使用独立 SQLite 文件（默认 SQLite 模式）。
 
@@ -23,21 +19,20 @@
 """
 import os
 
-# ── .env 加载 ─────────────────────────────────────────────
-# 在任何 os.environ.get() 之前加载 .env 文件，使 DATABASE_URL 等变量可用。
-# 无论从哪个入口点（main.py / 脚本 / 测试）导入 config，.env 都会被加载。
-from dotenv import load_dotenv
-
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-load_dotenv(os.path.join(PROJECT_ROOT, '.env'), override=True)
-
 DB_DIR = os.path.join(PROJECT_ROOT, 'db')
 
 # ── 数据库配置 ─────────────────────────────────────────────
-# 留空 = 默认 SQLite（本地文件）；填 mysql+pymysql://... 或 postgresql+psycopg2://... 则切换
-DATABASE_URL = os.environ.get('DATABASE_URL', '')
+# 切换数据库只需修改下面两个变量的值，改完重启即生效
+#
+#   SQLite（默认）:    DATABASE_URL = ''
+#   MySQL:            DATABASE_URL = 'mysql+pymysql://用户名:密码@主机:3306/queryforge?charset=utf8mb4'
+#   PostgreSQL:       DATABASE_URL = 'postgresql+psycopg2://用户名:密码@主机:5432/queryforge'
+#
+DATABASE_URL = ''
 # 遥测库连接串：留空时 SQLite 模式用独立文件，外部数据库模式与主库同址
-TELEMETRY_DATABASE_URL = os.environ.get('TELEMETRY_DATABASE_URL', '')
+# 如需独立遥测库，填入对应的连接串
+TELEMETRY_DATABASE_URL = ''
 
 # SQLite 默认路径（仅在 DATABASE_URL 留空时使用）
 MAIN_DB_PATH = os.path.join(DB_DIR, 'queryforge.db')
