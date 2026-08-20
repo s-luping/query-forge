@@ -15,14 +15,14 @@ from pydantic import BaseModel
 from app.auth import AdminUser, CurrentUser
 from app.logger import logger, log_audit
 from app.permissions import get_visible_schema_ids, get_table_grants_by_schema
-from services.vector import auto_build_vector_index, mark_index_stale  # 从服务层导入（消除路由层职责过重）
+from services.vector_service import auto_build_vector_index, mark_index_stale  # 从服务层导入（消除路由层职责过重）
 from models.schema import DbSchema, DbColumn
 from models.datasource import DataSource
-from services.schema.parsers import (
+from services.schema_parsers import (
     parse_json_schema, parse_schema_csv, DDLParseError, SUPPORTED_DB_TYPES,
 )
-from services.schema import service as schema_service
-from curd.base import session_scope
+from services import schema_service
+from crud.base import session_scope
 
 router = APIRouter()
 
@@ -117,7 +117,7 @@ class IndexInfoResponse(BaseModel):
 
 def _check_embedding_ready():
     """检查嵌入模型是否就绪，未就绪则抛出 400 错误"""
-    from core.retrieval.vector_store import EmbeddingModel
+    from core.ret_vector_store import EmbeddingModel
     if not EmbeddingModel.is_ready():
         raise HTTPException(
             status_code=400,
@@ -551,7 +551,7 @@ def build_vector_index(
     # (权限由 AdminUser 依赖统一校验)
     _check_embedding_ready()
     try:
-        from core.retrieval.index_meta import build_vector_index as do_build
+        from core.ret_index_meta import build_vector_index as do_build
 
         result = do_build(request.schema_name)
         message = "向量索引重建成功" if request.rebuild else "向量索引构建成功"
@@ -575,7 +575,7 @@ def get_vector_index_info(
     """获取向量索引信息"""
     _check_embedding_ready()
     try:
-        from core.retrieval.index_meta import get_vector_index_info as do_get_info
+        from core.ret_index_meta import get_vector_index_info as do_get_info
 
         info = do_get_info(schema_name)
         fields = info.get('fields', {})

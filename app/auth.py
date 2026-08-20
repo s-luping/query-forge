@@ -7,7 +7,7 @@ from fastapi import Depends, HTTPException, Request
 from app.logger import logger
 from app.config import SECRET_KEY, ACCESS_TOKEN_EXPIRE_MINUTES
 from app.timezone import now_beijing_aware
-from curd.base import session_scope, tx_scope
+from crud.base import session_scope, tx_scope
 from db import get_setting
 from models.user import User
 from models.role import Role, UserRole

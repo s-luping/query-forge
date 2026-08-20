@@ -12,8 +12,8 @@ from app.config import COOKIE_SECURE
 from app.limiter import limiter
 from app.logger import logger
 from app.timezone import now_beijing
-from curd.base import session_scope
-from curd.system import system_setting_crud
+from crud.base import session_scope
+from crud.system import system_setting_crud
 from models.user import User
 
 router = APIRouter()

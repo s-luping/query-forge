@@ -10,7 +10,7 @@ from sqlalchemy import func, case
 
 from app.logger import logger
 from app.timezone import now_beijing
-from curd.base import session_scope
+from crud.base import session_scope
 from models.llm import LLMCall, LLMUsageStat
 
 

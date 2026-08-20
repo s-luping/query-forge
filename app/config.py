@@ -1,13 +1,13 @@
 """配置模块 — Django 风格：全部配置为模块级 键=值 赋值，不使用函数
 
-数据库支持两种模式：
-  1) SQLite（默认）：适合个人/小型项目，零配置开箱即用
-     主库 db/queryforge.db，遥测库 db/llm_telemetry.db
-  2) 外部数据库（MySQL/PostgreSQL）：适合团队/企业，通过环境变量切换
-     设置 DATABASE_URL 和 TELEMETRY_DATABASE_URL 即可启用
-     示例：
-       DATABASE_URL=postgresql://user:pass@host:5432/queryforge
-       DATABASE_URL=mysql+pymysql://user:pass@host:3306/queryforge
+数据库切换（最简用法）：
+  设置环境变量 DATABASE_URL 即可切换到 MySQL 或 PostgreSQL，留空则默认 SQLite。
+  示例：
+    SQLite（默认）:  不设置，或 DATABASE_URL=sqlite:///db/queryforge.db
+    MySQL:           DATABASE_URL=mysql+pymysql://user:pass@host:3306/queryforge?charset=utf8mb4
+    PostgreSQL:      DATABASE_URL=postgresql+psycopg2://user:pass@host:5432/queryforge
+  遥测库可单独指定 TELEMETRY_DATABASE_URL；留空时与主库同址（外部数据库）
+  或使用独立 SQLite 文件（默认 SQLite 模式）。
 
 主库 queryforge.db：交互域短事务（用户/配置/Schema三层/知识/对话/聚合统计/系统设置）
 遥测库 llm_telemetry.db：LLM 调用追加型高频写（llm_calls / llm_prompts）
@@ -25,27 +25,21 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DB_DIR = os.path.join(PROJECT_ROOT, 'db')
 
 # ── 数据库配置 ─────────────────────────────────────────────
-# 默认 SQLite 路径（个人/小型项目，零配置）
+# 留空 = 默认 SQLite（本地文件）；填 mysql+pymysql://... 或 postgresql+psycopg2://... 则切换
+DATABASE_URL = os.environ.get('DATABASE_URL', '')
+# 遥测库连接串：留空时 SQLite 模式用独立文件，外部数据库模式与主库同址
+TELEMETRY_DATABASE_URL = os.environ.get('TELEMETRY_DATABASE_URL', '')
+
+# SQLite 默认路径（仅在 DATABASE_URL 留空时使用）
 MAIN_DB_PATH = os.path.join(DB_DIR, 'queryforge.db')
 TELEMETRY_DB_PATH = os.path.join(DB_DIR, 'llm_telemetry.db')
 
-# 外部数据库 URL（团队/企业部署时设置环境变量切换）
-# 留空则使用上方 SQLite 路径；设置则连接外部 MySQL/PostgreSQL
-#   PostgreSQL: postgresql://user:pass@host:5432/dbname
-#   MySQL:      mysql+pymysql://user:pass@host:3306/dbname
-DATABASE_URL = os.environ.get('DATABASE_URL', '')
-TELEMETRY_DATABASE_URL = os.environ.get('TELEMETRY_DATABASE_URL', '')
-
-# 判断当前数据库类型
-DB_IS_SQLITE = not DATABASE_URL or DATABASE_URL.startswith('sqlite')
-DB_DIALECT = DATABASE_URL.split('://')[0].split('+')[0] if DATABASE_URL else 'sqlite'
-
 # ── 数据库连接池（SQLAlchemy QueuePool 复用，减少建连/断连开销） ──
-DB_POOL_SIZE = int(os.environ.get('DB_POOL_SIZE', '10'))       # 池内常驻连接数
-DB_MAX_OVERFLOW = int(os.environ.get('DB_MAX_OVERFLOW', '20'))  # 峰值时最多额外创建的连接数
-DB_POOL_TIMEOUT = int(os.environ.get('DB_POOL_TIMEOUT', '30')) # 等待空闲连接超时（秒）
-DB_POOL_RECYCLE = int(os.environ.get('DB_POOL_RECYCLE', '3600')) # 连接回收周期（秒）
-DB_ECHO = False                  # SQL 回显（调试用）
+DB_POOL_SIZE = 10
+DB_MAX_OVERFLOW = 20
+DB_POOL_TIMEOUT = 30
+DB_POOL_RECYCLE = 3600
+DB_ECHO = False
 
 # ── 运行配置 ───────────────────────────────────────────────
 HOST = '0.0.0.0'

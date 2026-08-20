@@ -16,12 +16,12 @@ from pydantic import BaseModel, ConfigDict, Field, computed_field
 from app.auth import AdminUser
 from app.logger import logger, log_audit
 from app.timezone import now_beijing
-from app.security.crypto import encrypt_secret, decrypt_secret, mask_api_key
-from services.sync.connectors import get_connector
-from curd.base import session_scope
-from curd.datasource import datasource_crud
-from curd.schema import schema_crud, table_crud, column_crud
-from curd.sync import sync_job_crud, sync_run_crud, change_crud, get_sync_stats
+from app.crypto import encrypt_secret, decrypt_secret, mask_api_key
+from services.sync_connectors import get_connector
+from crud.base import session_scope
+from crud.datasource import datasource_crud
+from crud.schema import schema_crud, table_crud, column_crud
+from crud.sync import sync_job_crud, sync_run_crud, change_crud, get_sync_stats
 
 router = APIRouter()
 
@@ -419,7 +419,7 @@ def trigger_sync(job_id: int, user: AdminUser):
                         DataSource.id == ds_id).first()
                     if not bg_job or not bg_ds:
                         return
-                    from services.sync.engine import SyncEngine
+                    from services.sync_engine import SyncEngine
                     engine = SyncEngine(bg_job, bg_ds, triggered_by=triggered_by)
                     engine.run()
             except Exception as e:

@@ -15,13 +15,13 @@ from app.auth import CurrentUser
 from app.logger import logger
 from app.permissions import is_schema_visible
 from app.routers.knowledge_router import get_knowledge_safe
-from app.security.crypto import decrypt_secret
-from core.llm import LLMClient
-from core.generation.sql_generator import SqlGenerator
-from core.generation.pipeline import SQLPipeline
+from app.crypto import decrypt_secret
+from core import LLMClient
+from core.gen_sql import SqlGenerator
+from core.gen_pipeline import SQLPipeline
 from models.llm import LLMConfig
-from services.llm import telemetry
-from curd.base import session_scope
+from services import telemetry
+from crud.base import session_scope
 
 
 class TextToSqlRequest(BaseModel):

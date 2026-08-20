@@ -15,10 +15,10 @@ from app.timezone import now_beijing
 
 def run_scheduled_syncs():
     """检查并执行所有到期的同步任务"""
-    from curd.base import session_scope
+    from crud.base import session_scope
     from models.sync import SyncJobConfig
     from models.datasource import DataSource
-    from services.sync.engine import SyncEngine
+    from services.sync_engine import SyncEngine
 
     try:
         with session_scope() as db:
