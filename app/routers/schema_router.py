@@ -5,11 +5,8 @@ URL 与响应结构与旧版完全一致，前端无感切换。
 """
 import csv
 import io
-import threading
 from datetime import datetime
 from typing import List, Optional
-
-_vector_build_lock = threading.Lock()
 
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 from fastapi.responses import StreamingResponse
@@ -18,6 +15,7 @@ from pydantic import BaseModel
 from app.auth import AdminUser, CurrentUser
 from app.logger import logger, log_audit
 from app.permissions import get_visible_schema_ids, get_table_grants_by_schema
+from services.vector import auto_build_vector_index, mark_index_stale  # 从服务层导入（消除路由层职责过重）
 from models.schema import DbSchema, DbColumn
 from models.datasource import DataSource
 from services.schema.parsers import (
@@ -127,61 +125,10 @@ def _check_embedding_ready():
         )
 
 
-def _mark_index_stale(schema_name: str):
-    """标记索引为过期（数据有新增但索引未更新）"""
-    try:
-        from core.retrieval.index_meta import set_index_meta
-        set_index_meta(schema_name, 'stale')
-    except Exception:
-        pass
-
-
-def _auto_build_vector_index(schema_name: str, schema_field_count: int) -> Optional[str]:
-    from core.retrieval.vector_store import EmbeddingModel, get_vector_config
-
-    if not EmbeddingModel.is_ready():
-        logger.warning(f"Embedding 模型未就绪，跳过自动索引构建: {schema_name}")
-        return None
-
-    threshold = get_vector_config('VECTOR_INDEX_THRESHOLD')
-    if schema_field_count < threshold:
-        logger.info(f"Schema {schema_name} 字段数量 {schema_field_count} 未达到阈值 {threshold}，跳过自动索引构建")
-        return None
-
-    # 先标记为过期（新数据已入库，索引待更新）
-    _mark_index_stale(schema_name)
-
-    def _build_in_background():
-        from core.retrieval.index_meta import build_vector_index, get_index_meta
-        max_retries = 3
-        for attempt in range(max_retries):
-            with _vector_build_lock:
-                # 检查是否仍需构建（可能被上一轮修复了）
-                meta = get_index_meta(schema_name)
-                if meta and meta['status'] == 'ready':
-                    logger.info(f"Schema {schema_name} 索引已就绪，跳过构建（attempt {attempt+1}）")
-                    return
-
-                try:
-                    logger.info(f"开始构建向量索引: {schema_name} (attempt {attempt+1})")
-                    result = build_vector_index(schema_name)
-                    if result.get('success'):
-                        logger.info(f"Schema {schema_name} 向量索引构建完成")
-                except Exception as e:
-                    logger.warning(f"后台构建向量索引失败: {e}")
-                    return  # 构建失败不重试
-
-            # 释放锁后再次检查：构建期间是否有新数据导入导致索引再次过期
-            if attempt < max_retries - 1:
-                import time
-                time.sleep(0.5)
-                meta = get_index_meta(schema_name)
-                if meta and meta['status'] != 'stale':
-                    return  # 索引已是最新，无需再构建
-
-    thread = threading.Thread(target=_build_in_background, daemon=True)
-    thread.start()
-    return f"Schema {schema_name} 正在后台创建向量索引（字段数: {schema_field_count}）"
+# 向量索引构建逻辑已下沉到 services/vector/service.py
+# 此处保留兼容别名（如有外部引用）
+_auto_build_vector_index = auto_build_vector_index
+_mark_index_stale = mark_index_stale
 
 
 def _items_in_schemas(db, schema_names: List[str], fallback_schema: str) -> List[SchemaItem]:

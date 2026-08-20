@@ -120,7 +120,7 @@ def get_embedding_status(user: CurrentUser):
 
 
 @router.post("/download-embedding")
-def download_embedding(user: CurrentUser):
+def download_embedding(user: AdminUser):
     """触发下载 embedding 模型（后台异步）"""
     try:
         project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))

@@ -1,41 +1,50 @@
 # -*- coding: UTF-8 -*-
 """数据库引擎与会话工厂 — 双库布局（主库 + LLM 遥测库）
 
-并发策略（针对历史"查看记录被其他进程卡住"问题的系统性修复）：
-- 两库均启用 WAL（读不阻塞写、写不阻塞读，仅写-写串行）
-- busy_timeout=5000 全引擎生效（写锁竞争时等待而非立刻失败）
+数据库模式自动切换：
+  1) SQLite（默认，适合个人/小型项目）：零配置，WAL + busy_timeout + 连接池
+  2) 外部数据库（MySQL/PostgreSQL，适合团队/企业）：通过 DATABASE_URL 环境变量启用
+     外部数据库自动跳过 SQLite PRAGMA，使用原生连接池
+
+并发策略（SQLite 场景）：
+- WAL（读不阻塞写、写不阻塞读，仅写-写串行）
+- busy_timeout=5000（写锁竞争时等待而非立刻失败）
 - synchronous=NORMAL（WAL 下的安全性与性能平衡点）
 - 主库开启 FOREIGN KEY 约束
-- 业务代码保持短事务：一个请求内多次小 commit，避免长事务持锁
 
 连接池复用（SQLAlchemy QueuePool）：
-- 主库 / 遥测库各自独立的连接池，参数取自 app/config.py（DB_POOL_SIZE 等）
-- 连接复用避免高频短事务场景下反复建立/断开 sqlite 连接的损耗
-- pool_recycle 定期回收，防止陈旧连接；pool_timeout 限制等待，避免请求堆积
+- 主库 / 遥测库各自独立的连接池
+- 连接复用避免高频短事务场景下反复建立连接的损耗
+- pool_recycle 定期回收，防止陈旧连接
 """
 import os
 import secrets
 import string
 import time
+from urllib.parse import urlparse
 
 from sqlalchemy import create_engine, event, text
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import QueuePool
 
 import app.config as config
-from app.config import MAIN_DB_PATH, TELEMETRY_DB_PATH
+from app.config import (
+    DATABASE_URL, TELEMETRY_DATABASE_URL,
+    MAIN_DB_PATH, TELEMETRY_DB_PATH,
+    DB_IS_SQLITE,
+)
 from app.logger import logger
 from app.timezone import now_beijing
 
 
 def _make_pragma(foreign_keys: bool):
+    """SQLite 专用 PRAGMA 钩子 — 仅在 SQLite 引擎上注册"""
     def _set_sqlite_pragma(dbapi_conn, connection_record):
         cursor = dbapi_conn.cursor()
         cursor.execute("PRAGMA journal_mode=WAL")
         cursor.execute("PRAGMA synchronous=NORMAL")
         cursor.execute("PRAGMA busy_timeout=5000")
         cursor.execute("PRAGMA cache_size=-64000")
-        # 读性能：内存映射 + 临时表走内存
         cursor.execute("PRAGMA mmap_size=268435456")   # 256MB 内存映射
         cursor.execute("PRAGMA temp_store=MEMORY")
         if foreign_keys:
@@ -44,27 +53,53 @@ def _make_pragma(foreign_keys: bool):
     return _set_sqlite_pragma
 
 
-def _create_engine_with_wal(db_path: str, foreign_keys: bool = False):
-    """创建启用 WAL + 连接池复用的 SQLite 引擎。
+def _create_engine(db_url: str, *, foreign_keys: bool = False, is_sqlite: bool = True,
+                   db_path: str = ''):
+    """创建数据库引擎 — 统一入口，支持 SQLite 和外部数据库
 
-    显式使用 QueuePool（而非默认池），池参数来自 config，
-    高频短事务场景下复用连接，避免每次建连开销。
+    SQLite: WAL + PRAGMA + check_same_thread=False
+    MySQL/PostgreSQL: 原生连接池，无 PRAGMA
     """
-    engine = create_engine(
-        f'sqlite:///{db_path}',
+    engine_kwargs = dict(
         echo=config.DB_ECHO,
-        connect_args={'check_same_thread': False, 'timeout': 30},
         poolclass=QueuePool,
         pool_size=config.DB_POOL_SIZE,
         max_overflow=config.DB_MAX_OVERFLOW,
         pool_timeout=config.DB_POOL_TIMEOUT,
         pool_recycle=config.DB_POOL_RECYCLE,
     )
-    event.listen(engine, 'connect', _make_pragma(foreign_keys))
+
+    if is_sqlite:
+        engine_kwargs['connect_args'] = {'check_same_thread': False, 'timeout': 30}
+        engine = create_engine(db_url, **engine_kwargs)
+        event.listen(engine, 'connect', _make_pragma(foreign_keys))
+    else:
+        # 外部数据库：MySQL/PostgreSQL 连接池参数
+        # MySQL 默认连接数有限，适当控制 pool_size
+        engine = create_engine(db_url, **engine_kwargs)
+
+    dialect = db_url.split('://')[0].split('+')[0]
+    logger.info(f"数据库引擎已创建: dialect={dialect}, url={_mask_password(db_url)}")
     return engine
 
 
+def _mask_password(url: str) -> str:
+    """隐藏 URL 中的密码用于日志输出"""
+    if '://' not in url:
+        return url
+    try:
+        parsed = urlparse(url)
+        if parsed.password:
+            return url.replace(parsed.password, '***')
+    except Exception:
+        pass
+    return url
+
+
 def _ensure_db_dirs():
+    """确保 SQLite 数据库目录存在（外部数据库跳过）"""
+    if not DB_IS_SQLITE:
+        return
     for db_path in [MAIN_DB_PATH, TELEMETRY_DB_PATH]:
         db_dir = os.path.dirname(db_path)
         if db_dir and not os.path.exists(db_dir):
@@ -74,10 +109,20 @@ def _ensure_db_dirs():
 
 _ensure_db_dirs()
 
-# 主库：交互域（短事务）
-engine_main = _create_engine_with_wal(MAIN_DB_PATH, foreign_keys=True)
-# 遥测库：LLM 调用追加型高频写
-engine_telemetry = _create_engine_with_wal(TELEMETRY_DB_PATH)
+# ── 创建双库引擎 ──────────────────────────────────────────
+if DB_IS_SQLITE:
+    _main_url = f'sqlite:///{MAIN_DB_PATH}'
+    _telemetry_url = f'sqlite:///{TELEMETRY_DB_PATH}'
+else:
+    _main_url = DATABASE_URL
+    _telemetry_url = TELEMETRY_DATABASE_URL or DATABASE_URL
+
+engine_main = _create_engine(_main_url, foreign_keys=True, is_sqlite=DB_IS_SQLITE)
+engine_telemetry = _create_engine(
+    _telemetry_url,
+    foreign_keys=False,
+    is_sqlite=not TELEMETRY_DATABASE_URL or TELEMETRY_DATABASE_URL.startswith('sqlite'),
+)
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine_main)
 TelemetrySessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine_telemetry)
@@ -201,7 +246,7 @@ def create_default_admin():
         db.close()
 
 
-def _ensure_column(db_path: str, table: str, column: str, ddl: str) -> None:
+def _ensure_column_sqlite(db_path: str, table: str, column: str, ddl: str) -> None:
     """轻量迁移：SQLite 已存在的表补列（幂等，重复执行无害）"""
     import sqlite3 as _sqlite3
     try:
@@ -218,6 +263,23 @@ def _ensure_column(db_path: str, table: str, column: str, ddl: str) -> None:
         logger.warning(f"迁移失败 {table}.{column}: {e}")
 
 
+def _ensure_column_generic(table: str, column: str, ddl: str) -> None:
+    """通用迁移：通过 SQLAlchemy 检查并补列（MySQL/PostgreSQL）"""
+    try:
+        from sqlalchemy import inspect as sqla_inspect
+        inspector = sqla_inspect(engine_main)
+        if table not in inspector.get_table_names():
+            return
+        cols = [c['name'] for c in inspector.get_columns(table)]
+        if column not in cols:
+            with engine_main.connect() as conn:
+                conn.execute(text(f'ALTER TABLE {table} ADD COLUMN {column} {ddl}'))
+                conn.commit()
+            logger.info(f"迁移: {table} 新增列 {column}")
+    except Exception as e:
+        logger.warning(f"迁移失败 {table}.{column}: {e}")
+
+
 def init_database():
     """初始化双库表结构 + 种子数据"""
     from models.base import MainBase, TelemetryBase
@@ -226,10 +288,17 @@ def init_database():
 
     MainBase.metadata.create_all(engine_main)
     TelemetryBase.metadata.create_all(engine_telemetry)
-    # 轻量迁移：历史库补列
-    _ensure_column(MAIN_DB_PATH, 'conversation_messages', 'result_data', 'TEXT')
-    logger.info(f"主库表创建/检查完成: {MAIN_DB_PATH}")
-    logger.info(f"遥测库表创建/检查完成: {TELEMETRY_DB_PATH}")
+
+    # 轻量迁移：历史库补列（按数据库类型选择方式）
+    if DB_IS_SQLITE:
+        _ensure_column_sqlite(MAIN_DB_PATH, 'conversation_messages', 'result_data', 'TEXT')
+    else:
+        _ensure_column_generic('conversation_messages', 'result_data', 'TEXT')
+
+    _main_desc = _main_url if not DB_IS_SQLITE else MAIN_DB_PATH
+    _telemetry_desc = _telemetry_url if not (DB_IS_SQLITE and not TELEMETRY_DATABASE_URL) else TELEMETRY_DB_PATH
+    logger.info(f"主库表创建/检查完成: {_mask_password(_main_desc)}")
+    logger.info(f"遥测库表创建/检查完成: {_mask_password(_telemetry_desc)}")
 
     _seed_system_settings()
     create_default_admin()

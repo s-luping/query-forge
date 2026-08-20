@@ -12,6 +12,7 @@ __pycache__
 .runtime_secrets
 .workbuddy
 
+
 db/temp
 db/vectors
 models/embeddings

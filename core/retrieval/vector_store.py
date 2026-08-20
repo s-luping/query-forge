@@ -5,10 +5,10 @@
 """
 import os
 import threading
+import json
 
 os.environ.setdefault('HF_ENDPOINT', 'https://modelscope.cn')
 
-import pickle
 import numpy as np
 from typing import List, Dict, Tuple, Optional
 from app.logger import logger
@@ -231,31 +231,62 @@ class VectorIndex:
     def save(self, filepath: str):
         os.makedirs(os.path.dirname(filepath), exist_ok=True)
 
-        data = {
+        # 使用 np.savez 保存向量 + JSON 保存元数据，替代 pickle（消除 RCE 风险）
+        npz_path = filepath + '.npz'
+        meta_path = filepath + '.meta.json'
+
+        # 向量数据用 numpy 二进制格式（高效且安全）
+        vectors_arr = np.asarray(self.vectors) if self.vectors is not None else np.array([])
+        np.savez(npz_path, vectors=vectors_arr)
+
+        # 元数据用 JSON（文本格式，安全可读）
+        meta = {
             'dimension': self.dimension,
-            'vectors': self.vectors,
             'documents': self.documents,
-            'metadata': self.metadata
+            'metadata': self.metadata,
         }
-        pkl_path = filepath + '.pkl'
-        with open(pkl_path, 'wb') as f:
-            pickle.dump(data, f)
-        self._last_save_path = pkl_path
-        logger.info(f"向量索引已保存: {pkl_path}")
+        with open(meta_path, 'w', encoding='utf-8') as f:
+            json.dump(meta, f, ensure_ascii=False)
+
+        self._last_save_path = npz_path
+        logger.info(f"向量索引已保存: {npz_path}")
 
     def load(self, filepath: str) -> bool:
-        pkl_path = filepath + '.pkl'
+        npz_path = filepath + '.npz'
+        meta_path = filepath + '.meta.json'
 
-        if not os.path.exists(pkl_path):
+        # 兼容旧版 pickle 文件（一次性迁移后可移除）
+        pkl_path = filepath + '.pkl'
+        if os.path.exists(pkl_path) and not os.path.exists(npz_path):
+            logger.info("检测到旧版 pickle 格式索引，正在迁移...")
+            import pickle as _pickle
+            with open(pkl_path, 'rb') as f:
+                data = _pickle.load(f)
+            self.dimension = data['dimension']
+            self.vectors = data.get('vectors')
+            self.documents = data['documents']
+            self.metadata = data['metadata']
+            # 自动保存为新格式
+            self.save(filepath)
+            # 删除旧 pickle 文件
+            os.remove(pkl_path)
+            logger.info(f"迁移完成，旧 pickle 文件已删除: {pkl_path}")
+            return True
+
+        if not os.path.exists(npz_path) or not os.path.exists(meta_path):
             return False
 
-        with open(pkl_path, 'rb') as f:
-            data = pickle.load(f)
+        # 加载向量（numpy 二进制）
+        data = np.load(npz_path, allow_pickle=False)
+        self.vectors = data['vectors'].tolist() if data['vectors'].size > 0 else None
 
-        self.dimension = data['dimension']
-        self.vectors = data.get('vectors')
-        self.documents = data['documents']
-        self.metadata = data['metadata']
+        # 加载元数据（JSON）
+        with open(meta_path, 'r', encoding='utf-8') as f:
+            meta = json.load(f)
+
+        self.dimension = meta['dimension']
+        self.documents = meta['documents']
+        self.metadata = meta['metadata']
         logger.info(f"向量索引已加载: {len(self.documents)} 个向量")
         return True
 
