@@ -17,8 +17,10 @@ bcrypt>=4.0.0
 
 # --- 数据库 ---
 sqlalchemy>=2.0.0
+# .env 配置文件加载（数据库切换等环境变量）
+python-dotenv>=1.0.0
 # 外部数据库驱动（系统库切换 + 元数据同步：MySQL / PostgreSQL）
-# 设置 DATABASE_URL 环境变量即可从 SQLite 切换到外部数据库
+# 编辑 .env 文件设置 DATABASE_URL 即可从 SQLite 切换到外部数据库
 pymysql>=1.1.0
 psycopg2-binary>=2.9.0
 

@@ -72,7 +72,11 @@ query-forge/
 │   ├── ret_vector_store.py # 向量存储
 │   └── ret_index_meta.py   # 索引元数据
 ├── crud/                   # 数据访问层（12 文件）
-├── db/                     # 数据库引擎（纯 SQLite）
+├── db/                     # 数据库引擎（按角色拆分）
+│   ├── engine.py           # 引擎与会话工厂（方言自适应 SQLite/MySQL/PG）
+│   ├── sqlite_hooks.py     # SQLite 专用 PRAGMA 与轻量迁移
+│   ├── seed.py             # 种子数据（系统配置/管理员/角色）
+│   └── database.py         # 编排层（get_setting + init_database）
 ├── models/                 # 数据模型（12 文件）
 ├── services/               # 业务服务层（完全扁平，0 子目录）
 │   ├── telemetry.py        # 遥测
@@ -100,22 +104,52 @@ query-forge/
 | 最大目录深度 | 3 层 | 2 层 |
 | app/security 子目录 | 存在 | 已消除 |
 | curd 拼写 | 错误 | 已修正 (crud) |
-| 数据库切换功能 | 支持 MySQL/PG | 纯 SQLite |
+| 数据库切换功能 | 纯 SQLite | 支持 MySQL/PostgreSQL（环境变量切换） |
 | schema_parsers 文件数 | 3 | 1 (合并) |
 | sync_connectors 文件数 | 4+1 | 1 (合并) |
 
+## db/ 模块按角色拆分
+
+`db/database.py` 拆分为 4 个角色模块，每个文件职责单一：
+
+| 文件 | 职责 | 适用范围 |
+|------|------|---------|
+| `db/engine.py` | 引擎与会话工厂（方言自适应） | 所有数据库 |
+| `db/sqlite_hooks.py` | PRAGMA 优化 + 轻量迁移 | 仅 SQLite |
+| `db/seed.py` | 系统配置/管理员/角色种子数据 | 所有数据库 |
+| `db/database.py` | 薄编排层（get_setting + init_database） | 所有数据库 |
+
+### 多数据库切换配置
+
+设置环境变量即可切换，无需改代码：
+
+```bash
+# 默认 SQLite（不设置）
+python main.py
+
+# 切换 MySQL
+DATABASE_URL=mysql+pymysql://user:pass@host:3306/queryforge?charset=utf8mb4 python main.py
+
+# 切换 PostgreSQL
+DATABASE_URL=postgresql+psycopg2://user:pass@host:5432/queryforge python main.py
+```
+
+- `TELEMETRY_DATABASE_URL` 可单独指定遥测库（留空时外部数据库与主库同址，通过 ORM Base 隔离表）
+- `engine.py` 自动检测方言：SQLite 附加 PRAGMA 钩子，外部数据库用 `pool_pre_ping` 防陈旧连接
+- `_mask_url()` 脱敏 URL 中的密码，日志安全
+
 ## 验证结果
 
-- **24/24 import 检查全部 PASS**
+- **13/13 import 检查全部 PASS**（含 _mask_url 脱敏、_resolve_urls MySQL 模式模拟）
+- **init_database() 全流程验证**：24 主库表 + 2 遥测表 + admin 用户 + 8 系统配置
 - core/ 10 个模块导入正确
 - services/ 10 个模块导入正确
-- app.crypto 导入正确
 - crud.base / crud.user 导入正确
-- db 模块导入正确
-- config.py 确认无 DATABASE_URL 残留
+- config.py DATABASE_URL / TELEMETRY_DATABASE_URL 环境变量正常
 
 ## 备注
 
 - `app/routers/` 和 `scheduler/jobs/` 保留子目录结构，因文件数量多（15 和 3 个），分层有合理意义
 - 早期会话中完成的安全修复（Pickle RCE 消除、SSRF 防护、全局异常处理等）保持不变
 - 早期会话中完成性能优化（TTLCache、N+1 消除、时区修复等）保持不变
+- Git commit: `948836d` (80 files, +1322 -2332)

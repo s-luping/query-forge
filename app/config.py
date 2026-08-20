@@ -1,7 +1,9 @@
 """配置模块 — Django 风格：全部配置为模块级 键=值 赋值，不使用函数
 
 数据库切换（最简用法）：
-  设置环境变量 DATABASE_URL 即可切换到 MySQL 或 PostgreSQL，留空则默认 SQLite。
+  编辑项目根目录 .env 文件（从 .env.example 复制），取消注释一行即可切换。
+  SQLite 默认，留空 DATABASE_URL 即可；填 MySQL/PG 连接串则自动切换。
+
   示例：
     SQLite（默认）:  不设置，或 DATABASE_URL=sqlite:///db/queryforge.db
     MySQL:           DATABASE_URL=mysql+pymysql://user:pass@host:3306/queryforge?charset=utf8mb4
@@ -21,7 +23,14 @@
 """
 import os
 
+# ── .env 加载 ─────────────────────────────────────────────
+# 在任何 os.environ.get() 之前加载 .env 文件，使 DATABASE_URL 等变量可用。
+# 无论从哪个入口点（main.py / 脚本 / 测试）导入 config，.env 都会被加载。
+from dotenv import load_dotenv
+
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+load_dotenv(os.path.join(PROJECT_ROOT, '.env'), override=True)
+
 DB_DIR = os.path.join(PROJECT_ROOT, 'db')
 
 # ── 数据库配置 ─────────────────────────────────────────────
