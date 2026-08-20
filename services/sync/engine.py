@@ -163,12 +163,13 @@ class SyncEngine:
             DbTable.schema_id == schema.id
         ).all()
 
+        # 一次性加载所有列（避免 N+1 查询）
+        all_cols = db.query(DbColumn).filter(
+            DbColumn.table_id.in_([t.id for t in tables])
+        ).order_by(DbColumn.ordinal).all()
         cols_map: dict[int, list[DbColumn]] = {}
-        for t in tables:
-            cols = db.query(DbColumn).filter(
-                DbColumn.table_id == t.id
-            ).order_by(DbColumn.ordinal).all()
-            cols_map[t.id] = cols
+        for col in all_cols:
+            cols_map.setdefault(col.table_id, []).append(col)
 
         return schema, tables, cols_map
 
@@ -343,11 +344,11 @@ class SyncEngine:
     def _trigger_index_rebuild(self, schema_name: str):
         """触发向量索引重建（异步，不阻塞）"""
         try:
-            from app.routers.schema_router import _auto_build_vector_index
+            from services.vector import auto_build_vector_index
             from services.schema.service import field_count
             count = field_count(schema_name)
             if count > 0:
-                _auto_build_vector_index(schema_name, count)
+                auto_build_vector_index(schema_name, count)
                 logger.info(f"同步后触发索引重建: {schema_name} ({count} 字段)")
         except Exception as e:
             logger.warning(f"索引重建触发失败: {e}")

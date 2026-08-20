@@ -113,11 +113,8 @@ def execute_sql(sql: str, schema_name: Optional[str] = None,
         if ds is not None:
             engine = _build_engine_for_db_type(db_type, ds)
         elif db_type in ('sqlite', 'sqlite3'):
-            from app.config import MAIN_DB_PATH
-            engine = create_engine(
-                f"sqlite:///{MAIN_DB_PATH}",
-                connect_args={'check_same_thread': False},
-            )
+            from db import engine_main
+            engine = engine_main
         else:
             raise SqlExecutionError(
                 f"未找到数据源连接（schema={schema_name}），无法执行 {db_type} 查询")

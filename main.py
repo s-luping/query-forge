@@ -1,7 +1,8 @@
 # -*- coding: UTF-8 -*-
 from contextlib import asynccontextmanager
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from slowapi.errors import RateLimitExceeded
 from slowapi import _rate_limit_exceeded_handler
@@ -60,7 +61,6 @@ async def lifespan(app: FastAPI):
     logger.info("应用关闭")
 
 
-
 app = FastAPI(docs_url=None,
               redoc_url=None,
               openapi_url="/openapi.json",
@@ -68,6 +68,24 @@ app = FastAPI(docs_url=None,
 app.mount("/static", StaticFiles(directory="static"), name="static")
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+
+# ── 全局异常处理 — 防止异常信息泄露 ────────────────────────
+@app.exception_handler(Exception)
+async def _global_exception_handler(request: Request, exc: Exception):
+    """捕获所有未处理异常，记录完整堆栈到日志，但只返回通用错误消息给客户端。
+    DEBUG 模式下返回更多调试信息。"""
+    logger.error(
+        f"未处理异常 [{request.method} {request.url.path}]: {exc}",
+        exc_info=True,
+    )
+    detail = str(exc) if DEBUG else "服务器内部错误，请联系管理员"
+    return JSONResponse(
+        status_code=500,
+        content={"detail": detail},
+    )
+
+
 register_docs(app)
 register_middlewares(app)
 app.include_router(page_router)

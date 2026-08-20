@@ -17,7 +17,8 @@ bcrypt>=4.0.0
 
 # --- 数据库 ---
 sqlalchemy>=2.0.0
-# 外部数据库连接驱动（元数据同步：MySQL / PostgreSQL）
+# 外部数据库驱动（系统库切换 + 元数据同步：MySQL / PostgreSQL）
+# 设置 DATABASE_URL 环境变量即可从 SQLite 切换到外部数据库
 pymysql>=1.1.0
 psycopg2-binary>=2.9.0
 
@@ -27,8 +28,12 @@ sqlglot>=20.0.0
 # --- 限流 ---
 slowapi>=0.1.9
 
+# --- 缓存 ---
+cachetools>=5.3.0  # TTLCache 替代无界 dict
+
 # --- HTTP 请求 ---
 requests>=2.28.0
+httpx>=0.27.0  # LLM 调用异步化 + SSRF 防护
 
 # --- 定时任务 ---
 apscheduler>=3.10.0

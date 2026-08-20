@@ -1,13 +1,90 @@
 # -*- coding: UTF-8 -*-
 """
 LLM客户端 - 通用大模型API调用
+
+安全：SSRF 防护 — base_url 仅允许 http/https 且禁止指向内网地址
+性能：requests.Session 连接池复用，减少建连开销
 """
+import ipaddress
+import re
 import time
 from typing import Optional
+from urllib.parse import urlparse
 
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 from app.logger import llm_logger
+
+
+# ── SSRF 防护 ──────────────────────────────────────────────
+
+# 禁止访问的内网 IP 范围
+_BLOCKED_CIDRS = [
+    ipaddress.ip_network('127.0.0.0/8'),       # loopback
+    ipaddress.ip_network('10.0.0.0/8'),        # private A
+    ipaddress.ip_network('172.16.0.0/12'),     # private B
+    ipaddress.ip_network('192.168.0.0/16'),    # private C
+    ipaddress.ip_network('169.254.0.0/16'),    # link-local (云元数据服务)
+    ipaddress.ip_network('0.0.0.0/8'),         # current network
+]
+
+
+def _validate_llm_url(url: str) -> None:
+    """校验 LLM API URL — 防止 SSRF 攻击
+
+    规则：
+    1) 必须是 http 或 https scheme
+    2) 不能指向内网地址（127.x / 10.x / 172.16-31.x / 192.168.x / 169.254.x）
+    3) 不能使用 localhost / 0.0.0.0
+    """
+    if not url:
+        raise ValueError("LLM API 地址未配置")
+
+    parsed = urlparse(url)
+    if parsed.scheme not in ('http', 'https'):
+        raise ValueError(
+            f"LLM API 地址 scheme 不合法: {parsed.scheme}，仅允许 http/https"
+        )
+
+    hostname = parsed.hostname or ''
+    if hostname.lower() in ('localhost', '0.0.0.0'):
+        raise ValueError(f"LLM API 地址不允许指向 {hostname}")
+
+    # 尝试解析为 IP 地址（域名跳过 IP 检查，DNS 在请求时解析）
+    try:
+        ip = ipaddress.ip_address(hostname)
+        for cidr in _BLOCKED_CIDRS:
+            if ip in cidr:
+                raise ValueError(
+                    f"LLM API 地址不允许指向内网地址 {ip}（禁止 {cidr}）"
+                )
+    except ValueError as e:
+        if "doesn't appear to be an IPv" in str(e) or "does not appear to be an IPv" in str(e):
+            pass  # 是域名不是 IP，放行（DNS 在请求时解析）
+        else:
+            raise  # 是内网 IP，拒绝
+
+
+# ── 连接池 Session ──────────────────────────────────────────
+_session: Optional[requests.Session] = None
+
+
+def _get_session() -> requests.Session:
+    """获取共享 Session（连接池复用）"""
+    global _session
+    if _session is None:
+        _session = requests.Session()
+        adapter = HTTPAdapter(
+            pool_connections=5,
+            pool_maxsize=10,
+            max_retries=Retry(total=2, backoff_factor=0.5,
+                              status_forcelist=[502, 503, 504]),
+        )
+        _session.mount('http://', adapter)
+        _session.mount('https://', adapter)
+    return _session
 
 
 class LLMClient:
@@ -21,7 +98,7 @@ class LLMClient:
         :param provider: 模型供应商名称（自由输入，如 OpenAI、DeepSeek 等）
         :param api_key: API密钥
         :param model: 模型名称
-        :param base_url: API地址
+        :param base_url: API地址（仅允许 http/https 且禁止内网地址）
         :param max_tokens: 最大生成token数
         :param timeout: 请求超时时间（秒）
         :param temperature: 生成随机性 (0-2)
@@ -60,6 +137,8 @@ class LLMClient:
         if not self.api_key:
             raise ValueError(f"未配置 {self.provider_name} API密钥，请设置环境变量或在前端配置")
 
+        _validate_llm_url(self.base_url)  # SSRF 防护
+
         headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json"
@@ -77,7 +156,7 @@ class LLMClient:
         llm_logger.info(f"【发送内容】\n{prompt}")
 
         try:
-            response = requests.post(
+            response = _get_session().post(
                 self.base_url,
                 headers=headers,
                 json=payload,
@@ -135,6 +214,8 @@ class LLMClient:
         if not self.api_key:
             raise ValueError(f"未配置 {self.provider_name} API密钥，请设置环境变量或在前端配置")
 
+        _validate_llm_url(self.base_url)  # SSRF 防护
+
         headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json"
@@ -156,7 +237,7 @@ class LLMClient:
             llm_logger.info(f"【消息{i+1}-{role}】\n{content}")
 
         try:
-            response = requests.post(
+            response = _get_session().post(
                 self.base_url,
                 headers=headers,
                 json=payload,
@@ -208,6 +289,8 @@ class LLMClient:
             if not self.api_key:
                 return {'success': False, 'message': 'API密钥未配置'}
 
+            _validate_llm_url(self.base_url)  # SSRF 防护
+
             headers = {
                 "Authorization": f"Bearer {self.api_key}",
                 "Content-Type": "application/json"
@@ -218,7 +301,7 @@ class LLMClient:
                 "max_tokens": 10
             }
 
-            response = requests.post(
+            response = _get_session().post(
                 self.base_url,
                 headers=headers,
                 json=payload,
@@ -229,5 +312,7 @@ class LLMClient:
                 return {'success': True, 'message': f'{self.provider_name} API连接成功'}
             else:
                 return {'success': False, 'message': f'API返回错误: {response.status_code} - {response.text[:200]}'}
+        except ValueError as e:
+            return {'success': False, 'message': f'URL校验失败: {e}'}
         except Exception as e:
             return {'success': False, 'message': f'连接失败: {str(e)}'}

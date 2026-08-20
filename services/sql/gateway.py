@@ -123,7 +123,7 @@ class SqlGateway:
         self._expand_select_star(tree, result)
 
         # 7. 注入行级过滤
-        tree = self._inject_row_scope(tree, result)
+        tree = self._inject_row_scope(tree, result, dialect=dialect)
 
         # 8. 生成最终 SQL
         if result.was_modified:
@@ -252,7 +252,7 @@ class SqlGateway:
                 continue
 
             col_id, sensitive_level = col_info
-            access = self._access_map.get(col_id, 'SELECT')
+            access = self._access_map.get(col_id, 'NONE')
 
             # 检查敏感字段
             if sensitive_level in ('sensitive', 'confidential'):
@@ -315,7 +315,7 @@ class SqlGateway:
                 select.set('expressions', new_expressions)
                 result.was_modified = True
                 result.modifications.append(f'展开 SELECT * 为 {len(new_expressions)} 个授权字段')
-                break  # 只处理第一个 SELECT *
+                # 不 break — 继续处理后续 SELECT *（多表 JOIN 场景）
 
     def _get_authorized_columns(self, table_names: List[str]) -> Dict[str, List[str]]:
         """获取表的授权字段列表（SELECT 级别）"""
@@ -326,11 +326,13 @@ class SqlGateway:
             result = {}
             for row in q.all():
                 col_name, col_id, tbl_name = row[0], row[1], row[2]
-                access = self._access_map.get(col_id, 'SELECT')
+                access = self._access_map.get(col_id, 'NONE')
                 if access == 'SELECT':
                     result.setdefault(tbl_name, []).append(col_name)
             return result
-    def _inject_row_scope(self, tree: exp.Expression, result: SqlGatewayResult) -> exp.Expression:
+
+    def _inject_row_scope(self, tree: exp.Expression, result: SqlGatewayResult,
+                          dialect: str = 'sqlite') -> exp.Expression:
         """注入行级过滤条件，返回修改后的 tree"""
         if not self._row_scopes:
             return tree
@@ -340,7 +342,7 @@ class SqlGateway:
         for table_name, filter_expr in self._row_scopes.items():
             if table_name in tables_in_sql:
                 try:
-                    tree = tree.where(filter_expr, append=True, dialect='sqlite')
+                    tree = tree.where(filter_expr, append=True, dialect=dialect)
                     result.was_modified = True
                     result.modifications.append(f'注入行级过滤: {table_name} → {filter_expr}')
                 except Exception:

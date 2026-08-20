@@ -7,6 +7,7 @@ import hashlib
 import time
 from typing import Optional, List
 
+from cachetools import TTLCache
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
@@ -45,7 +46,7 @@ router = APIRouter()
 
 sql_generator = SqlGenerator()
 
-validation_cache = {}
+validation_cache = TTLCache(maxsize=1000, ttl=300)  # 最多 1000 条，5 分钟过期
 
 
 def get_user_llm_config(user_id: int, config_id: Optional[int] = None) -> Optional[dict]:

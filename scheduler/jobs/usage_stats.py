@@ -9,6 +9,7 @@ from datetime import date, datetime, timedelta
 from sqlalchemy import func, case
 
 from app.logger import logger
+from app.timezone import now_beijing
 from curd.base import session_scope
 from models.llm import LLMCall, LLMUsageStat
 
@@ -22,7 +23,7 @@ def aggregate_usage_stats(days_back: int = 7) -> dict:
     Returns:
         {"rows_upserted": int, "days_covered": int}
     """
-    today = date.today()
+    today = now_beijing().date()
     start_date = today - timedelta(days=days_back)
 
     # ── 1. 从遥测库读取聚合数据 ──
@@ -55,14 +56,21 @@ def aggregate_usage_stats(days_back: int = 7) -> dict:
     # ── 2. Upsert 到主库 llm_usage_stats ──
     try:
         with session_scope() as db:
+            # 批量预加载已有记录（避免 N+1 查询）
+            existing = {}
+            if rows:
+                stat_dates = list({r.stat_date for r in rows})
+                user_ids = list({r.user_id for r in rows})
+                for row in db.query(LLMUsageStat).filter(
+                    LLMUsageStat.stat_date.in_(stat_dates),
+                    LLMUsageStat.user_id.in_(user_ids),
+                ).all():
+                    existing[(row.stat_date, row.user_id, row.model)] = row
+
             upserted = 0
             for r in rows:
-                stat_date = datetime.strptime(str(r.stat_date), '%Y-%m-%d').date()
-                row = db.query(LLMUsageStat).filter(
-                    LLMUsageStat.stat_date == stat_date,
-                    LLMUsageStat.user_id == r.user_id,
-                    LLMUsageStat.model == r.model,
-                ).first()
+                stat_date = r.stat_date if isinstance(r.stat_date, date) else datetime.strptime(str(r.stat_date), '%Y-%m-%d').date()
+                row = existing.get((stat_date, r.user_id, r.model))
 
                 if row:
                     row.provider = r.provider or ''
