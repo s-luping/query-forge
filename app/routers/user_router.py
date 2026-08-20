@@ -17,8 +17,8 @@ from app.timezone import now_beijing
 from app.routers.auth_router import _validate_password_strength
 from models.user import User
 from models.role import Role, UserRole
-from curd.base import session_scope
-from curd.user import user_crud
+from crud.base import session_scope
+from crud.user import user_crud
 
 router = APIRouter()
 

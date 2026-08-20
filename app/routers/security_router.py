@@ -9,7 +9,7 @@ from app.auth import AdminUser
 from app.logger import logger
 from models.security import QueryAuditLog
 from models.schema import DbColumn, DbTable, DbSchema
-from curd.base import session_scope
+from crud.base import session_scope
 
 router = APIRouter(tags=['audit'])
 

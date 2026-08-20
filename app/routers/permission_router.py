@@ -8,8 +8,8 @@ from app.auth import AdminUser
 from app.logger import log_audit
 from models.role import Role, UserRole, RolePermission
 from models.user import User
-from curd.base import session_scope
-from curd.role import role_crud, user_role_crud, role_permission_crud
+from crud.base import session_scope
+from crud.role import role_crud, user_role_crud, role_permission_crud
 
 router = APIRouter()
 

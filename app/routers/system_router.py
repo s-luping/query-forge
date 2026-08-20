@@ -15,7 +15,7 @@ from pydantic import BaseModel
 from app.auth import AdminUser, CurrentUser
 from app.logger import logger
 from models.system import SystemSetting
-from curd.base import session_scope
+from crud.base import session_scope
 
 router = APIRouter()
 

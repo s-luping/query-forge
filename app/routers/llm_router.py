@@ -15,10 +15,10 @@ from pydantic import BaseModel
 
 from app.auth import CurrentUser
 from app.logger import logger, log_audit
-from app.security.crypto import encrypt_secret, decrypt_secret, mask_api_key
-from core.llm import LLMClient
+from app.crypto import encrypt_secret, decrypt_secret, mask_api_key
+from core import LLMClient
 from models.llm import LLMConfig, LLMCall, LLMPrompt
-from curd.base import session_scope
+from crud.base import session_scope
 
 log_router = APIRouter()
 config_router = APIRouter()

@@ -13,8 +13,8 @@ from pydantic import BaseModel, field_validator
 from app.auth import CurrentUser
 from app.logger import logger, log_audit
 from app.permissions import get_visible_knowledge_ids, is_admin
-from curd.base import session_scope
-from curd.knowledge import knowledge_crud
+from crud.base import session_scope
+from crud.knowledge import knowledge_crud
 from models.knowledge import KnowledgeItem
 from models.user import User
 

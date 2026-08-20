@@ -19,8 +19,8 @@
 """
 from typing import Optional, Dict, List
 
-from curd.base import session_scope
-from curd.role import role_permission_crud, user_role_crud
+from crud.base import session_scope
+from crud.role import role_permission_crud, user_role_crud
 from models.schema import DbColumn, DbTable, DbSchema
 from models.role import RolePermission, UserRole
 

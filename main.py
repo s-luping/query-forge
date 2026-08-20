@@ -47,7 +47,7 @@ async def lifespan(app: FastAPI):
 
     def _warmup_vector():
         try:
-            from core.retrieval.vector_store import EmbeddingModel
+            from core.ret_vector_store import EmbeddingModel
             # 编码一条文本强制加载 bge-m3 embedding 模型（模型加载是首问耗时大头）
             EmbeddingModel.encode(['预热'])
             logger.info("向量模型预热完成（后台加载成功）")

@@ -16,18 +16,18 @@ from pydantic import BaseModel
 
 from app.auth import CurrentUser
 from app.logger import logger
-from app.security.crypto import decrypt_secret
-from core.llm import LLMClient
-from core.generation.sql_generator import SqlGenerator
-from core.generation.chat import ChatSession
+from app.crypto import decrypt_secret
+from core import LLMClient
+from core.gen_sql import SqlGenerator
+from core.gen_chat import ChatSession
 from app.timezone import now_beijing
 from models.conversation import Conversation, ConversationMessage
-from services.llm import telemetry
-from services.schema import service as schema_service
-from services.sql.executor import execute_sql, SqlExecutionError
-from curd.base import session_scope
-from curd.conversation import conversation_crud
-from curd.schema import schema_crud
+from services import telemetry
+from services import schema_service
+from services.sql_executor import execute_sql, SqlExecutionError
+from crud.base import session_scope
+from crud.conversation import conversation_crud
+from crud.schema import schema_crud
 
 router = APIRouter()
 
@@ -481,7 +481,7 @@ def list_conversations(
     # schema id → name 映射（一次查询）
     schema_names = schema_crud.name_map()
     # 各对话消息数（一次 GROUP BY 聚合，避免 N+1 count）
-    from curd.conversation import message_crud
+    from crud.conversation import message_crud
     from sqlalchemy import func
     with session_scope() as db:
         conv_ids = [c.id for c in conversations]
