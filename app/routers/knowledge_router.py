@@ -84,6 +84,10 @@ def get_all_knowledge(user: dict, limit: int = 20, offset: int = 0) -> tuple:
             query = query.filter(KnowledgeItem.id.in_(visible_ids))
         total = query.count()
         items = query.order_by(KnowledgeItem.updated_at.desc()).limit(limit).offset(offset).all()
+        # 必须在会话关闭前 expunge，否则 session.close() 会过期属性，
+        # 会话外访问 item.id 触发惰性刷新 → DetachedInstanceError
+        for obj in items:
+            db.expunge(obj)
         return items, total
 
 

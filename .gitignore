@@ -3,7 +3,7 @@ __pycache__
 .vscode
 .venv
 *.zip
-*.log
+/logs
 *.db
 *.db-shm
 *.db-wal
