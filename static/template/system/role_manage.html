@@ -156,13 +156,21 @@ function renderRoles() {
         `<option value="${r.id}" ${selectedRole && selectedRole.id === r.id ? 'selected' : ''}>${esc(r.name)}（${esc(r.code)}）· ${r.user_count}用户</option>`).join('');
 }
 async function selectRole(id) {
-    selectedRole = roles.find(r => r.id === id);
+    selectedRole = roles.find(r => String(r.id) === String(id));
     if (!selectedRole) return;
     document.getElementById('roleTitle').textContent = `${selectedRole.name}（${selectedRole.code}）`;
     document.getElementById('roleDescription').value = selectedRole.description || '';
     document.getElementById('btnDeleteRole').style.display = selectedRole.is_system ? 'none' : '';
     renderRoles();
     const assigned = await (await apiRequest(`/api/permission/roles/${id}/permissions`)).json();
+    permissions = assigned.filter(item => types.some(t => t[0] === item.resource_type)).map(normalizePermission);
+    permPage = 1;
+    renderPermissions();
+}
+// 仅刷新当前选中角色的权限项（保存后调用，避免 load() 把角色切回首个角色）
+async function refreshPermissions() {
+    if (!selectedRole) return;
+    const assigned = await (await apiRequest(`/api/permission/roles/${selectedRole.id}/permissions`)).json();
     permissions = assigned.filter(item => types.some(t => t[0] === item.resource_type)).map(normalizePermission);
     permPage = 1;
     renderPermissions();
@@ -347,7 +355,7 @@ async function savePermissions() {
     const data = await resp.json();
     if (!resp.ok) return alert(data.detail || '保存失败');
     QF.toast(data.message || '已保存', 'success');
-    load();
+    await refreshPermissions();
 }
 function esc(v) { return String(v || '').replace(/[&<>"']/g, x => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[x])); }
 load();

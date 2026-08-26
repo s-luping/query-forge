@@ -18,6 +18,7 @@ from app.logger import logger, log_audit
 from app.timezone import now_beijing
 from app.crypto import encrypt_secret, decrypt_secret, mask_api_key
 from services.sync_connectors import get_connector
+from models.datasource import DataSource
 from crud.base import session_scope
 from crud.datasource import datasource_crud
 from crud.schema import schema_crud, table_crud, column_crud
