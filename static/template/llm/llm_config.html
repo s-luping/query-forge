@@ -71,10 +71,10 @@
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label">API 密钥 <span class="text-danger">*</span></label>
+                        <label class="form-label">API 密钥</label>
                         <div class="input-group">
                             <input type="password" class="form-control api-key-input" id="apiKey"
-                                   placeholder="请输入API密钥" required>
+                                   placeholder="请输入API密钥">
                             <button class="btn btn-outline-secondary" type="button" onclick="toggleApiKey()">
                                 <i class="fas fa-eye" id="apiKeyToggleIcon"></i>
                             </button>
@@ -93,13 +93,13 @@
                         <div class="col-md-4">
                             <label class="form-label">Max Tokens</label>
                             <input type="number" class="form-control" id="maxTokens"
-                                   value="8000" min="100" max="128000">
+                                   value="8192" min="100" max="128000">
                             <small class="text-muted">最大生成token数</small>
                         </div>
                         <div class="col-md-4">
                             <label class="form-label">Temperature</label>
                             <input type="number" class="form-control" id="temperature"
-                                   value="0.7" min="0" max="2" step="0.1">
+                                   value="0.0" min="0" max="2" step="0.1">
                             <small class="text-muted">生成随机性 (0-2)</small>
                         </div>
                         <div class="col-md-4">

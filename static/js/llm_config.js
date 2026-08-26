@@ -17,8 +17,8 @@
             const apiKey = document.getElementById('apiKey').value;
             const model = document.getElementById('modelInput').value;
             const baseUrl = document.getElementById('baseUrl').value;
-            const maxTokens = parseInt(document.getElementById('maxTokens').value) || 8000;
-            const temperature = parseFloat(document.getElementById('temperature').value) || 0.7;
+            const maxTokens = parseInt(document.getElementById('maxTokens').value) || 8192;
+            const temperature = parseFloat(document.getElementById('temperature').value) || 0.0;
             const configId = document.getElementById('configId').value;
 
             if (!provider) {
@@ -104,8 +104,8 @@
                 provider: provider,
                 model: model,
                 base_url: baseUrl || null,
-                max_tokens: parseInt(document.getElementById('maxTokens').value) || 8000,
-                temperature: parseFloat(document.getElementById('temperature').value) || 0.7,
+                max_tokens: parseInt(document.getElementById('maxTokens').value) || 8192,
+                temperature: parseFloat(document.getElementById('temperature').value) || 0.0,
                 timeout: parseInt(document.getElementById('timeout').value) || 300,
                 is_default: document.getElementById('isDefault').checked,
                 is_public: document.getElementById('isPublic').checked,
@@ -223,8 +223,8 @@
                 if (config.base_url) {
                     document.getElementById('baseUrl').value = config.base_url;
                 }
-                document.getElementById('maxTokens').value = config.max_tokens || 8000;
-                document.getElementById('temperature').value = config.temperature || 0.7;
+                document.getElementById('maxTokens').value = config.max_tokens ?? 8192;
+                document.getElementById('temperature').value = config.temperature ?? 0.0;
                 document.getElementById('timeout').value = config.timeout || 300;
                 document.getElementById('isDefault').checked = config.is_default;
                 document.getElementById('isPublic').checked = config.is_public || false;
@@ -276,8 +276,8 @@
             document.getElementById('apiKey').placeholder = '请输入API密钥';
             document.getElementById('apiKeyHint').textContent = '新建配置时必填，编辑时留空则保持原值';
             document.getElementById('baseUrl').value = '';
-            document.getElementById('maxTokens').value = 8000;
-            document.getElementById('temperature').value = 0.7;
+            document.getElementById('maxTokens').value = 8192;
+            document.getElementById('temperature').value = 0.0;
             document.getElementById('timeout').value = 300;
             document.getElementById('description').value = '';
             document.getElementById('isDefault').checked = false;

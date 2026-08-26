@@ -67,7 +67,12 @@ def _get_token_expire_minutes() -> int:
 
 
 def authenticate_user(username: str, password: str):
-    """验证用户（bcrypt 哈希；历史明文命中后自动升级为哈希）"""
+    """验证用户（bcrypt 哈希；历史明文命中后自动升级为哈希）
+
+    返回的是已 `expunge` 的游离实例：属性已加载但已脱离 Session，
+    调用方在 `with session_scope()` 之外访问 user.id / user.role 等字段
+    不会触发 "Instance is not bound to a Session" 惰性刷新报错。
+    """
     logger.debug(f"尝试验证用户: {username}")
     with session_scope() as db:
         login_user = db.query(User).filter(User.username == username).first()
@@ -78,7 +83,12 @@ def authenticate_user(username: str, password: str):
         elif verify_password(password, login_user.password or ''):
             if not is_hashed(login_user.password):
                 login_user.password = hash_password(password)
+                db.flush()  # 先把密码升级落库，再 expunge
                 logger.info(f"用户 {username} 密码已自动升级为 bcrypt 哈希")
+            # 关键修复：expunge 脱离 Session 但保留已加载属性，
+            # 否则 commit 后实例属性过期 + close 后脱离 Session，
+            # 调用方在 with 块外访问 user.id 等会触发 DetachedInstanceError
+            db.expunge(login_user)
         else:
             login_user = None
     if login_user:
