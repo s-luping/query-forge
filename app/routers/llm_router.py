@@ -203,7 +203,7 @@ def delete_llm_log(log_id: int, user: CurrentUser):
 
 class LLMConfigCreate(BaseModel):
     provider: str; model: str; api_key: str; base_url: str
-    max_tokens: Optional[int] = 8000; temperature: Optional[float] = 0.7
+    max_tokens: Optional[int] = 8192; temperature: Optional[float] = 0.0
     timeout: Optional[int] = 300; is_default: bool = False
     is_public: bool = False; description: Optional[str] = None
 
@@ -257,7 +257,8 @@ def get_configs(user: CurrentUser):
             items = [LLMConfigItem(
                 id=c.id, user_id=c.user_id, provider=c.provider, model=c.model,
                 api_key_masked=mask_api_key(decrypt_secret(c.api_key)), base_url=c.base_url,
-                max_tokens=c.max_tokens or 8000, temperature=c.temperature or 0.7,
+                max_tokens=c.max_tokens if c.max_tokens is not None else 8192,
+                temperature=c.temperature if c.temperature is not None else 0.0,
                 timeout=c.timeout or 300, is_default=c.is_default, is_active=c.is_active,
                 is_public=c.is_public or False, description=c.description,
                 created_at=c.created_at, updated_at=c.updated_at
@@ -405,7 +406,8 @@ def get_default_config(user: CurrentUser):
                 "id": config.id, "provider": config.provider, "model": config.model,
                 "api_key_masked": mask_api_key(decrypt_secret(config.api_key)),
                 "base_url": config.base_url,
-                "max_tokens": config.max_tokens or 8000, "temperature": config.temperature or 0.7,
+                "max_tokens": config.max_tokens if config.max_tokens is not None else 8192,
+                "temperature": config.temperature if config.temperature is not None else 0.0,
                 "timeout": config.timeout or 300}}
     except Exception as e:
         logger.error(f"获取默认配置失败: {e}")
