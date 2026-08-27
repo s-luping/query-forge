@@ -197,11 +197,11 @@ async function submitCreate() {
         description: document.getElementById('c-desc').value.trim() || null,
         is_active: document.getElementById('c-active').checked ? 1 : 0,
     };
-    if (body.username.length < 3) return alert('用户名至少需要3个字符');
+    if (body.username.length < 3) return QF.toast('用户名至少需要3个字符', 'warning');
     const resp = await apiRequest('/api/user/create', { method: 'POST', body: JSON.stringify(body) });
     const data = await resp.json().catch(() => ({}));
-    if (!resp.ok) return alert(data.detail || '创建失败');
-    alert(data.message || '用户创建成功');
+    if (!resp.ok) return QF.toast(data.detail || '创建失败', 'danger');
+    QF.toast(data.message || '用户创建成功', 'success');
     createModal.hide();
     loadUsers();
 }
@@ -223,8 +223,8 @@ async function submitRole() {
         method: 'PUT', body: JSON.stringify({ role_ids: roleIds })
     });
     const data = await resp.json().catch(() => ({}));
-    if (!resp.ok) return alert(data.detail || '角色保存失败');
-    alert(data.message || '角色已更新');
+    if (!resp.ok) return QF.toast(data.detail || '角色保存失败', 'danger');
+    QF.toast(data.message || '角色已更新', 'success');
     roleModal.hide();
     loadUsers();
 }
@@ -251,7 +251,7 @@ async function toggleActive(uid) {
         method: 'PUT', body: JSON.stringify({ is_active: next })
     });
     const data = await resp.json().catch(() => ({}));
-    if (!resp.ok) return alert(data.detail || '操作失败');
+    if (!resp.ok) return QF.toast(data.detail || '操作失败', 'danger');
     loadUsers();
 }
 
@@ -270,13 +270,13 @@ async function submitReset() {
     const uid = document.getElementById('r-user-id').value;
     const p1 = document.getElementById('r-password').value;
     const p2 = document.getElementById('r-password2').value;
-    if (p1 !== p2) return alert('两次输入的密码不一致');
+    if (p1 !== p2) return QF.toast('两次输入的密码不一致', 'warning');
     const resp = await apiRequest(`/api/user/${uid}/reset-password`, {
         method: 'POST', body: JSON.stringify({ new_password: p1 })
     });
     const data = await resp.json().catch(() => ({}));
-    if (!resp.ok) return alert(data.detail || '重置失败');
-    alert(data.message || '密码已重置');
+    if (!resp.ok) return QF.toast(data.detail || '重置失败', 'danger');
+    QF.toast(data.message || '密码已重置', 'success');
     resetModal.hide();
 }
 
@@ -287,8 +287,8 @@ async function delUser(uid) {
     if (!confirm(`确定删除用户「${u.username}」？\n\n将同时清除其授权、对话、模型配置、知识库等关联数据，且不可恢复。\n（企业建议：不确定时请改用「禁用」）`)) return;
     const resp = await apiRequest(`/api/user/${uid}`, { method: 'DELETE' });
     const data = await resp.json().catch(() => ({}));
-    if (!resp.ok) return alert(data.detail || '删除失败');
-    alert(data.message || '已删除');
+    if (!resp.ok) return QF.toast(data.detail || '删除失败', 'danger');
+    QF.toast(data.message || '已删除', 'success');
     loadUsers();
 }
 

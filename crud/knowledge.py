@@ -4,11 +4,23 @@
 用法：
     from crud.knowledge import knowledge_crud
     items = knowledge_crud.list_active(user_id=1)
+    matched = knowledge_crud.search_matched_items(keyword_set, scope_schema_id=1)
 """
-from typing import Optional
+import json
+from typing import List, Optional, Set
 
 from crud.base import BaseCrud, session_scope
 from models.knowledge import KnowledgeItem
+
+
+def _parse_json(text, default):
+    """解析 JSON 文本，失败或为空返回 default"""
+    if not text:
+        return default
+    try:
+        return json.loads(text)
+    except Exception:
+        return default
 
 
 class KnowledgeCrud(BaseCrud):
@@ -29,6 +41,64 @@ class KnowledgeCrud(BaseCrud):
     def list_all_visible(self, user_id: int) -> list:
         """管理员看全部启用条目；普通用户看自己创建的启用条目"""
         return self.list_active(user_id=user_id)
+
+    # ---------- typed 序列化 ----------
+
+    @staticmethod
+    def to_dict(item: KnowledgeItem) -> dict:
+        """统一序列化：含 typed 字段，NULL knowledge_type 归一成 'note'"""
+        return {
+            'id': item.id,
+            'user_id': item.user_id,
+            'title': item.title,
+            'content': item.content or '',
+            'knowledge_type': (item.knowledge_type or 'note'),
+            'aliases': _parse_json(item.aliases, []),
+            'payload': _parse_json(item.payload, {}),
+            'scope_schema_id': item.scope_schema_id,
+            'is_active': item.is_active,
+            'created_at': item.created_at.strftime('%Y-%m-%d %H:%M:%S') if item.created_at else None,
+            'updated_at': item.updated_at.strftime('%Y-%m-%d %H:%M:%S') if item.updated_at else None,
+        }
+
+    # ---------- 召回 ----------
+
+    def search_matched_items(self, keyword_set: Set[str], scope_schema_id: Optional[int] = None,
+                             limit: int = 12) -> List[dict]:
+        """按关键词集合召回知识条目（打分排序），返回已序列化的字典列表。
+
+        - 匹配范围：title + aliases(JSON) + content + payload(JSON 文本)
+        - 作用域：scope_schema_id 为 NULL（全局）或匹配传入 schema id 的条目；
+          relation 类型忽略 scope 限制（关系天然跨库，用于动态扩表）
+        - 在会话内完成序列化，避免返回分离对象后因属性过期触发 DetachedInstanceError
+        - 返回字典（含 score）列表，top `limit`
+        """
+        if not keyword_set:
+            return []
+        with session_scope() as db:
+            items = db.query(KnowledgeItem).filter(KnowledgeItem.is_active == 1).all()
+            results = []
+            for it in items:
+                # 作用域过滤（relation 类型豁免）
+                if it.knowledge_type != 'relation' and scope_schema_id is not None:
+                    if it.scope_schema_id is not None and it.scope_schema_id != scope_schema_id:
+                        continue
+                # 构造可匹配文本
+                aliases = _parse_json(it.aliases, [])
+                alias_text = ' '.join(aliases) if isinstance(aliases, list) else ''
+                haystack = ' '.join([
+                    it.title or '',
+                    alias_text,
+                    it.content or '',
+                    it.payload or '',
+                ]).lower()
+                score = sum(1 for kw in keyword_set if kw and kw in haystack)
+                if score > 0:
+                    d = self.to_dict(it)
+                    d['score'] = score
+                    results.append(d)
+            results.sort(key=lambda x: x['score'], reverse=True)
+            return results[:limit]
 
 
 knowledge_crud = KnowledgeCrud()

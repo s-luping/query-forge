@@ -80,6 +80,28 @@
     <script src="/static/js/bootstrap.bundle.min.js"></script>
     <script src="/static/js/branding.js"></script>
     <script>
+        // 本页未加载 app_common.js，内联提供与之一致的 QF.toast（非阻塞轻提示）。
+        // 仅 confirm() 仍是需要用户确认的弹窗，例如下方登录过期的跳转确认。
+        window.QF = window.QF || {};
+        window.QF.toast = function (msg, type) {
+            const s = (msg == null ? '' : String(msg));
+            const colors = { danger: '#dc3545', success: '#28a745', warning: '#ffc107', info: '#0d6efd' };
+            const color = colors[type] || colors.info;
+            let host = document.getElementById('qf-toast-container');
+            if (!host) {
+                host = document.createElement('div');
+                host.id = 'qf-toast-container';
+                host.style.cssText = 'position:fixed;top:16px;right:16px;z-index:9999;display:flex;flex-direction:column;gap:8px;max-width:360px;';
+                document.body.appendChild(host);
+            }
+            const t = document.createElement('div');
+            t.style.cssText = 'background:#fff;border-left:4px solid ' + color + ';border-radius:6px;box-shadow:0 2px 12px rgba(0,0,0,.15);padding:10px 14px;font-size:13px;color:#333;display:flex;align-items:center;gap:8px;word-break:break-all;';
+            t.innerHTML = '<span style="width:8px;height:8px;border-radius:50%;background:' + color + ';flex:none;"></span><span></span>';
+            t.lastChild.textContent = s;   // textContent 防 XSS
+            host.appendChild(t);
+            setTimeout(function () { t.remove(); }, 2600);
+        };
+
         // 全局 API 请求封装 — 子页面通过 window.apiRequest 调用
         window.apiRequest = async function (url, options = {}) {
             const token = getCookie('token');
@@ -148,9 +170,9 @@
                 try {
                     const resp = await window.apiRequest('/api/system/download-embedding', { method: 'POST' });
                     const data = await resp.json();
-                    alert(data.message);
+                    QF.toast(data.message, 'info');
                 } catch (e) {
-                    alert('启动下载失败: ' + e.message);
+                    QF.toast('启动下载失败: ' + e.message, 'danger');
                 }
                 this.textContent = '📥 下载模型';
                 this.disabled = false;

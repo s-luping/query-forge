@@ -36,6 +36,8 @@ class ColumnFlat:
     default_value: Optional[str]
     sample_values: Optional[str]
     sensitive_level: str = 'public'
+    is_dimension: bool = False
+    is_measure: bool = False
     created_at: datetime = None
 
 
@@ -52,6 +54,8 @@ class FieldRow:
     schema_name: str = ''
     column_id: int = 0
     sensitive_level: str = 'public'
+    is_dimension: bool = False
+    is_measure: bool = False
 
 
 _FLAT_COLS = (
@@ -59,6 +63,7 @@ _FLAT_COLS = (
     DbColumn.name, DbColumn.data_type, DbColumn.description,
     DbColumn.column_key, DbColumn.foreign_key, DbColumn.is_nullable,
     DbColumn.default_value, DbColumn.sample_values, DbColumn.sensitive_level,
+    DbColumn.is_dimension, DbColumn.is_measure,
     DbColumn.created_at,
 )
 
@@ -75,7 +80,8 @@ def _to_flat(row) -> ColumnFlat:
         column_name=row[4], column_type=row[5], column_description=row[6],
         column_key=row[7] or '', foreign_key=row[8] or '', is_nullable=bool(row[9]),
         default_value=row[10], sample_values=row[11], sensitive_level=row[12] or 'public',
-        created_at=row[13],
+        is_dimension=bool(row[13]), is_measure=bool(row[14]),
+        created_at=row[15],
     )
 
 
@@ -312,7 +318,8 @@ def iter_field_rows(schema_name: Optional[str] = None,
     with session_scope() as db:
         q = (db.query(DbSchema.name, DbTable.name, DbColumn.name, DbColumn.data_type,
                       DbColumn.description, DbColumn.column_key, DbColumn.foreign_key,
-                      DbColumn.sample_values, DbColumn.id, DbColumn.sensitive_level)
+                      DbColumn.sample_values, DbColumn.id, DbColumn.sensitive_level,
+                      DbColumn.is_dimension, DbColumn.is_measure)
              .join(DbTable, DbColumn.table_id == DbTable.id)
              .join(DbSchema, DbTable.schema_id == DbSchema.id))
         if visible_schema_ids is not None:
@@ -336,6 +343,7 @@ def iter_field_rows(schema_name: Optional[str] = None,
             column_key=r[5] or '', foreign_key=r[6] or '',
             sample_values=r[7] or '', column_id=r[8],
             sensitive_level=r[9] or 'public',
+            is_dimension=bool(r[10]), is_measure=bool(r[11]),
         ) for r in q.all()]
 # ═══════════════════════════════════════════════════════════════════
 # 删除 / 更新
@@ -385,6 +393,24 @@ def update_sample_values(db: Session, column_id: int, sample_values: str) -> boo
     if not col:
         return False
     col.sample_values = sample_values
+    db.commit()
+    return True
+
+
+def update_column_metadata(db: Session, column_id: int,
+                           is_dimension: Optional[bool] = None,
+                           is_measure: Optional[bool] = None,
+                           description: Optional[str] = None) -> bool:
+    """更新字段的维度/度量标记与描述（仅管理员）。未传字段保持不变。"""
+    col = db.query(DbColumn).filter(DbColumn.id == column_id).first()
+    if not col:
+        return False
+    if is_dimension is not None:
+        col.is_dimension = bool(is_dimension)
+    if is_measure is not None:
+        col.is_measure = bool(is_measure)
+    if description is not None:
+        col.description = description
     db.commit()
     return True
 

@@ -120,8 +120,8 @@ async function saveDs() {
     const id = document.getElementById('dsId').value;
     const name = document.getElementById('dsName').value.trim();
     const database = document.getElementById('dsDatabase').value.trim();
-    if (!name) return alert('数据源名称必填');
-    if (!database) return alert('数据库名必填');
+    if (!name) { QF.toast('数据源名称必填', 'warning'); return; }
+    if (!database) { QF.toast('数据库名必填', 'warning'); return; }
     const body = {
         name,
         db_type: document.getElementById('dsDbType').value,
@@ -143,18 +143,18 @@ async function saveDs() {
             loadDatasources();
         } else {
             const err = await resp.json();
-            alert(err.detail || '保存失败');
+            QF.toast(err.detail || '保存失败', 'danger');
         }
-    } catch (e) { alert('请求失败: ' + e.message); }
+    } catch (e) { QF.toast('请求失败: ' + e.message, 'danger'); }
 }
 
 async function testDs(id) {
     try {
         const resp = await apiRequest(`/api/sync/datasources/${id}/test`, { method: 'POST' });
         const data = await resp.json();
-        alert(data.success ? '连接成功' : '连接失败: ' + data.message);
+        QF.toast(data.success ? '连接成功' : '连接失败: ' + data.message, data.success ? 'success' : 'danger');
         loadDatasources();
-    } catch (e) { alert('请求失败: ' + e.message); }
+    } catch (e) { QF.toast('请求失败: ' + e.message, 'danger'); }
 }
 
 async function deleteDs(id) {
@@ -162,7 +162,7 @@ async function deleteDs(id) {
     try {
         await apiRequest(`/api/sync/datasources/${id}`, { method: 'DELETE' });
         loadDatasources();
-    } catch (e) { alert('删除失败: ' + e.message); }
+    } catch (e) { QF.toast('删除失败: ' + e.message, 'danger'); }
 }
 
 // ── 同步任务 ─────────────────────────────────────────────────
@@ -243,7 +243,7 @@ async function saveJob() {
     const id = document.getElementById('jobId').value;
     const dsId = parseInt(document.getElementById('jobDsId').value);
     const ds = dsList.find(d => d.id === dsId);
-    if (!ds || !ds.database) return alert('请先在数据源中填写数据库名');
+    if (!ds || !ds.database) { QF.toast('请先在数据源中填写数据库名', 'warning'); return; }
     const body = {
         datasource_id: dsId,
         schedule_type: document.getElementById('jobSchedType').value,
@@ -262,9 +262,9 @@ async function saveJob() {
             loadJobs();
         } else {
             const err = await resp.json();
-            alert(err.detail || '保存失败');
+            QF.toast(err.detail || '保存失败', 'danger');
         }
-    } catch (e) { alert('请求失败: ' + e.message); }
+    } catch (e) { QF.toast('请求失败: ' + e.message, 'danger'); }
 }
 
 async function triggerSync(id) {
@@ -273,9 +273,9 @@ async function triggerSync(id) {
         const beforeSyncedAt = before ? before.last_synced_at : null;
         const resp = await apiRequest(`/api/sync/jobs/${id}/run`, { method: 'POST' });
         const data = await resp.json();
-        alert(data.message || '同步已触发');
+        QF.toast(data.message || '同步已触发', 'info');
         waitForSyncCompletion(id, beforeSyncedAt);
-    } catch (e) { alert('请求失败: ' + e.message); }
+    } catch (e) { QF.toast('请求失败: ' + e.message, 'danger'); }
 }
 
 async function waitForSyncCompletion(id, beforeSyncedAt, attempt = 0) {
@@ -305,7 +305,7 @@ async function deleteJob(id) {
     try {
         await apiRequest(`/api/sync/jobs/${id}`, { method: 'DELETE' });
         loadJobs();
-    } catch (e) { alert('删除失败: ' + e.message); }
+    } catch (e) { QF.toast('删除失败: ' + e.message, 'danger'); }
 }
 
 // ── 启用/停用同步任务（暂停/恢复调度） ─────────────────────────
@@ -319,10 +319,10 @@ async function toggleJob(id) {
             body: JSON.stringify({ is_enabled: next })
         });
         const data = await resp.json().catch(() => ({}));
-        if (!resp.ok) return alert(data.detail || '操作失败');
-        alert(next ? '同步任务已启用' : '同步任务已停用（不再自动同步）');
+        if (!resp.ok) { QF.toast(data.detail || '操作失败', 'danger'); return; }
+        QF.toast(next ? '同步任务已启用' : '同步任务已停用（不再自动同步）', 'info');
         loadJobs();
-    } catch (e) { alert('操作失败: ' + e.message); }
+    } catch (e) { QF.toast('操作失败: ' + e.message, 'danger'); }
 }
 
 // ── 清空同步历史与变更记录（仅管理员） ─────────────────────────
@@ -331,13 +331,13 @@ async function clearSyncHistory() {
     try {
         const resp = await apiRequest('/api/sync/history/clear', { method: 'POST' });
         const data = await resp.json().catch(() => ({}));
-        if (!resp.ok) return alert(data.detail || '清空失败');
-        alert(data.message || '已清空');
+        if (!resp.ok) { QF.toast(data.detail || '清空失败', 'danger'); return; }
+        QF.toast(data.message || '已清空', 'success');
         runsPage = 1; changesPage = 1;
         loadOverview();
         loadRuns();
         loadChanges();
-    } catch (e) { alert('清空失败: ' + e.message); }
+    } catch (e) { QF.toast('清空失败: ' + e.message, 'danger'); }
 }
 
 // ── 同步历史 ─────────────────────────────────────────────────
@@ -395,13 +395,13 @@ async function showRunDetail(runId) {
                 <tr><td>新增字段</td><td>${r.columns_added || 0}</td>
                     <td>修改字段</td><td>${r.columns_modified || 0}</td></tr>
                 <tr><td>删除字段</td><td>${r.columns_removed || 0}</td>
-                    <td>自动/待审</td><td>${r.changes_auto || 0} / ${r.changes_pending || 0}</td></tr>
+                    <td>自动应用/待审批</td><td>${r.changes_auto || 0} / ${r.changes_pending || 0}</td></tr>
                 ${r.error_message ? `<tr><td colspan="4" class="text-danger">错误: ${r.error_message}</td></tr>` : ''}
             </table>
             <h6 class="mt-3">变更明细（${changes.length} 条）</h6>
             <pre>${JSON.stringify(changes, null, 2)}</pre>`;
         new bootstrap.Modal(document.getElementById('changeModal')).show();
-    } catch (e) { alert('加载失败: ' + e.message); }
+    } catch (e) { QF.toast('加载失败: ' + e.message, 'danger'); }
 }
 
 // ── 变更记录 ─────────────────────────────────────────────────
@@ -448,7 +448,7 @@ function showChangeDetail(id) {
     // 从当前列表中查找
     // 由于没有全局缓存changes列表，这里简单 alert
     // 实际场景中可以调用 API 获取详情
-    alert('请在同步历史中查看变更详情');
+    QF.toast('请在同步历史中查看变更详情', 'info');
 }
 
 async function approveChange(id) {
@@ -456,9 +456,9 @@ async function approveChange(id) {
     try {
         const resp = await apiRequest(`/api/sync/changes/${id}/approve`, { method: 'POST' });
         const data = await resp.json();
-        if (resp.ok) { alert(data.message); loadChanges(); }
-        else { alert(data.detail || '操作失败'); }
-    } catch (e) { alert('请求失败: ' + e.message); }
+        if (resp.ok) { QF.toast(data.message, 'success'); loadChanges(); }
+        else { QF.toast(data.detail || '操作失败', 'danger'); }
+    } catch (e) { QF.toast('请求失败: ' + e.message, 'danger'); }
 }
 
 async function rejectChange(id) {
@@ -466,9 +466,9 @@ async function rejectChange(id) {
     try {
         const resp = await apiRequest(`/api/sync/changes/${id}/reject`, { method: 'POST' });
         const data = await resp.json();
-        if (resp.ok) { alert(data.message); loadChanges(); }
-        else { alert(data.detail || '操作失败'); }
-    } catch (e) { alert('请求失败: ' + e.message); }
+        if (resp.ok) { QF.toast(data.message, 'success'); loadChanges(); }
+        else { QF.toast(data.detail || '操作失败', 'danger'); }
+    } catch (e) { QF.toast('请求失败: ' + e.message, 'danger'); }
 }
 
 // ── 工具 ──────────────────────────────────────────────────

@@ -14,7 +14,7 @@
         .picker-panel { position: absolute; z-index: 1050; background: #fff; border: 1px solid #dde3ea;
             border-radius: 6px; box-shadow: 0 4px 16px rgba(0,0,0,.12); padding: 6px; width: 320px; }
         .picker-item { padding: 5px 8px; border-radius: 4px; cursor: pointer; font-size: 13px;
-            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+            white-space: normal; word-break: break-word; line-height: 1.3; }
         .picker-item:hover { background: #eaf2ff; }
         .picker-item.active { background: #0d6efd; color: #fff; }
     </style>
@@ -180,7 +180,7 @@ async function saveDescription() {
     const resp = await apiRequest(`/api/permission/roles/${selectedRole.id}/permissions`, {
         method: 'PUT', body: JSON.stringify({ permissions })
     });
-    if (!resp.ok) return alert((await resp.json()).detail || '保存失败');
+    if (!resp.ok) return QF.toast((await resp.json()).detail || '保存失败', 'danger');
     selectedRole.description = document.getElementById('roleDescription').value;
     QF.toast('角色说明已保存', 'success');
 }
@@ -188,7 +188,7 @@ async function deleteRole() {
     if (!selectedRole) return;
     if (!confirm(`确认删除角色「${selectedRole.name}」？其授权关系将一并清除。`)) return;
     const resp = await apiRequest(`/api/permission/roles/${selectedRole.id}`, { method: 'DELETE' });
-    if (!resp.ok) return alert((await resp.json()).detail || '删除失败');
+    if (!resp.ok) return QF.toast((await resp.json()).detail || '删除失败', 'danger');
     QF.toast('角色已删除', 'success');
     selectedRole = null; permissions = [];
     load();
@@ -207,10 +207,10 @@ async function submitCreateRole() {
     const name = document.getElementById('crName').value.trim();
     const code = document.getElementById('crCode').value.trim();
     const desc = document.getElementById('crDesc').value.trim();
-    if (!name || !code) return alert('角色名称和编码必填');
+    if (!name || !code) return QF.toast('角色名称和编码必填', 'warning');
     const resp = await apiRequest('/api/permission/roles', { method: 'POST', body: JSON.stringify({ name, code, description: desc || null }) });
     const data = await resp.json();
-    if (!resp.ok) return alert(data.detail || '创建失败');
+    if (!resp.ok) return QF.toast(data.detail || '创建失败', 'danger');
     QF.toast('角色创建成功', 'success');
     createRoleModal.hide();
     load();
@@ -280,9 +280,10 @@ function resourceSelector(p, index) {
     const items = catalog[listKey] || [];
     const sel = items.find(x => x.id === p.resource_id);
     const shown = sel ? (sel.display || sel.name) : '';
-    return `<div class="d-flex gap-1">
-        <button type="button" class="btn btn-sm btn-outline-primary flex-grow-1 text-start text-truncate"
-            onclick="openPicker(${index})" id="pick-${index}" style="max-width:300px;">
+    return `<div class="d-flex gap-1 align-items-start">
+        <button type="button" class="btn btn-sm btn-outline-primary flex-grow-1 text-start"
+            onclick="openPicker(${index})" id="pick-${index}" title="${esc(shown || emptyText)}"
+            style="white-space:normal; word-break:break-word;">
             ${shown ? esc(shown) : `<span class="text-muted">${emptyText}...</span>`}
         </button>
         ${p.resource_id ? `<button type="button" class="btn btn-sm btn-outline-danger" title="清除" onclick="clearResource(${index})">✕</button>` : ''}
@@ -350,10 +351,10 @@ async function savePermissions() {
     }));
     // 资源型权限必须选到具体资源
     const incomplete = payload.find(p => ['datasource', 'schema', 'table'].includes(p.resource_type) && !p.resource_id);
-    if (incomplete) return alert(`请为「${TYPE_LABEL[incomplete.resource_type]}」权限选择具体资源`);
+    if (incomplete) return QF.toast(`请为「${TYPE_LABEL[incomplete.resource_type]}」权限选择具体资源`, 'warning');
     const resp = await apiRequest(`/api/permission/roles/${selectedRole.id}/permissions`, { method: 'PUT', body: JSON.stringify({ permissions: payload }) });
     const data = await resp.json();
-    if (!resp.ok) return alert(data.detail || '保存失败');
+    if (!resp.ok) return QF.toast(data.detail || '保存失败', 'danger');
     QF.toast(data.message || '已保存', 'success');
     await refreshPermissions();
 }

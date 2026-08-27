@@ -2,10 +2,11 @@
 """
 知识库路由 — 领域知识管理（业务口径/表关系/计算规则等，生成 SQL 时注入提示词）
 
-数据层：models/knowledge.py 的 KnowledgeItem（表名 knowledge_items，字段 content）
-API 契约：字段名为 content（与表字段一致），前端通过 /api/knowledge 访问。
+数据层：models/knowledge.py 的 KnowledgeItem（typed 结构化：knowledge_type/aliases/payload/scope_schema_id）
+API 契约：前端通过 /api/knowledge 访问；字段召回增强端点 /api/knowledge/recall。
 """
-from typing import Optional, List
+import json
+from typing import Optional, List, Dict, Any
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, field_validator
@@ -21,10 +22,31 @@ from models.user import User
 router = APIRouter()
 
 
+# 内置知识类型（平台不解释具体值，仅做下拉/渲染路由）
+KNOWLEDGE_TYPES = [
+    'note',            # 普通笔记 / 自由文本
+    'terminology',     # 术语别名
+    'calculation',     # 计算规则
+    'relation',        # 表关系
+    'value_domain',    # 取值域
+    'convention',      # 约定
+    'entity_map',      # 实体映射
+    'sample_qa',       # 样例问答
+]
+
+
 class KnowledgeRequest(BaseModel):
-    """知识库条目请求"""
+    """知识库条目请求（typed 结构化）
+
+    部分更新：用 Pydantic v2 的 model_fields_set 判断字段是否被显式传入，
+    未传入的字段不写入，避免覆盖其余字段。
+    """
     title: Optional[str] = None
     content: Optional[str] = None
+    knowledge_type: Optional[str] = None
+    aliases: Optional[List[str]] = None
+    payload: Optional[Dict[str, Any]] = None
+    scope_schema_id: Optional[int] = None
 
     @field_validator('title')
     @classmethod
@@ -40,6 +62,13 @@ class KnowledgeRequest(BaseModel):
             raise ValueError('知识内容长度不能超过5000个字符')
         return v
 
+    @field_validator('knowledge_type')
+    @classmethod
+    def validate_type(cls, v):
+        if v is not None and v not in KNOWLEDGE_TYPES:
+            raise ValueError(f'不支持的知识类型: {v}')
+        return v
+
 
 class KnowledgeResponse(BaseModel):
     """知识库条目响应"""
@@ -47,6 +76,10 @@ class KnowledgeResponse(BaseModel):
     user_id: int
     title: Optional[str]
     content: Optional[str]
+    knowledge_type: str = 'note'
+    aliases: List[str] = []
+    payload: Dict[str, Any] = {}
+    scope_schema_id: Optional[int] = None
     is_active: int
     created_at: Optional[str]
     updated_at: Optional[str]
@@ -61,16 +94,21 @@ class KnowledgeListResponse(BaseModel):
     total: int
 
 
+class KnowledgeRecallRequest(BaseModel):
+    """知识条目单独召回请求"""
+    query: str
+    scope_schema_id: Optional[int] = None
+
+
+class KnowledgeRecallResponse(BaseModel):
+    """知识条目单独召回响应"""
+    items: List[Dict[str, Any]]
+    prompt_text: str
+    related_tables: List[str]
+
+
 def _to_dict(item: KnowledgeItem) -> dict:
-    return {
-        'id': item.id,
-        'user_id': item.user_id,
-        'title': item.title,
-        'content': item.content or '',
-        'is_active': item.is_active,
-        'created_at': item.created_at.strftime('%Y-%m-%d %H:%M:%S') if item.created_at else None,
-        'updated_at': item.updated_at.strftime('%Y-%m-%d %H:%M:%S') if item.updated_at else None
-    }
+    return knowledge_crud.to_dict(item)
 
 
 def get_all_knowledge(user: dict, limit: int = 20, offset: int = 0) -> tuple:
@@ -137,8 +175,15 @@ def create_knowledge(
     """创建知识条目"""
     try:
         item = knowledge_crud.create(
-            user_id=user['user_id'], title=data.title, content=data.content or '')
-        log_audit(user, "create_knowledge", f"title={data.title}")
+            user_id=user['user_id'],
+            title=data.title,
+            content=data.content or '',
+            knowledge_type=data.knowledge_type or 'note',
+            aliases=json.dumps(data.aliases or [], ensure_ascii=False),
+            payload=json.dumps(data.payload or {}, ensure_ascii=False),
+            scope_schema_id=data.scope_schema_id,
+        )
+        log_audit(user, "create_knowledge", f"title={data.title} type={data.knowledge_type}")
         return _to_dict(item)
     except Exception as e:
         logger.error(f"创建知识失败: {e}")
@@ -182,11 +227,22 @@ def update_knowledge(
         if not is_admin(user) and item.user_id != user['user_id']:
             raise HTTPException(status_code=403, detail="只能修改自己创建的知识")
 
-        knowledge_crud.update(
-            knowledge_id,
-            title=data.title if data.title is not None else item.title,
-            content=data.content if data.content is not None else item.content,
-        )
+        update_fields = {}
+        provided = data.model_fields_set
+        if 'title' in provided:
+            update_fields['title'] = data.title
+        if 'content' in provided:
+            update_fields['content'] = data.content
+        if 'knowledge_type' in provided:
+            update_fields['knowledge_type'] = data.knowledge_type
+        if 'aliases' in provided:
+            update_fields['aliases'] = json.dumps(data.aliases or [], ensure_ascii=False)
+        if 'payload' in provided:
+            update_fields['payload'] = json.dumps(data.payload or {}, ensure_ascii=False)
+        if 'scope_schema_id' in provided:
+            update_fields['scope_schema_id'] = data.scope_schema_id
+
+        knowledge_crud.update(knowledge_id, **update_fields)
         log_audit(user, "update_knowledge", f"id={knowledge_id}")
         return _to_dict(knowledge_crud.get_by_id(knowledge_id))
     except HTTPException:
@@ -216,4 +272,25 @@ def delete_knowledge(
         raise
     except Exception as e:
         logger.error(f"删除知识失败: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/recall", response_model=KnowledgeRecallResponse)
+def recall_knowledge_endpoint(
+    body: KnowledgeRecallRequest,
+    user: CurrentUser
+):
+    """知识条目单独召回：按 query 关键词召回 typed 知识，返回注入提示词的文本块与关联表（用于动态扩表）"""
+    try:
+        from core.ret_retriever import SchemaRetriever
+        retriever = SchemaRetriever(user=user, user_id=user['user_id'])
+        result = retriever.recall_knowledge(
+            query=body.query,
+            scope_schema_id=body.scope_schema_id,
+        )
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"知识召回失败: {e}")
         raise HTTPException(status_code=500, detail=str(e))

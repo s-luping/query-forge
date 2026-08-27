@@ -32,19 +32,19 @@
         </div>
         <div class="filter-section">
             <div class="row">
-                <div class="col-md-3">
+                <div class="col-md-2">
                     <label class="form-label">数据源:</label>
                     <select class="form-select" id="filterDatasource" onchange="onDatasourceChange()">
                         <option value="">全部数据源</option>
                     </select>
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-2">
                     <label class="form-label">数据库:</label>
                     <select class="form-select" id="filterSchema" onchange="onSchemaChange()">
                         <option value="">全部</option>
                     </select>
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-5">
                     <label class="form-label">表名:</label>
                     <select class="form-select" id="filterTable" onchange="onTableChange()" disabled>
                         <option value="">请先选择数据库</option>
@@ -69,6 +69,8 @@
                             <th>表描述</th>
                             <th>主键</th>
                             <th>外键</th>
+                            <th>维度</th>
+                            <th>度量</th>
                             <th>创建时间</th>
                             <th id="thOps" style="display:none;">操作</th>
                         </tr>
@@ -177,6 +179,16 @@ async function loadSchemaList() {
                     <td class="table-cell-ellipsis">${e(item.table_description || '')}</td>
                     <td>${item.column_key ? '<span class="pk-badge">PK</span>' : ''}</td>
                     <td class="table-cell-ellipsis">${e(item.foreign_key || '')}</td>
+                    <td class="text-center">
+                        ${isAdmin
+                            ? `<input type="checkbox" id="dim_${item.id}" ${item.is_dimension ? 'checked' : ''} onchange="saveColumnMeta(${item.id})" title="标记为维度字段">`
+                            : (item.is_dimension ? '✓' : '–')}
+                    </td>
+                    <td class="text-center">
+                        ${isAdmin
+                            ? `<input type="checkbox" id="meas_${item.id}" ${item.is_measure ? 'checked' : ''} onchange="saveColumnMeta(${item.id})" title="标记为度量字段">`
+                            : (item.is_measure ? '✓' : '–')}
+                    </td>
                     <td>${new Date(item.created_at).toLocaleString()}</td>
                     ${isAdmin ? `<td><button class="btn btn-outline-danger btn-sm py-0 px-2" title="删除字段 ${e(item.column_name)}" onclick="deleteColumn(${item.id}, '${e(item.schema_name).replace(/'/g, "\\'")}', '${e(item.table_name).replace(/'/g, "\\'")}', '${e(item.column_name).replace(/'/g, "\\'")}')"><i class="fas fa-trash-alt"></i></button></td>` : ''}
                 </tr>
@@ -187,7 +199,7 @@ async function loadSchemaList() {
             document.getElementById('prevPageBtn').disabled = currentPage === 1;
             document.getElementById('nextPageBtn').disabled = currentPage >= totalPages;
         } else {
-            tbody.innerHTML = '<tr><td colspan="10" class="text-center py-4 text-muted">暂无数据</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="12" class="text-center py-4 text-muted">暂无数据</td></tr>';
             document.getElementById('paginationContainer').style.display = 'none';
         }
     } catch (e) {
@@ -299,7 +311,7 @@ function onSearchInput() {
 // ═══════════════════════════════════════════════════════════
 async function deleteSelectedSchema() {
     const schema = document.getElementById('filterSchema').value;
-    if (!schema) { alert('请先在「数据库」筛选中选择要删除的库'); return; }
+    if (!schema) { QF.toast('请先在「数据库」筛选中选择要删除的库', 'warning'); return; }
     // 该库若由数据源同步维护，提示可能被重新同步（避免"删了又回来"）
     const dsGroup = _schemaGroups.find(g => (g.schemas || []).includes(schema));
     let msg = `确定删除库「${schema}」？将同时删除其所有表和字段，且不可恢复。`;
@@ -313,31 +325,31 @@ async function deleteSelectedSchema() {
         const resp = await apiRequest(`/api/schema/schema/${encodeURIComponent(schema)}`, { method: 'DELETE' });
         const data = await resp.json().catch(() => ({}));
         if (resp.ok) {
-            alert(data.message || '删除成功');
+            QF.toast(data.message || '删除成功', 'success');
             loadSchemaNames();
             loadSchemaList();
         } else {
-            alert(data.detail || '删除失败');
+            QF.toast(data.detail || '删除失败', 'danger');
         }
-    } catch (err) { alert('删除失败：' + err.message); }
+    } catch (err) { QF.toast('删除失败：' + err.message, 'danger'); }
 }
 
 async function deleteSelectedTable() {
     const schema = document.getElementById('filterSchema').value;
     const table = document.getElementById('filterTable').value;
-    if (!schema || !table) { alert('请先在筛选中选择库和表'); return; }
+    if (!schema || !table) { QF.toast('请先在筛选中选择库和表', 'warning'); return; }
     if (!confirm(`确定删除表「${schema}.${table}」？将同时删除其所有字段，且不可恢复。`)) return;
     try {
         const resp = await apiRequest(`/api/schema/table?schema_name=${encodeURIComponent(schema)}&table_name=${encodeURIComponent(table)}`, { method: 'DELETE' });
         const data = await resp.json().catch(() => ({}));
         if (resp.ok) {
-            alert(data.message || '删除成功');
+            QF.toast(data.message || '删除成功', 'success');
             document.getElementById('filterTable').value = '';
             loadSchemaList();
         } else {
-            alert(data.detail || '删除失败');
+            QF.toast(data.detail || '删除失败', 'danger');
         }
-    } catch (err) { alert('删除失败：' + err.message); }
+    } catch (err) { QF.toast('删除失败：' + err.message, 'danger'); }
 }
 
 async function deleteColumn(id, schemaName, tableName, columnName) {
@@ -346,12 +358,28 @@ async function deleteColumn(id, schemaName, tableName, columnName) {
         const resp = await apiRequest(`/api/schema/${id}`, { method: 'DELETE' });
         const data = await resp.json().catch(() => ({}));
         if (resp.ok) {
-            alert('字段已删除');
+            QF.toast('字段已删除', 'success');
             loadSchemaList();
         } else {
-            alert(data.detail || '删除失败');
+            QF.toast(data.detail || '删除失败', 'danger');
         }
-    } catch (err) { alert('删除失败：' + err.message); }
+    } catch (err) { QF.toast('删除失败：' + err.message, 'danger'); }
+}
+
+// 维度/度量标记即时保存（仅管理员；后端 AdminUser 兜底）
+async function saveColumnMeta(id) {
+    const dimEl = document.getElementById('dim_' + id);
+    const measEl = document.getElementById('meas_' + id);
+    if (!dimEl || !measEl) return;
+    const body = JSON.stringify({ is_dimension: dimEl.checked, is_measure: measEl.checked });
+    try {
+        const resp = await apiRequest(`/api/schema/column/${id}`, { method: 'PUT', body });
+        if (!resp.ok) throw new Error((await resp.json()).detail || '保存失败');
+        QF.toast('维度/度量已保存', 'success');
+    } catch (err) {
+        QF.toast('保存失败：' + err.message, 'danger');
+        loadSchemaList(); // 失败回滚为服务端真实值
+    }
 }
 
 // ═══════════════════════════════════════════════════════════

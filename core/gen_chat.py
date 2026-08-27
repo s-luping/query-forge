@@ -44,7 +44,8 @@ class ChatSession:
         query: str,
         schema_name: Optional[str] = None,
         db_type: str = "sqlite",
-        knowledge_content: str = ""
+        knowledge_content: str = "",
+        scope_schema_id: Optional[int] = None
     ) -> dict:
         """第一轮消息：走完整流水线（关键词→字段召回→表聚合→LLM生成）
 
@@ -79,13 +80,29 @@ class ChatSession:
             "tables": aggregation.get('tables', []),
             "total_field_count": len(aggregation.get('all_fields', {}))})
 
+        # 概念级召回：typed 知识单独召回 + relation 动态扩表
+        scope_id = scope_schema_id if scope_schema_id is not None else self.retriever.resolve_scope_schema_id(schema_name)
+        recall = self.retriever.recall_knowledge(query, scope_schema_id=scope_id)
+        self._log_step(pipeline_log, "STEP_RECALL_KNOWLEDGE", {
+            "matched_count": len(recall['items']),
+            "related_tables": recall['related_tables']})
+        if recall['related_tables']:
+            aggregation = self.retriever.extend_aggregation_with_tables(
+                aggregation, recall['related_tables'], schema_name)
+            self._log_step(pipeline_log, "STEP_EXTEND_TABLES", {
+                "tables": aggregation.get('tables', []),
+                "total_field_count": len(aggregation.get('all_fields', {}))})
+
         # 构建 schema CSV（会保存到对话上下文，供后续轮次复用）
         schema_csv = SchemaRetriever.build_schema_csv(aggregation)
 
         logger.info(f"[ChatSession] 第一轮 - schema 上下文已构建，字段数: {len(aggregation.get('all_fields', {}))}")
 
-        # Step 4: 构建 messages 数组
-        system_prompt = self._build_system_prompt(schema_csv, db_type, knowledge_content)
+        # Step 4: 构建 messages 数组（召回的知识文本并入【领域知识】）
+        kb = knowledge_content or ""
+        if recall['prompt_text']:
+            kb = (kb + "\n\n" + recall['prompt_text']).strip() if kb else recall['prompt_text']
+        system_prompt = self._build_system_prompt(schema_csv, db_type, kb)
         messages = [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": query}
@@ -151,7 +168,8 @@ class ChatSession:
         schema_csv: str,
         db_type: str = "sqlite",
         schema_name: Optional[str] = None,
-        knowledge_content: str = ""
+        knowledge_content: str = "",
+        scope_schema_id: Optional[int] = None
     ) -> dict:
         """后续轮次消息：使用对话历史 + 已保存的 schema 上下文
 
@@ -205,6 +223,20 @@ class ChatSession:
         messages = self._build_messages_from_history(
             conversation_messages, schema_csv, db_type, knowledge_content
         )
+
+        # 概念级召回：追问也单独召回 typed 知识，文本并入【领域知识】
+        scope_id = scope_schema_id if scope_schema_id is not None else self.retriever.resolve_scope_schema_id(schema_name)
+        followup_recall = self.retriever.recall_knowledge(new_user_content, scope_schema_id=scope_id)
+        self._log_step(pipeline_log, "STEP_RECALL_KNOWLEDGE", {
+            "matched_count": len(followup_recall['items']),
+            "related_tables": followup_recall['related_tables']})
+        if followup_recall['prompt_text']:
+            # 在现有 system prompt 末尾追加召回知识（复用已构建的 messages）
+            if messages and messages[0].get('role') == 'system':
+                extra = followup_recall['prompt_text']
+                base = messages[0]['content']
+                if extra not in base:
+                    messages[0]['content'] = (base + "\n\n【领域知识(追问召回)】\n" + extra).strip()
 
         # 追加新的 user 消息
         messages.append({"role": "user", "content": new_user_content})

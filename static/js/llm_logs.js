@@ -322,7 +322,7 @@
 
                 detailModal.show();
             } catch (e) {
-                alert('获取详情失败');
+                QF.toast('获取详情失败', 'danger');
             }
         }
 
@@ -340,7 +340,7 @@
                     loadStats();
                 }
             } catch (e) {
-                alert('删除失败');
+                QF.toast('删除失败', 'danger');
             }
         }
 

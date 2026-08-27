@@ -215,7 +215,8 @@ class SQLPipeline:
     def run_pipeline(self, query: str, schema_name: Optional[str] = None,
                      knowledge_content: str = "",
                      history_queries: List[Dict] = None,
-                     db_type: str = "sqlite") -> Dict:
+                     db_type: str = "sqlite",
+                     scope_schema_id: Optional[int] = None) -> Dict:
         """运行SQL生成流程
 
         Args:
@@ -250,7 +251,29 @@ class SQLPipeline:
         keywords = self.step1_extract_keywords(query)
         recalled_fields = self.step2_recall_fields(keywords, schema_name)
         merged_info = self.step3_aggregate_tables(recalled_fields, schema_name)
-        merged_info = self.step4_add_context_info(merged_info, query, knowledge_content, history_queries)
+
+        # 概念级召回：typed 知识单独召回 + relation 动态扩表
+        scope_id = scope_schema_id if scope_schema_id is not None else self.retriever.resolve_scope_schema_id(schema_name)
+        recall = self.retriever.recall_knowledge(query, scope_schema_id=scope_id, keywords=keywords)
+        self._log_step("STEP_RECALL_KNOWLEDGE", {
+            "matched_count": len(recall['items']),
+            "related_tables": recall['related_tables'],
+        })
+        if recall['related_tables']:
+            merged_info = self.retriever.extend_aggregation_with_tables(
+                merged_info, recall['related_tables'], schema_name)
+            self._log_step("STEP_EXTEND_TABLES", {
+                "tables": merged_info['tables'],
+                "total_field_count": len(merged_info['all_fields']),
+            })
+
+        # 将召回的知识文本并入【领域知识】上下文
+        augmented_knowledge = knowledge_content or ""
+        if recall['prompt_text']:
+            augmented_knowledge = (augmented_knowledge + "\n\n" + recall['prompt_text']).strip() \
+                if augmented_knowledge else recall['prompt_text']
+
+        merged_info = self.step4_add_context_info(merged_info, query, augmented_knowledge, history_queries)
         llm_result = self.step5_generate_sql(merged_info, db_type)
         sql = llm_result.get('sql', '')
         is_valid, error_msg, columns = self.step6_validate_sql(sql)

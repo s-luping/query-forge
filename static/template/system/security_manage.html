@@ -98,7 +98,7 @@ async function showPipeline(logId) {
         _logsCache = data.items;
         item = _logsCache.find(x => x.id === logId);
     }
-    if (!item || !item.pipeline_log) { alert('该记录无链路数据'); return; }
+    if (!item || !item.pipeline_log) { QF.toast('该记录无链路数据', 'info'); return; }
     let steps = [];
     try { steps = JSON.parse(item.pipeline_log); } catch (e) { steps = []; }
     const STEP_CN = {

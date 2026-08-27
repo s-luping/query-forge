@@ -19,6 +19,7 @@ from app.timezone import now_beijing
 from app.crypto import encrypt_secret, decrypt_secret, mask_api_key
 from services.sync_connectors import get_connector
 from models.datasource import DataSource
+from models.sync import SyncJobConfig
 from crud.base import session_scope
 from crud.datasource import datasource_crud
 from crud.schema import schema_crud, table_crud, column_crud
@@ -450,10 +451,14 @@ def list_runs(
     # 批量取任务目标库名（避免 N+1 查询）
     run_job_ids = {r.job_id for r in rows if r.job_id}
     job_schema_map = sync_run_crud.schema_map_for_runs(list(run_job_ids))
+    # 实时待审批数：按 run_log_id 统计仍处于 pending 的变更，随审批动态减少
+    pending_map = change_crud.pending_count_by_runs([r.id for r in rows])
     items = []
     for r in rows:
         out = SyncRunOut.model_validate(r)
         out.schema_name = job_schema_map.get(r.job_id, '')
+        # changes_pending 覆盖为实时值；changes_auto 为运行时的自动应用数，不再变化
+        out.changes_pending = pending_map.get(r.id, 0)
         items.append(out)
     return {"items": items, "total": total}
 @router.get("/runs/{run_id}")
@@ -470,6 +475,8 @@ def get_run_detail(run_id: int, user: AdminUser):
     detail = SyncRunDetailOut.model_validate(run)
     detail.schema_name = job_schema
     detail.changes = [SyncChangeOut.model_validate(c) for c in changes]
+    # 待审批数覆盖为实时值（随审批/拒绝动态减少）
+    detail.changes_pending = change_crud.pending_count_by_run(run_id)
     return detail
 # ═══════════════════════════════════════════════════════════════════
 # 变更记录与审批

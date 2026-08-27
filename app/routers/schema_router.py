@@ -61,6 +61,9 @@ class SchemaItem(BaseModel):
     is_nullable: Optional[bool] = True
     default_value: Optional[str] = None
     sample_values: Optional[str] = None
+    sensitive_level: str = 'public'
+    is_dimension: bool = False
+    is_measure: bool = False
     created_at: datetime
 
     class Config:
@@ -70,6 +73,13 @@ class SchemaItem(BaseModel):
 class UpdateSampleValuesRequest(BaseModel):
     """更新示例值请求"""
     sample_values: str
+
+
+class UpdateColumnMetaRequest(BaseModel):
+    """更新字段维度/度量/描述请求"""
+    is_dimension: Optional[bool] = None
+    is_measure: Optional[bool] = None
+    description: Optional[str] = None
 
 
 class SchemaListResponse(BaseModel):
@@ -411,8 +421,13 @@ def get_schemas(user: CurrentUser):
                 })
                 g["schemas"].append(r['name'])
             datasources = [groups[k] for k in sorted(groups.keys())]
-    
-            return {"schemas": names, "schema_types": types, "datasources": datasources}
+
+            # 库名 → id 映射（供知识作用域等场景按 id 关联）
+            _id_map = schema_service.get_schema_name_map(db)
+            schema_ids = {name: sid for sid, name in _id_map.items()}
+
+            return {"schemas": names, "schema_types": types,
+                    "datasources": datasources, "schema_ids": schema_ids}
     except Exception as e:
         logger.error(f"获取 schema 列表失败：{e}")
         raise HTTPException(status_code=500, detail=f"获取失败：{str(e)}")
@@ -535,6 +550,31 @@ def update_sample_values(
         raise
     except Exception as e:
         logger.error(f"更新示例值失败：{e}")
+        raise HTTPException(status_code=500, detail=f"更新失败：{str(e)}")
+
+
+@router.put("/column/{column_id}")
+def update_column_meta(
+        column_id: int,
+        request: UpdateColumnMetaRequest,
+        user: AdminUser
+):
+    """更新字段的维度/度量标记与描述（仅管理员）"""
+    # (权限由 AdminUser 依赖统一校验)
+    try:
+        with session_scope() as db:
+            if not schema_service.update_column_metadata(
+                db, column_id,
+                is_dimension=request.is_dimension,
+                is_measure=request.is_measure,
+                description=request.description,
+            ):
+                raise HTTPException(status_code=404, detail="字段不存在")
+            return {"success": True, "message": "更新成功"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"更新字段元数据失败：{e}")
         raise HTTPException(status_code=500, detail=f"更新失败：{str(e)}")
 
 
