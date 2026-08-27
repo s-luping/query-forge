@@ -72,6 +72,30 @@ class MessageItem(BaseModel):
 
 # ── Helpers ───────────────────────────────────────────────────────
 
+def _infer_visible_db_type(user: dict) -> Optional[str]:
+    """全库模式：从用户可见的库中推断 db_type（取首个有类型的库）
+
+    供 LLM prompt 的引用符提示使用；执行时仍按 SQL 库前缀精确路由到数据源。
+    无可见库或全部无类型时返回 None（沿用请求兜底类型）。
+    """
+    try:
+        from app.permissions import get_visible_schema_ids
+        from models.schema import DbSchema
+        visible = get_visible_schema_ids(user)
+        with session_scope() as db:
+            q = db.query(DbSchema.name, DbSchema.db_type)
+            if visible is not None:
+                if not visible:
+                    return None
+                q = q.filter(DbSchema.id.in_(visible))
+            for _name, dtype in q.all():
+                if dtype:
+                    return dtype
+        return None
+    except Exception:
+        return None
+
+
 def _get_user_llm_config(user_id: int, config_id: Optional[int] = None) -> Optional[dict]:
     """获取用户的LLM配置（api_key 解密后供客户端使用）"""
     from models.llm import LLMConfig
@@ -211,22 +235,48 @@ def create_conversation(
     """创建新对话 + 首轮 SQL 生成"""
     user_id = user['user_id']
 
-    # 库级可见性二次校验（防绕过前端下拉直接请求无权限库）
+    # 链路追踪：前置步骤（鉴权/模型/知识库）
     from app.permissions import is_schema_visible
+    from app.timezone import now_beijing as _nb
+    pre_log = [{
+        "step": "AUTH_SCHEMA_CHECK", "timestamp": _nb().strftime("%Y-%m-%d %H:%M:%S"),
+        "data": {"schema_name": request.schema_name, "role": user.get('role', ''),
+                 "passed": True},
+    }]
+
+    # 库级可见性二次校验（防绕过前端下拉直接请求无权限库）
     if not is_schema_visible(user, request.schema_name):
+        pre_log[-1]["data"]["passed"] = False
+        pre_log[-1]["data"]["reason"] = "库级可见性校验未通过"
         raise HTTPException(status_code=403, detail="无权访问该数据库")
 
-    # 数据库类型以所选库存储的类型为准（选库后无需再手动选类型）；
-    # 库未设置类型时才回退请求参数
+    # 数据库类型：选了库则以库类型为准；全库模式（None）从可见库推断（供 LLM 引用符提示）
     db_type = request.db_type
     if request.schema_name:
         with session_scope() as db_cfg:
             db_type = schema_service.get_schema_type_by_name(
                 db_cfg, request.schema_name) or db_type
+    else:
+        inferred = _infer_visible_db_type(user)
+        if inferred:
+            db_type = inferred
 
     try:
         llm_client = _build_llm_client(user_id, request.llm_config_id)
         knowledge_content = _get_knowledge_safe(user_id, request.knowledge_id)
+
+        pre_log.append({
+            "step": "LLM_CONFIG_LOAD", "timestamp": _nb().strftime("%Y-%m-%d %H:%M:%S"),
+            "data": {"provider": getattr(llm_client, 'provider', '') or 'default',
+                     "model": getattr(llm_client, 'model', '') or 'default',
+                     "config_id": request.llm_config_id},
+        })
+        pre_log.append({
+            "step": "KNOWLEDGE_LOAD", "timestamp": _nb().strftime("%Y-%m-%d %H:%M:%S"),
+            "data": {"knowledge_id": request.knowledge_id,
+                     "loaded": bool(knowledge_content),
+                     "content_length": len(knowledge_content)},
+        })
 
         session = ChatSession(
             user_id=user_id,
@@ -240,30 +290,36 @@ def create_conversation(
             query=request.query,
             schema_name=request.schema_name,
             db_type=db_type,
-            knowledge_content=knowledge_content
+            knowledge_content=knowledge_content,
+            pre_log=pre_log,
         )
 
         # 执行生成的 SQL：查询前校验非空，直接查库返回结果
-        query_result = _execute_generated_sql(
-            result.get('sql', ''), request.schema_name, db_type)
+        # 信息不足（need_more_info）时不执行 SQL，前端引导用户补充
+        if result.get('need_more_info'):
+            query_result = None
+        else:
+            query_result = _execute_generated_sql(
+                result.get('sql', ''), request.schema_name, db_type)
 
         # 保存到数据库
         with session_scope() as db:
             title = request.query[:80] + ("..." if len(request.query) > 80 else "")
-    
+
             schema_id = schema_service.get_schema_id_by_name(db, request.schema_name)
-    
+
             conversation = Conversation(
                 user_id=user_id,
                 title=title,
                 schema_id=schema_id,
                 db_type=db_type,
                 llm_config_id=request.llm_config_id,
-                knowledge_id=request.knowledge_id
+                knowledge_id=request.knowledge_id,
+                schema_tables=json.dumps(result.get('tables') or [], ensure_ascii=False)
             )
             db.add(conversation)
             db.flush()
-    
+
             # 用户消息
             user_msg = ConversationMessage(
                 conversation_id=conversation.id,
@@ -271,7 +327,7 @@ def create_conversation(
                 content=request.query
             )
             db.add(user_msg)
-    
+
             # 助手消息
             columns_json = json.dumps(result.get('columns') or [], ensure_ascii=False)
             assistant_msg = ConversationMessage(
@@ -305,6 +361,23 @@ def create_conversation(
             conversation_crud.bind_telemetry(conversation_id, assistant_msg_id, call_id, prompt_id)
         logger.info(f"对话创建成功: id={conversation_id}, user_id={user_id}")
 
+        # 后置步骤：SQL 执行 + 消息持久化（追加到 pipeline_log，回写审计）
+        pipeline_log = result.get('pipeline_log') or []
+        pipeline_log.append({
+            "step": "SQL_EXECUTE", "timestamp": _nb().strftime("%Y-%m-%d %H:%M:%S"),
+            "data": {"executed": bool(query_result and not query_result.get('error')),
+                     "row_count": (query_result or {}).get('row_count', 0),
+                     "error": (query_result or {}).get('error', '') or None},
+        })
+        pipeline_log.append({
+            "step": "MESSAGE_PERSIST", "timestamp": _nb().strftime("%Y-%m-%d %H:%M:%S"),
+            "data": {"conversation_id": conversation_id, "assistant_msg_id": assistant_msg_id,
+                     "telemetry_call_id": call_id, "prompt_id": prompt_id},
+        })
+        from core.gen_audit import update_pipeline_log
+        update_pipeline_log(result.get('audit_log_id'),
+                            json.dumps(pipeline_log, ensure_ascii=False, default=str))
+
         return {
             "conversation": {
                 "id": conversation_id,
@@ -321,7 +394,10 @@ def create_conversation(
                 "columns": result.get('columns'),
                 "raw_response": result.get('raw_response', ''),
                 "tokens": result.get('tokens', {}),
-                "query_result": query_result
+                "query_result": query_result,
+                "need_more_info": result.get('need_more_info', False),
+                "missing_info": result.get('missing_info'),
+                "suggestion": result.get('suggestion'),
             }
         }
 
@@ -367,10 +443,45 @@ def send_message(
             conv_db_type = conversation.db_type
             conv_llm_config_id = conversation.llm_config_id
             conv_knowledge_id = conversation.knowledge_id
-        # 从三层模型重建 schema CSV（用于 context）
+            # 在 session 关闭前取出首轮表集合（避免退出 with 后 detached 访问报错）
+            conv_schema_tables = conversation.schema_tables
+        # 从三层模型重建 schema CSV（fallback 全量，用于未记录首轮表集合的旧对话）
         schema_csv = _rebuild_schema_csv(schema_name)
+        # 首轮召回表集合（新对话已记录；旧对话为空则追问轮沿用全量 schema_csv）
+        first_tables: list = []
+        if conv_schema_tables:
+            try:
+                first_tables = json.loads(conv_schema_tables) or []
+            except (json.JSONDecodeError, TypeError):
+                first_tables = []
 
         llm_client = _build_llm_client(user_id, conv_llm_config_id)
+
+        # 链路追踪：前置步骤（鉴权/模型/知识库）
+        from app.timezone import now_beijing as _nb
+        from app.permissions import is_schema_visible as _is_visible
+        schema_visible = _is_visible(user, schema_name)
+        pre_log = [{
+            "step": "AUTH_SCHEMA_CHECK", "timestamp": _nb().strftime("%Y-%m-%d %H:%M:%S"),
+            "data": {"schema_name": schema_name, "role": user.get('role', ''),
+                     "passed": schema_visible, "conversation_id": conversation_id},
+        }]
+        if not schema_visible:
+            raise HTTPException(status_code=403, detail="无权访问该数据库（对话关联库权限已变更）")
+        pre_log.append({
+            "step": "LLM_CONFIG_LOAD", "timestamp": _nb().strftime("%Y-%m-%d %H:%M:%S"),
+            "data": {"provider": getattr(llm_client, 'provider', '') or 'default',
+                     "model": getattr(llm_client, 'model', '') or 'default',
+                     "config_id": conv_llm_config_id},
+        })
+        # 跟进消息的知识内容需在日志步骤前加载（避免引用未赋值变量）
+        knowledge_content = _get_knowledge_safe(user_id, conv_knowledge_id)
+        pre_log.append({
+            "step": "KNOWLEDGE_LOAD", "timestamp": _nb().strftime("%Y-%m-%d %H:%M:%S"),
+            "data": {"knowledge_id": conv_knowledge_id,
+                     "loaded": bool(knowledge_content),
+                     "content_length": len(knowledge_content)},
+        })
 
         session = ChatSession(
             user_id=user_id,
@@ -380,19 +491,24 @@ def send_message(
         )
 
         # 跟进消息
-        knowledge_content = _get_knowledge_safe(user_id, conv_knowledge_id)
         result = session.process_followup_message(
             conversation_messages=history,
             new_user_content=request.content,
             schema_csv=schema_csv,
+            first_tables=first_tables,
             db_type=conv_db_type,
             schema_name=schema_name,
-            knowledge_content=knowledge_content
+            knowledge_content=knowledge_content,
+            pre_log=pre_log,
         )
 
         # 执行生成的 SQL：查询前校验非空，直接查库返回结果
-        query_result = _execute_generated_sql(
-            result.get('sql', ''), schema_name, conv_db_type)
+        # 信息不足（need_more_info）时不执行 SQL，前端引导用户补充
+        if result.get('need_more_info'):
+            query_result = None
+        else:
+            query_result = _execute_generated_sql(
+                result.get('sql', ''), schema_name, conv_db_type)
 
         # 保存消息
         with session_scope() as db:
@@ -402,7 +518,7 @@ def send_message(
                 content=request.content
             )
             db.add(user_msg)
-    
+
             columns_json = json.dumps(result.get('columns') or [], ensure_ascii=False)
             assistant_msg = ConversationMessage(
                 conversation_id=conversation_id,
@@ -416,12 +532,12 @@ def send_message(
             )
             db.add(assistant_msg)
             db.flush()
-    
+
             # 更新会话时间
             db.query(Conversation).filter(
                 Conversation.id == conversation_id
             ).update({'updated_at': now_beijing()})
-    
+
             # flush 后 id 已分配，先取回再 commit（避免 commit expire 后属性刷新异常）
             user_msg_id = user_msg.id
             assistant_msg_id = assistant_msg.id
@@ -443,6 +559,24 @@ def send_message(
                 db.commit()
         logger.info(f"对话消息已发送: conversation_id={conversation_id}")
 
+        # 后置步骤：SQL 执行 + 消息持久化（追加到 pipeline_log，回写审计）
+        pipeline_log = result.get('pipeline_log') or []
+        pipeline_log.append({
+            "step": "SQL_EXECUTE", "timestamp": _nb().strftime("%Y-%m-%d %H:%M:%S"),
+            "data": {"executed": bool(query_result and not query_result.get('error')),
+                     "row_count": (query_result or {}).get('row_count', 0),
+                     "error": (query_result or {}).get('error', '') or None},
+        })
+        pipeline_log.append({
+            "step": "MESSAGE_PERSIST", "timestamp": _nb().strftime("%Y-%m-%d %H:%M:%S"),
+            "data": {"conversation_id": conversation_id,
+                     "user_msg_id": user_msg_id, "assistant_msg_id": assistant_msg_id,
+                     "telemetry_call_id": call_id},
+        })
+        from core.gen_audit import update_pipeline_log
+        update_pipeline_log(result.get('audit_log_id'),
+                            json.dumps(pipeline_log, ensure_ascii=False, default=str))
+
         return {
             "user_message": {
                 "id": user_msg_id,
@@ -458,7 +592,10 @@ def send_message(
                 "columns": result.get('columns'),
                 "raw_response": result.get('raw_response', ''),
                 "tokens": result.get('tokens', {}),
-                "query_result": query_result
+                "query_result": query_result,
+                "need_more_info": result.get('need_more_info', False),
+                "missing_info": result.get('missing_info'),
+                "suggestion": result.get('suggestion'),
             }
         }
 
@@ -564,13 +701,18 @@ def delete_conversation(
 # ── Internal helpers ──────────────────────────────────────────────
 
 def _rebuild_schema_csv(schema_name: Optional[str] = None) -> str:
-    """从三层模型重建 schema CSV 字符串（字段召回上下文）"""
+    """从三层模型重建 schema CSV 字符串（字段召回上下文）
+
+    schema_name=None（全库模式）时表名带库前缀（库名.表名），跨库消歧；
+    指定库时保持纯表名（兼容旧行为）。
+    """
     rows = schema_service.iter_field_rows(schema_name=schema_name)
 
     if not rows:
         return "表名,字段名,字段类型,字段描述,主键,外键"
 
     # 按表分组（iter_field_rows 已按表连续返回，仍做稳定分组）
+    cross_schema = schema_name is None and len({r.schema_name for r in rows}) > 1
     tables = {}
     for f in rows:
         tables.setdefault(f.table_name, []).append(f)
@@ -578,8 +720,9 @@ def _rebuild_schema_csv(schema_name: Optional[str] = None) -> str:
     lines = ["表名,字段名,字段类型,字段描述,主键,外键"]
     for table_name, fields in tables.items():
         for f in fields:
+            label = f"{f.schema_name}.{table_name}" if cross_schema else table_name
             lines.append(
-                f"{table_name},{f.column_name or ''},"
+                f"{label},{f.column_name or ''},"
                 f"{f.column_type or ''},"
                 f"{f.column_description or ''},"
                 f"{f.column_key or ''},"

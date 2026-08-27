@@ -414,10 +414,9 @@
         <div class="modal-body-custom">
             <div class="newconv-error" id="newConvError" style="display:none;"></div>
 
-            <label>数据库 <small class="text-muted" style="font-weight:normal;">（数据库类型随所选库自动带出）</small></label>
-            <select id="newConvSchema" onchange="onSchemaSelect()">
-                <option value="">全部数据库</option>
-            </select>
+            <div class="text-muted" style="font-size:12px;margin-bottom:14px;padding:8px 10px;background:#f8f9fa;border-radius:6px;">
+                数据范围由管理员授权自动决定，无需选择数据库。
+            </div>
 
             <label>知识库</label>
             <select id="newConvKnowledge">

@@ -202,7 +202,8 @@
                             <option value="interval">定时间隔</option>
                             <option value="manual">仅手动</option>
                         </select></div>
-                    <div class="col-md-6 mb-3" id="schedValueWrap"><label class="form-label">间隔（分钟）</label><input type="number" class="form-control" id="jobSchedValue" value="360"></div>
+                    <div class="col-md-6 mb-3" id="schedValueWrap"><label class="form-label">间隔（分钟）</label><input type="number" class="form-control" id="jobSchedValue" min="10" value="360">
+                        <small class="text-muted">距上次同步（含失败）至少间隔该分钟数后，在下一个 10 分钟巡检点执行；最小 10 分钟。</small></div>
                 </div>
                 <div class="mb-3 form-check"><input type="checkbox" class="form-check-input" id="jobAutoClassify" checked><label class="form-check-label">自动分类新字段敏感等级</label></div>
                 <div class="mb-3"><label class="form-label">包含的表（逗号分隔，空=全部）</label><input type="text" class="form-control" id="jobInclude" placeholder="users,orders"></div>

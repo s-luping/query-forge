@@ -56,3 +56,39 @@ class DbColumn(MainBase):
     is_dimension = Column(Boolean, default=False, comment='是否维度字段(可分组)')
     is_measure = Column(Boolean, default=False, comment='是否度量字段(可聚合)')
     created_at = Column(DateTime, default=now_beijing, comment='创建时间（北京时间）')
+
+
+class DbTableRelation(MainBase):
+    """表关系维护 — 人工维护的表间 JOIN 关系（生成 SQL 时注入提示词）
+
+    说明：
+        - left/right 仅为书写方向，语义上是对称的连接关系
+        - 查询链路按聚合命中的表匹配两侧表名，渲染为 JOIN 提示
+    """
+    __tablename__ = 'db_table_relations'
+    __table_args__ = (
+        UniqueConstraint('left_schema_id', 'left_table', 'left_column',
+                         'right_schema_id', 'right_table', 'right_column',
+                         name='uix_relation_both_sides'),
+    )
+    id = Column(Integer, primary_key=True, autoincrement=True, comment='主键')
+    # 兼容历史字段：取左表所属 schema（迁移后废弃单列约束，仅用于回看/审计）
+    schema_id = Column(Integer, ForeignKey('db_schemas.id'), nullable=True,
+                       index=True, comment='兼容字段：左表所属 Schema')
+    # 同数据源可跨库：左右两侧各自所属 schema（数据库）；两者可不同
+    left_schema_id = Column(Integer, ForeignKey('db_schemas.id'), nullable=False,
+                            index=True, comment='左表所属 Schema')
+    right_schema_id = Column(Integer, ForeignKey('db_schemas.id'), nullable=False,
+                             index=True, comment='右表所属 Schema')
+    left_table = Column(String(150), nullable=False, comment='左表名')
+    left_column = Column(String(150), nullable=False, comment='左表连接字段')
+    right_table = Column(String(150), nullable=False, comment='右表名')
+    right_column = Column(String(150), nullable=False, comment='右表连接字段')
+    join_type = Column(String(20), default='INNER JOIN',
+                       comment='连接方式: INNER JOIN/LEFT JOIN/RIGHT JOIN')
+    relation_type = Column(String(20), default='1:N', comment='基数: 1:1/1:N/N:1/N:N')
+    description = Column(Text, default='', comment='关系说明')
+    created_by = Column(Integer, nullable=True, comment='创建人用户ID')
+    created_at = Column(DateTime, default=now_beijing, comment='创建时间（北京时间）')
+    updated_at = Column(DateTime, default=now_beijing, onupdate=now_beijing,
+                        comment='更新时间（北京时间）')

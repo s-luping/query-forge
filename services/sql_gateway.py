@@ -70,8 +70,9 @@ class SqlGateway:
         self._is_admin = is_admin(user)
         self._access_map: Dict[int, str] = {}  # {column_id: SELECT/FILTER/NONE}
         self._row_scopes: Dict[str, str] = {}  # {table_name: filter_expression}
-        self._col_lookup: Dict[Tuple[str, str], Tuple[int, str]] = {}  # {(table, col): (col_id, sensitive_level)}
-        self._table_schema: Dict[str, int] = {}  # {table_name: schema_id}
+        # 跨库支持：key 统一为 (db_name or '', table_name)
+        self._col_lookup: Dict[Tuple[str, str, str], Tuple[int, str]] = {}  # {(db, table, col): (col_id, sensitive)}
+        self._table_schema: Dict[Tuple[str, str], int] = {}  # {(db, table): schema_id}
         self._table_grants_by_name: Dict[int, set] = {}  # {schema_id: {table_name,...}} 表级白名单(表名)
 
     def process(self, sql: str, schema_name: Optional[str] = None,
@@ -80,15 +81,15 @@ class SqlGateway:
         result = SqlGatewayResult()
         result.sql = sql
 
-        # admin 跳过校验（但仍记录审计信息）
-        if self._is_admin:
-            try:
-                tree = sqlglot.parse_one(sql, dialect=_DIALECT_MAP.get(db_type, 'sqlite'))
-                result.tables = self._extract_tables(tree)
-                result.columns = self._extract_columns_with_context(tree)
-            except Exception:
-                pass
-            return result
+        # 不再为 admin 整体跳过校验：admin 同样受角色 DENY（schema/table/column）约束，
+        # 路由层 is_schema_visible 已先行拦截被拒库，这里做 SQL 级兜底（表/字段级）。
+        # 仅保留解析表/字段用于审计信息。
+        try:
+            tree = sqlglot.parse_one(sql, dialect=_DIALECT_MAP.get(db_type, 'sqlite'))
+            result.tables = self._extract_tables(tree)
+            result.columns = self._extract_columns_with_context(tree)
+        except Exception:
+            pass
 
         dialect = _DIALECT_MAP.get(db_type, 'sqlite')
 
@@ -134,10 +135,11 @@ class SqlGateway:
         return result
 
     def _extract_tables(self, tree: exp.Expression) -> List[str]:
-        """提取 SQL 中引用的所有表名"""
+        """提取 SQL 中引用的所有表名（跨库场景返回 库名.表名 或 表名）"""
         tables = []
         for t in tree.find_all(exp.Table):
-            name = t.name
+            # 带库前缀时返回 库名.表名（权限校验/审计用精确标识）
+            name = f"{t.db}.{t.name}" if t.db else t.name
             if name and name not in tables:
                 tables.append(name)
         return tables
@@ -179,33 +181,37 @@ class SqlGateway:
         return 'UNKNOWN'
 
     def _load_permissions(self, schema_name: Optional[str], table_names: List[str]):
-        """加载字段权限、行级规则与表级白名单"""
+        """加载字段权限、行级规则与表级白名单（跨库支持：schema_name=None 时全库）"""
+        # 提取纯表名（去掉库前缀）用于权限查询
+        pure_names = [t.split('.', 1)[1] if '.' in t else t for t in table_names] or None
         self._access_map = get_column_access_map(self.user, schema_name=schema_name,
-                                                  table_names=table_names or None)
-        self._row_scopes = get_row_scope_rules(self.user, table_names=table_names or None)
+                                                  table_names=pure_names)
+        self._row_scopes = get_row_scope_rules(self.user, table_names=pure_names)
 
-        # 构建 (table_name, column_name) → (column_id, sensitive_level) 查找表
+        # 构建 (db, table, col) → (column_id, sensitive_level) 查找表
         with session_scope() as db:
-            q = (db.query(DbColumn.id, DbColumn.name, DbColumn.sensitive_level, DbTable.name)
+            q = (db.query(DbSchema.name, DbColumn.id, DbColumn.name, DbColumn.sensitive_level,
+                          DbTable.name)
                  .join(DbTable, DbColumn.table_id == DbTable.id)
                  .join(DbSchema, DbTable.schema_id == DbSchema.id))
             if schema_name:
                 q = q.filter(DbSchema.name == schema_name)
-            if table_names:
-                q = q.filter(DbTable.name.in_(table_names))
-            for row in q.all():
-                self._col_lookup[(row[3], row[1])] = (row[0], row[2] or 'public')
-    
-            # 表名 → schema_id 映射（表级权限判定用）
-            tq = db.query(DbTable.name, DbTable.schema_id)
+            if pure_names:
+                q = q.filter(DbTable.name.in_(pure_names))
+            for db_name, col_id, col_name, sensitive, tbl_name in q.all():
+                self._col_lookup[(db_name or '', tbl_name, col_name)] = (
+                    col_id, sensitive or 'public')
+
+            # (db, table) → schema_id 映射（表级权限判定用）
+            tq = (db.query(DbSchema.name, DbTable.name, DbTable.schema_id)
+                  .join(DbSchema, DbTable.schema_id == DbSchema.id))
             if schema_name:
-                tq = (tq.join(DbSchema, DbTable.schema_id == DbSchema.id)
-                      .filter(DbSchema.name == schema_name))
-            if table_names:
-                tq = tq.filter(DbTable.name.in_(table_names))
-            for name, sid in tq.all():
-                self._table_schema[name] = sid
-    
+                tq = tq.filter(DbSchema.name == schema_name)
+            if pure_names:
+                tq = tq.filter(DbTable.name.in_(pure_names))
+            for db_name, name, sid in tq.all():
+                self._table_schema[(db_name or '', name)] = sid
+
             # 表级白名单 {schema_id: {table_name,...}}（表名形式便于 SQL 表名校验）
             grants = get_table_grants_by_schema(self.user)
             if grants:
@@ -219,10 +225,10 @@ class SqlGateway:
         if not self._table_grants_by_name:
             return False
         for t in tree.find_all(exp.Table):
-            tname = t.name
+            db_name, tname = t.db or '', t.name
             if not tname:
                 continue
-            sid = self._table_schema.get(tname)
+            sid = self._table_schema.get((db_name, tname))
             if sid is None:
                 continue  # 未知表（不存在）→ 交由数据库报错
             allowed = self._table_grants_by_name.get(sid)
@@ -239,13 +245,17 @@ class SqlGateway:
             if not col_name:
                 continue
 
-            # 解析表名（处理别名）
-            table_name = self._resolve_table_name(col)
+            # 解析表名（处理别名）+ 库名
+            table_name, db_name = self._resolve_table_name(col)
             clause = self._get_clause_context(col)
 
-            # 查找 column_id 和权限
-            lookup_key = (table_name, col_name)
+            # 查找 column_id 和权限（跨库 key：db + table + col）
+            lookup_key = (db_name or '', table_name, col_name)
             col_info = self._col_lookup.get(lookup_key)
+
+            # 兼容无库前缀 SQL：同表名在多库时取第一个匹配（旧行为兜底）
+            if col_info is None and db_name:
+                col_info = self._col_lookup.get(('', table_name, col_name))
 
             if col_info is None:
                 # 字段不在已知 schema 中，可能是不存在的字段，跳过（让 DB 报错）
@@ -272,17 +282,23 @@ class SqlGateway:
 
         return False
 
-    def _resolve_table_name(self, col: exp.Column) -> str:
-        """解析字段引用的表名（处理别名）"""
+    def _resolve_table_name(self, col: exp.Column) -> Tuple[str, str]:
+        """解析字段引用的表名（处理别名），返回 (table_name, db_name)"""
         table = col.table
         if table:
-            return table
+            # 尝试在查询中找该别名对应的真实表（取 db）
+            select = col.find_ancestor(exp.Select)
+            if select:
+                for t in select.find_all(exp.Table):
+                    if t.alias_or_name == table:
+                        return t.name, (t.db or '')
+            return table, ''
         # 如果没有表前缀，尝试从 FROM 子句推断
         select = col.find_ancestor(exp.Select)
         if select:
             for t in select.find_all(exp.Table):
-                return t.name
-        return ''
+                return t.name, (t.db or '')
+        return '', ''
 
     def _expand_select_star(self, tree: exp.Expression, result: SqlGatewayResult):
         """展开 SELECT * 为授权字段列表"""
@@ -291,10 +307,10 @@ class SqlGateway:
             if not select:
                 continue
 
-            # 获取 SELECT 涉及的表
+            # 获取 SELECT 涉及的表（带库名，避免跨库同名表混淆）
             tables_in_select = set()
             for t in select.find_all(exp.Table):
-                tables_in_select.add(t.name)
+                tables_in_select.add((t.db or '', t.name))
 
             if not tables_in_select:
                 continue
@@ -306,9 +322,12 @@ class SqlGateway:
 
             # 构建 SELECT 列表
             new_expressions = []
-            for table_name, col_names in authorized_cols.items():
+            for (db_name, table_name), col_names in authorized_cols.items():
                 for col_name in col_names:
-                    new_expressions.append(exp.column(col_name, table=table_name))
+                    col = exp.column(col_name, table=table_name)
+                    if db_name:
+                        col.set('db', exp.Identifier(this=db_name))
+                    new_expressions.append(col)
 
             if new_expressions:
                 # 替换 SELECT * 中的 *
@@ -317,18 +336,19 @@ class SqlGateway:
                 result.modifications.append(f'展开 SELECT * 为 {len(new_expressions)} 个授权字段')
                 # 不 break — 继续处理后续 SELECT *（多表 JOIN 场景）
 
-    def _get_authorized_columns(self, table_names: List[str]) -> Dict[str, List[str]]:
-        """获取表的授权字段列表（SELECT 级别）"""
+    def _get_authorized_columns(self, table_keys: List[Tuple[str, str]]) -> Dict[Tuple[str, str], List[str]]:
+        """获取表的授权字段列表（SELECT 级别）。table_keys: [(db_name, table_name), ...]"""
+        pure_names = [t for _db, t in table_keys]
         with session_scope() as db:
-            q = (db.query(DbColumn.name, DbColumn.id, DbTable.name)
+            q = (db.query(DbSchema.name, DbColumn.name, DbColumn.id, DbTable.name)
                  .join(DbTable, DbColumn.table_id == DbTable.id)
-                 .filter(DbTable.name.in_(table_names)))
-            result = {}
-            for row in q.all():
-                col_name, col_id, tbl_name = row[0], row[1], row[2]
+                 .join(DbSchema, DbTable.schema_id == DbSchema.id)
+                 .filter(DbTable.name.in_(pure_names)))
+            result: Dict[Tuple[str, str], List[str]] = {}
+            for db_name, col_name, col_id, tbl_name in q.all():
                 access = self._access_map.get(col_id, 'NONE')
                 if access == 'SELECT':
-                    result.setdefault(tbl_name, []).append(col_name)
+                    result.setdefault((db_name or '', tbl_name), []).append(col_name)
             return result
 
     def _inject_row_scope(self, tree: exp.Expression, result: SqlGatewayResult,

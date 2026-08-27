@@ -328,6 +328,7 @@ class SchemaVectorStore:
 
             field_texts.append(f"{table}.{column}: {desc}")
             field_meta.append({
+                'schema_name': s.get('schema_name', ''),
                 'table_name': table,
                 'field_name': column,
                 'description': desc,

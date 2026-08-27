@@ -57,7 +57,7 @@ async function loadOverview() {
         if (!items.length) { tbody.innerHTML = '<tr><td colspan="8" class="empty-state">暂无同步记录</td></tr>'; return; }
         tbody.innerHTML = items.map(r => `<tr>
             <td>${fmt(r.started_at)}</td>
-            <td>${r.summary ? (JSON.parse(r.summary).schema || '-') : '-'}</td>
+            <td>${e(runSchemaName(r))}</td>
             <td>${r.triggered_by || '-'}</td>
             <td><span class="badge badge-${r.status}">${r.status}</span></td>
             <td>${r.columns_added || 0}</td>

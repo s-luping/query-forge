@@ -82,6 +82,13 @@ def init_database():
         _ensure_column_sqlite(
             config.MAIN_DB_PATH, 'knowledge_items', 'scope_schema_id', 'INTEGER'
         )
+        # 表关系支持同数据源跨库：left/right 各自所属 schema（存量行用旧 schema_id 回填）
+        from db.sqlite_hooks import _migrate_relation_cross_db
+        _migrate_relation_cross_db(config.MAIN_DB_PATH)
+        # 对话首轮召回表集合（供追问轮累积召回；存量库增量迁移）
+        _ensure_column_sqlite(
+            config.MAIN_DB_PATH, 'conversations', 'schema_tables', 'TEXT'
+        )
 
     logger.info("主库表创建/检查完成")
     logger.info("遥测库表创建/检查完成")

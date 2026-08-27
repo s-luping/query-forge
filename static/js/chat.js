@@ -8,7 +8,6 @@ let isLoading = false;
 // ── Init ───────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
     loadConvList();
-    loadSchemas();
     loadLlmConfigs();
     loadKnowledge();
 });
@@ -242,7 +241,6 @@ function hideNewConvModal() {
 function resetNewConvForm() {
     // 重置表单：清空问题、错误提示，下拉恢复默认（保留默认模型预选）
     document.getElementById('newConvQuery').value = '';
-    document.getElementById('newConvSchema').value = '';
     document.getElementById('newConvKnowledge').value = '';
     setNewConvError('');
     const llmSel = document.getElementById('newConvLlmConfig');
@@ -258,20 +256,11 @@ function setNewConvError(msg) {
     if (!msg) el.style.color = '#dc3545';   // 清空时恢复默认红色
 }
 
-// 选库即确定数据库类型（类型由库本身存储，后端也会兜底取库的类型）
-function onSchemaSelect() {
-    const schema = document.getElementById('newConvSchema').value;
-    window._selectedSchemaType = (window._schemaTypes || {})[schema] || '';
-}
-
 async function createConv() {
     if (_convSubmitting) return;   // 防重复提交
     const query = document.getElementById('newConvQuery').value.trim();
     if (!query) { setNewConvError('请输入问题'); return; }
 
-    const schemaName = document.getElementById('newConvSchema').value || null;
-    // 数据库类型由所选库自动带出（未选库/库无类型时后端按默认处理）
-    const dbType = window._selectedSchemaType || 'sqlite';
     const llmConfigId = document.getElementById('newConvLlmConfig').value || null;
     const knowledgeId = document.getElementById('newConvKnowledge').value || null;
 
@@ -309,7 +298,8 @@ async function createConv() {
             headers: { 'Content-Type': 'application/json' },
             credentials: 'same-origin',
             body: JSON.stringify({
-                query, schema_name: schemaName, db_type: dbType,
+                query,
+                schema_name: null,   // 全库模式：由权限自动决定可用数据范围
                 llm_config_id: llmConfigId ? parseInt(llmConfigId) : null,
                 knowledge_id: knowledgeId ? parseInt(knowledgeId) : null
             }),
@@ -359,34 +349,7 @@ async function createConv() {
     }
 }
 
-// ── Schema & LLM Config Loaders ────────────────────────────
-async function loadSchemas() {
-    try {
-        const resp = await apiRequest('/api/schema/schemas');
-        if (!resp.ok) return;
-        const data = await resp.json();
-        window._schemaTypes = data.schema_types || {};   // 库名 → db_type，选库自动带出
-        const sel = document.getElementById('newConvSchema');
-        sel.innerHTML = '<option value="">全部数据库</option>';
-        const groups = data.datasources && data.datasources.length
-            ? data.datasources
-            : [{ datasource_id: -1, datasource_name: '数据库', schemas: data.schemas || [] }];
-        groups.forEach(g => {
-            const schemas = (g.schemas || []).filter(Boolean);
-            if (!schemas.length) return;
-            const og = document.createElement('optgroup');
-            og.label = g.datasource_name || '数据库';
-            schemas.forEach(s => {
-                const opt = document.createElement('option');
-                opt.value = s;
-                opt.textContent = s;
-                og.appendChild(opt);
-            });
-            sel.appendChild(og);
-        });
-    } catch (e) { console.error('加载数据库列表失败:', e); }
-}
-
+// ── LLM Config & Knowledge Loaders ─────────────────────────
 async function loadLlmConfigs() {
     try {
         const resp = await apiRequest('/api/llm-config/list');

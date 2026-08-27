@@ -14,7 +14,6 @@ from app.config import DEBUG
 from app.auth import _get_secret_key
 from app.middleware import register_middlewares
 from app.routers.auth_router import router as auth_router
-from app.routers.chat_to_sql_router import router as chat_to_sql_router
 from app.routers.schema_router import router as schema_router
 from app.routers.knowledge_router import router as knowledge_router
 from app.routers.llm_router import log_router as llm_router, config_router as llm_config_router
@@ -93,8 +92,6 @@ app.include_router(page_router)
 
 app.include_router(auth_router, tags=["基础认证"])
 app.include_router(user_router, prefix="/api/user", tags=["用户管理"])
-app.include_router(chat_to_sql_router,
-                   prefix="/api/chat-to-sql", tags=["chat_to_sql"])
 app.include_router(schema_router, prefix="/api/schema", tags=["schema 管理"])
 app.include_router(knowledge_router, prefix="/api/knowledge", tags=["知识库"])
 app.include_router(llm_router, prefix="/api/llm", tags=["LLM调用记录"])

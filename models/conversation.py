@@ -21,6 +21,7 @@ class Conversation(MainBase):
     db_type = Column(String(20), default="sqlite", comment='数据库类型')
     llm_config_id = Column(Integer, nullable=True, comment='使用的模型配置ID')
     knowledge_id = Column(Integer, ForeignKey('knowledge_items.id'), nullable=True, comment='创建对话时关联的知识库条目ID')
+    schema_tables = Column(Text, nullable=True, comment='首轮召回表集合(JSON数组)，供追问轮累积召回')
     context_prompt_id = Column(Integer, nullable=True, comment='首轮 schema 上下文 prompt ID(→llm_prompts，跨库逻辑引用)')
     created_at = Column(DateTime, default=now_beijing, comment='创建时间（北京时间）')
     updated_at = Column(DateTime, default=now_beijing, onupdate=now_beijing, comment='更新时间（北京时间）')
