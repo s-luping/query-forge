@@ -61,8 +61,8 @@ async function loadTasks() {
 async function taskAction(id, action) {
     const resp = await apiRequest(`/api/scheduler/tasks/${id}/${action}`, { method: 'POST' });
     const data = await resp.json();
-    if (!resp.ok) return alert(data.detail || '操作失败');
-    alert(data.message || '操作成功');
+    if (!resp.ok) return QF.toast(data.detail || '操作失败', 'danger');
+    QF.toast(data.message || '操作成功', 'success');
     loadTasks();
 }
 function runTask(id) { taskAction(id, 'run'); }

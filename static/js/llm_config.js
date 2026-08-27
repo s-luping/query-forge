@@ -22,19 +22,19 @@
             const configId = document.getElementById('configId').value;
 
             if (!provider) {
-                alert('请输入模型供应商');
+                QF.toast('请输入模型供应商', 'warning');
                 return;
             }
             if (!model) {
-                alert('请输入模型名称');
+                QF.toast('请输入模型名称', 'warning');
                 return;
             }
             if (!apiKey && !configId) {
-                alert('请输入API密钥');
+                QF.toast('请输入API密钥', 'warning');
                 return;
             }
             if (!baseUrl) {
-                alert('请输入API地址');
+                QF.toast('请输入API地址', 'warning');
                 return;
             }
 
@@ -66,12 +66,12 @@
                 const result = await response.json();
 
                 if (result.success) {
-                    alert('✅ ' + result.message);
+                    QF.toast('✅ ' + result.message, 'success');
                 } else {
-                    alert('❌ ' + result.message);
+                    QF.toast('❌ ' + result.message, 'danger');
                 }
             } catch (e) {
-                alert('测试失败: ' + e.message);
+                QF.toast('测试失败: ' + e.message, 'danger');
             } finally {
                 btn.innerHTML = originalText;
                 btn.disabled = false;
@@ -88,15 +88,15 @@
             const baseUrl = document.getElementById('baseUrl').value;
 
             if (!provider) {
-                alert('请输入模型供应商');
+                QF.toast('请输入模型供应商', 'warning');
                 return;
             }
             if (!model) {
-                alert('请输入模型名称');
+                QF.toast('请输入模型名称', 'warning');
                 return;
             }
             if (!baseUrl) {
-                alert('请输入API地址');
+                QF.toast('请输入API地址', 'warning');
                 return;
             }
 
@@ -125,7 +125,7 @@
                     });
                 } else {
                     if (!apiKeyValue) {
-                        alert('请输入API密钥');
+                        QF.toast('请输入API密钥', 'warning');
                         return;
                     }
                     response = await apiRequest('/api/llm-config/create', {
@@ -137,15 +137,15 @@
                 const result = await response.json();
 
                 if (result.message) {
-                    alert('✅ ' + result.message);
+                    QF.toast('✅ ' + result.message, 'success');
                     loadConfigs();
                     resetForm();
                 } else {
-                    alert('❌ 保存失败');
+                    QF.toast('❌ 保存失败', 'danger');
                 }
             } catch (e) {
                 const error = await e.json?.() || { detail: e.message };
-                alert('保存失败: ' + (error.detail || e.message));
+                QF.toast('保存失败: ' + (error.detail || e.message), 'danger');
             }
         });
 
@@ -210,7 +210,7 @@
                 const config = data.items.find(c => c.id === id);
 
                 if (!config) {
-                    alert('配置不存在');
+                    QF.toast('配置不存在', 'danger');
                     return;
                 }
 
@@ -232,7 +232,7 @@
                     document.getElementById('description').value = config.description;
                 }
             } catch (e) {
-                alert('获取配置失败');
+                QF.toast('获取配置失败', 'danger');
             }
         }
 
@@ -247,7 +247,7 @@
                     loadConfigs();
                 }
             } catch (e) {
-                alert('设置失败');
+                QF.toast('设置失败', 'danger');
             }
         }
 
@@ -264,7 +264,7 @@
                     loadConfigs();
                 }
             } catch (e) {
-                alert('删除失败');
+                QF.toast('删除失败', 'danger');
             }
         }
 

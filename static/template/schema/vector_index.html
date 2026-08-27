@@ -106,13 +106,13 @@ async function rebuild(schemaName) {
         });
         const data = await resp.json();
         if (data.success) {
-            alert(data.message || '重建已启动');
+            QF.toast(data.message || '重建已启动', 'success');
             setTimeout(loadList, 2000);
         } else {
-            alert('失败: ' + (data.message || '未知错误'));
+            QF.toast('失败: ' + (data.message || '未知错误'), 'danger');
         }
     } catch (e) {
-        alert('重建失败: ' + e.message);
+        QF.toast('重建失败: ' + e.message, 'danger');
     }
 }
 

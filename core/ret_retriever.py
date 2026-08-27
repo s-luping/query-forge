@@ -13,10 +13,13 @@
 """
 from typing import List, Dict, Optional
 
+import json
+
 from app.logger import logger
 from app.permissions import filter_fields_by_permission, get_table_grants_by_schema
 from services import schema_service
 from core.ret_vector_store import SchemaVectorStore, get_vector_config
+from core.ret_keywords import KeywordExtractor
 from crud.base import session_scope
 
 
@@ -26,6 +29,7 @@ class SchemaRetriever:
     def __init__(self, user: dict = None, user_id: int = None):
         self.user = user or {'user_id': user_id, 'role': 'user'}
         self.user_id = user_id or self.user.get('user_id')
+        self.keyword_extractor = KeywordExtractor()
         self.vector_store: Optional[SchemaVectorStore] = None
         self.vector_loaded = False
         self.vector_error: Optional[str] = None
@@ -43,6 +47,8 @@ class SchemaRetriever:
             'foreign_key': r.foreign_key,
             'sample_values': r.sample_values,
             'sensitive_level': getattr(r, 'sensitive_level', None) or 'public',
+            'is_dimension': getattr(r, 'is_dimension', False),
+            'is_measure': getattr(r, 'is_measure', False),
         }
 
     def get_field_rows(self, schema_name: Optional[str] = None,
@@ -55,6 +61,17 @@ class SchemaRetriever:
 
     def field_count(self, schema_name: Optional[str] = None) -> int:
         return schema_service.field_count(schema_name)
+
+    def resolve_scope_schema_id(self, schema_name: Optional[str]) -> Optional[int]:
+        """库名 → schema id（用于知识作用域过滤；未知库返回 None）"""
+        if not schema_name:
+            return None
+        try:
+            with session_scope() as db:
+                return schema_service.get_schema_id_by_name(db, schema_name)
+        except Exception as e:
+            logger.warning(f"[SchemaRetriever] 解析 scope schema id 失败: {e}")
+            return None
 
     # ---------- 向量索引 ----------
 
@@ -159,6 +176,67 @@ class SchemaRetriever:
             'schema_name': schema_name,
         }
 
+    # ---------- 知识条目单独召回（概念级检索，第三支柱） ----------
+
+    def recall_knowledge(self, query: str, scope_schema_id: Optional[int] = None,
+                         keywords: Optional[List[str]] = None) -> Dict:
+        """按 query 关键词召回 typed 知识条目，返回注入提示词的文本块与关联表（用于动态扩表）。
+
+        Returns:
+            {
+              'items':       [{id,title,knowledge_type,aliases,payload,content,score}, ...],
+              'prompt_text': str,   # 注入 system prompt【领域知识】的文本块
+              'related_tables': [table_name, ...]  # relation 类知识涉及的表（跨库扩表用）
+            }
+        """
+        from crud.knowledge import knowledge_crud
+        kws = keywords or self.keyword_extractor.extract(query, top_k=10)
+        kw_set = set(k.lower() for k in kws)
+        if not kw_set:
+            return {'items': [], 'prompt_text': '', 'related_tables': []}
+
+        items = knowledge_crud.search_matched_items(kw_set, scope_schema_id=scope_schema_id, limit=12)
+        serialized: List[Dict] = []
+        related_tables: List[str] = []
+        for d in items:
+            serialized.append(d)
+            # relation 类型：收集两侧表名用于动态扩表（实现跨库作用域发现）
+            if d['knowledge_type'] == 'relation':
+                pl = d.get('payload') or {}
+                for side in ('left', 'right'):
+                    t = (pl.get(side) or {}).get('table')
+                    if t and t not in related_tables:
+                        related_tables.append(t)
+
+        return {
+            'items': serialized,
+            'prompt_text': _format_knowledge_prompt(serialized),
+            'related_tables': related_tables,
+        }
+
+    def extend_aggregation_with_tables(self, aggregation: Dict, table_names: List[str],
+                                       schema_name: Optional[str] = None) -> Dict:
+        """把额外表（如 relation 知识涉及的表）并入聚合结果，补齐完整字段结构。
+
+        跨库扩表：不过滤 schema_name（传 None），仅按用户权限裁剪，
+        从而让 relation 知识把分散在多个数据库中的表自动纳入上下文。
+        """
+        existing = set(aggregation.get('tables', []))
+        to_add = [t for t in table_names if t not in existing]
+        if not to_add:
+            return aggregation
+        for r in self.get_field_rows(None, to_add):
+            key = f"{r.table_name}.{r.column_name}"
+            if key not in aggregation['all_fields']:
+                field = self._row_to_dict(r)
+                if r.sample_values:
+                    samples = [v.strip() for v in r.sample_values.split(',') if v.strip()][:5]
+                    if samples:
+                        field['sample_values_list'] = samples
+                aggregation['all_fields'][key] = field
+        aggregation['tables'] = list(aggregation['tables']) + to_add
+        return aggregation
+
     # ---------- CSV ----------
 
     @staticmethod
@@ -181,3 +259,58 @@ class SchemaRetriever:
                 )
 
         return '\n'.join(lines)
+
+
+# ═══════════════════════════════════════════════════════════════════
+# 知识条目 → 提示词渲染（内建类型渲染器；平台不解释具体业务值）
+# ═══════════════════════════════════════════════════════════════════
+
+def _render_relation(pl: dict) -> str:
+    """将 relation 类型 payload 渲染为可读的 JOIN 描述"""
+    left = pl.get('left') or {}
+    right = pl.get('right') or {}
+    join = pl.get('join_type') or 'INNER JOIN'
+    on = pl.get('on')
+    if not on:
+        lc, rc = left.get('column'), right.get('column')
+        if left.get('table') and right.get('table') and lc and rc:
+            on = f"{left['table']}.{lc} = {right['table']}.{rc}"
+    rel = (f"{left.get('table', '')} {left.get('alias', '')} "
+           f"{join} {right.get('table', '')} {right.get('alias', '')} "
+           f"ON {on or ''}").strip()
+    note = pl.get('note')
+    return rel + (f"\n说明: {note}" if note else '')
+
+
+def _flatten_payload(pl: dict) -> List[str]:
+    """通用结构化渲染：顶层键值对（嵌套对象/数组转 JSON）"""
+    out = []
+    for k, v in pl.items():
+        if isinstance(v, (dict, list)):
+            out.append(f"{k}={json.dumps(v, ensure_ascii=False)}")
+        else:
+            out.append(f"{k}={v}")
+    return out
+
+
+def _format_knowledge_prompt(items: List[Dict]) -> str:
+    """将召回的知识条目格式化为注入【领域知识】的提示词文本块"""
+    if not items:
+        return ''
+    blocks = []
+    for it in items:
+        t = it.get('knowledge_type', 'note')
+        title = it.get('title') or '(无标题)'
+        lines = [f"### [{t}] {title}"]
+        content = it.get('content')
+        if content:
+            lines.append(content)
+        payload = it.get('payload')
+        if t == 'relation' and isinstance(payload, dict):
+            lines.append(_render_relation(payload))
+        elif payload and isinstance(payload, dict):
+            flat = _flatten_payload(payload)
+            if flat:
+                lines.append('；'.join(flat))
+        blocks.append('\n'.join(lines))
+    return '\n\n'.join(blocks)

@@ -110,7 +110,7 @@
             </div>
             <div class="card-body p-0">
                 <table class="table table-hover table-sm mb-0">
-                    <thead><tr><th>开始时间</th><th>Schema</th><th>触发者</th><th>状态</th><th>表数</th><th>新增</th><th>修改</th><th>删除</th><th>自动/待审</th><th>耗时</th><th>详情</th></tr></thead>
+                    <thead><tr><th>开始时间</th><th>Schema</th><th>触发者</th><th>状态</th><th title="本次同步中实际有变更的表数 / 源库读取到的表总数。分母为 0 表示这次是空跑（源库结构无变化）。">同步表数<br><small>(已变更/总表)</small></th><th>新增</th><th>修改</th><th>删除</th><th title="分子=本次自动应用的变更数（新增/修改，已直接生效）；分母=当前仍处于待审批的变更数（删除类，需审批）。分母随审批/拒绝实时减少。">自动应用 / 待审批<br><small>(实时)</small></th><th>耗时</th><th>详情</th></tr></thead>
                     <tbody id="runsTable"><tr><td colspan="11" class="empty-state">加载中...</td></tr></tbody>
                 </table>
                 <div class="pager-wrap" id="runsPager"></div>

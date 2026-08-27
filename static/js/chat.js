@@ -84,7 +84,7 @@ async function deleteConv(id) {
         }
         loadConvList();
     } catch (e) {
-        alert('删除失败: ' + e.message);
+        QF.toast('删除失败: ' + e.message, 'danger');
     }
 }
 
@@ -165,7 +165,7 @@ async function sendMsg() {
     if (!content) return;
 
     if (!currentConvId) {
-        alert('请先选择或创建一个对话');
+        QF.toast('请先选择或创建一个对话', 'warning');
         return;
     }
 
@@ -432,7 +432,7 @@ function copySql(btn, sql) {
         btn.textContent = '✓ 已复制';
         setTimeout(() => { btn.textContent = '📋 复制'; }, 1500);
     }).catch(() => {
-        alert('复制失败，请手动复制');
+        QF.toast('复制失败，请手动复制', 'danger');
     });
 }
 
@@ -458,7 +458,7 @@ let _resultPage = 1;
 
 function showFullResult(key) {
     const qr = (window._queryResults || {})[key];
-    if (!qr) { alert('结果数据不存在，请重新查询'); return; }
+    if (!qr) { QF.toast('结果数据不存在，请重新查询', 'danger'); return; }
     _resultData = qr;
     _resultPage = 1;
     renderResultPage();

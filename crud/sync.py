@@ -125,6 +125,27 @@ class ChangeCrud(BaseCrud):
         """取待审批变更（非 pending 状态返回 None，供审批校验）"""
         return self.get_one(id=change_id, approval_status='pending')
 
+    def pending_count_by_runs(self, run_log_ids: List[int]) -> Dict[int, int]:
+        """批量统计各次运行当前仍处 pending 的变更数 {run_log_id: count}。
+
+        用于「同步执行历史」的「待审批」列实时展示：审批/拒绝后该数应动态减少，
+        而非读取运行记录里定格的 changes_pending 快照。
+        """
+        if not run_log_ids:
+            return {}
+        from sqlalchemy import func
+        with session_scope() as db:
+            rows = (db.query(SchemaChangeLog.run_log_id,
+                             func.count(SchemaChangeLog.id))
+                    .filter(SchemaChangeLog.run_log_id.in_(run_log_ids),
+                            SchemaChangeLog.approval_status == 'pending')
+                    .group_by(SchemaChangeLog.run_log_id).all())
+            return {rid: cnt for rid, cnt in rows}
+
+    def pending_count_by_run(self, run_log_id: int) -> int:
+        """单次运行当前仍处 pending 的变更数（详情接口用）"""
+        return self.pending_count_by_runs([run_log_id]).get(run_log_id, 0)
+
     def clear_history(self) -> Tuple[int, int]:
         """清空全部执行历史与变更记录，返回 (runs, changes)"""
         with session_scope() as db:

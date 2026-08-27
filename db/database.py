@@ -69,6 +69,19 @@ def init_database():
         _ensure_column_sqlite(
             config.MAIN_DB_PATH, 'conversation_messages', 'result_data', 'TEXT'
         )
+        # 知识库 typed 结构化字段（存量 SQLite 库增量迁移；新库由 create_all 建全量表）
+        _ensure_column_sqlite(
+            config.MAIN_DB_PATH, 'knowledge_items', 'knowledge_type', 'VARCHAR(50)'
+        )
+        _ensure_column_sqlite(
+            config.MAIN_DB_PATH, 'knowledge_items', 'aliases', 'TEXT'
+        )
+        _ensure_column_sqlite(
+            config.MAIN_DB_PATH, 'knowledge_items', 'payload', 'TEXT'
+        )
+        _ensure_column_sqlite(
+            config.MAIN_DB_PATH, 'knowledge_items', 'scope_schema_id', 'INTEGER'
+        )
 
     logger.info("主库表创建/检查完成")
     logger.info("遥测库表创建/检查完成")
