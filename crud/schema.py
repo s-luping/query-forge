@@ -6,7 +6,7 @@
 from typing import List, Optional
 
 from crud.base import BaseCrud, session_scope
-from models.schema import DbSchema, DbTable, DbColumn
+from models.schema import DbSchema, DbTable, DbColumn, DbTableRelation
 
 
 class SchemaCrud(BaseCrud):
@@ -15,12 +15,18 @@ class SchemaCrud(BaseCrud):
     def get_by_name(self, name: str) -> Optional[DbSchema]:
         return self.get_one(name=name)
 
-    def list_visible(self, visible_schema_ids: List[int]) -> List[DbSchema]:
-        """按可见 ID 列表查询（空列表返回空）"""
-        if not visible_schema_ids:
-            return []
+    def list_visible(self, visible_schema_ids: Optional[List[int]]) -> List[DbSchema]:
+        """按可见 ID 列表查询；None=全部（管理员），空列表返回空"""
         with session_scope() as db:
-            return db.query(DbSchema).filter(DbSchema.id.in_(visible_schema_ids)).all()
+            q = db.query(DbSchema)
+            if visible_schema_ids is not None:
+                if not visible_schema_ids:
+                    return []
+                q = q.filter(DbSchema.id.in_(visible_schema_ids))
+            rows = q.all()
+            for r in rows:
+                db.expunge(r)
+            return rows
 
     def list_names(self) -> List[str]:
         with session_scope() as db:
@@ -79,6 +85,60 @@ class ColumnCrud(BaseCrud):
         return self.get_one(table_id=table_id, name=name)
 
 
+class RelationCrud(BaseCrud):
+    """表关系维护 CRUD — db_table_relations（支持同数据源跨库）"""
+    model = DbTableRelation
+
+    def list_by_schema(self, schema_id: int) -> List[DbTableRelation]:
+        """按单个 schema 列出（左或右任一側属于该库即命中）"""
+        with session_scope() as db:
+            rows = db.query(DbTableRelation).filter(
+                (DbTableRelation.left_schema_id == schema_id) |
+                (DbTableRelation.right_schema_id == schema_id)
+            ).order_by(DbTableRelation.id).all()
+            for r in rows:
+                db.expunge(r)
+            return rows
+
+    def list_by_schemas(self, schema_ids: List[int]) -> List[DbTableRelation]:
+        """按可见 schema 集合列出（空列表返回空；左右任一侧命中即可）"""
+        if not schema_ids:
+            return []
+        with session_scope() as db:
+            rows = db.query(DbTableRelation).filter(
+                DbTableRelation.left_schema_id.in_(schema_ids) |
+                DbTableRelation.right_schema_id.in_(schema_ids)
+            ).order_by(DbTableRelation.id).all()
+            for r in rows:
+                db.expunge(r)
+            return rows
+
+    def exists_same(self, left_schema_id: int, left_table: str, left_column: str,
+                    right_schema_id: int, right_table: str, right_column: str,
+                    exclude_id: Optional[int] = None) -> bool:
+        """同一对连接字段（含方向颠倒）是否已存在；两侧 schema 一起参与判重"""
+        with session_scope() as db:
+            fwd = db.query(DbTableRelation).filter(
+                DbTableRelation.left_schema_id == left_schema_id,
+                DbTableRelation.left_table == left_table,
+                DbTableRelation.left_column == left_column,
+                DbTableRelation.right_schema_id == right_schema_id,
+                DbTableRelation.right_table == right_table,
+                DbTableRelation.right_column == right_column)
+            rev = db.query(DbTableRelation).filter(
+                DbTableRelation.left_schema_id == right_schema_id,
+                DbTableRelation.left_table == right_table,
+                DbTableRelation.left_column == right_column,
+                DbTableRelation.right_schema_id == left_schema_id,
+                DbTableRelation.right_table == left_table,
+                DbTableRelation.right_column == left_column)
+            if exclude_id is not None:
+                fwd = fwd.filter(DbTableRelation.id != exclude_id)
+                rev = rev.filter(DbTableRelation.id != exclude_id)
+            return fwd.first() is not None or rev.first() is not None
+
+
 schema_crud = SchemaCrud()
 table_crud = TableCrud()
 column_crud = ColumnCrud()
+relation_crud = RelationCrud()

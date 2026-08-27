@@ -1,6 +1,5 @@
 # -*- coding: UTF-8 -*-
-"""
-查询审计日志 — 原 SQLPipeline 与 ChatSession 两份 _write_audit_log 的合并
+"""查询审计日志 — ChatSession 的 write_query_audit_log
 
 gateway_result 兼容两种形态：
   - SqlGatewayResult 对象（pipeline 传入）
@@ -8,13 +7,19 @@ gateway_result 兼容两种形态：
 """
 from app.logger import logger, pipeline_logger
 from crud.base import session_scope
+from typing import Optional
 
 
 def write_query_audit_log(user_id: int, user: dict, query: str,
                           generated_sql: str, final_sql: str,
                           gateway_result=None, duration_ms: int = 0,
-                          pipeline_log: str = ''):
-    """写入 QueryAuditLog；失败只记日志，不影响主流程"""
+                          pipeline_log: str = '') -> Optional[int]:
+    """写入 QueryAuditLog；失败只记日志，不影响主流程
+
+    Returns:
+        新建审计记录的 id（供路由层追加后置步骤后 update_pipeline_log 回写）；
+        写入失败返回 None。
+    """
     try:
         from models.security import QueryAuditLog
 
@@ -48,6 +53,27 @@ def write_query_audit_log(user_id: int, user: dict, query: str,
             )
             db.add(log)
             db.commit()
+            db.refresh(log)
+            return log.id
     except Exception as e:
         logger.warning(f"审计日志写入失败: {e}")
         pipeline_logger.error(f"审计日志写入失败: {e}")
+        return None
+
+
+def update_pipeline_log(log_id: Optional[int], pipeline_log: str):
+    """回写审计记录的 pipeline_log 字段（路由层追加后置步骤后调用）
+
+    供「链路追踪」弹窗展示完整端到端链路（前置鉴权 + 生成 + 后置执行/持久化）。
+    失败静默，不影响主流程。
+    """
+    if not log_id:
+        return
+    try:
+        from models.security import QueryAuditLog
+        with session_scope() as db:
+            db.query(QueryAuditLog).filter(QueryAuditLog.id == log_id).update(
+                {QueryAuditLog.pipeline_log: pipeline_log})
+            db.commit()
+    except Exception as e:
+        logger.warning(f"审计链路日志回写失败 (log_id={log_id}): {e}")

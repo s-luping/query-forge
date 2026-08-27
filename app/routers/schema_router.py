@@ -10,11 +10,11 @@ from typing import List, Optional
 
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from app.auth import AdminUser, CurrentUser
 from app.logger import logger, log_audit
-from app.permissions import get_visible_schema_ids, get_table_grants_by_schema
+from app.permissions import get_visible_schema_ids, get_table_grants_by_schema, is_schema_visible
 from services.vector_service import auto_build_vector_index, mark_index_stale  # 从服务层导入（消除路由层职责过重）
 from models.schema import DbSchema, DbColumn
 from models.datasource import DataSource
@@ -576,6 +576,242 @@ def update_column_meta(
     except Exception as e:
         logger.error(f"更新字段元数据失败：{e}")
         raise HTTPException(status_code=500, detail=f"更新失败：{str(e)}")
+
+
+# ═══════════════════════════════════════════════════════════════════
+# 表关系维护
+# ═══════════════════════════════════════════════════════════════════
+
+from models.schema import DbTableRelation
+from crud.schema import relation_crud, table_crud, column_crud, schema_crud
+
+ALLOWED_JOIN_TYPES = {'INNER JOIN', 'LEFT JOIN', 'RIGHT JOIN', 'FULL JOIN'}
+ALLOWED_RELATION_TYPES = {'1:1', '1:N', 'N:1', 'N:N'}
+
+
+class RelationCreateRequest(BaseModel):
+    """新建表关系请求（同数据源可跨库：左右两侧各自选库）"""
+    left_schema_name: str
+    left_table: str
+    left_column: str
+    right_schema_name: str
+    right_table: str
+    right_column: str
+    join_type: str = 'INNER JOIN'
+    relation_type: str = '1:N'
+    description: str = ''
+
+
+class RelationUpdateRequest(BaseModel):
+    """更新表关系请求（全字段覆盖，前端弹窗回显后整体提交）"""
+    left_schema_name: str
+    left_table: str
+    left_column: str
+    right_schema_name: str
+    right_table: str
+    right_column: str
+    join_type: str = 'INNER JOIN'
+    relation_type: str = '1:N'
+    description: str = ''
+
+
+class RelationOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    left_schema_id: int
+    right_schema_id: int
+    left_schema_name: str = ''
+    right_schema_name: str = ''
+    left_table: str
+    left_column: str
+    right_table: str
+    right_column: str
+    join_type: str
+    relation_type: str
+    description: Optional[str] = ''
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+
+def _validate_relation_payload(left_schema, right_schema, left_table, left_column,
+                               right_table, right_column, join_type, relation_type):
+    """校验关系字段：连接方式/基数合法 + 两侧表与字段在各自 schema 中真实存在"""
+    if join_type not in ALLOWED_JOIN_TYPES:
+        raise HTTPException(400, f"连接方式无效，可选: {', '.join(sorted(ALLOWED_JOIN_TYPES))}")
+    if relation_type not in ALLOWED_RELATION_TYPES:
+        raise HTTPException(400, f"关系基数无效，可选: {', '.join(sorted(ALLOWED_RELATION_TYPES))}")
+    if left_schema.id == right_schema.id and left_table == right_table and left_column == right_column:
+        raise HTTPException(400, "两侧连接字段不能是同一字段")
+
+    # 左表/左字段在左库校验
+    ltable = table_crud.get_by_schema_and_name(left_schema.id, left_table)
+    if not ltable:
+        raise HTTPException(400, f"左表不存在: {left_schema.name}.{left_table}")
+    lcol = column_crud.get_by_table_and_name(ltable.id, left_column)
+    if not lcol:
+        raise HTTPException(400, f"左字段不存在: {left_schema.name}.{left_table}.{left_column}")
+    # 右表/右字段在右库校验（跨库时与左库不同）
+    rtable = table_crud.get_by_schema_and_name(right_schema.id, right_table)
+    if not rtable:
+        raise HTTPException(400, f"右表不存在: {right_schema.name}.{right_table}")
+    rcol = column_crud.get_by_table_and_name(rtable.id, right_column)
+    if not rcol:
+        raise HTTPException(400, f"右字段不存在: {right_schema.name}.{right_table}.{right_column}")
+
+
+@router.get("/relations")
+def list_relations(user: CurrentUser, schema_name: Optional[str] = None):
+    """表关系列表（按用户可见 schema 过滤；可再按库名筛选，左右任一侧命中即匹配）"""
+    try:
+        visible = get_visible_schema_ids(user)
+        relations = relation_crud.list_by_schemas(visible) if visible is not None \
+            else relation_crud.list_all(order_by='id')
+        # 注意：visible=None 表示管理员可见全部，必须传 None 给 list_visible（传 [] 会返回空）
+        name_map = {s.id: s.name for s in schema_crud.list_visible(visible)}
+        if schema_name:
+            relations = [r for r in relations
+                         if name_map.get(r.left_schema_id) == schema_name
+                         or name_map.get(r.right_schema_id) == schema_name]
+
+        items = []
+        for r in relations:
+            out = RelationOut.model_validate(r)
+            out.left_schema_name = name_map.get(r.left_schema_id, '')
+            out.right_schema_name = name_map.get(r.right_schema_id, '')
+            items.append(out)
+        return {"items": items, "total": len(items)}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"获取表关系列表失败: {e}")
+        raise HTTPException(status_code=500, detail=f"获取失败: {str(e)}")
+
+
+@router.post("/relations")
+def create_relation(req: RelationCreateRequest, user: AdminUser):
+    """新建表关系（仅管理员；表/字段须真实存在，支持跨库）"""
+    log_audit(user, "create_table_relation",
+              f"{req.left_schema_name}.{req.left_table}.{req.left_column}"
+              f"={req.right_schema_name}.{req.right_table}.{req.right_column}")
+    try:
+        left_schema = schema_crud.get_by_name(req.left_schema_name.strip())
+        if not left_schema:
+            raise HTTPException(400, f"左库不存在: {req.left_schema_name}")
+        right_schema = schema_crud.get_by_name(req.right_schema_name.strip())
+        if not right_schema:
+            raise HTTPException(400, f"右库不存在: {req.right_schema_name}")
+
+        left_table, left_column = req.left_table.strip(), req.left_column.strip()
+        right_table, right_column = req.right_table.strip(), req.right_column.strip()
+        _validate_relation_payload(left_schema, right_schema, left_table, left_column,
+                                   right_table, right_column,
+                                   req.join_type, req.relation_type)
+
+        if relation_crud.exists_same(left_schema.id, left_table, left_column,
+                                     right_schema.id, right_table, right_column):
+            raise HTTPException(400, "该连接关系已存在（两侧字段相同即视为重复）")
+
+        rel = relation_crud.create(
+            schema_id=left_schema.id,
+            left_schema_id=left_schema.id, right_schema_id=right_schema.id,
+            left_table=left_table, left_column=left_column,
+            right_table=right_table, right_column=right_column,
+            join_type=req.join_type, relation_type=req.relation_type,
+            description=req.description, created_by=user['user_id'],
+        )
+        out = RelationOut.model_validate(rel)
+        out.left_schema_name = left_schema.name
+        out.right_schema_name = right_schema.name
+        return out
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"新建表关系失败: {e}")
+        raise HTTPException(status_code=500, detail=f"创建失败: {str(e)}")
+
+
+@router.put("/relations/{relation_id}")
+def update_relation(relation_id: int, req: RelationUpdateRequest, user: AdminUser):
+    """更新表关系（仅管理员；支持跨库，可改两侧库）"""
+    log_audit(user, "update_table_relation", f"id={relation_id}")
+    try:
+        rel = relation_crud.get_by_id(relation_id)
+        if not rel:
+            raise HTTPException(404, "表关系不存在")
+        left_schema = schema_crud.get_by_name(req.left_schema_name.strip())
+        if not left_schema:
+            raise HTTPException(400, f"左库不存在: {req.left_schema_name}")
+        right_schema = schema_crud.get_by_name(req.right_schema_name.strip())
+        if not right_schema:
+            raise HTTPException(400, f"右库不存在: {req.right_schema_name}")
+
+        left_table, left_column = req.left_table.strip(), req.left_column.strip()
+        right_table, right_column = req.right_table.strip(), req.right_column.strip()
+        _validate_relation_payload(left_schema, right_schema, left_table, left_column,
+                                   right_table, right_column,
+                                   req.join_type, req.relation_type)
+
+        if relation_crud.exists_same(left_schema.id, left_table, left_column,
+                                     right_schema.id, right_table, right_column,
+                                     exclude_id=relation_id):
+            raise HTTPException(400, "该连接关系已存在（两侧字段相同即视为重复）")
+
+        rel = relation_crud.update(relation_id,
+                                   schema_id=left_schema.id,
+                                   left_schema_id=left_schema.id,
+                                   right_schema_id=right_schema.id,
+                                   left_table=left_table, left_column=left_column,
+                                   right_table=right_table, right_column=right_column,
+                                   join_type=req.join_type, relation_type=req.relation_type,
+                                   description=req.description)
+        out = RelationOut.model_validate(rel)
+        out.left_schema_name = left_schema.name
+        out.right_schema_name = right_schema.name
+        return out
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"更新表关系失败: {e}")
+        raise HTTPException(status_code=500, detail=f"更新失败: {str(e)}")
+
+
+@router.delete("/relations/{relation_id}")
+def delete_relation(relation_id: int, user: AdminUser):
+    """删除表关系（仅管理员）"""
+    log_audit(user, "delete_table_relation", f"id={relation_id}")
+    try:
+        if not relation_crud.delete(relation_id):
+            raise HTTPException(404, "表关系不存在")
+        return {"success": True, "message": "表关系已删除"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"删除表关系失败: {e}")
+        raise HTTPException(status_code=500, detail=f"删除失败: {str(e)}")
+
+
+@router.get("/table-columns")
+def get_table_columns(user: CurrentUser, schema_name: str, table_name: str):
+    """获取指定表的字段列表（表关系维护下拉用，含权限校验）"""
+    try:
+        if not is_schema_visible(user, schema_name):
+            raise HTTPException(403, "无权访问该数据库")
+        schema = schema_crud.get_by_name(schema_name)
+        if not schema:
+            return {"columns": []}
+        table = table_crud.get_by_schema_and_name(schema.id, table_name)
+        if not table:
+            return {"columns": []}
+        cols = column_crud.list_by_table(table.id)
+        return {"columns": [
+            {"name": c.name, "data_type": c.data_type or '', "description": c.description or ''}
+            for c in cols
+        ]}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"获取表字段失败: {e}")
+        raise HTTPException(status_code=500, detail=f"获取失败: {str(e)}")
 
 
 # ═══════════════════════════════════════════════════════════════════

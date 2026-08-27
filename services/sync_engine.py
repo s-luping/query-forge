@@ -121,16 +121,26 @@ class SyncEngine:
 
         except Exception as e:
             logger.error(f"同步失败: {e}", exc_info=True)
+            now = now_beijing()
             if self._run_log:
                 self._run_log.status = 'failed'
                 self._run_log.error_message = str(e)[:2000]
-                self._run_log.finished_at = now_beijing()
+                self._run_log.finished_at = now
                 self._run_log.duration_ms = int((time.time() - start) * 1000)
+            # 失败同样推进尝试时间：否则任务保持"到期"状态，会被 10 分钟巡检
+            # 反复重试（失败重试风暴）。下次重试时间为 now + interval。
+            self.job.last_synced_at = now
+            self.job.last_sync_status = 'failed'
+            try:
                 with tx_scope() as db:
-                    db.add(self._run_log)
+                    # merge 而非 add：run_log 可能已在步骤1提交（有主键），
+                    # add 会按新行 INSERT 导致主键冲突
+                    if self._run_log is not None:
+                        db.merge(self._run_log)
                     db.merge(self.job)
                     db.commit()
-                self.job.last_sync_status = 'failed'
+            except Exception as e2:
+                logger.error(f"同步失败状态落库异常: {e2}", exc_info=True)
             return self._run_log
         finally:
             if self._connector:

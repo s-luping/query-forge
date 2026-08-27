@@ -28,6 +28,18 @@ from crud.sync import sync_job_crud, sync_run_crud, change_crud, get_sync_stats
 router = APIRouter()
 
 
+def _validate_schedule(schedule_type: Optional[str], schedule_value: Optional[str]):
+    """interval 类型必须为 ≥10 的正整数分钟（调度巡检周期为 10 分钟，更小值无意义）"""
+    if schedule_type == 'interval' and schedule_value is not None:
+        try:
+            minutes = int(schedule_value)
+        except (ValueError, TypeError):
+            raise HTTPException(400, "同步间隔必须为整数分钟")
+        if minutes < 10:
+            raise HTTPException(400, "同步间隔最小为 10 分钟（系统巡检周期），当前值无效")
+
+
+
 # ═══════════════════════════════════════════════════════════════════
 # Pydantic 模型
 # ═══════════════════════════════════════════════════════════════════
@@ -326,6 +338,8 @@ def create_job(req: SyncJobCreate, user: AdminUser):
     if sync_job_crud.get_by_datasource_and_schema(req.datasource_id, schema_name):
         raise HTTPException(400, "该数据源+目标 schema 的同步任务已存在")
 
+    _validate_schedule(req.schedule_type, req.schedule_value)
+
     job = sync_job_crud.create(
         datasource_id=req.datasource_id,
         target_schema_name=schema_name,
@@ -351,6 +365,7 @@ def update_job(job_id: int, req: SyncJobUpdate, user: AdminUser):
         raise HTTPException(404, "同步任务不存在")
 
     # 目标数据库名始终取数据源数据库名；数据源变更后下次编辑保存时自动同步
+    _validate_schedule(req.schedule_type, req.schedule_value)
     updates = {}
     for field in ['sync_mode', 'schedule_type', 'schedule_value',
                   'auto_classify', 'include_tables', 'exclude_tables']:
@@ -366,6 +381,10 @@ def update_job(job_id: int, req: SyncJobUpdate, user: AdminUser):
         schema_name = (ds.database or '').strip()
         if not schema_name:
             raise HTTPException(400, "数据源未填写数据库名，无法作为目标数据库")
+        # 唯一约束（datasource_id+target_schema_name）前置校验，避免 IntegrityError 500
+        existing = sync_job_crud.get_by_datasource_and_schema(req.datasource_id, schema_name)
+        if existing and existing.id != job_id:
+            raise HTTPException(400, "该数据源+目标 schema 的同步任务已存在")
         updates['datasource_id'] = req.datasource_id
         updates['target_schema_name'] = schema_name
 
@@ -408,6 +427,17 @@ def trigger_sync(job_id: int, user: AdminUser):
         ds = db.query(DataSource).filter(DataSource.id == job.datasource_id).first()
         if not ds:
             raise HTTPException(404, "关联数据源不存在")
+
+        # 并发防护：30 分钟内有处于 running 状态的执行记录时拒绝重复触发
+        from models.sync import SyncRunLog
+        active_run = db.query(SyncRunLog).filter(
+            SyncRunLog.job_id == job_id,
+            SyncRunLog.status == 'running',
+        ).order_by(SyncRunLog.started_at.desc()).first()
+        if active_run and active_run.started_at:
+            from app.timezone import now_beijing as _now
+            if (_now() - active_run.started_at).total_seconds() < 30 * 60:
+                raise HTTPException(409, "该任务正在同步中，请稍候再试")
     
         triggered_by = f"manual:{user.get('username', '')}"
     

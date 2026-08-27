@@ -5,7 +5,7 @@
 第一轮走完整召回流水线（委托 core.retrieval.SchemaRetriever），
 后续轮次直接复用对话历史 + 首轮已确定的 schema 上下文。
 """
-from typing import Optional
+from typing import Optional, List
 
 from app.logger import logger, pipeline_logger
 from app.timezone import now_beijing
@@ -14,6 +14,22 @@ from core.gen_sql import SqlGenerator
 from core.gen_audit import write_query_audit_log
 from core.ret_keywords import KeywordExtractor
 from core.ret_retriever import SchemaRetriever
+
+
+def _parse_tables_from_csv(schema_csv: str) -> List[str]:
+    """从 schema CSV 解析表名（第一列，跳过表头行）
+
+    跨库模式下表名带库前缀（库名.表名），一并返回（追问轮用于表关系匹配）。
+    """
+    tables: List[str] = []
+    for line in (schema_csv or '').split('\n'):
+        line = line.strip()
+        if not line or line.startswith('表名'):
+            continue
+        t = line.split(',')[0].strip()
+        if t and t not in tables:
+            tables.append(t)
+    return tables
 
 
 class ChatSession:
@@ -45,16 +61,20 @@ class ChatSession:
         schema_name: Optional[str] = None,
         db_type: str = "sqlite",
         knowledge_content: str = "",
-        scope_schema_id: Optional[int] = None
+        scope_schema_id: Optional[int] = None,
+        pre_log: Optional[list] = None
     ) -> dict:
         """第一轮消息：走完整流水线（关键词→字段召回→表聚合→LLM生成）
 
+        Args:
+            pre_log: 路由层前置步骤（鉴权/模型/知识库），追加到链路头部
+
         Returns:
-            {"sql": ..., "is_valid": ..., "schema_csv": ..., "messages": [...]}
+            {"sql": ..., "is_valid": ..., "schema_csv": ..., "messages": [...], "audit_log_id": ...}
         """
         import json
         start_time = now_beijing()
-        pipeline_log = []
+        pipeline_log = list(pre_log) if pre_log else []
         self._log_step(pipeline_log, "PIPELINE_START", {
             "user_id": self.user_id, "query": query,
             "schema_name": schema_name or "全部",
@@ -80,6 +100,9 @@ class ChatSession:
             "tables": aggregation.get('tables', []),
             "total_field_count": len(aggregation.get('all_fields', {}))})
 
+        # Step 3.5: 权限裁剪统计（库级 / 表级 / 字段级）
+        self._log_permission_stats(pipeline_log, aggregation, schema_name)
+
         # 概念级召回：typed 知识单独召回 + relation 动态扩表
         scope_id = scope_schema_id if scope_schema_id is not None else self.retriever.resolve_scope_schema_id(schema_name)
         recall = self.retriever.recall_knowledge(query, scope_schema_id=scope_id)
@@ -96,13 +119,16 @@ class ChatSession:
         # 构建 schema CSV（会保存到对话上下文，供后续轮次复用）
         schema_csv = SchemaRetriever.build_schema_csv(aggregation)
 
+        # 人工维护的表关系 → JOIN 提示（随 schema 上下文一并注入）
+        relations_text = self.retriever.get_relations_text(aggregation.get('tables', []))
+
         logger.info(f"[ChatSession] 第一轮 - schema 上下文已构建，字段数: {len(aggregation.get('all_fields', {}))}")
 
         # Step 4: 构建 messages 数组（召回的知识文本并入【领域知识】）
         kb = knowledge_content or ""
         if recall['prompt_text']:
             kb = (kb + "\n\n" + recall['prompt_text']).strip() if kb else recall['prompt_text']
-        system_prompt = self._build_system_prompt(schema_csv, db_type, kb)
+        system_prompt = self._build_system_prompt(schema_csv, db_type, kb, relations_text)
         messages = [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": query}
@@ -110,6 +136,48 @@ class ChatSession:
         self._log_step(pipeline_log, "STEP4_CONTEXT", {
             "has_knowledge": bool(knowledge_content),
             "schema_csv_lines": len(schema_csv.split('\n'))})
+
+        # Step 4.5: 可否生成 SQL 判断 — 信息不足则提前返回，引导用户补充
+        judge_prompt = self.sql_generator.judge_generatable_prompt(
+            query=query, schema_csv=schema_csv,
+            knowledge_content=kb, relations_text=relations_text)
+        self._log_step(pipeline_log, "STEP_JUDGE_PROMPT", {
+            "prompt_length": len(judge_prompt)})
+        try:
+            judge = self.llm_client.call_llm_json(judge_prompt)
+        except Exception as e:
+            self._log_step(pipeline_log, "STEP_JUDGE_ERROR", {"error": str(e)})
+            judge = None
+        self._log_step(pipeline_log, "STEP_JUDGE_RESULT", {
+            "can_generate": (judge or {}).get('can_generate'),
+            "reason": (judge or {}).get('reason', ''),
+            "missing_info": (judge or {}).get('missing_info', []),
+            "suggestion": (judge or {}).get('suggestion', '')})
+        if judge and not judge.get('can_generate', True):
+            duration_ms = int((now_beijing() - start_time).total_seconds() * 1000)
+            jt = judge.get('_judge_tokens') or {}
+            audit_log_id = write_query_audit_log(
+                self.user_id, self.user, query, '', '',
+                gateway_result=None, duration_ms=duration_ms,
+                pipeline_log=json.dumps(pipeline_log, ensure_ascii=False, default=str))
+            return {
+                "sql": '', "is_valid": False,
+                "error_message": judge.get('suggestion') or '信息不足，请补充后重试',
+                "columns": None, "schema_csv": schema_csv,
+                "tables": aggregation.get('tables', []), "keywords": keywords,
+                "messages": messages, "duration_ms": duration_ms,
+                "raw_response": '', "gateway": None, "pipeline_log": pipeline_log,
+                "need_more_info": True,
+                "missing_info": judge.get('missing_info', []),
+                "suggestion": judge.get('suggestion', ''),
+                "judge_reason": judge.get('reason', ''),
+                "audit_log_id": audit_log_id,
+                "tokens": {
+                    "prompt_tokens": jt.get('prompt_tokens', 0),
+                    "completion_tokens": jt.get('completion_tokens', 0),
+                    "total_tokens": jt.get('total_tokens', 0),
+                },
+            }
 
         # Step 5: 调用 LLM
         llm_result = self.llm_client.chat(messages)
@@ -136,7 +204,7 @@ class ChatSession:
 
         # Step 8: 审计日志
         duration_ms = int((now_beijing() - start_time).total_seconds() * 1000)
-        write_query_audit_log(
+        audit_log_id = write_query_audit_log(
             self.user_id, self.user, query, generated_sql, sql,
             gateway_result=gateway_info, duration_ms=duration_ms,
             pipeline_log=json.dumps(pipeline_log, ensure_ascii=False, default=str)
@@ -148,12 +216,14 @@ class ChatSession:
             "error_message": error_msg,
             "columns": columns,
             "schema_csv": schema_csv,
+            "tables": aggregation.get('tables', []),
             "keywords": keywords,
             "messages": messages,
             "duration_ms": duration_ms,
             "raw_response": llm_result.get("raw_response", ""),
             "gateway": gateway_info,
             "pipeline_log": pipeline_log,
+            "audit_log_id": audit_log_id,
             "tokens": {
                 "prompt_tokens": llm_result.get("prompt_tokens", 0),
                 "completion_tokens": llm_result.get("completion_tokens", 0),
@@ -166,10 +236,12 @@ class ChatSession:
         conversation_messages: list,
         new_user_content: str,
         schema_csv: str,
+        first_tables: Optional[List[str]] = None,
         db_type: str = "sqlite",
         schema_name: Optional[str] = None,
         knowledge_content: str = "",
-        scope_schema_id: Optional[int] = None
+        scope_schema_id: Optional[int] = None,
+        pre_log: Optional[list] = None
     ) -> dict:
         """后续轮次消息：使用对话历史 + 已保存的 schema 上下文
 
@@ -180,13 +252,14 @@ class ChatSession:
             db_type: 数据库类型
             schema_name: 数据源/schema 名（用于追问召回追踪）
             knowledge_content: 创建对话时关联的知识库内容
+            pre_log: 路由层前置步骤（鉴权/模型/知识库），追加到链路头部
 
         Returns:
-            {"sql": ..., "is_valid": ..., "messages": [...]}
+            {"sql": ..., "is_valid": ..., "messages": [...], "audit_log_id": ...}
         """
         import json
         start_time = now_beijing()
-        pipeline_log = []
+        pipeline_log = list(pre_log) if pre_log else []
         self._log_step(pipeline_log, "PIPELINE_START", {
             "user_id": self.user_id, "query": new_user_content,
             "schema_name": schema_name or "复用上一轮", "mode": "followup",
@@ -219,17 +292,47 @@ class ChatSession:
             self._log_step(pipeline_log, "STEP3_AGGREGATE", {
                 "reuse_schema_csv": True,
                 "schema_csv_lines": len(schema_csv.split('\n'))})
+            aggregation = None
 
-        messages = self._build_messages_from_history(
-            conversation_messages, schema_csv, db_type, knowledge_content
-        )
-
-        # 概念级召回：追问也单独召回 typed 知识，文本并入【领域知识】
+        # 累积召回：首轮表集合(first_tables) ∪ 追问重召回表 ∪ 知识扩表
+        # 仅当首轮表集合已知时重建（带权限裁剪），否则沿用 router 全量 schema_csv（向后兼容旧对话）
         scope_id = scope_schema_id if scope_schema_id is not None else self.retriever.resolve_scope_schema_id(schema_name)
         followup_recall = self.retriever.recall_knowledge(new_user_content, scope_schema_id=scope_id)
         self._log_step(pipeline_log, "STEP_RECALL_KNOWLEDGE", {
             "matched_count": len(followup_recall['items']),
             "related_tables": followup_recall['related_tables']})
+
+        relation_tables = None
+        if first_tables:
+            merged_tables = set(first_tables)
+            if aggregation is not None:
+                merged_tables |= set(aggregation.get('tables', []))
+            merged_tables |= set(followup_recall['related_tables'])
+            try:
+                recalled = [{'table_name': t} for t in merged_tables]
+                merged_aggregation = self.retriever.aggregate_tables(recalled, schema_name)
+                schema_csv_used = SchemaRetriever.build_schema_csv(merged_aggregation)
+                relation_tables = merged_aggregation.get('tables', [])
+                self._log_step(pipeline_log, "STEP_CUMULATIVE_AGGREGATE", {
+                    "merged_table_count": len(relation_tables),
+                    "first_tables": len(first_tables),
+                    "from_recall": len(aggregation.get('tables', [])) if aggregation else 0,
+                    "from_knowledge": len(followup_recall['related_tables'])})
+                # Step 3.5: 权限裁剪统计（累积后）
+                self._log_permission_stats(pipeline_log, merged_aggregation, schema_name)
+            except Exception as e:
+                logger.warning(f"[ChatSession] 累积聚合失败，回退全量 schema_csv: {e}")
+                schema_csv_used = schema_csv
+                relation_tables = _parse_tables_from_csv(schema_csv)
+        else:
+            schema_csv_used = schema_csv
+            relation_tables = _parse_tables_from_csv(schema_csv)
+
+        messages = self._build_messages_from_history(
+            conversation_messages, schema_csv_used, db_type, knowledge_content
+        )
+
+        # 概念级召回知识文本并入【领域知识】
         if followup_recall['prompt_text']:
             # 在现有 system prompt 末尾追加召回知识（复用已构建的 messages）
             if messages and messages[0].get('role') == 'system':
@@ -237,6 +340,17 @@ class ChatSession:
                 base = messages[0]['content']
                 if extra not in base:
                     messages[0]['content'] = (base + "\n\n【领域知识(追问召回)】\n" + extra).strip()
+
+        # 人工维护的表关系（基于累积/全量表集合）：追加 JOIN 提示
+        if relation_tables:
+            followup_relations = self.retriever.get_relations_text(relation_tables)
+            if followup_relations and messages and messages[0].get('role') == 'system':
+                base = messages[0]['content']
+                if '【表关系（已人工确认的 JOIN 条件）】' not in base:
+                    messages[0]['content'] = (
+                        base + "\n\n【表关系（已人工确认的 JOIN 条件）】\n" + followup_relations.strip()
+                        + "\n多表查询时必须优先使用上述连接条件，不要自行猜测连接字段。"
+                    ).strip()
 
         # 追加新的 user 消息
         messages.append({"role": "user", "content": new_user_content})
@@ -248,6 +362,54 @@ class ChatSession:
             "has_knowledge": bool(knowledge_content),
             "history_rounds": len(conversation_messages),
             "schema_csv_lines": len(schema_csv.split('\n'))})
+
+        # Step 4.5: 可否生成 SQL 判断 — 信息不足则提前返回，引导用户补充
+        followup_relations_for_judge = ""
+        if relation_tables:
+            followup_relations_for_judge = self.retriever.get_relations_text(relation_tables)
+        judge_prompt = self.sql_generator.judge_generatable_prompt(
+            query=new_user_content, schema_csv=schema_csv_used,
+            knowledge_content=knowledge_content,
+            relations_text=followup_relations_for_judge)
+        self._log_step(pipeline_log, "STEP_JUDGE_PROMPT", {
+            "prompt_length": len(judge_prompt)})
+        try:
+            judge = self.llm_client.call_llm_json(judge_prompt)
+        except Exception as e:
+            self._log_step(pipeline_log, "STEP_JUDGE_ERROR", {"error": str(e)})
+            judge = None
+        self._log_step(pipeline_log, "STEP_JUDGE_RESULT", {
+            "can_generate": (judge or {}).get('can_generate'),
+            "reason": (judge or {}).get('reason', ''),
+            "missing_info": (judge or {}).get('missing_info', []),
+            "suggestion": (judge or {}).get('suggestion', '')})
+        if judge and not judge.get('can_generate', True):
+            duration_ms = int((now_beijing() - start_time).total_seconds() * 1000)
+            jt = judge.get('_judge_tokens') or {}
+            try:
+                audit_log_id = write_query_audit_log(
+                    self.user_id, self.user, new_user_content, '', '',
+                    gateway_result=None, duration_ms=duration_ms,
+                    pipeline_log=json.dumps(pipeline_log, ensure_ascii=False, default=str))
+            except Exception:
+                logger.warning("跟进判断不足审计日志写入失败（不影响主流程）")
+                audit_log_id = None
+            return {
+                "sql": '', "is_valid": False,
+                "error_message": judge.get('suggestion') or '信息不足，请补充后重试',
+                "columns": None, "messages": messages, "duration_ms": duration_ms,
+                "raw_response": '', "gateway": None, "pipeline_log": pipeline_log,
+                "need_more_info": True,
+                "missing_info": judge.get('missing_info', []),
+                "suggestion": judge.get('suggestion', ''),
+                "judge_reason": judge.get('reason', ''),
+                "audit_log_id": audit_log_id,
+                "tokens": {
+                    "prompt_tokens": jt.get('prompt_tokens', 0),
+                    "completion_tokens": jt.get('completion_tokens', 0),
+                    "total_tokens": jt.get('total_tokens', 0),
+                },
+            }
 
         # Step 5: 调用 LLM
         llm_result = self.llm_client.chat(messages)
@@ -275,12 +437,13 @@ class ChatSession:
         # Step 8: 审计日志（与首轮一致：完整链路 问题→关键词→召回→生成）
         duration_ms = int((now_beijing() - start_time).total_seconds() * 1000)
         try:
-            write_query_audit_log(
+            audit_log_id = write_query_audit_log(
                 self.user_id, self.user, new_user_content, generated_sql, sql,
                 gateway_result=gateway_info, duration_ms=duration_ms,
                 pipeline_log=json.dumps(pipeline_log, ensure_ascii=False, default=str))
         except Exception:
             logger.warning("跟进消息审计日志写入失败（不影响主流程）")
+            audit_log_id = None
 
         return {
             "sql": sql,
@@ -292,6 +455,7 @@ class ChatSession:
             "raw_response": llm_result.get("raw_response", ""),
             "gateway": gateway_info,
             "pipeline_log": pipeline_log,
+            "audit_log_id": audit_log_id,
             "tokens": {
                 "prompt_tokens": llm_result.get("prompt_tokens", 0),
                 "completion_tokens": llm_result.get("completion_tokens", 0),
@@ -300,6 +464,34 @@ class ChatSession:
         }
 
     # ---------- 内部方法 ----------
+
+    def _log_permission_stats(self, pipeline_log: list, aggregation: dict,
+                              schema_name: Optional[str]):
+        """记录权限裁剪统计：库级可见性 / 表级白名单 / 字段级访问分布"""
+        from collections import Counter
+        from app.permissions import (get_visible_schema_ids, get_table_grants_by_schema,
+                                     get_column_access_map)
+        try:
+            visible = get_visible_schema_ids(self.user)
+            table_grants = get_table_grants_by_schema(self.user)
+            tables = aggregation.get('tables', [])
+            col_map = (get_column_access_map(self.user, schema_name=schema_name,
+                                             table_names=tables or None)
+                       if tables else {})
+            dist = Counter(col_map.values())
+            self._log_step(pipeline_log, "STEP_PERMISSION", {
+                "schema_visible": ("全部" if visible is None
+                                   else (f"{len(visible)} 个" if visible else "无")),
+                "table_grant_schemas": len(table_grants),
+                "fields_in_context": len(aggregation.get('all_fields', {})),
+                "field_access": {
+                    "SELECT": dist.get('SELECT', 0),
+                    "FILTER": dist.get('FILTER', 0),
+                    "NONE": dist.get('NONE', 0),
+                },
+            })
+        except Exception as e:
+            self._log_step(pipeline_log, "STEP_PERMISSION_ERROR", {"error": str(e)})
 
     def _apply_gateway(self, sql: str, is_valid: bool, error_msg: Optional[str],
                        db_type: str, schema_name: Optional[str] = None):
@@ -324,7 +516,9 @@ class ChatSession:
             logger.warning(f"[ChatSession] 网关处理失败: {e}")
             return sql, is_valid, error_msg, None
 
-    def _build_system_prompt(self, schema_csv: str, db_type: str, knowledge_content: str = "") -> str:
+    def _build_system_prompt(self, schema_csv: str, db_type: str,
+                             knowledge_content: str = "",
+                             relations_text: str = "") -> str:
         """构建 system prompt"""
         db_name = db_type.upper() if db_type else "SQLite"
         prompt = f"""你是一个专业的SQL生成助手。请根据用户的自然语言查询和表结构，生成正确的{db_name}查询语句。
@@ -342,6 +536,10 @@ class ChatSession:
 
         if knowledge_content:
             prompt += f"\n\n【领域知识】\n{knowledge_content}"
+
+        if relations_text:
+            prompt += ("\n\n【表关系（已人工确认的 JOIN 条件）】\n" + relations_text.strip()
+                       + "\n多表查询时必须优先使用上述连接条件，不要自行猜测连接字段。")
 
         prompt += "\n\n只返回SQL语句，不要包含其他解释文字。"
         return prompt

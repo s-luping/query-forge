@@ -64,9 +64,32 @@ def _resolve_datasource(schema_name: Optional[str]) -> Optional[dict]:
         }
 
 
+def _extract_sql_schema_names(sql: str) -> List[str]:
+    """从 SQL 中提取表引用携带的库名（库名.表名 形式），去重保序。
+
+    跨库模式（schema_name=None）下生成的 SQL 会带库前缀（如 pjmall.asset），
+    执行前据此路由到正确数据源连接；无库前缀的 SQL 返回空列表（走默认路径）。
+    解析失败不阻断主流程（静默返回空，交由原逻辑兜底）。
+    """
+    names: List[str] = []
+    try:
+        import sqlglot
+        from sqlglot import exp
+        tree = sqlglot.parse_one(sql)
+        for t in tree.find_all(exp.Table):
+            if t.db and t.db not in names:
+                names.append(t.db)
+    except Exception:
+        pass
+    return names
+
+
 def _build_engine_for_db_type(db_type: str, ds: dict) -> Engine:
-    """按数据源连接参数构建只读执行引擎"""
-    db_type = (db_type or ds.get('db_type') or 'sqlite').lower()
+    """按数据源连接参数构建只读执行引擎
+
+    数据源自身类型优先（跨库模式下调用方兜底类型可能与实际库类型不一致）。
+    """
+    db_type = (ds.get('db_type') or db_type or 'sqlite').lower()
     password = decrypt_secret(ds.get('password_enc') or '') if ds.get('password_enc') else ''
     database = ds.get('database') or ''
     username = ds.get('username') or ''
@@ -107,17 +130,26 @@ def execute_sql(sql: str, schema_name: Optional[str] = None,
     _validate_select_only(sql)
     start = time.time()
 
-    ds = _resolve_datasource(schema_name)
+    # 跨库模式（schema_name=None）：从 SQL 表前缀解析目标库，路由到对应数据源
+    # 例如「pjmall.asset JOIN sys.sys_config」→ 优先用 SQL 中第一个库的数据源连接
+    resolved_schema = schema_name
+    if not schema_name:
+        sql_schemas = _extract_sql_schema_names(sql)
+        if sql_schemas:
+            resolved_schema = sql_schemas[0]
+
+    ds = _resolve_datasource(resolved_schema)
     engine = None
     try:
         if ds is not None:
+            # 数据源类型优先于调用方兜底类型（跨库场景尤为重要）
             engine = _build_engine_for_db_type(db_type, ds)
         elif db_type in ('sqlite', 'sqlite3'):
             from db import engine_main
             engine = engine_main
         else:
             raise SqlExecutionError(
-                f"未找到数据源连接（schema={schema_name}），无法执行 {db_type} 查询")
+                f"未找到数据源连接（schema={resolved_schema}），无法执行 {db_type} 查询")
 
         with engine.connect() as conn:
             result = conn.execute(text(sql))
@@ -132,7 +164,7 @@ def execute_sql(sql: str, schema_name: Optional[str] = None,
             row_count = len(rows)
 
         duration_ms = int((time.time() - start) * 1000)
-        logger.info(f"SQL 执行完成: schema={schema_name} rows={row_count} 耗时={duration_ms}ms")
+        logger.info(f"SQL 执行完成: schema={resolved_schema} rows={row_count} 耗时={duration_ms}ms")
         return {
             'columns': col_names,
             'rows': rows,
@@ -143,7 +175,7 @@ def execute_sql(sql: str, schema_name: Optional[str] = None,
     except SqlExecutionError:
         raise
     except Exception as e:
-        logger.warning(f"SQL 执行失败: schema={schema_name} err={e}")
+        logger.warning(f"SQL 执行失败: schema={resolved_schema} err={e}")
         raise SqlExecutionError(f"SQL 执行失败: {str(e)}")
     finally:
         if engine is not None:

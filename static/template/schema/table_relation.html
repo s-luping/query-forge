@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>表关系维护</title>
+    <link rel="stylesheet" href="/static/css/bootstrap.min.css">
+    <link rel="stylesheet" href="/static/css/all.min.css">
+    <link rel="stylesheet" href="/static/css/common.css">
+    <style>
+        .badge-join { background: #667eea; }
+        .empty-state { text-align: center; padding: 40px; color: #999; }
+        .rel-arrow { color: #667eea; font-weight: 600; }
+        .hint-box { background: #f0f4ff; border-left: 3px solid #667eea; padding: 10px 14px;
+                    border-radius: 4px; font-size: 13px; color: #495057; margin-bottom: 12px; }
+    </style>
+</head>
+<body>
+<div class="container-fluid">
+    <div class="hint-box">
+        维护表之间的 JOIN 关系后，智能查询（单轮问答与多轮对话）会在涉及相关表时
+        自动把连接条件注入提示词，让生成的 SQL 使用正确的连接字段。
+    </div>
+
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <div class="d-flex align-items-center gap-2">
+                <span>表关系列表</span>
+                <select class="form-select form-select-sm" id="relSchemaFilter" style="width:200px;" onchange="loadRelations()">
+                    <option value="">全部数据库</option>
+                </select>
+            </div>
+            <button class="btn btn-sm btn-primary" onclick="showRelModal()"><i class="fas fa-plus"></i> 新增关系</button>
+        </div>
+        <div class="card-body p-0">
+            <table class="table table-hover table-sm mb-0">
+                <thead><tr>
+                    <th>库（左 ⇄ 右）</th><th>左表.字段</th><th>连接</th><th>右表.字段</th>
+                    <th>基数</th><th>说明</th><th>更新时间</th><th>操作</th>
+                </tr></thead>
+                <tbody id="relTable"><tr><td colspan="8" class="empty-state">加载中...</td></tr></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- 关系编辑弹窗 -->
+<div class="modal fade" id="relModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header"><h5 class="modal-title" id="relModalTitle">新增表关系</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <input type="hidden" id="relId">
+                <div class="row align-items-end">
+                    <div class="col-md-6 mb-3"><label class="form-label">左表所属库 <span class="text-danger">*</span></label>
+                        <select class="form-select" id="relLeftSchema" onchange="onSchemaChange('left')"></select></div>
+                    <div class="col-md-6 mb-3"><label class="form-label">右表所属库 <span class="text-danger">*</span></label>
+                        <select class="form-select" id="relRightSchema" onchange="onSchemaChange('right')"></select></div>
+                </div>
+                <div class="row align-items-end">
+                    <div class="col-md-5 mb-3"><label class="form-label">左表 <span class="text-danger">*</span></label>
+                        <select class="form-select" id="relLeftTable" onchange="onTableChange('left')"></select></div>
+                    <div class="col-md-7 mb-3"><label class="form-label">左表连接字段 <span class="text-danger">*</span></label>
+                        <select class="form-select" id="relLeftColumn"></select></div>
+                </div>
+                <div class="row align-items-end">
+                    <div class="col-md-5 mb-3"><label class="form-label">右表 <span class="text-danger">*</span></label>
+                        <select class="form-select" id="relRightTable" onchange="onTableChange('right')"></select></div>
+                    <div class="col-md-7 mb-3"><label class="form-label">右表连接字段 <span class="text-danger">*</span></label>
+                        <select class="form-select" id="relRightColumn"></select></div>
+                </div>
+                <div class="row">
+                    <div class="col-md-4 mb-3"><label class="form-label">连接方式</label>
+                        <select class="form-select" id="relJoinType">
+                            <option value="INNER JOIN">INNER JOIN</option>
+                            <option value="LEFT JOIN">LEFT JOIN</option>
+                            <option value="RIGHT JOIN">RIGHT JOIN</option>
+                            <option value="FULL JOIN">FULL JOIN</option>
+                        </select></div>
+                    <div class="col-md-4 mb-3"><label class="form-label">基数关系</label>
+                        <select class="form-select" id="relCardinality">
+                            <option value="1:1">1 : 1</option>
+                            <option value="1:N" selected>1 : N</option>
+                            <option value="N:1">N : 1</option>
+                            <option value="N:N">N : N</option>
+                        </select></div>
+                    <div class="col-md-4 mb-3"><label class="form-label">说明</label>
+                        <input type="text" class="form-control" id="relDescription" placeholder="如：订单关联客户"></div>
+                </div>
+                <small class="text-muted">支持同数据源跨库关联：左右两侧可分别选择不同数据库，保存时校验两侧表与字段均真实存在。</small>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button class="btn btn-primary" onclick="saveRelation()">保存</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="/static/js/bootstrap.bundle.min.js"></script>
+<script src="/static/js/app_common.js"></script>
+<script src="/static/js/table_relation.js"></script>
+</body>
+</html>

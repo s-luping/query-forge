@@ -6,6 +6,7 @@ LLM客户端 - 通用大模型API调用
 性能：requests.Session 连接池复用，减少建连开销
 """
 import ipaddress
+import json
 import re
 import time
 from typing import Optional
@@ -131,6 +132,62 @@ class LLMClient:
         """调用大模型API，返回SQL"""
         result = self.call_llm_with_details(prompt)
         return result['sql']
+
+    def call_llm_json(self, prompt: str) -> dict:
+        """调用大模型 API 并解析 JSON 响应（用于结构化判断，如「可否生成 SQL」）
+
+        解析策略（容错）：
+          1. 去掉 ```json / ``` 代码块包裹
+          2. 截取首个 '{' 到最后一个 '}' 的子串做 json.loads
+          3. 解析失败 → 返回 {"can_generate": true, "reason": "..."} 默认放行，
+             保证判断步故障不阻断主生成流程（宁可放过，不可误拦）
+
+        Returns:
+            dict: 含原始 JSON 字段 + _judge_tokens（token 统计）
+        """
+        result = self.call_llm_with_details(prompt)
+        raw = (result.get('raw_response') or '').strip()
+
+        # 去掉 markdown 代码块包裹
+        cleaned = raw
+        if cleaned.startswith('```json'):
+            cleaned = cleaned[7:]
+        elif cleaned.startswith('```'):
+            cleaned = cleaned[3:]
+        if cleaned.endswith('```'):
+            cleaned = cleaned[:-3]
+        cleaned = cleaned.strip()
+
+        # 截取首个 { 到最后一个 } 之间的 JSON 文本
+        start = cleaned.find('{')
+        end = cleaned.rfind('}')
+        tokens_meta = {
+            'prompt_tokens': result.get('prompt_tokens', 0),
+            'completion_tokens': result.get('completion_tokens', 0),
+            'total_tokens': result.get('total_tokens', 0),
+        }
+        if start != -1 and end != -1 and end > start:
+            json_str = cleaned[start:end + 1]
+            try:
+                parsed = json.loads(json_str)
+                if isinstance(parsed, dict):
+                    parsed.setdefault('_judge_tokens', tokens_meta)
+                    parsed.setdefault('_judge_raw', raw)
+                    return parsed
+            except json.JSONDecodeError as e:
+                llm_logger.warning(f"【JSON 解析失败】{e} | raw: {raw[:200]}")
+        else:
+            llm_logger.warning(f"【JSON 响应未找到对象边界】raw: {raw[:200]}")
+
+        # 兜底：默认放行，避免判断步故障阻断生成
+        return {
+            'can_generate': True,
+            'reason': '可行性判断响应解析失败，默认放行进入生成流程',
+            'missing_info': [],
+            'suggestion': '',
+            '_judge_tokens': tokens_meta,
+            '_judge_raw': raw,
+        }
 
     def call_llm_with_details(self, prompt: str) -> dict:
         """调用大模型API，返回详细信息"""

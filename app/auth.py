@@ -191,7 +191,7 @@ async def get_current_admin(request: Request) -> dict:
 
 # ═══════════════════════════════════════════════════════════════════
 # 类型化依赖别名 — 企业主流写法（FastAPI Annotated 依赖注入）
-#   def generate_sql(request: TextToSqlRequest, user: CurrentUser):
+#   def create_conversation(req: CreateConversationRequest, user: CurrentUser):
 #   def create_user(req: UserCreateRequest, user: AdminUser):
 # 相比 `user=Depends(get_current_user)`：IDE 类型提示、Swagger 可读、
 # 角色校验下沉到依赖层，业务函数不再重复写 _admin_only。

@@ -23,7 +23,8 @@ class SqlGenerator:
             schema_csv: str = "",
             knowledge_content: str = "",
             history_queries: List[Dict[str, str]] = None,
-            db_type: str = "sqlite"
+            db_type: str = "sqlite",
+            relations_text: str = ""
     ) -> str:
         """生成用于大模型的SQL生成提示
 
@@ -33,6 +34,7 @@ class SqlGenerator:
             knowledge_content: 知识库内容（业务口径/表关系/计算规则等）
             history_queries: 历史成功查询 [{query, sql}]
             db_type: 数据库类型 (mysql, sqlite, postgresql, oracle, sqlserver)
+            relations_text: 人工维护的表间 JOIN 关系提示（每行一条）
         """
         quote = self._get_quote(db_type)
         pre_rules = (
@@ -58,6 +60,10 @@ class SqlGenerator:
 
         if knowledge_content:
             prompt_parts.append(f"【领域知识】\n{knowledge_content.strip()}")
+        if relations_text:
+            prompt_parts.append(
+                "【表关系（已人工确认的 JOIN 条件）】\n" + relations_text.strip()
+                + "\n多表查询时必须优先使用上述连接条件，不要自行猜测连接字段。")
         if history_section:
             prompt_parts.append(f"【历史成功查询参考】\n{history_section}")
 
@@ -66,6 +72,53 @@ class SqlGenerator:
 
         prompt = '\n\n'.join(prompt_parts)
         return prompt
+
+    def judge_generatable_prompt(
+            self,
+            query: str,
+            schema_csv: str = "",
+            knowledge_content: str = "",
+            relations_text: str = ""
+    ) -> str:
+        """生成「可否生成 SQL」的判断提示词
+
+        让 LLM 基于已召回的表结构 + 领域知识，判断用户问题信息是否充足。
+        若不足，指出缺失项并给出补充建议，供前端引导用户补充后再生成。
+
+        Args:
+            query: 用户原始问题
+            schema_csv: 已召回的表结构（按权限裁剪后的 CSV）
+            knowledge_content: 领域知识（业务口径/表关系/计算规则）
+            relations_text: 人工维护的 JOIN 关系提示
+        """
+        prompt_parts = [
+            "你是一个 SQL 生成可行性判断专家。请判断：基于已召回的表结构和领域知识，能否为用户的自然语言问题生成一条能正确回答该问题的 SQL 查询。",
+            f"【用户问题】\n{query}",
+            f"【已召回表结构】\n{schema_csv or '（无）'}",
+        ]
+        if knowledge_content:
+            prompt_parts.append(f"【领域知识】\n{knowledge_content.strip()}")
+        if relations_text:
+            prompt_parts.append(
+                "【表关系（已人工确认的 JOIN 条件）】\n" + relations_text.strip())
+
+        prompt_parts.append(
+            "【判断标准】\n"
+            "1. 表覆盖：用户问题涉及的实体是否都能在已召回的表中找到对应表；若问题明显指向未召回的表 → 不足\n"
+            "2. 字段覆盖：所需的查询字段、过滤字段、关联字段是否都存在；关键字段缺失 → 不足\n"
+            "3. 过滤条件明确：用户是否给出了足够的过滤条件（如时间范围、具体维度值）；问题模糊导致结果不可预期 → 不足\n"
+            "4. 聚合/计算清晰：是否清楚要查什么（计数/求和/明细/分组等）；意图不明 → 不足\n"
+            "5. 若仅是措辞口语化但意图可推断，应判为充足，不要过度苛求"
+        )
+        prompt_parts.append(
+            "【输出要求】\n"
+            "只返回一个 JSON 对象，不要包含任何其他文字，不要用 markdown 代码块包裹：\n"
+            '{"can_generate": true/false, "reason": "简述判断依据", '
+            '"missing_info": ["缺失的具体信息1", "..."], '
+            '"suggestion": "给用户的补充建议（如何描述才能生成）"}\n'
+            "若信息充足，missing_info 返回空数组，suggestion 返回空字符串。"
+        )
+        return '\n\n'.join(prompt_parts)
 
     def validate_sql(self, sql: str) -> Tuple[bool, Optional[str], Optional[List[str]]]:
         """验证SQL语句的基本安全性"""
