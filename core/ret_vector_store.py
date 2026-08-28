@@ -255,9 +255,7 @@ class VectorIndex:
         # 注意 np.savez 会在传入路径上自动追加 .npz 后缀，因此临时文件用
         # 文件对象写入，避免路径后缀叠加（fields.npz.tmp.npz 的坑）。
         npz_tmp = npz_path + '.tmp'
-        with open(npz_tmp, 'wb') as f:
-            np.savez(f, vectors=vectors_arr)
-        os.replace(npz_tmp, npz_path)
+        self._atomic_replace(npz_tmp, npz_path, lambda f: np.savez(f, vectors=vectors_arr))
 
         # 元数据用 JSON（文本格式，安全可读）
         meta = {
@@ -266,12 +264,36 @@ class VectorIndex:
             'metadata': self.metadata,
         }
         meta_tmp = meta_path + '.tmp'
-        with open(meta_tmp, 'w', encoding='utf-8') as f:
-            json.dump(meta, f, ensure_ascii=False)
-        os.replace(meta_tmp, meta_path)
+        self._atomic_replace(
+            meta_tmp, meta_path,
+            lambda f: f.write(json.dumps(meta, ensure_ascii=False).encode('utf-8')))
 
         self._last_save_path = npz_path
         logger.info(f"向量索引已保存: {npz_path}")
+
+    @staticmethod
+    def _atomic_replace(tmp_path: str, target_path: str, write_fn) -> None:
+        """写临时文件 → 确认落盘 → 原子替换；失败清理残留并抛清晰错误。
+
+        Windows 上偶发文件系统/杀软延迟，rename 前必须确认临时文件已实际存在，
+        否则 os.replace 会抛 [WinError 2] 找不到源文件，且残留脏文件。
+        """
+        try:
+            with open(tmp_path, 'wb') as f:
+                write_fn(f)
+                f.flush()
+                os.fsync(f.fileno())
+            if not os.path.exists(tmp_path):
+                raise OSError(f"临时文件写入后不存在: {tmp_path}")
+            os.replace(tmp_path, target_path)
+        except Exception:
+            # 清理残留临时文件，避免下次保存读到半写状态
+            try:
+                if os.path.exists(tmp_path):
+                    os.remove(tmp_path)
+            except OSError:
+                pass
+            raise
 
     def load(self, filepath: str) -> bool:
         npz_path = filepath + '.npz'

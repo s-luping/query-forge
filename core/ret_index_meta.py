@@ -38,6 +38,9 @@ def set_index_meta(schema_name: str, status: str, field_count: int = 0,
                     row.file_path = file_path  # type: ignore[assignment]
                 if error_msg:
                     row.error_message = error_msg  # type: ignore[assignment]
+                elif status == 'ready':
+                    # 构建成功必须清空历史错误，否则管理页会残留上一次失败的信息
+                    row.error_message = ''  # type: ignore[assignment]
                 if status == 'ready':
                     row.built_at = now_beijing()  # type: ignore[assignment]
             else:
