@@ -11,6 +11,24 @@ from sqlalchemy.engine import URL
 from sqlalchemy.engine import Engine
 
 
+# ── 通配符匹配（同步任务 include/exclude 表名） ─────────────
+import re
+
+
+def _glob_match(pattern: str, name: str) -> bool:
+    """通配符匹配表名：`*` 匹配任意字符（含空），大小写不敏感。
+
+    - 无 `*` 时退化为精确匹配（兼容旧配置的等值语义）
+    - 多个 `*` 可用（如 `*SMR*_TMP`）
+    """
+    if not pattern:
+        return False
+    if '*' not in pattern:
+        return pattern.lower() == name.lower()
+    regex = '^' + re.escape(pattern).replace(r'\*', '.*') + '$'
+    return re.match(regex, name, re.IGNORECASE) is not None
+
+
 # ── 标准化元数据结构 ──────────────────────────────────────
 
 @dataclass
@@ -84,9 +102,19 @@ class BaseConnector:
     def _should_include(table_name: str,
                         include_tables: Optional[List[str]] = None,
                         exclude_tables: Optional[List[str]] = None) -> bool:
-        if exclude_tables and table_name.lower() in [t.lower() for t in exclude_tables]:
+        """判断表是否应纳入同步（支持 * 通配符，大小写不敏感）
+
+        匹配规则：
+          - `*SMR*`  包含匹配：表名任意位置含 SMR
+          - `SMR_*`  前缀匹配：表名以 SMR_ 开头
+          - `*_TMP`  后缀匹配：表名以 _TMP 结尾
+          - `orders` 精确匹配：无 * 时退化为等值比较（兼容旧配置）
+        """
+        if exclude_tables and any(
+                _glob_match(pat, table_name) for pat in exclude_tables):
             return False
-        if include_tables and table_name.lower() not in [t.lower() for t in include_tables]:
+        if include_tables and not any(
+                _glob_match(pat, table_name) for pat in include_tables):
             return False
         return True
 
