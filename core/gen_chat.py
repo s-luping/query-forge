@@ -104,10 +104,12 @@ class ChatSession:
         # Step 3.5: 权限裁剪统计（库级 / 表级 / 字段级）
         self._log_permission_stats(pipeline_log, aggregation, schema_name)
 
-        # 概念级召回：typed 知识单独召回 + relation 动态扩表
+        # 概念级召回：typed 知识单独召回 + relation 动态扩表（自动执行，与用户勾选知识库无关）
         scope_id = scope_schema_id if scope_schema_id is not None else self.retriever.resolve_scope_schema_id(schema_name)
         recall = self.retriever.recall_knowledge(query, scope_schema_id=scope_id)
         self._log_step(pipeline_log, "STEP_RECALL_KNOWLEDGE", {
+            "source": "auto_concept_recall",
+            "note": "自动概念召回（对全部知识条目关键词匹配，无需勾选知识库）",
             "matched_count": len(recall['items']),
             "related_tables": recall['related_tables']})
         if recall['related_tables']:
@@ -314,6 +316,8 @@ class ChatSession:
         scope_id = scope_schema_id if scope_schema_id is not None else self.retriever.resolve_scope_schema_id(schema_name)
         followup_recall = self.retriever.recall_knowledge(new_user_content, scope_schema_id=scope_id)
         self._log_step(pipeline_log, "STEP_RECALL_KNOWLEDGE", {
+            "source": "auto_concept_recall",
+            "note": "自动概念召回（对全部知识条目关键词匹配，无需勾选知识库）",
             "matched_count": len(followup_recall['items']),
             "related_tables": followup_recall['related_tables']})
 

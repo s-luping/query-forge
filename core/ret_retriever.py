@@ -230,6 +230,8 @@ class SchemaRetriever:
                        d.get('column_name', ''))
                 if key not in seen:
                     seen.add(key)
+                    # 标记来源：向量召回语义相关度高，聚合裁剪时优先保留
+                    d['recall_source'] = 'vector'
                     merged.append(d)
         # DB 关键词召回（已按权限过滤）并集补充，覆盖向量索引缺失的库/表
         for d in self.recall_from_db(keywords, schema_name):
@@ -237,6 +239,7 @@ class SchemaRetriever:
                    d.get('column_name', ''))
             if key not in seen:
                 seen.add(key)
+                d['recall_source'] = 'db'
                 merged.append(d)
         # 超出 top_k 时截断（优先保留向量高相关结果）
         top_k = get_vector_config('FIELD_RECALL_TOP_K')
@@ -292,11 +295,15 @@ class SchemaRetriever:
         table_names = list(set(f.get('table_name') for f in recalled_fields if f.get('table_name')))
 
         if len(table_names) > max_tables:
+            # 权重裁剪：向量召回字段(recall_source=vector)所在表优先保留，
+            # DB 子串兜底命中的表（权重低）只在剩余名额内补充——
+            # 避免"项目/广告费"这类子串在大量无关表中命中导致聚合混入杂表。
             counts: Dict[str, int] = {}
             for f in recalled_fields:
                 t = f.get('table_name')
                 if t:
-                    counts[t] = counts.get(t, 0) + 1
+                    w = 10 if f.get('recall_source') == 'vector' else 1
+                    counts[t] = counts.get(t, 0) + w
             if keep_first:
                 first_names = [t for t in table_names if t in keep_first]
                 rest = [t for t in table_names if t not in keep_first]
