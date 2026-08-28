@@ -248,17 +248,23 @@ async function sendMsg() {
     scrollToBottom();
 
     try {
-        // 发送时带上当前切换器选择的模型/知识库（后端切换并持久化到会话）
-        const prefs = getConvPref(currentConvId);
+        // 发送时实时取切换器当前值（模型下拉 + 知识库勾选），而非历史快照。
+        // 此前用 _convPrefs 快照导致：勾选知识库后 _convPrefs 不更新，发出空数组，
+        // 后端还会把会话知识库清空（[] 非 None 会被持久化）。
+        const llmVal = document.getElementById('chatLlmConfig').value || null;
+        const kbIds = getSelectedKbIds();
         const resp = await apiRequest(`/api/conversation/${currentConvId}/messages`, {
             method: 'POST',
             body: JSON.stringify({
                 content,
-                llm_config_id: prefs.llm_config_id ? parseInt(prefs.llm_config_id) : null,
-                knowledge_ids: (prefs.knowledge_ids || []).map(id => parseInt(id))
+                llm_config_id: llmVal ? parseInt(llmVal) : null,
+                knowledge_ids: kbIds.map(id => parseInt(id))
             })
         });
         if (!resp.ok) throw new Error((await resp.json()).detail || '请求失败');
+
+        // 发送成功后把本次选择写回记忆（切走再切回可恢复最新选择）
+        _convPrefs[currentConvId] = { llm_config_id: llmVal, knowledge_ids: kbIds };
 
         const data = await resp.json();
 
@@ -469,6 +475,12 @@ function renderKbOptions() {
         cb.addEventListener('change', () => {
             if (cb.checked) _kbChecked.add(cb.value); else _kbChecked.delete(cb.value);
             updateKbLabel();
+            // 勾选变化即时同步到当前对话记忆（不发送也保留选择）
+            if (currentConvId) {
+                const p = getConvPref(currentConvId);
+                p.knowledge_ids = getSelectedKbIds();
+                _convPrefs[currentConvId] = p;
+            }
         });
     });
 }
@@ -515,6 +527,13 @@ async function loadLlmConfigs() {
                 opt.dataset.default = '1';
             }
             sel.appendChild(opt);
+        });
+        // 模型切换即时记忆（即使不发送就切走对话，再切回也能恢复）
+        sel.addEventListener('change', () => {
+            if (!currentConvId) return;
+            const p = getConvPref(currentConvId);
+            p.llm_config_id = sel.value || null;
+            _convPrefs[currentConvId] = p;
         });
     } catch (e) { console.error('加载 LLM 配置失败:', e); }
 }
