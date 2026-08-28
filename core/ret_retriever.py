@@ -279,8 +279,15 @@ class SchemaRetriever:
     # ---------- 聚合 ----------
 
     def aggregate_tables(self, recalled_fields: List[Dict],
-                         schema_name: Optional[str] = None) -> Dict:
-        """召回字段 → 表名去重（超限按命中数裁剪）→ 完整表结构"""
+                         schema_name: Optional[str] = None,
+                         keep_first: Optional[set] = None) -> Dict:
+        """召回字段 → 表名去重（超限按命中数裁剪）→ 完整表结构
+
+        keep_first: 优先保留的表名集合（追问轮首轮表）。超限时首轮表完整保留，
+        仅对新增召回表按命中数裁剪到剩余名额，避免追问上下文缩水。
+        此前累积路径把首轮表混入后按 MAX_TABLES 随机裁剪（无命中数时排序不稳定），
+        导致首轮 15 张表被挤到 10 张。
+        """
         max_tables = get_vector_config('MAX_TABLES')
         table_names = list(set(f.get('table_name') for f in recalled_fields if f.get('table_name')))
 
@@ -290,7 +297,16 @@ class SchemaRetriever:
                 t = f.get('table_name')
                 if t:
                     counts[t] = counts.get(t, 0) + 1
-            table_names = sorted(counts, key=counts.get, reverse=True)[:max_tables]
+            if keep_first:
+                first_names = [t for t in table_names if t in keep_first]
+                rest = [t for t in table_names if t not in keep_first]
+                if len(first_names) >= max_tables:
+                    table_names = first_names
+                else:
+                    rest = sorted(rest, key=lambda t: counts.get(t, 0), reverse=True)
+                    table_names = first_names + rest[:max_tables - len(first_names)]
+            else:
+                table_names = sorted(counts, key=counts.get, reverse=True)[:max_tables]
 
         if not table_names:
             # 未召回任何表时兜底：取前 N 张表（库级 + 表级权限约束）

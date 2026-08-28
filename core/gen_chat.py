@@ -273,29 +273,41 @@ class ChatSession:
             "count": len(keywords), "mode": "followup"})
 
         # Step 2-3: 针对新问题重新召回/聚合（仅链路追踪；失败降级不阻断主流程）
-        try:
-            recalled_fields = self.retriever.recall_fields(
-                keywords, schema_name, query=new_user_content)
-            self._log_step(pipeline_log, "STEP2_RECALL", {
-                "method": "vector" if self.retriever.vector_loaded else "database_query",
-                "keywords": keywords, "recalled_count": len(recalled_fields),
-                "recalled_fields": [{"schema": f.get("schema_name") or '',
-                                     "table": f.get("table_name"), "column": f.get("column_name")}
-                                    for f in recalled_fields[:10]]})
-            aggregation = self.retriever.aggregate_tables(recalled_fields, schema_name)
-            self._log_step(pipeline_log, "STEP3_AGGREGATE", {
-                "recalled_table_count": len(aggregation.get('tables', [])),
-                "tables": aggregation.get('tables', []),
-                "total_field_count": len(aggregation.get('all_fields', {}))})
-        except Exception as e:
-            logger.warning(f"[ChatSession] 追问召回失败，降级复用上一轮上下文: {e}")
+        # 追问/修改指令（如"不对 条件不对"）可能不含实质业务词——停用词过滤后为空，
+        # 此时全库向量召回必然跑偏（召回过百个无关字段），直接复用首轮表集合。
+        aggregation = None
+        if not keywords:
             self._log_step(pipeline_log, "STEP2_RECALL", {
                 "method": "reuse_previous_context", "keywords": keywords,
-                "recalled_count": 0, "recalled_fields": []})
+                "recalled_count": 0, "recalled_fields": [],
+                "reason": "追问无实质业务关键词，跳过向量召回，直接复用上一轮表集合"})
             self._log_step(pipeline_log, "STEP3_AGGREGATE", {
                 "reuse_schema_csv": True,
                 "schema_csv_lines": len(schema_csv.split('\n'))})
-            aggregation = None
+        else:
+            try:
+                recalled_fields = self.retriever.recall_fields(
+                    keywords, schema_name, query=new_user_content)
+                self._log_step(pipeline_log, "STEP2_RECALL", {
+                    "method": "vector" if self.retriever.vector_loaded else "database_query",
+                    "keywords": keywords, "recalled_count": len(recalled_fields),
+                    "recalled_fields": [{"schema": f.get("schema_name") or '',
+                                         "table": f.get("table_name"), "column": f.get("column_name")}
+                                        for f in recalled_fields[:10]]})
+                aggregation = self.retriever.aggregate_tables(recalled_fields, schema_name)
+                self._log_step(pipeline_log, "STEP3_AGGREGATE", {
+                    "recalled_table_count": len(aggregation.get('tables', [])),
+                    "tables": aggregation.get('tables', []),
+                    "total_field_count": len(aggregation.get('all_fields', {}))})
+            except Exception as e:
+                logger.warning(f"[ChatSession] 追问召回失败，降级复用上一轮上下文: {e}")
+                self._log_step(pipeline_log, "STEP2_RECALL", {
+                    "method": "reuse_previous_context", "keywords": keywords,
+                    "recalled_count": 0, "recalled_fields": []})
+                self._log_step(pipeline_log, "STEP3_AGGREGATE", {
+                    "reuse_schema_csv": True,
+                    "schema_csv_lines": len(schema_csv.split('\n'))})
+                aggregation = None
 
         # 累积召回：首轮表集合(first_tables) ∪ 追问重召回表 ∪ 知识扩表
         # 仅当首轮表集合已知时重建（带权限裁剪），否则沿用 router 全量 schema_csv（向后兼容旧对话）
@@ -307,13 +319,16 @@ class ChatSession:
 
         relation_tables = None
         if first_tables:
-            merged_tables = set(first_tables)
+            first_set = set(first_tables)
+            merged_tables = first_set
             if aggregation is not None:
                 merged_tables |= set(aggregation.get('tables', []))
             merged_tables |= set(followup_recall['related_tables'])
             try:
                 recalled = [{'table_name': t} for t in merged_tables]
-                merged_aggregation = self.retriever.aggregate_tables(recalled, schema_name)
+                # keep_first：首轮表完整保留，超限只裁剪新增召回表（追问上下文不缩水）
+                merged_aggregation = self.retriever.aggregate_tables(
+                    recalled, schema_name, keep_first=first_set)
                 schema_csv_used = SchemaRetriever.build_schema_csv(merged_aggregation)
                 relation_tables = merged_aggregation.get('tables', [])
                 self._log_step(pipeline_log, "STEP_CUMULATIVE_AGGREGATE", {
@@ -364,7 +379,8 @@ class ChatSession:
         self._log_step(pipeline_log, "STEP4_CONTEXT", {
             "has_knowledge": bool(knowledge_content),
             "history_rounds": len(conversation_messages),
-            "schema_csv_lines": len(schema_csv.split('\n'))})
+            "schema_csv_lines": len(schema_csv_used.split('\n')),
+            "tables_in_context": len(relation_tables) if relation_tables else 0})
 
         # Step 4.5: 可否生成 SQL 判断 — 信息不足则提前返回，引导用户补充
         # 传入最近对话历史，让判断基于上下文（追问如「只保留某列」需结合上一轮表/字段）
