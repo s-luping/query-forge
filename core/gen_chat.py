@@ -27,8 +27,27 @@ def _parse_tables_from_csv(schema_csv: str) -> List[str]:
         if not line or line.startswith('表名'):
             continue
         t = line.split(',')[0].strip()
-        if t and t not in tables:
-            tables.append(t)
+        if t and t not in tables:            tables.append(t)
+    return tables
+
+
+def _extract_tables_from_sql(sql: str) -> List[str]:
+    """从 SQL 提取 FROM/JOIN 引用的表名（去库前缀、去重、过滤伪匹配）
+
+    用于追问轮：历史 SQL 实际用到的表作为"必留表"，保证上下文收敛不膨胀。
+    子查询内部的 FROM 也会匹配（子查询表同样是实际引用的表，应保留）。
+    """
+    import re
+    if not sql:
+        return []
+    _SKIP = {'SELECT', 'WHERE', 'GROUP', 'ORDER', 'LIMIT', 'HAVING', 'ON',
+             'AS', 'UPDATE', 'DELETE', 'INSERT', 'VALUES', 'SET', 'FROM', 'JOIN'}
+    tables: List[str] = []
+    for m in re.finditer(r'\b(?:FROM|JOIN)\s+([A-Za-z0-9_\.`"]+)', sql, re.IGNORECASE):
+        name = m.group(1).strip('`"[]')
+        name = name.split('.')[-1]      # schema.table → table
+        if name and name.upper() not in _SKIP and name not in tables:
+            tables.append(name)
     return tables
 
 
@@ -322,24 +341,37 @@ class ChatSession:
             "related_tables": followup_recall['related_tables']})
 
         relation_tables = None
-        if first_tables:
-            first_set = set(first_tables)
-            merged_tables = first_set
+        if first_tables or aggregation is not None:
+            # 历史 SQL 实际用到的表 → 必留表（最高优先，保证上下文收敛）
+            # 首轮表不再无条件全量继承：只有被历史 SQL 用过、或本轮召回到、
+            # 或知识扩表命中的表才进入候选，避免 CSV 每轮膨胀（139→293 行问题）。
+            used_tables: List[str] = []
+            for msg in conversation_messages:
+                sql = msg.get('sql') if isinstance(msg, dict) else getattr(msg, 'sql', None)
+                if sql:
+                    used_tables.extend(_extract_tables_from_sql(sql))
+            used_tables = list(dict.fromkeys(used_tables))
+            first_set = set(first_tables) if first_tables else set()
+            keep_first = set(used_tables) or (first_set if first_tables else None)
+
+            merged_tables = set(used_tables)
             if aggregation is not None:
                 merged_tables |= set(aggregation.get('tables', []))
             merged_tables |= set(followup_recall['related_tables'])
             try:
                 recalled = [{'table_name': t} for t in merged_tables]
-                # keep_first：首轮表完整保留，超限只裁剪新增召回表（追问上下文不缩水）
+                # keep_first：历史 SQL 用过的表完整保留，超限只裁剪新增召回表
                 merged_aggregation = self.retriever.aggregate_tables(
-                    recalled, schema_name, keep_first=first_set)
+                    recalled, schema_name, keep_first=keep_first)
                 schema_csv_used = SchemaRetriever.build_schema_csv(merged_aggregation)
                 relation_tables = merged_aggregation.get('tables', [])
                 self._log_step(pipeline_log, "STEP_CUMULATIVE_AGGREGATE", {
                     "merged_table_count": len(relation_tables),
-                    "first_tables": len(first_tables),
+                    "used_tables_from_sql": used_tables,
+                    "from_history": len(used_tables),
                     "from_recall": len(aggregation.get('tables', [])) if aggregation else 0,
-                    "from_knowledge": len(followup_recall['related_tables'])})
+                    "from_knowledge": len(followup_recall['related_tables']),
+                    "note": "首轮表不再全量继承，仅保留历史SQL用过的+本轮召回到的表"})
                 # Step 3.5: 权限裁剪统计（累积后）
                 self._log_permission_stats(pipeline_log, merged_aggregation, schema_name)
             except Exception as e:
