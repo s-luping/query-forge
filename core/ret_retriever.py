@@ -292,7 +292,9 @@ class SchemaRetriever:
         导致首轮 15 张表被挤到 10 张。
         """
         max_tables = get_vector_config('MAX_TABLES')
-        table_names = list(set(f.get('table_name') for f in recalled_fields if f.get('table_name')))
+        # 保持输入顺序（追问轮传 merged_order 保序列表；同名列去重/白名单裁剪依赖稳定表序）
+        table_names = list(dict.fromkeys(
+            f.get('table_name') for f in recalled_fields if f.get('table_name')))
 
         if len(table_names) > max_tables:
             # 权重裁剪：向量召回字段(recall_source=vector)所在表优先保留，
@@ -344,8 +346,12 @@ class SchemaRetriever:
     # ---------- 知识条目单独召回（概念级检索，第三支柱） ----------
 
     def recall_knowledge(self, query: str, scope_schema_id: Optional[int] = None,
-                         keywords: Optional[List[str]] = None) -> Dict:
+                         keywords: Optional[List[str]] = None,
+                         exclude_contents: Optional[set] = None) -> Dict:
         """按 query 关键词召回 typed 知识条目，返回注入提示词的文本块与关联表（用于动态扩表）。
+
+        exclude_contents: 已注入 prompt 的知识内容集合（如用户勾选知识库的 content），
+        命中条目按 content 精确去重，避免同一知识在【领域知识】中出现两次。
 
         Returns:
             {
@@ -361,6 +367,9 @@ class SchemaRetriever:
             return {'items': [], 'prompt_text': '', 'related_tables': []}
 
         items = knowledge_crud.search_matched_items(kw_set, scope_schema_id=scope_schema_id, limit=12)
+        if exclude_contents:
+            items = [d for d in items
+                     if (d.get('content') or '').strip() not in exclude_contents]
         serialized: List[Dict] = []
         related_tables: List[str] = []
         for d in items:
@@ -450,11 +459,16 @@ class SchemaRetriever:
     # ---------- CSV ----------
 
     @staticmethod
-    def build_schema_csv(aggregation: Dict) -> str:
+    def build_schema_csv(aggregation: Dict,
+                         fields_whitelist: Optional[set] = None) -> str:
         """聚合结果 → CSV 格式 schema 字符串（LLM prompt 用）
 
         跨库模式（召回涉及多个 schema）下表名带库名前缀（库名.表名），
         供 LLM 生成跨库 SQL 时区分同名表；单库模式保持纯表名（兼容旧行为）。
+
+        fields_whitelist: {(表名, 字段名), ...} — 非空时仅输出白名单字段，
+        并自动补齐主键(PRI)与外键列（保证 JOIN 关联可用）。
+        首轮/单次生成不传（需要完整表结构）；追问轮传"历史 SQL 引用列 ∪ 本轮召回列"。
         """
         lines = ["表名,字段名,字段类型,字段描述,主键,外键"]
         tables = aggregation.get('tables', [])
@@ -469,6 +483,12 @@ class SchemaRetriever:
             table_fields = [(key, field) for key, field in all_fields.items()
                             if field.get('table_name') == table]
             for _key, field in table_fields:
+                if fields_whitelist:
+                    col = field.get('column_name', '')
+                    is_pk = field.get('column_key') == 'PRI'
+                    has_fk = bool(field.get('foreign_key'))
+                    if (table, col) not in fields_whitelist and not is_pk and not has_fk:
+                        continue
                 # 跨库时显示 库名.表名（同库多 schema 场景下精确到库）
                 label = table
                 if cross_schema and field.get('schema_name'):

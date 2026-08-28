@@ -74,7 +74,13 @@ def _resolve_datasource(schema_name: Optional[str]) -> Optional[dict]:
         }
 
 
-def _extract_sql_schema_names(sql: str) -> List[str]:
+_SQLGLOT_DIALECT = {
+    'sqlite': 'sqlite', 'mysql': 'mysql', 'postgresql': 'postgres',
+    'postgres': 'postgres', 'oracle': 'oracle', 'sqlserver': 'tsql', 'mssql': 'tsql',
+}
+
+
+def _extract_sql_schema_names(sql: str, db_type: str = '') -> List[str]:
     """从 SQL 中提取表引用携带的库名（库名.表名 形式），去重保序。
 
     跨库模式（schema_name=None）下生成的 SQL 会带库前缀（如 pjmall.asset），
@@ -85,12 +91,24 @@ def _extract_sql_schema_names(sql: str) -> List[str]:
     try:
         import sqlglot
         from sqlglot import exp
-        tree = sqlglot.parse_one(sql)
+        tree = sqlglot.parse_one(sql, dialect=_SQLGLOT_DIALECT.get((db_type or '').lower()))
         for t in tree.find_all(exp.Table):
             if t.db and t.db not in names:
                 names.append(t.db)
     except Exception:
         pass
+    # 解析仍失败时正则兜底：只匹配 FROM/JOIN/UPDATE/INTO 后的 库名.表名，
+    # 兼容反引号/双引号/方括号/裸写四种引用风格（避免别名.列名误判）
+    if not names:
+        import re
+        for m in re.finditer(
+            r'(?:FROM|JOIN|UPDATE|INTO)\s+'
+            r'((?:`[^`]+`|"[^"]+"|\[[^\]]+\]|[A-Za-z_][A-Za-z0-9_]*)\.'
+            r'(?:`[^`]+`|"[^"]+"|\[[^\]]+\]|[A-Za-z_][A-Za-z0-9_]*))',
+            sql, re.IGNORECASE):
+            schema = m.group(1).split('.')[0].strip('`"[]')
+            if schema not in names:
+                names.append(schema)
     return names
 
 
@@ -169,7 +187,7 @@ def execute_sql(sql: str, schema_name: Optional[str] = None,
     # 例如「pjmall.asset JOIN sys.sys_config」→ 优先用 SQL 中第一个库的数据源连接
     resolved_schema = schema_name
     if not schema_name:
-        sql_schemas = _extract_sql_schema_names(sql)
+        sql_schemas = _extract_sql_schema_names(sql, db_type)
         if sql_schemas:
             resolved_schema = sql_schemas[0]
 

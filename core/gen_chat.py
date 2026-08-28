@@ -32,23 +32,64 @@ def _parse_tables_from_csv(schema_csv: str) -> List[str]:
 
 
 def _extract_tables_from_sql(sql: str) -> List[str]:
-    """从 SQL 提取 FROM/JOIN 引用的表名（去库前缀、去重、过滤伪匹配）
+    """从 SQL 提取 FROM/JOIN 引用的表名（去库前缀、去重、保留字表名正确处理）
 
     用于追问轮：历史 SQL 实际用到的表作为"必留表"，保证上下文收敛不膨胀。
-    子查询内部的 FROM 也会匹配（子查询表同样是实际引用的表，应保留）。
+
+    用 sqlglot 解析（mysql 方言）——保留字表名（如 order）、反引号引用的表、
+    别名等都能正确处理；解析失败时正则兜底。注意：早期版本用关键字黑名单过滤
+    伪匹配，误杀了名为 order 的保留字表（order 表永远进不了追问轮上下文）。
     """
-    import re
-    if not sql:
-        return []
-    _SKIP = {'SELECT', 'WHERE', 'GROUP', 'ORDER', 'LIMIT', 'HAVING', 'ON',
-             'AS', 'UPDATE', 'DELETE', 'INSERT', 'VALUES', 'SET', 'FROM', 'JOIN'}
     tables: List[str] = []
+    if not sql:
+        return tables
+    try:
+        import sqlglot
+        from sqlglot import exp
+        tree = sqlglot.parse_one(sql, dialect='mysql')
+        for t in tree.find_all(exp.Table):
+            name = t.name
+            if name and name not in tables:
+                tables.append(name)
+        if tables:
+            return tables
+    except Exception:
+        pass
+    # 正则兜底（仅匹配 FROM/JOIN 后的首个标识符，ORDER BY 等关键字不会误命中）
+    import re
     for m in re.finditer(r'\b(?:FROM|JOIN)\s+([A-Za-z0-9_\.`"]+)', sql, re.IGNORECASE):
         name = m.group(1).strip('`"[]')
         name = name.split('.')[-1]      # schema.table → table
-        if name and name.upper() not in _SKIP and name not in tables:
+        if name and name not in tables:
             tables.append(name)
     return tables
+
+
+def _extract_columns_from_sql(sql: str, db_type: str = 'mysql') -> set:
+    """从 SQL 提取 (表名, 列名) 引用集合（别名解析），用于追问轮字段级裁剪白名单
+
+    返回 {(table_name, column_name), ...}；解析失败返回空集（调用方回退全量 CSV）。
+    """
+    cols: set = set()
+    if not sql:
+        return cols
+    try:
+        import sqlglot
+        from sqlglot import exp
+        _DIALECTS = {'mysql': 'mysql', 'mariadb': 'mysql', 'doris': 'mysql',
+                     'postgresql': 'postgres', 'postgres': 'postgres',
+                     'oracle': 'oracle', 'sqlserver': 'tsql', 'mssql': 'tsql',
+                     'sqlite': 'sqlite'}
+        tree = sqlglot.parse_one(sql, dialect=_DIALECTS.get((db_type or '').lower()))
+        alias_map = {t.alias_or_name: t.name for t in tree.find_all(exp.Table)}
+        for c in tree.find_all(exp.Column):
+            t = c.table or ''
+            if not t or not c.name:
+                continue
+            cols.add((alias_map.get(t, t), c.name))
+    except Exception:
+        pass
+    return cols
 
 
 class ChatSession:
@@ -110,8 +151,9 @@ class ChatSession:
             "method": "vector" if self.retriever.vector_loaded else "database_query",
             "keywords": keywords, "recalled_count": len(recalled_fields),
             "recalled_fields": [{"schema": f.get("schema_name") or '',
-                                 "table": f.get("table_name"), "column": f.get("column_name")}
-                                for f in recalled_fields[:10]]})
+                                 "table": f.get("table_name"), "column": f.get("column_name"),
+                                 "sensitive_level": f.get("sensitive_level") or 'public'}
+                                for f in recalled_fields]})
 
         # Step 3: 按表聚合，获取完整表结构
         aggregation = self.retriever.aggregate_tables(recalled_fields, schema_name)
@@ -124,8 +166,12 @@ class ChatSession:
         self._log_permission_stats(pipeline_log, aggregation, schema_name)
 
         # 概念级召回：typed 知识单独召回 + relation 动态扩表（自动执行，与用户勾选知识库无关）
+        # 排除已勾选知识库内容（content 精确去重），避免同一知识在【领域知识】中出现两次
         scope_id = scope_schema_id if scope_schema_id is not None else self.retriever.resolve_scope_schema_id(schema_name)
-        recall = self.retriever.recall_knowledge(query, scope_schema_id=scope_id)
+        kb_base = knowledge_content or ''
+        kb_parts = {p.strip() for p in kb_base.split('\n\n') if p.strip()}
+        recall = self.retriever.recall_knowledge(
+            query, scope_schema_id=scope_id, exclude_contents=kb_parts or None)
         self._log_step(pipeline_log, "STEP_RECALL_KNOWLEDGE", {
             "source": "auto_concept_recall",
             "note": "自动概念召回（对全部知识条目关键词匹配，无需勾选知识库）",
@@ -297,6 +343,7 @@ class ChatSession:
         # 追问/修改指令（如"不对 条件不对"）可能不含实质业务词——停用词过滤后为空，
         # 此时全库向量召回必然跑偏（召回过百个无关字段），直接复用首轮表集合。
         aggregation = None
+        recalled_fields: List = []
         if not keywords:
             self._log_step(pipeline_log, "STEP2_RECALL", {
                 "method": "reuse_previous_context", "keywords": keywords,
@@ -333,7 +380,11 @@ class ChatSession:
         # 累积召回：首轮表集合(first_tables) ∪ 追问重召回表 ∪ 知识扩表
         # 仅当首轮表集合已知时重建（带权限裁剪），否则沿用 router 全量 schema_csv（向后兼容旧对话）
         scope_id = scope_schema_id if scope_schema_id is not None else self.retriever.resolve_scope_schema_id(schema_name)
-        followup_recall = self.retriever.recall_knowledge(new_user_content, scope_schema_id=scope_id)
+        # 自动召回排除已勾选知识内容（content 精确去重，防同一知识重复出现）
+        kb_base = knowledge_content or ''
+        kb_parts = {p.strip() for p in kb_base.split('\n\n') if p.strip()}
+        followup_recall = self.retriever.recall_knowledge(
+            new_user_content, scope_schema_id=scope_id, exclude_contents=kb_parts or None)
         self._log_step(pipeline_log, "STEP_RECALL_KNOWLEDGE", {
             "source": "auto_concept_recall",
             "note": "自动概念召回（对全部知识条目关键词匹配，无需勾选知识库）",
@@ -354,16 +405,36 @@ class ChatSession:
             first_set = set(first_tables) if first_tables else set()
             keep_first = set(used_tables) or (first_set if first_tables else None)
 
-            merged_tables = set(used_tables)
-            if aggregation is not None:
-                merged_tables |= set(aggregation.get('tables', []))
-            merged_tables |= set(followup_recall['related_tables'])
+            # 合并表集合：历史已用表在前（顺序稳定，供同名列去重裁决），召回/知识扩表在后
+            merged_order = list(used_tables)
+            for t in (aggregation.get('tables') or []) + list(followup_recall['related_tables']):
+                if t not in merged_order:
+                    merged_order.append(t)
             try:
-                recalled = [{'table_name': t} for t in merged_tables]
+                recalled = [{'table_name': t} for t in merged_order]
                 # keep_first：历史 SQL 用过的表完整保留，超限只裁剪新增召回表
                 merged_aggregation = self.retriever.aggregate_tables(
                     recalled, schema_name, keep_first=keep_first)
-                schema_csv_used = SchemaRetriever.build_schema_csv(merged_aggregation)
+                # 字段级裁剪：白名单 = 历史 SQL 引用列(保底) ∪ 本轮召回列(可裁剪)
+                # 召回列裁剪：同名列跨表只保留首个（按 merged_order 顺序）+ 未引用表每表上限，
+                # 消除 product_brand 多表重复、维度表整表灌入的问题（主外键由 CSV 自动补齐）
+                required_cols: set = set()   # 历史 SQL 引用列：硬需求，绝不裁
+                for msg in conversation_messages:
+                    sql = msg.get('sql') if isinstance(msg, dict) else getattr(msg, 'sql', None)
+                    if sql:
+                        required_cols |= _extract_columns_from_sql(sql, db_type)
+                recall_cols: List = []     # 本轮召回列（软信号）：保序（向量相似度降序），可去重/限幅
+                _recall_seen: set = set()
+                for f in recalled_fields:
+                    t = f.get('table_name')
+                    c = f.get('column_name') or f.get('field_name')
+                    if t and c and (t, c) not in _recall_seen:
+                        _recall_seen.add((t, c))
+                        recall_cols.append((t, c))
+                field_whitelist = required_cols | self._trim_recall_cols(
+                    merged_aggregation, required_cols, recall_cols)
+                schema_csv_used = SchemaRetriever.build_schema_csv(
+                    merged_aggregation, field_whitelist or None)
                 relation_tables = merged_aggregation.get('tables', [])
                 self._log_step(pipeline_log, "STEP_CUMULATIVE_AGGREGATE", {
                     "merged_table_count": len(relation_tables),
@@ -536,6 +607,13 @@ class ChatSession:
                                              table_names=tables or None)
                        if tables else {})
             dist = Counter(col_map.values())
+            # 按敏感级别列出字段名，便于审计核对敏感/机密字段是否被正确处理
+            by_level: Dict[str, List[str]] = {'sensitive': [], 'confidential': [],
+                                              'internal': [], 'public': []}
+            for _key, f in (aggregation.get('all_fields') or {}).items():
+                lv = f.get('sensitive_level') or 'public'
+                if lv in by_level:
+                    by_level[lv].append(f"{f.get('table_name')}.{f.get('column_name')}")
             self._log_step(pipeline_log, "STEP_PERMISSION", {
                 "schema_visible": ("全部" if visible is None
                                    else (f"{len(visible)} 个" if visible else "无")),
@@ -546,6 +624,8 @@ class ChatSession:
                     "FILTER": dist.get('FILTER', 0),
                     "NONE": dist.get('NONE', 0),
                 },
+                "sensitive_fields": by_level['sensitive'],
+                "confidential_fields": by_level['confidential'],
             })
         except Exception as e:
             self._log_step(pipeline_log, "STEP_PERMISSION_ERROR", {"error": str(e)})
@@ -584,12 +664,13 @@ class ChatSession:
 {schema_csv}
 
 【规则】
-1. 只生成SELECT查询语句，不要包含INSERT、UPDATE、DELETE等操作
-2. 确保所有列名和表名都在提供的表结构中存在
-3. 如果需要连接多个表，请使用适当的JOIN
-4. 添加适当的WHERE条件来过滤数据
-5. 如果用户提出修改意见，请基于上一轮的SQL进行修改优化
-6. 维度层级过滤（极其重要）：数据采用父子层级存储，父节点值=子节点汇总（预聚合）。【领域知识】中列出的每一个维度列都必须添加 WHERE 条件，用户未指定时使用最高级父节点（根节点），不要混用不同层级。遗漏任何一个维度列都会导致数据翻倍"""
+1. 仅生成SELECT；禁INSERT/UPDATE/DELETE等写操作
+2. 列名/表名必须在提供的表结构中
+3. 多表连接用JOIN，连接字段类型保持一致
+4. 添加适当WHERE过滤
+5. 用户修改意见→基于上一轮SQL修改
+6. 维度层级过滤(必守)：维度列必须加WHERE，用户未指定用最高级父节点(根节点)，勿混用层级，遗漏任何维度列数据会翻倍
+7. 禁止SELECT *，必须显式列出查询字段(防敏感泄露)"""
 
         if knowledge_content:
             prompt += f"\n\n【领域知识】\n{knowledge_content}"
@@ -601,6 +682,59 @@ class ChatSession:
         prompt += "\n\n只返回SQL语句，不要包含其他解释文字。"
         return prompt
 
+    # 追问轮历史滑动窗口：保留首轮 + 最近 N 轮（user+assistant 成对计为一轮）
+    _HISTORY_WINDOW = 5
+    # 未在历史 SQL 中引用过的表，白名单最多保留的召回列数（PRI/FK 由 CSV 构建自动补齐）
+    _RECALL_COLS_CAP = 4
+    # 同名列跨表去重仅作用于长复合列名（product_brand 等语义化字段）；
+    # status/name/id 等通用短名列各表语义不同，不去重（order.status ≠ brand.status）
+    _COL_NAME_DEDUP_MIN_LEN = 8
+    # 召回列中的审计/删除标记类字段直接裁掉（生成 SQL 用不上；
+    # 若确实需要，会通过历史 SQL 引用进入 required 保底，不受此限制）
+    _AUDIT_COLS = ('created_by', 'updated_by', 'created_at', 'updated_at',
+                   'create_time', 'update_time', 'create_by', 'update_by',
+                   'deleted', 'is_deleted', 'is_delete')
+
+    @staticmethod
+    def _trim_recall_cols(aggregation: dict, required_cols: set,
+                          recall_cols: list) -> set:
+        """裁剪召回列：去重 + 限幅，仅作用于"软信号"召回列，历史引用列不裁
+
+        recall_cols 须保持召回相似度降序（优先保留更相关的字段）。
+
+        规则：
+        1. 同名列跨表只保留第一个出现（仅限长复合列名 ≥ _COL_NAME_DEDUP_MIN_LEN，
+           如 product_brand；status/name/id 等通用短名列各表语义不同，不去重；
+           按 aggregation 表顺序裁决归属，required 已占名的列召回列同名不再加）
+        2. 未在历史 SQL 引用过的表，每表最多 _RECALL_COLS_CAP 个召回列——
+           避免 brand 表 8 个字段整表灌入（created_by/updated_at 等审计字段被裁）
+        3. 已引用表的召回列不设上限（新查询的维度列可能落在任意已用表上，如
+           order_detail.product_brand 用于"区分品牌"的 GROUP BY）
+        """
+        if not recall_cols:
+            return set()
+        tables = aggregation.get('tables', [])
+        used_tables = {_t for (_t, _c) in required_cols}
+        min_len = ChatSession._COL_NAME_DEDUP_MIN_LEN
+        seen_names = {c for (_t, c) in required_cols}
+        kept: set = set()
+        counts: dict = {}
+        for table in tables:                       # 顺序稳定（merged_order），裁决同名列归属
+            cap = None if table in used_tables else ChatSession._RECALL_COLS_CAP
+            for t, c in recall_cols:               # 保持召回相似度顺序，先到先得
+                if t != table:
+                    continue
+                if c in ChatSession._AUDIT_COLS:
+                    continue                       # 审计/删除标记类字段，直接裁
+                if len(c) >= min_len and c in seen_names:
+                    continue                       # 长复合列名已被更早的表/required 占用
+                if cap is not None and counts.get(table, 0) >= cap:
+                    continue
+                kept.add((t, c))
+                seen_names.add(c)
+                counts[table] = counts.get(table, 0) + 1
+        return kept
+
     def _build_messages_from_history(
         self,
         conversation_messages: list,
@@ -608,12 +742,24 @@ class ChatSession:
         db_type: str = "sqlite",
         knowledge_content: str = ""
     ) -> list:
-        """将数据库消息历史转换为 LLM messages 数组"""
+        """将数据库消息历史转换为 LLM messages 数组
+
+        多轮压缩（仅发送层，存储层保留全部记录）：
+        1. 连续相同 user 消息去重：同一问题重复提交（前端重试/用户重发）时
+           只保留最后一轮（user+assistant），较早轮次撤回
+        2. 滑动窗口：仅保留首轮 + 最近 N 轮，更早轮次裁剪
+        """
+        msgs = self._dedup_history(list(conversation_messages))
+        total = len(msgs)
+        keep = 2 * self._HISTORY_WINDOW  # 最近 N 轮（每条 user/assistant 各占 1 条）
+        if total > keep + 2:             # 2 = 首轮 user + 首轮 assistant
+            msgs = msgs[:2] + msgs[-keep:]
+
         messages = [
             {"role": "system", "content": self._build_system_prompt(schema_csv, db_type, knowledge_content)}
         ]
 
-        for msg in conversation_messages:
+        for msg in msgs:
             # 兼容 dict（router 传入）与 ORM 对象两种形态
             role = msg.get('role') if isinstance(msg, dict) else getattr(msg, 'role', None)
             content = msg.get('content') if isinstance(msg, dict) else getattr(msg, 'content', '')
@@ -626,3 +772,31 @@ class ChatSession:
                 messages.append({"role": "assistant", "content": assistant_content})
 
         return messages
+
+    @staticmethod
+    def _dedup_history(msgs: list) -> list:
+        """发送层去重：连续相同 user 消息只保留最后一轮（user+assistant 成对撤回）
+
+        场景：同一问题被重复提交（前端重试/用户重发），DB 存了多条相同 user 消息，
+        发送给 LLM 时只保留最新一轮，避免重复上下文与互相矛盾的多版本 SQL。
+        仅对"内容完全相同的连续 user 消息"生效，不误伤有意重问。
+        存储层记录不动，仅影响发送给 LLM 的消息数组。
+        """
+        result: list = []
+        last_user = None
+        for msg in msgs:
+            role = msg.get('role') if isinstance(msg, dict) else getattr(msg, 'role', None)
+            content = msg.get('content') if isinstance(msg, dict) else getattr(msg, 'content', '')
+            if role == 'user':
+                if content and content == last_user:
+                    # 与上一条 user 相同：撤回上一轮（assistant + user）
+                    while result:
+                        last = result[-1]
+                        r = last.get('role') if isinstance(last, dict) else getattr(last, 'role', None)
+                        if r == 'user':
+                            result.pop()
+                            break
+                        result.pop()
+                last_user = content
+            result.append(msg)
+        return result
