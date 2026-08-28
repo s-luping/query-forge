@@ -9,7 +9,7 @@ async function loadStats() {
 }
 async function loadLogs() {
     const data = await get('/api/audit/logs?limit=100');
-    document.getElementById('logs').innerHTML = data.items.map(item => `<tr><td>${esc(item.created_at)}</td><td>${esc(item.username)}</td><td>${esc(item.query)}</td><td class="sql-cell" title="${esc(item.generated_sql)}">${esc(item.generated_sql)}</td><td>${item.was_blocked ? '已拦截' : '通过'}</td><td>${item.pipeline_log ? `<button class="btn btn-sm btn-outline-primary" onclick="showPipeline(${item.id})">查看</button>` : '<span class="text-muted">-</span>'}</td></tr>`).join('') || '<tr><td colspan="6" class="text-center text-muted">暂无记录</td></tr>';
+    document.getElementById('logs').innerHTML = data.items.map(item => `<tr><td>${esc(item.created_at)}</td><td>${esc(item.username)}</td><td class="query-cell" title="${esc(item.query)}">${esc(item.query)}</td><td class="sql-cell" title="${esc(item.generated_sql)}">${esc(item.generated_sql)}</td><td>${item.was_blocked ? '已拦截' : '通过'}</td><td>${item.pipeline_log ? `<button class="btn btn-sm btn-outline-primary" onclick="showPipeline(${item.id})">查看</button>` : '<span class="text-muted">-</span>'}</td></tr>`).join('') || '<tr><td colspan="6" class="text-center text-muted">暂无记录</td></tr>';
 }
 // 链路追踪查看：从日志列表定位并解析 pipeline_log JSON
 let _logsCache = [];
