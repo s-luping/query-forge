@@ -50,11 +50,16 @@
                             <span class="chat-kb-arrow">▾</span>
                         </div>
                         <div class="chat-kb-dropdown" id="chatKbDropdown">
-                            <div class="chat-kb-option">
-                                <label><input type="checkbox" value="" data-id="">不使用知识库</label>
+                            <div class="chat-kb-search">
+                                <input type="text" id="chatKbSearch" placeholder="搜索标题 / 同义词 / 内容..."
+                                    autocomplete="off" oninput="onKbSearch(this.value)">
+                            </div>
+                            <div class="chat-kb-option chat-kb-opt-none">
+                                <label><input type="checkbox" value="" data-id="" data-name="">不使用知识库</label>
                             </div>
                             <!-- 知识库选项由 JS 填充 -->
                             <div id="chatKbOptions"></div>
+                            <div class="chat-kb-empty" id="chatKbEmpty" style="display:none;">无匹配的知识库</div>
                         </div>
                     </div>
                 </div>

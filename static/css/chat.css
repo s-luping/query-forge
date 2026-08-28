@@ -277,19 +277,49 @@ body {
 .chat-kb-dropdown {
     display: none;
     position: absolute;
-    top: calc(100% + 4px);
-    left: 0;
+    /* 切换器位于输入区上方（页面底部），弹层向上展开避免被底部遮挡 */
+    bottom: calc(100% + 4px);
+    right: 0;
     z-index: 50;
     background: #fff;
     border: 1px solid #ddd;
     border-radius: 8px;
     box-shadow: 0 4px 16px rgba(0,0,0,0.12);
-    min-width: 220px;
-    max-height: 240px;
+    min-width: 320px;
+    max-width: 420px;
+    max-height: 320px;
     overflow-y: auto;
     padding: 6px;
 }
 .chat-kb-dropdown.show { display: block; }
+/* 搜索框 */
+.chat-kb-search {
+    position: sticky;
+    top: 0;
+    background: #fff;
+    padding: 4px 2px 8px;
+    z-index: 1;
+}
+.chat-kb-search input {
+    width: 100%;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    padding: 5px 10px;
+    font-size: 12px;
+    box-sizing: border-box;
+    outline: none;
+    background: #f8f9fa;
+}
+.chat-kb-search input:focus {
+    border-color: #0d6efd;
+    background: #fff;
+}
+.chat-kb-empty {
+    padding: 12px;
+    text-align: center;
+    color: #999;
+    font-size: 12px;
+}
 .chat-kb-option label {
     display: flex;
     align-items: center;

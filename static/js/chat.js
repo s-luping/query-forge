@@ -111,11 +111,9 @@ async function openConv(id, title) {
     } else {
         llmSel.value = '';
     }
-    // 知识库多选恢复
-    const kbIds = new Set((prefs.knowledge_ids || []).map(String));
-    document.querySelectorAll('#chatKbDropdown input[type="checkbox"]').forEach(cb => {
-        cb.checked = kbIds.has(cb.value);
-    });
+    // 知识库多选恢复（基于全量数据重渲染，不受搜索过滤影响）
+    _kbChecked = new Set((prefs.knowledge_ids || []).map(String));
+    renderKbOptions();
     updateKbLabel();
 
     const msgContainer = document.getElementById('chatMessages');
@@ -427,28 +425,71 @@ function getConvPref(convId) {
     return p || { llm_config_id: null, knowledge_ids: [] };
 }
 
+// ── 知识库多选：全量数据 + 勾选状态独立管理 ────────────────
+// _kbItems 保存全部条目（标题/同义词/内容），_kbChecked 独立记录勾选，
+// 搜索过滤只影响展示列表，不影响已勾选状态与标签显示。
+let _kbItems = [];          // [{id, title, aliases, content}]
+let _kbChecked = new Set(); // 已勾选知识 id（字符串）
+let _kbSearch = '';
+
 function getSelectedKbIds() {
-    const checked = document.querySelectorAll('#chatKbDropdown input[type="checkbox"]:checked');
-    const ids = [];
-    checked.forEach(cb => { if (cb.value) ids.push(cb.value); });
-    return ids;
+    return Array.from(_kbChecked).filter(v => v !== '');
 }
 
 function updateKbLabel() {
     const ids = getSelectedKbIds();
     const label = document.getElementById('chatKbLabel');
     if (!ids.length) { label.textContent = '不使用知识库'; return; }
-    const opts = document.querySelectorAll('#chatKbDropdown input[type="checkbox"]');
-    const names = [];
-    opts.forEach(cb => {
-        if (ids.includes(cb.value)) names.push(cb.dataset.name || cb.value);
+    const names = ids.map(id => {
+        const it = _kbItems.find(x => String(x.id) === id);
+        return it ? it.title : id;
     });
     label.textContent = names.join('、') + (ids.length > 3 ? ` (+${ids.length - 3})` : '');
 }
 
+function renderKbOptions() {
+    const box = document.getElementById('chatKbOptions');
+    // 拆词过滤：每个词需在 标题/同义词/内容 中命中（大小写不敏感，子串模糊匹配）
+    const terms = _kbSearch.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    const list = _kbItems.filter(it => {
+        if (!terms.length) return true;
+        const hay = [it.title || '', (it.aliases || []).join(' '), it.content || '']
+            .join(' ').toLowerCase();
+        return terms.every(t => hay.includes(t));
+    });
+    box.innerHTML = list.map(it => {
+        const checked = _kbChecked.has(String(it.id)) ? ' checked' : '';
+        return `<div class="chat-kb-option">
+            <label><input type="checkbox" value="${it.id}" data-name="${escapeAttr(it.title || '(无标题)')}"${checked}>${escapeHtml(it.title || '(无标题)')}</label>
+        </div>`;
+    }).join('');
+    document.getElementById('chatKbEmpty').style.display =
+        (terms.length && !list.length) ? 'block' : 'none';
+    box.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+        cb.addEventListener('change', () => {
+            if (cb.checked) _kbChecked.add(cb.value); else _kbChecked.delete(cb.value);
+            updateKbLabel();
+        });
+    });
+}
+
+function onKbSearch(value) {
+    _kbSearch = value || '';
+    renderKbOptions();
+}
+
 function toggleKbDropdown(e) {
     e.stopPropagation();
-    document.getElementById('chatKbDropdown').classList.toggle('show');
+    const dd = document.getElementById('chatKbDropdown');
+    const willShow = !dd.classList.contains('show');
+    dd.classList.toggle('show');
+    if (willShow) {
+        // 每次打开重置搜索词（已勾选状态保留），并聚焦搜索框
+        onKbSearch('');
+        const input = document.getElementById('chatKbSearch');
+        input.value = '';
+        setTimeout(() => input.focus(), 0);
+    }
 }
 
 // 点击页面其它区域关闭知识库下拉
@@ -480,20 +521,17 @@ async function loadLlmConfigs() {
 
 async function loadKnowledge() {
     try {
-        const resp = await apiRequest('/api/knowledge');
+        // 拉取尽量多的条目（接口上限 100），保证搜索/多选覆盖全量
+        const resp = await apiRequest('/api/knowledge?limit=100');
         if (!resp.ok) return;
         const data = await resp.json();
-        const box = document.getElementById('chatKbOptions');
-        (data.items || []).forEach(k => {
-            const div = document.createElement('div');
-            div.className = 'chat-kb-option';
-            div.innerHTML = `<label><input type="checkbox" value="${k.id}" data-name="${escapeAttr(k.title || '(无标题)')}">${escapeHtml(k.title || '(无标题)')}</label>`;
-            box.appendChild(div);
-        });
-        // checkbox 变化时更新标签
-        box.querySelectorAll('input[type="checkbox"]').forEach(cb => {
-            cb.addEventListener('change', updateKbLabel);
-        });
+        _kbItems = (data.items || []).map(k => ({
+            id: k.id,
+            title: k.title || '(无标题)',
+            aliases: Array.isArray(k.aliases) ? k.aliases : [],
+            content: k.content || ''
+        }));
+        renderKbOptions();
     } catch (e) { console.error('加载知识库失败:', e); }
 }
 
