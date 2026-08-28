@@ -103,6 +103,21 @@ async function openConv(id, title) {
     document.getElementById('chatHeader').textContent =
         (title || 'Chat SQL') + ' — 连续对话';
 
+    // 恢复该对话的模型/知识库切换器选择（有记忆则恢复，无则默认）
+    const prefs = getConvPref(id);
+    const llmSel = document.getElementById('chatLlmConfig');
+    const kbSel = document.getElementById('chatKnowledge');
+    if (prefs.llm_config_id && llmSel.querySelector(`option[value="${prefs.llm_config_id}"]`)) {
+        llmSel.value = prefs.llm_config_id;
+    } else {
+        llmSel.value = '';
+    }
+    if (prefs.knowledge_id && kbSel.querySelector(`option[value="${prefs.knowledge_id}"]`)) {
+        kbSel.value = prefs.knowledge_id;
+    } else {
+        kbSel.value = '';
+    }
+
     const msgContainer = document.getElementById('chatMessages');
     msgContainer.innerHTML = '<div style="text-align:center;color:#aaa;padding:40px;">加载中...</div>';
 
@@ -235,9 +250,15 @@ async function sendMsg() {
     scrollToBottom();
 
     try {
+        // 发送时带上当前切换器选择的模型/知识库（后端切换并持久化到会话）
+        const prefs = getConvPref(currentConvId);
         const resp = await apiRequest(`/api/conversation/${currentConvId}/messages`, {
             method: 'POST',
-            body: JSON.stringify({ content })
+            body: JSON.stringify({
+                content,
+                llm_config_id: prefs.llm_config_id ? parseInt(prefs.llm_config_id) : null,
+                knowledge_id: prefs.knowledge_id ? parseInt(prefs.knowledge_id) : null
+            })
         });
         if (!resp.ok) throw new Error((await resp.json()).detail || '请求失败');
 
@@ -287,13 +308,9 @@ function hideNewConvModal() {
 }
 
 function resetNewConvForm() {
-    // 重置表单：清空问题、错误提示，下拉恢复默认（保留默认模型预选）
+    // 重置表单：清空问题、错误提示（模型/知识库在对话中切换，不在创建弹窗选择）
     document.getElementById('newConvQuery').value = '';
-    document.getElementById('newConvKnowledge').value = '';
     setNewConvError('');
-    const llmSel = document.getElementById('newConvLlmConfig');
-    const def = llmSel.querySelector('option[selected]') || llmSel.querySelector('option[data-default="1"]');
-    llmSel.value = def ? def.value : '';
 }
 
 function setNewConvError(msg) {
@@ -308,9 +325,6 @@ async function createConv() {
     if (_convSubmitting) return;   // 防重复提交
     const query = document.getElementById('newConvQuery').value.trim();
     if (!query) { setNewConvError('请输入问题'); return; }
-
-    const llmConfigId = document.getElementById('newConvLlmConfig').value || null;
-    const knowledgeId = document.getElementById('newConvKnowledge').value || null;
 
     _convSubmitting = true;
     const submitBtn = document.getElementById('newConvSubmit');
@@ -347,9 +361,8 @@ async function createConv() {
             credentials: 'same-origin',
             body: JSON.stringify({
                 query,
-                schema_name: null,   // 全库模式：由权限自动决定可用数据范围
-                llm_config_id: llmConfigId ? parseInt(llmConfigId) : null,
-                knowledge_id: knowledgeId ? parseInt(knowledgeId) : null
+                schema_name: null   // 全库模式：由权限自动决定可用数据范围
+                // 模型/知识库不在创建时选择，对话中通过切换器随时调整
             }),
             signal: timeoutCtrl.signal
         });
@@ -368,6 +381,12 @@ async function createConv() {
         currentConvId = data.conversation.id;
         document.getElementById('chatHeader').textContent =
             data.conversation.title + ' — 连续对话';
+
+        // 新对话采用当前切换器选择（模型/知识库），供后续消息发送
+        _convPrefs[currentConvId] = {
+            llm_config_id: (document.getElementById('chatLlmConfig').value || null),
+            knowledge_id: (document.getElementById('chatKnowledge').value || null)
+        };
 
         // Render messages（对话界面内展示结果）
         renderMessage({
@@ -397,20 +416,28 @@ async function createConv() {
     }
 }
 
-// ── LLM Config & Knowledge Loaders ─────────────────────────
+// ── LLM Config & Knowledge Loaders（对话切换器） ───────────
+// 创建对话不再选择模型/知识库；对话过程中通过输入区上方的切换器随时切换，
+// 切换值记录在 _convPrefs（按对话 id 记忆），下一条消息发送时生效。
+let _convPrefs = {};   // {convId: {llm_config_id, knowledge_id}}
+
+function getConvPref(convId) {
+    return _convPrefs[convId] || { llm_config_id: null, knowledge_id: null };
+}
+
 async function loadLlmConfigs() {
     try {
         const resp = await apiRequest('/api/llm-config/list');
         if (!resp.ok) return;
         const data = await resp.json();
-        const sel = document.getElementById('newConvLlmConfig');
+        const sel = document.getElementById('chatLlmConfig');
         (data.items || []).forEach(c => {
             const opt = document.createElement('option');
             opt.value = c.id;
             opt.textContent = `${c.provider} - ${c.model}`;
             if (c.is_default) {
                 opt.selected = true;
-                opt.dataset.default = '1';   // 重置表单时保留默认模型预选
+                opt.dataset.default = '1';
             }
             sel.appendChild(opt);
         });
@@ -422,7 +449,7 @@ async function loadKnowledge() {
         const resp = await apiRequest('/api/knowledge');
         if (!resp.ok) return;
         const data = await resp.json();
-        const sel = document.getElementById('newConvKnowledge');
+        const sel = document.getElementById('chatKnowledge');
         (data.items || []).forEach(k => {
             const opt = document.createElement('option');
             opt.value = k.id;

@@ -35,6 +35,21 @@
         </div>
 
         <div class="chat-input-area" id="chatInputArea" style="display:none;">
+            <div class="chat-switcher" id="chatSwitcher">
+                <div class="chat-switcher-item">
+                    <label for="chatLlmConfig">模型</label>
+                    <select id="chatLlmConfig">
+                        <option value="">使用默认模型</option>
+                    </select>
+                </div>
+                <div class="chat-switcher-item">
+                    <label for="chatKnowledge">知识库</label>
+                    <select id="chatKnowledge">
+                        <option value="">不使用知识库</option>
+                    </select>
+                </div>
+                <span class="chat-switcher-hint">切换后对下一条消息生效</span>
+            </div>
             <div class="chat-input-row">
                 <textarea id="msgInput" rows="1" placeholder="输入修改意见，如：表名改成 orders、加一个日期过滤..."
                     onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMsg();}"></textarea>
@@ -53,18 +68,9 @@
             <div class="newconv-error" id="newConvError" style="display:none;"></div>
 
             <div class="text-muted" style="font-size:12px;margin-bottom:14px;padding:8px 10px;background:#f8f9fa;border-radius:6px;">
-                数据范围由管理员授权自动决定，无需选择数据库。
+                数据范围由管理员授权自动决定，无需选择数据库。<br>
+                模型与知识库可在对话过程中随时切换。
             </div>
-
-            <label>知识库</label>
-            <select id="newConvKnowledge">
-                <option value="">不使用知识库</option>
-            </select>
-
-            <label>LLM 模型</label>
-            <select id="newConvLlmConfig">
-                <option value="">使用默认模型</option>
-            </select>
 
             <label>输入问题 <span style="color:#999;font-weight:normal;">（Enter 发送，Shift+Enter 换行）</span></label>
             <textarea id="newConvQuery" placeholder="描述你想要查询的数据..."></textarea>
