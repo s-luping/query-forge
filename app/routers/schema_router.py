@@ -869,7 +869,11 @@ def get_vector_index_info(
 
 @router.get("/vector-index-list")
 def list_vector_indexes(user: AdminUser):
-    """列出所有向量索引元数据（仅管理员）"""
+    """列出向量索引元数据（仅管理员）
+
+    对话为全库模式，统一维护 'default' 全库索引一行；历史按库索引行
+    一并返回但标记 legacy（前端仅展示 default）。
+    """
     # (权限由 AdminUser 依赖统一校验)
     try:
         from models.vector_index import VectorIndexMeta
@@ -878,6 +882,8 @@ def list_vector_indexes(user: AdminUser):
             rows = db.query(VectorIndexMeta).order_by(
                 VectorIndexMeta.schema_name.asc()
             ).all()
+            # 仅返回全库索引（default）行；历史按库行保留在 DB 但不展示
+            rows = [r for r in rows if r.schema_name in ('default', '')] or rows[:0]
             return [{
                 'id': r.id,
                 'schema_name': r.schema_name,
