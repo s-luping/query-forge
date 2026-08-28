@@ -78,7 +78,8 @@ class SqlGenerator:
             query: str,
             schema_csv: str = "",
             knowledge_content: str = "",
-            relations_text: str = ""
+            relations_text: str = "",
+            history_queries: Optional[List[Dict[str, str]]] = None
     ) -> str:
         """生成「可否生成 SQL」的判断提示词
 
@@ -90,12 +91,25 @@ class SqlGenerator:
             schema_csv: 已召回的表结构（按权限裁剪后的 CSV）
             knowledge_content: 领域知识（业务口径/表关系/计算规则）
             relations_text: 人工维护的 JOIN 关系提示
+            history_queries: 最近对话历史 [{role, content, sql}]（追问轮传入，
+                让判断基于上下文而非孤立的追问文本）
         """
         prompt_parts = [
-            "你是一个 SQL 生成可行性判断专家。请判断：基于已召回的表结构和领域知识，能否为用户的自然语言问题生成一条能正确回答该问题的 SQL 查询。",
+            "你是一个 SQL 生成可行性判断专家。请判断：基于已召回的表结构、领域知识和对话上下文，能否为用户的自然语言问题生成一条能正确回答该问题的 SQL 查询。",
             f"【用户问题】\n{query}",
             f"【已召回表结构】\n{schema_csv or '（无）'}",
         ]
+        if history_queries:
+            history_section = "以下是最近对话历史（用户问过什么、上一轮生成了什么 SQL），用于理解当前追问的上下文：\n"
+            for h in history_queries[-6:]:
+                role = h.get('role', '')
+                content = h.get('content', '') or ''
+                sql = h.get('sql', '') or ''
+                if role == 'user':
+                    history_section += f"用户: {content}\n"
+                else:
+                    history_section += f"助手: {sql or content}\n"
+            prompt_parts.append(f"【对话历史】\n{history_section}")
         if knowledge_content:
             prompt_parts.append(f"【领域知识】\n{knowledge_content.strip()}")
         if relations_text:
@@ -108,7 +122,9 @@ class SqlGenerator:
             "2. 字段覆盖：所需的查询字段、过滤字段、关联字段是否都存在；关键字段缺失 → 不足\n"
             "3. 过滤条件明确：用户是否给出了足够的过滤条件（如时间范围、具体维度值）；问题模糊导致结果不可预期 → 不足\n"
             "4. 聚合/计算清晰：是否清楚要查什么（计数/求和/明细/分组等）；意图不明 → 不足\n"
-            "5. 若仅是措辞口语化但意图可推断，应判为充足，不要过度苛求"
+            "5. 追问语义：若当前问题是针对上一轮结果的修改/收窄（如“只保留某列”“加上时间过滤”），"
+            "应结合【对话历史】判断——上一轮已明确的表/字段可直接沿用，不要因为没有重复提及就判为不足\n"
+            "6. 若仅是措辞口语化但意图可推断，应判为充足，不要过度苛求"
         )
         prompt_parts.append(
             "【输出要求】\n"

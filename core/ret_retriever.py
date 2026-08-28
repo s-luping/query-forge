@@ -130,18 +130,36 @@ class SchemaRetriever:
 
     def recall_fields(self, keywords: List[str],
                       schema_name: Optional[str] = None) -> List[Dict]:
-        """字段召回统一入口：向量优先（懒加载），DB 降级。
+        """字段召回统一入口：向量优先（懒加载）+ DB 关键词兜底合并。
 
-        两条路径均做权限裁剪（向量索引可能为历史构建，含权限外字段；
-        召回结果以 DB 权限集合过滤，防止跨库/越权泄漏）。
+        - 向量索引可能是历史构建（缺库/权限范围不一致），仅靠向量会漏召回
+          未建索引库的表 → 用 DB 关键词召回做并集兜底，保证覆盖所有可见库。
+        - 两条路径返回字段均以 DB 权限集合过滤/归一化（schema_name/column_name）。
+        - 结果去重（同一字段以 DB 权威结构为准）。
         """
         if not self.vector_loaded and self.vector_error is None:
             self.try_load_vector_store(schema_name)
 
         results = self.search_vector(keywords)
+        merged: List[Dict] = []
+        seen = set()
         if results:
-            return self._filter_recalled_by_permission(results, schema_name)
-        return self.recall_from_db(keywords, schema_name)
+            for d in self._filter_recalled_by_permission(results, schema_name):
+                key = (d.get('schema_name') or '', d.get('table_name', ''),
+                       d.get('column_name', ''))
+                if key not in seen:
+                    seen.add(key)
+                    merged.append(d)
+        # DB 关键词召回（已按权限过滤）并集补充，覆盖向量索引缺失的库/表
+        for d in self.recall_from_db(keywords, schema_name):
+            key = (d.get('schema_name') or '', d.get('table_name', ''),
+                   d.get('column_name', ''))
+            if key not in seen:
+                seen.add(key)
+                merged.append(d)
+        # 超出 top_k 时截断（优先保留向量高相关结果）
+        top_k = get_vector_config('FIELD_RECALL_TOP_K')
+        return merged[:top_k] if len(merged) > top_k else merged
 
     def _filter_recalled_by_permission(self, recalled: List[Dict],
                                        schema_name: Optional[str] = None) -> List[Dict]:
@@ -149,23 +167,29 @@ class SchemaRetriever:
 
         向量索引可能构建于权限更宽的时期，或为全量索引；
         召回字段若不在当前用户可见字段集合内则剔除。
+        同时把向量索引的 field_name 结构统一为 DB 的 column_name + schema_name，
+        保证下游聚合/CSV/链路日志读取的字段一致。
         """
         if not recalled:
             return recalled
         try:
             table_names = list({f.get('table_name') for f in recalled if f.get('table_name')})
-            allowed = set()
-            allowed_flat = set()   # (table, column) 无库名集合，兼容旧向量索引（无 schema 信息）
+            allowed = {}
+            allowed_flat = {}   # (table, column) → field dict，兼容旧向量索引（无 schema 信息）
             for r in self.get_field_rows(schema_name, table_names or None):
-                allowed.add((r.schema_name or '', r.table_name, r.column_name))
-                allowed_flat.add((r.table_name, r.column_name))
+                d = self._row_to_dict(r)
+                allowed[(r.schema_name or '', r.table_name, r.column_name)] = d
+                allowed_flat.setdefault((r.table_name, r.column_name), d)
             filtered = []
             for f in recalled:
                 table = f.get('table_name', '')
                 field = f.get('field_name') or f.get('column_name', '')
                 key = (f.get('schema_name') or '', table, field)
-                if key in allowed or (table, field) in allowed_flat:
-                    filtered.append(f)
+                d = allowed.get(key)
+                if d is None:
+                    d = allowed_flat.get((table, field))
+                if d is not None:
+                    filtered.append(d)
             return filtered
         except Exception as e:
             logger.warning(f"[SchemaRetriever] 召回权限过滤失败，放行: {e}")
@@ -188,10 +212,11 @@ class SchemaRetriever:
             table_names = sorted(counts, key=counts.get, reverse=True)[:max_tables]
 
         if not table_names:
-            # 未召回任何表时兜底：取前 N 张表（同样受表级权限约束）
+            # 未召回任何表时兜底：取前 N 张表（库级 + 表级权限约束）
             with session_scope() as db:
                 tables = schema_service.list_tables(
                     db, schema_name=schema_name,
+                    visible_schema_ids=get_visible_schema_ids(self.user),
                     table_grants_by_schema=get_table_grants_by_schema(self.user))
                 table_names = [t[0] for t in tables][:max_tables]
         all_fields: Dict[str, Dict] = {}
