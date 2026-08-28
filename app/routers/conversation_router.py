@@ -97,7 +97,14 @@ def _infer_visible_db_type(user: dict) -> Optional[str]:
 
 
 def _get_user_llm_config(user_id: int, config_id: Optional[int] = None) -> Optional[dict]:
-    """获取用户的LLM配置（api_key 解密后供客户端使用）"""
+    """获取用户的LLM配置（api_key 解密后供客户端使用）
+
+    查找顺序：
+      1. 指定 config_id（限本人或公共）
+      2. 本人默认配置
+      3. 公共默认配置（is_public + is_default）——非技术用户无自有配置时
+         可用管理员公开的模型，避免「未配置 API 密钥」报错
+    """
     from models.llm import LLMConfig
 
     with session_scope() as db:
@@ -113,6 +120,13 @@ def _get_user_llm_config(user_id: int, config_id: Optional[int] = None) -> Optio
                 LLMConfig.is_default == True,
                 LLMConfig.is_active == True
             ).first()
+            if config is None:
+                # 回退公共默认配置（管理员公开给全员使用的模型）
+                config = db.query(LLMConfig).filter(
+                    LLMConfig.is_public == True,
+                    LLMConfig.is_default == True,
+                    LLMConfig.is_active == True
+                ).first()
     
         if config:
             return {

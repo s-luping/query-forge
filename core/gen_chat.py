@@ -90,7 +90,8 @@ class ChatSession:
         self._log_step(pipeline_log, "STEP2_RECALL", {
             "method": "vector" if self.retriever.vector_loaded else "database_query",
             "keywords": keywords, "recalled_count": len(recalled_fields),
-            "recalled_fields": [{"table": f.get("table_name"), "column": f.get("column_name")}
+            "recalled_fields": [{"schema": f.get("schema_name") or '',
+                                 "table": f.get("table_name"), "column": f.get("column_name")}
                                 for f in recalled_fields[:10]]})
 
         # Step 3: 按表聚合，获取完整表结构
@@ -277,7 +278,8 @@ class ChatSession:
             self._log_step(pipeline_log, "STEP2_RECALL", {
                 "method": "vector" if self.retriever.vector_loaded else "database_query",
                 "keywords": keywords, "recalled_count": len(recalled_fields),
-                "recalled_fields": [{"table": f.get("table_name"), "column": f.get("column_name")}
+                "recalled_fields": [{"schema": f.get("schema_name") or '',
+                                     "table": f.get("table_name"), "column": f.get("column_name")}
                                     for f in recalled_fields[:10]]})
             aggregation = self.retriever.aggregate_tables(recalled_fields, schema_name)
             self._log_step(pipeline_log, "STEP3_AGGREGATE", {
@@ -364,13 +366,15 @@ class ChatSession:
             "schema_csv_lines": len(schema_csv.split('\n'))})
 
         # Step 4.5: 可否生成 SQL 判断 — 信息不足则提前返回，引导用户补充
+        # 传入最近对话历史，让判断基于上下文（追问如「只保留某列」需结合上一轮表/字段）
         followup_relations_for_judge = ""
         if relation_tables:
             followup_relations_for_judge = self.retriever.get_relations_text(relation_tables)
         judge_prompt = self.sql_generator.judge_generatable_prompt(
             query=new_user_content, schema_csv=schema_csv_used,
             knowledge_content=knowledge_content,
-            relations_text=followup_relations_for_judge)
+            relations_text=followup_relations_for_judge,
+            history_queries=conversation_messages)
         self._log_step(pipeline_log, "STEP_JUDGE_PROMPT", {
             "prompt_length": len(judge_prompt)})
         try:
