@@ -65,6 +65,9 @@ class SqlGatewayResult:
 class SqlGateway:
     """SQL 权限网关"""
 
+    # FILTER 字段允许出现在 SELECT 表达式中仅限被这些聚合函数整体包裹
+    _AGG_FUNCS = {'sum', 'avg', 'count', 'max', 'min'}
+
     def __init__(self, user: dict):
         self.user = user
         self._is_admin = is_admin(user)
@@ -72,6 +75,8 @@ class SqlGateway:
         self._row_scopes: Dict[str, str] = {}  # {table_name: filter_expression}
         # 跨库支持：key 统一为 (db_name or '', table_name)
         self._col_lookup: Dict[Tuple[str, str, str], Tuple[int, str]] = {}  # {(db, table, col): (col_id, sensitive)}
+        # 无前缀 SQL 兜底（跨库模式）：(table, col) → (col_id, sensitive)，同表多库取第一个匹配
+        self._col_lookup_flat: Dict[Tuple[str, str], Tuple[int, str]] = {}
         self._table_schema: Dict[Tuple[str, str], int] = {}  # {(db, table): schema_id}
         self._table_grants_by_name: Dict[int, set] = {}  # {schema_id: {table_name,...}} 表级白名单(表名)
 
@@ -120,8 +125,10 @@ class SqlGateway:
         if blocked:
             return result
 
-        # 6. 展开 SELECT *
-        self._expand_select_star(tree, result)
+        # 6. 禁止 SELECT *（星号必须显式列字段；COUNT(*) 等函数内星号放行）
+        blocked = self._check_select_star(tree, result)
+        if blocked:
+            return result
 
         # 7. 注入行级过滤
         tree = self._inject_row_scope(tree, result, dialect=dialect)
@@ -193,7 +200,8 @@ class SqlGateway:
             q = (db.query(DbSchema.name, DbColumn.id, DbColumn.name, DbColumn.sensitive_level,
                           DbTable.name)
                  .join(DbTable, DbColumn.table_id == DbTable.id)
-                 .join(DbSchema, DbTable.schema_id == DbSchema.id))
+                 .join(DbSchema, DbTable.schema_id == DbSchema.id)
+                 .order_by(DbSchema.id))
             if schema_name:
                 q = q.filter(DbSchema.name == schema_name)
             if pure_names:
@@ -201,6 +209,9 @@ class SqlGateway:
             for db_name, col_id, col_name, sensitive, tbl_name in q.all():
                 self._col_lookup[(db_name or '', tbl_name, col_name)] = (
                     col_id, sensitive or 'public')
+                # 无前缀 SQL 兜底：平铺表取第一个匹配库（按 schema id 排序保证确定性）
+                self._col_lookup_flat.setdefault(
+                    (tbl_name, col_name), (col_id, sensitive or 'public'))
 
             # (db, table) → schema_id 映射（表级权限判定用）
             tq = (db.query(DbSchema.name, DbTable.name, DbTable.schema_id)
@@ -253,9 +264,10 @@ class SqlGateway:
             lookup_key = (db_name or '', table_name, col_name)
             col_info = self._col_lookup.get(lookup_key)
 
-            # 兼容无库前缀 SQL：同表名在多库时取第一个匹配（旧行为兜底）
-            if col_info is None and db_name:
-                col_info = self._col_lookup.get(('', table_name, col_name))
+            # 无库前缀 SQL 兜底（跨库模式）：按 (table, col) 平铺表全库查找，
+            # 同表名多库时取第一个匹配（按 schema id 排序）。防止漏掉 FILTER/NONE 校验。
+            if col_info is None:
+                col_info = self._col_lookup_flat.get((table_name, col_name))
 
             if col_info is None:
                 # 字段不在已知 schema 中，可能是不存在的字段，跳过（让 DB 报错）
@@ -275,10 +287,23 @@ class SqlGateway:
                 return True
 
             if access == 'FILTER' and clause == 'SELECT':
-                result.is_allowed = False
-                result.block_reason = (f'字段 {table_name}.{col_name} 仅可用于条件过滤，'
-                                       f'不允许出现在 SELECT 列表中')
-                return True
+                # 仅放行被聚合函数（SUM/AVG/COUNT/MAX/MIN）整体包裹的用法，
+                # 如 SUM(amount - quantity*IFNULL(cost_price,0)) 这类业务指标。
+                # 裸列（含 AS 别名）与仅被算术/普通函数包裹的用法（如 quantity*cost_price、
+                # IFNULL(cost_price,0) 直接输出）一律拦截——此类仍可反推/直接暴露敏感值。
+                node = col
+                while isinstance(node.parent, exp.Alias):
+                    node = node.parent
+                if isinstance(node.parent, exp.Select):
+                    result.is_allowed = False
+                    result.block_reason = (f'字段 {table_name}.{col_name} 仅可用于条件过滤，'
+                                           f'不允许出现在 SELECT 列表中')
+                    return True
+                if not self._inside_aggregate(col):
+                    result.is_allowed = False
+                    result.block_reason = (f'字段 {table_name}.{col_name} 仅可用于条件过滤'
+                                           f'或聚合计算，不允许直接出现在 SELECT 表达式中')
+                    return True
 
         return False
 
@@ -300,56 +325,36 @@ class SqlGateway:
                 return t.name, (t.db or '')
         return '', ''
 
-    def _expand_select_star(self, tree: exp.Expression, result: SqlGatewayResult):
-        """展开 SELECT * 为授权字段列表"""
+    def _inside_aggregate(self, col: exp.Column) -> bool:
+        """判断字段是否被聚合函数（SUM/AVG/COUNT/MAX/MIN）整体包裹
+
+        沿 parent 链向上：先遇到聚合函数 → True；未遇到聚合就先撞到 Select → False。
+        中间允许穿过 Alias/IFNULL/算术运算等节点（如 SUM(amount - quantity*IFNULL(cost_price,0))）。
+        """
+        node = col
+        while node.parent is not None:
+            node = node.parent
+            if isinstance(node, exp.Select):
+                return False
+            if isinstance(node, exp.Func) and node.__class__.__name__.lower() in self._AGG_FUNCS:
+                return True
+        return False
+
+    def _check_select_star(self, tree: exp.Expression, result: SqlGatewayResult) -> bool:
+        """禁止 SELECT * / t.*：必须显式列出字段，避免展开遗漏或新字段意外暴露。
+
+        COUNT(*) 等函数内部的星号放行（星号到 Select 之间隔着函数节点，
+        仅允许 t.* 这种带表前缀的星号包装（sqlglot 解析为 Star → Column → Select））。
+        """
         for star in tree.find_all(exp.Star):
-            select = star.find_ancestor(exp.Select)
-            if not select:
-                continue
-
-            # 获取 SELECT 涉及的表（带库名，避免跨库同名表混淆）
-            tables_in_select = set()
-            for t in select.find_all(exp.Table):
-                tables_in_select.add((t.db or '', t.name))
-
-            if not tables_in_select:
-                continue
-
-            # 获取授权字段
-            authorized_cols = self._get_authorized_columns(list(tables_in_select))
-            if not authorized_cols:
-                continue
-
-            # 构建 SELECT 列表
-            new_expressions = []
-            for (db_name, table_name), col_names in authorized_cols.items():
-                for col_name in col_names:
-                    col = exp.column(col_name, table=table_name)
-                    if db_name:
-                        col.set('db', exp.Identifier(this=db_name))
-                    new_expressions.append(col)
-
-            if new_expressions:
-                # 替换 SELECT * 中的 *
-                select.set('expressions', new_expressions)
-                result.was_modified = True
-                result.modifications.append(f'展开 SELECT * 为 {len(new_expressions)} 个授权字段')
-                # 不 break — 继续处理后续 SELECT *（多表 JOIN 场景）
-
-    def _get_authorized_columns(self, table_keys: List[Tuple[str, str]]) -> Dict[Tuple[str, str], List[str]]:
-        """获取表的授权字段列表（SELECT 级别）。table_keys: [(db_name, table_name), ...]"""
-        pure_names = [t for _db, t in table_keys]
-        with session_scope() as db:
-            q = (db.query(DbSchema.name, DbColumn.name, DbColumn.id, DbTable.name)
-                 .join(DbTable, DbColumn.table_id == DbTable.id)
-                 .join(DbSchema, DbTable.schema_id == DbSchema.id)
-                 .filter(DbTable.name.in_(pure_names)))
-            result: Dict[Tuple[str, str], List[str]] = {}
-            for db_name, col_name, col_id, tbl_name in q.all():
-                access = self._access_map.get(col_id, 'NONE')
-                if access == 'SELECT':
-                    result.setdefault((db_name or '', tbl_name), []).append(col_name)
-            return result
+            node = star
+            while isinstance(node.parent, exp.Column):
+                node = node.parent
+            if isinstance(node.parent, exp.Select):
+                result.is_allowed = False
+                result.block_reason = '不允许使用 SELECT *，请明确指定需要查询的字段'
+                return True
+        return False
 
     def _inject_row_scope(self, tree: exp.Expression, result: SqlGatewayResult,
                           dialect: str = 'sqlite') -> exp.Expression:

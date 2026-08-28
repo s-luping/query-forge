@@ -101,6 +101,33 @@ def _infer_visible_db_type(user: dict) -> Optional[str]:
         return None
 
 
+def _resolve_fallback_schema(user: dict, sql: str) -> Optional[str]:
+    """全库模式 SQL 无库前缀时：可见库唯一则直接路由，多库/无库返回 None
+
+    兜底场景：LLM 在全库模式生成 SQL 但漏带库前缀（如 FROM order_detail 而非
+    pjmall.order_detail）。仅当用户可见库唯一时才自动补路由，避免多库歧义；
+    SQL 自带库前缀时返回 None（执行器按前缀精确路由）。
+    """
+    from services.sql_executor import _extract_sql_schema_names
+    if _extract_sql_schema_names(sql):
+        return None
+    try:
+        from app.permissions import get_visible_schema_ids
+        from models.schema import DbSchema
+        visible = get_visible_schema_ids(user)
+        with session_scope() as db:
+            if visible is None:
+                # 无权限限制（如 admin）：系统仅 1 个库时才兜底
+                names = [n for (n,) in db.query(DbSchema.name).all()]
+                return names[0] if len(names) == 1 else None
+            if len(visible) != 1:
+                return None
+            return db.query(DbSchema.name).filter(DbSchema.id == visible[0]).scalar()
+    except Exception as e:
+        logger.warning(f"[conversation_router] 兜底路由解析失败: {e}")
+        return None
+
+
 def _get_user_llm_config(user_id: int, config_id: Optional[int] = None) -> Optional[dict]:
     """获取用户的LLM配置（api_key 解密后供客户端使用）
 
@@ -210,10 +237,12 @@ def _get_knowledge_safe(user_id: int, knowledge_id: Optional[int] = None,
     try:
         from app.routers.knowledge_router import get_knowledge_safe
         parts = []
+        seen: set = set()
         for kid in ids:
             knowledge = get_knowledge_safe(user_id, kid)
             content = knowledge.get("content", "") if knowledge else ""
-            if content:
+            if content and content not in seen:   # 内容级去重，防同一条知识重复注入 prompt
+                seen.add(content)
                 parts.append(content)
         return "\n\n".join(parts)
     except Exception:
@@ -335,13 +364,14 @@ def create_conversation(
             pre_log=pre_log,
         )
 
-        # 执行生成的 SQL：查询前校验非空，直接查库返回结果
-        # 信息不足（need_more_info）时不执行 SQL，前端引导用户补充
-        if result.get('need_more_info'):
+        # 执行生成的 SQL：校验失败（含权限拦截）或信息不足时不执行，前端展示原因
+        if result.get('need_more_info') or not result.get('is_valid'):
             query_result = None
         else:
+            exec_schema = request.schema_name or _resolve_fallback_schema(
+                user, result.get('sql', ''))
             query_result = _execute_generated_sql(
-                result.get('sql', ''), request.schema_name, db_type)
+                result.get('sql', ''), exec_schema, db_type)
 
         # 保存到数据库
         with session_scope() as db:
@@ -583,13 +613,14 @@ def send_message(
             pre_log=pre_log,
         )
 
-        # 执行生成的 SQL：查询前校验非空，直接查库返回结果
-        # 信息不足（need_more_info）时不执行 SQL，前端引导用户补充
-        if result.get('need_more_info'):
+        # 执行生成的 SQL：校验失败（含权限拦截）或信息不足时不执行，前端展示原因
+        if result.get('need_more_info') or not result.get('is_valid'):
             query_result = None
         else:
+            exec_schema = schema_name or _resolve_fallback_schema(
+                user, result.get('sql', ''))
             query_result = _execute_generated_sql(
-                result.get('sql', ''), schema_name, conv_db_type)
+                result.get('sql', ''), exec_schema, conv_db_type)
 
         # 保存消息
         with session_scope() as db:
