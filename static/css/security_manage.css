@@ -4,4 +4,20 @@
 .stat-label { font-size: 13px; opacity: .9; }
 .stat-total { background: #315c8c; } .stat-blocked { background: #b94a48; }
 .stat-sensitive { background: #b87924; } .stat-rate { background: #34745d; }
-.sql-cell { max-width: 280px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* 长文本列截断（问题/生成SQL）：悬停 title 查看完整内容 */
+.query-cell, .sql-cell {
+    max-width: 100%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* 审计日志表格：固定布局 + 显式列宽，避免问题/SQL 长文本把整表撑宽 */
+#tab-logs .table { table-layout: fixed; width: 100%; }
+#tab-logs th:nth-child(1) { width: 128px; }   /* 时间 */
+#tab-logs th:nth-child(2) { width: 84px; }    /* 用户 */
+#tab-logs th:nth-child(3) { width: 220px; }   /* 问题 */
+#tab-logs th:nth-child(4) { width: 300px; }   /* 生成 SQL */
+#tab-logs th:nth-child(5) { width: 64px; }    /* 状态 */
+#tab-logs th:nth-child(6) { width: 80px; }    /* 链路 */
+#tab-logs td { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
