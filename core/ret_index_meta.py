@@ -82,19 +82,24 @@ def get_index_meta(schema_name: str) -> Optional[dict]:
 
 
 def build_vector_index(schema_name: Optional[str] = None) -> Dict:
-    """构建向量索引"""
+    """构建向量索引（全库统一构建，不再按库区分）
+
+    对话为全库模式（schema_name=None），召回使用无前缀 fields 全库索引。
+    schema_name 参数仅用于记录来源（兼容调用方），构建内容始终为全库字段。
+    """
     from core.ret_vector_store import SchemaVectorStore
     from services import schema_service
 
-    target_schema = schema_name or 'default'
+    # 全库统一构建：target 固定为全库索引（None），元数据 key 用 'default'
+    target_schema = 'default'
     try:
         store = SchemaVectorStore()
-        rows = schema_service.iter_field_rows(schema_name=schema_name)
+        rows = schema_service.iter_field_rows(schema_name=None)
         if not rows:
             return {'success': False, 'message': '没有数据'}
 
         schema_list = [{
-            'schema_name': r.schema_name or schema_name or '',
+            'schema_name': r.schema_name or '',
             'table_name': r.table_name,
             'table_description': r.table_description or '',
             'column_name': r.column_name,
@@ -108,7 +113,7 @@ def build_vector_index(schema_name: Optional[str] = None) -> Dict:
         # 写入构建中状态
         set_index_meta(target_schema, 'building')
 
-        result = store.build_from_schemas(schema_list, schema_name)
+        result = store.build_from_schemas(schema_list, None)
 
         if result.get('success'):
             table_count = len(set(s.get('table_name', '') for s in schema_list))

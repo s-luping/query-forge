@@ -205,7 +205,16 @@ class VectorIndex:
         self.vectors = self.vectors / norms
         logger.info(f"向量索引构建完成: {len(vectors)} 个向量")
 
-    def search(self, query_vector: np.ndarray, top_k: int = 5) -> List[Tuple[str, Dict, float]]:
+    def search(self, query_vector: np.ndarray, top_k: int = 5,
+               mask: Optional[np.ndarray] = None) -> List[Tuple[str, Dict, float]]:
+        """相似度搜索（支持权限掩码）
+
+        Args:
+            query_vector: 查询向量
+            top_k: 返回条数
+            mask: 可选布尔数组（长度=向量数，True=允许搜索）。
+                  用于召回前剔除用户无权限的字段，避免 top-K 名额被挤占。
+        """
         if self.vectors is None or len(self.vectors) == 0:
             return []
 
@@ -215,12 +224,15 @@ class VectorIndex:
         query = query / np.linalg.norm(query)
 
         similarities = np.dot(self.vectors, query.T).flatten()
+        if mask is not None and len(mask) == len(similarities):
+            # 无权限字段的相似度置为负无穷，不参与 top-K 竞争
+            similarities = np.where(mask, similarities, -np.inf)
         top_k = min(top_k, len(similarities))
         top_indices = np.argsort(similarities)[-top_k:][::-1]
 
         results = []
         for idx in top_indices:
-            if idx < len(self.documents):
+            if idx < len(self.documents) and similarities[idx] != -np.inf:
                 distance = 1.0 - similarities[idx]
                 results.append((
                     self.documents[idx],
@@ -238,7 +250,14 @@ class VectorIndex:
 
         # 向量数据用 numpy 二进制格式（高效且安全）
         vectors_arr = np.asarray(self.vectors) if self.vectors is not None else np.array([])
-        np.savez(npz_path, vectors=vectors_arr)
+        # 原子写：先写临时文件再 rename，重建期间旧索引文件保持完整可读，
+        # 正在进行的召回不会读到半写状态（重建不影响用户使用）。
+        # 注意 np.savez 会在传入路径上自动追加 .npz 后缀，因此临时文件用
+        # 文件对象写入，避免路径后缀叠加（fields.npz.tmp.npz 的坑）。
+        npz_tmp = npz_path + '.tmp'
+        with open(npz_tmp, 'wb') as f:
+            np.savez(f, vectors=vectors_arr)
+        os.replace(npz_tmp, npz_path)
 
         # 元数据用 JSON（文本格式，安全可读）
         meta = {
@@ -246,8 +265,10 @@ class VectorIndex:
             'documents': self.documents,
             'metadata': self.metadata,
         }
-        with open(meta_path, 'w', encoding='utf-8') as f:
+        meta_tmp = meta_path + '.tmp'
+        with open(meta_tmp, 'w', encoding='utf-8') as f:
             json.dump(meta, f, ensure_ascii=False)
+        os.replace(meta_tmp, meta_path)
 
         self._last_save_path = npz_path
         logger.info(f"向量索引已保存: {npz_path}")
@@ -403,11 +424,12 @@ class SchemaVectorStore:
         logger.info(f"向量索引构建完成: 字段={len(field_texts)}")
         return results
 
-    def search_fields(self, query: str, top_k: int = 10) -> List[Dict]:
+    def search_fields(self, query: str, top_k: int = 10,
+                      mask: Optional[np.ndarray] = None) -> List[Dict]:
         if not self.field_index.is_built:
             return []
         vector = EmbeddingModel.encode([query])[0]
-        results = self.field_index.search(vector, top_k)
+        results = self.field_index.search(vector, top_k, mask=mask)
         return [meta for _, meta, _ in results]
 
     def save(self, schema_name: Optional[str] = None):

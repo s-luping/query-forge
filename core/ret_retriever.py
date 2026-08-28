@@ -13,6 +13,8 @@ from typing import List, Dict, Optional
 
 import json
 
+import numpy as np
+
 from app.logger import logger
 from app.permissions import (filter_fields_by_permission, get_table_grants_by_schema,
                              get_visible_schema_ids)
@@ -79,20 +81,28 @@ class SchemaRetriever:
     # ---------- 向量索引 ----------
 
     def try_load_vector_store(self, schema_name: Optional[str] = None) -> bool:
-        """尝试加载（必要时构建）向量索引；字段数低于阈值或失败时返回 False"""
+        """尝试加载（必要时构建）向量索引；字段数低于阈值或失败时返回 False
+
+        全库统一索引：始终加载无前缀 fields 索引（schema_name 仅记录用途）。
+        - 索引状态为 stale（同步后标记）时，用旧索引继续服务 + 后台懒重建，
+          不阻塞当前请求（重建不影响用户使用）。
+        """
         try:
             threshold = get_vector_config('VECTOR_INDEX_THRESHOLD')
-            if self.field_count(schema_name) < threshold:
+            if self.field_count(None) < threshold:
                 return False
 
             store = SchemaVectorStore()
-            if store.load(schema_name):
+            if store.load(None):
                 self.vector_store, self.vector_loaded = store, True
+                # stale 检查：后台重建，不阻塞本次召回
+                self._maybe_rebuild_stale()
                 return True
 
-            schemas = [self._row_to_dict(r) for r in self.get_field_rows(schema_name)]
+            # 无索引文件：前台构建（首问会慢，属预期）
+            schemas = [self._row_to_dict(r) for r in self.get_field_rows(None)]
             if schemas:
-                store.build_from_schemas(schemas, schema_name)
+                store.build_from_schemas(schemas, None)
                 self.vector_store, self.vector_loaded = store, True
                 return True
             return False
@@ -101,18 +111,40 @@ class SchemaRetriever:
             logger.warning(f"[SchemaRetriever] 向量索引加载失败，降级DB查询: {e}")
             return False
 
+    def _maybe_rebuild_stale(self):
+        """索引状态为 stale 时后台懒重建（不阻塞当前请求）。
+
+        重建期间旧索引文件保持完整（原子写），本次召回继续用旧索引，
+        新索引就绪后自动替换。auto_build_vector_index 内部自带构建锁，
+        并发触发时后到者直接跳过。
+        """
+        try:
+            from core.ret_index_meta import get_index_meta
+            meta = get_index_meta('default')
+            if meta is None or meta.get('status') != 'stale':
+                return
+            from services.vector_service import auto_build_vector_index
+            result = auto_build_vector_index('default', meta.get('field_count', 0))
+            if result:
+                logger.info(f"[SchemaRetriever] stale 索引后台重建已触发")
+        except Exception as e:
+            logger.warning(f"[SchemaRetriever] stale 懒重建触发失败: {e}")
+
     def search_vector(self, keywords: List[str],
-                      query: Optional[str] = None) -> Optional[List[Dict]]:
+                      query: Optional[str] = None,
+                      schema_name: Optional[str] = None) -> Optional[List[Dict]]:
         """向量检索字段；未加载或失败时返回 None
 
         编码文本优先使用原始 query（完整语义），未提供时回退关键词拼接。
+        构建权限掩码，剔除用户无权限字段参与 top-K 竞争。
         """
         if not self.vector_loaded or self.vector_store is None:
             return None
         try:
             text = (query or '').strip() or ' '.join(keywords)
+            mask = self._build_search_mask(schema_name)
             return self.vector_store.search_fields(
-                text, top_k=get_vector_config('FIELD_RECALL_TOP_K'))
+                text, top_k=get_vector_config('FIELD_RECALL_TOP_K'), mask=mask)
         except Exception as e:
             logger.warning(f"[SchemaRetriever] 向量检索失败，降级DB查询: {e}")
             return None
@@ -132,6 +164,48 @@ class SchemaRetriever:
                 results.append(self._row_to_dict(r))
         return results[:get_vector_config('FIELD_RECALL_TOP_K')]
 
+    def _build_search_mask(self, schema_name: Optional[str] = None) -> Optional[np.ndarray]:
+        """构建向量搜索权限掩码：仅允许用户可见的字段参与 top-K 竞争。
+
+        索引为全库索引（含所有库字段），用户可能只对部分库/表有权限。
+        把无权限字段的相似度排除，避免 top-K 名额被不可见字段挤占。
+        返回 None 表示无需掩码（管理员全可见或索引未加载）。
+        """
+        try:
+            import numpy as np
+            store = self.vector_store
+            if store is None or not store.field_index.is_built:
+                return None
+            metas = store.field_index.metadata
+            if not metas:
+                return None
+            # 管理员（无权限限制）直接放行
+            visible = get_visible_schema_ids(self.user)
+            if visible is None:
+                return None
+            # 可见 schema id → 库名集合（掩码按库名匹配索引 metadata）
+            from models.schema import DbSchema
+            with session_scope() as db:
+                visible_names = set(
+                    name for (name,) in db.query(DbSchema.name).filter(
+                        DbSchema.id.in_(visible)).all()
+                )
+            # 单库模式：仅保留该库字段
+            if schema_name:
+                mask = np.array([
+                    m.get('schema_name') == schema_name for m in metas
+                ], dtype=bool)
+                return mask if mask.any() else None
+            # 全库模式：保留可见库 + 未标库名的字段（旧索引兼容）
+            mask = np.array([
+                (not m.get('schema_name')) or (m.get('schema_name') in visible_names)
+                for m in metas
+            ], dtype=bool)
+            return mask if mask.any() else None
+        except Exception as e:
+            logger.warning(f"[SchemaRetriever] 构建搜索掩码失败，放行全量: {e}")
+            return None
+
     def recall_fields(self, keywords: List[str],
                       schema_name: Optional[str] = None,
                       query: Optional[str] = None) -> List[Dict]:
@@ -142,11 +216,12 @@ class SchemaRetriever:
         - 两条路径返回字段均以 DB 权限集合过滤/归一化（schema_name/column_name）。
         - 结果去重（同一字段以 DB 权威结构为准）。
         - query: 原始用户问题，用于向量编码（语义完整度高于关键词拼接）。
+        - 全库索引下用权限掩码避免 top-K 名额被无权限字段挤占。
         """
         if not self.vector_loaded and self.vector_error is None:
             self.try_load_vector_store(schema_name)
 
-        results = self.search_vector(keywords, query=query)
+        results = self.search_vector(keywords, query=query, schema_name=schema_name)
         merged: List[Dict] = []
         seen = set()
         if results:

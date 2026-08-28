@@ -352,16 +352,18 @@ class SyncEngine:
         db.commit()
 
     def _trigger_index_rebuild(self, schema_name: str):
-        """触发向量索引重建（异步，不阻塞）"""
+        """同步后标记向量索引过期（懒重建，不立即全量构建）
+
+        对话为全库模式（统一 fields 索引），同步任一库都影响全库索引。
+        策略：只标记 stale，下次对话召回时检测到 stale 再后台重建（原子写，
+        重建期间旧索引继续服务），避免每次同步都触发耗时全量重建。
+        """
         try:
-            from services.vector_service import auto_build_vector_index
-            from services.schema_service import field_count
-            count = field_count(schema_name)
-            if count > 0:
-                auto_build_vector_index(schema_name, count)
-                logger.info(f"同步后触发索引重建: {schema_name} ({count} 字段)")
+            from services.vector_service import mark_index_stale
+            mark_index_stale('default')
+            logger.info(f"同步后已标记全库向量索引过期: {schema_name}")
         except Exception as e:
-            logger.warning(f"索引重建触发失败: {e}")
+            logger.warning(f"索引过期标记失败: {e}")
 
 
 def _parse_csv(s: str) -> List[str]:
