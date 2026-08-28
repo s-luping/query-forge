@@ -42,11 +42,21 @@
                         <option value="">使用默认模型</option>
                     </select>
                 </div>
-                <div class="chat-switcher-item">
+                <div class="chat-switcher-item chat-kb-multi">
                     <label for="chatKnowledge">知识库</label>
-                    <select id="chatKnowledge">
-                        <option value="">不使用知识库</option>
-                    </select>
+                    <div class="chat-kb-select" id="chatKnowledgeWrap" onclick="event.stopPropagation()">
+                        <div class="chat-kb-trigger" onclick="toggleKbDropdown(event)">
+                            <span id="chatKbLabel">不使用知识库</span>
+                            <span class="chat-kb-arrow">▾</span>
+                        </div>
+                        <div class="chat-kb-dropdown" id="chatKbDropdown">
+                            <div class="chat-kb-option">
+                                <label><input type="checkbox" value="" data-id="">不使用知识库</label>
+                            </div>
+                            <!-- 知识库选项由 JS 填充 -->
+                            <div id="chatKbOptions"></div>
+                        </div>
+                    </div>
                 </div>
                 <span class="chat-switcher-hint">切换后对下一条消息生效</span>
             </div>

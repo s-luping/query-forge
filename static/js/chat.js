@@ -106,17 +106,17 @@ async function openConv(id, title) {
     // 恢复该对话的模型/知识库切换器选择（有记忆则恢复，无则默认）
     const prefs = getConvPref(id);
     const llmSel = document.getElementById('chatLlmConfig');
-    const kbSel = document.getElementById('chatKnowledge');
     if (prefs.llm_config_id && llmSel.querySelector(`option[value="${prefs.llm_config_id}"]`)) {
         llmSel.value = prefs.llm_config_id;
     } else {
         llmSel.value = '';
     }
-    if (prefs.knowledge_id && kbSel.querySelector(`option[value="${prefs.knowledge_id}"]`)) {
-        kbSel.value = prefs.knowledge_id;
-    } else {
-        kbSel.value = '';
-    }
+    // 知识库多选恢复
+    const kbIds = new Set((prefs.knowledge_ids || []).map(String));
+    document.querySelectorAll('#chatKbDropdown input[type="checkbox"]').forEach(cb => {
+        cb.checked = kbIds.has(cb.value);
+    });
+    updateKbLabel();
 
     const msgContainer = document.getElementById('chatMessages');
     msgContainer.innerHTML = '<div style="text-align:center;color:#aaa;padding:40px;">加载中...</div>';
@@ -257,7 +257,7 @@ async function sendMsg() {
             body: JSON.stringify({
                 content,
                 llm_config_id: prefs.llm_config_id ? parseInt(prefs.llm_config_id) : null,
-                knowledge_id: prefs.knowledge_id ? parseInt(prefs.knowledge_id) : null
+                knowledge_ids: (prefs.knowledge_ids || []).map(id => parseInt(id))
             })
         });
         if (!resp.ok) throw new Error((await resp.json()).detail || '请求失败');
@@ -385,7 +385,7 @@ async function createConv() {
         // 新对话采用当前切换器选择（模型/知识库），供后续消息发送
         _convPrefs[currentConvId] = {
             llm_config_id: (document.getElementById('chatLlmConfig').value || null),
-            knowledge_id: (document.getElementById('chatKnowledge').value || null)
+            knowledge_ids: getSelectedKbIds()
         };
 
         // Render messages（对话界面内展示结果）
@@ -419,11 +419,45 @@ async function createConv() {
 // ── LLM Config & Knowledge Loaders（对话切换器） ───────────
 // 创建对话不再选择模型/知识库；对话过程中通过输入区上方的切换器随时切换，
 // 切换值记录在 _convPrefs（按对话 id 记忆），下一条消息发送时生效。
-let _convPrefs = {};   // {convId: {llm_config_id, knowledge_id}}
+// 知识库支持多选（checkbox 下拉）。
+let _convPrefs = {};   // {convId: {llm_config_id, knowledge_ids: []}}
 
 function getConvPref(convId) {
-    return _convPrefs[convId] || { llm_config_id: null, knowledge_id: null };
+    const p = _convPrefs[convId];
+    return p || { llm_config_id: null, knowledge_ids: [] };
 }
+
+function getSelectedKbIds() {
+    const checked = document.querySelectorAll('#chatKbDropdown input[type="checkbox"]:checked');
+    const ids = [];
+    checked.forEach(cb => { if (cb.value) ids.push(cb.value); });
+    return ids;
+}
+
+function updateKbLabel() {
+    const ids = getSelectedKbIds();
+    const label = document.getElementById('chatKbLabel');
+    if (!ids.length) { label.textContent = '不使用知识库'; return; }
+    const opts = document.querySelectorAll('#chatKbDropdown input[type="checkbox"]');
+    const names = [];
+    opts.forEach(cb => {
+        if (ids.includes(cb.value)) names.push(cb.dataset.name || cb.value);
+    });
+    label.textContent = names.join('、') + (ids.length > 3 ? ` (+${ids.length - 3})` : '');
+}
+
+function toggleKbDropdown(e) {
+    e.stopPropagation();
+    document.getElementById('chatKbDropdown').classList.toggle('show');
+}
+
+// 点击页面其它区域关闭知识库下拉
+document.addEventListener('click', function (e) {
+    const wrap = document.getElementById('chatKnowledgeWrap');
+    if (wrap && !wrap.contains(e.target)) {
+        document.getElementById('chatKbDropdown')?.classList.remove('show');
+    }
+});
 
 async function loadLlmConfigs() {
     try {
@@ -449,12 +483,16 @@ async function loadKnowledge() {
         const resp = await apiRequest('/api/knowledge');
         if (!resp.ok) return;
         const data = await resp.json();
-        const sel = document.getElementById('chatKnowledge');
+        const box = document.getElementById('chatKbOptions');
         (data.items || []).forEach(k => {
-            const opt = document.createElement('option');
-            opt.value = k.id;
-            opt.textContent = k.title || '(无标题)';
-            sel.appendChild(opt);
+            const div = document.createElement('div');
+            div.className = 'chat-kb-option';
+            div.innerHTML = `<label><input type="checkbox" value="${k.id}" data-name="${escapeAttr(k.title || '(无标题)')}">${escapeHtml(k.title || '(无标题)')}</label>`;
+            box.appendChild(div);
+        });
+        // checkbox 变化时更新标签
+        box.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+            cb.addEventListener('change', updateKbLabel);
         });
     } catch (e) { console.error('加载知识库失败:', e); }
 }
