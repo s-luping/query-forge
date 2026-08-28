@@ -218,6 +218,39 @@ body {
     flex-shrink: 0;
 }
 
+/* 模型 / 知识库切换器（对话中随时切换） */
+.chat-switcher {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+}
+.chat-switcher-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.chat-switcher-item label {
+    font-size: 12px;
+    color: #666;
+    white-space: nowrap;
+    margin: 0;
+}
+.chat-switcher-item select {
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    padding: 4px 8px;
+    font-size: 12px;
+    max-width: 260px;
+    background: #fff;
+}
+.chat-switcher-hint {
+    font-size: 11px;
+    color: #aaa;
+    margin-left: auto;
+}
+
 .chat-input-row {
     display: flex;
     gap: 10px;

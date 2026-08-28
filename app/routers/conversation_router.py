@@ -46,6 +46,9 @@ class CreateConversationRequest(BaseModel):
 
 class SendMessageRequest(BaseModel):
     content: str
+    # 对话过程中可随时切换模型 / 知识库（显式传值则切换并持久化；不传沿用会话配置）
+    llm_config_id: Optional[int] = None
+    knowledge_id: Optional[int] = None
 
 
 class ConversationItem(BaseModel):
@@ -459,6 +462,27 @@ def send_message(
             conv_knowledge_id = conversation.knowledge_id
             # 在 session 关闭前取出首轮表集合（避免退出 with 后 detached 访问报错）
             conv_schema_tables = conversation.schema_tables
+
+        # ── 对话中切换模型 / 知识库 ──
+        # 请求显式传值 → 本次生效并持久化到会话（后续轮次沿用）；不传 → 沿用会话已存配置
+        if request.llm_config_id is not None:
+            conv_llm_config_id = request.llm_config_id
+        if request.knowledge_id is not None:
+            conv_knowledge_id = request.knowledge_id
+        if (request.llm_config_id is not None or request.knowledge_id is not None):
+            with session_scope() as db_upd:
+                db_upd.query(Conversation).filter(
+                    Conversation.id == conversation_id
+                ).update({
+                    'llm_config_id': conv_llm_config_id,
+                    'knowledge_id': conv_knowledge_id,
+                    'updated_at': now_beijing(),
+                })
+                db_upd.commit()
+            logger.info(
+                f"对话 {conversation_id} 配置切换: "
+                f"llm_config_id={conv_llm_config_id}, knowledge_id={conv_knowledge_id}")
+
         # 从三层模型重建 schema CSV（fallback 全量，用于未记录首轮表集合的旧对话）
         schema_csv = _rebuild_schema_csv(schema_name)
         # 首轮召回表集合（新对话已记录；旧对话为空则追问轮沿用全量 schema_csv）
