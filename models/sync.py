@@ -67,13 +67,13 @@ class SchemaChangeLog(MainBase):
     job_id = Column(Integer, ForeignKey('sync_job_configs.id'), nullable=False, index=True, comment='同步任务ID')
     datasource_id = Column(Integer, ForeignKey('data_sources.id'), nullable=False, index=True, comment='数据源ID')
     target_schema_name = Column(String(100), nullable=False, comment='目标 schema 名')
-    change_type = Column(String(20), nullable=False, comment='变更类型: add/modify/remove')
+    change_type = Column(String(20), nullable=False, index=True, comment='变更类型: add/modify/remove')
     object_type = Column(String(20), nullable=False, comment='对象类型: table/column')
     object_name = Column(String(300), nullable=False, comment='对象全名(table.column)')
     old_value = Column(Text, default='', comment='旧值(JSON)')
     new_value = Column(Text, default='', comment='新值(JSON)')
     auto_classified_level = Column(String(20), default='', comment='自动分类的敏感等级(仅新增字段)')
-    approval_status = Column(String(20), default='auto_applied',
+    approval_status = Column(String(20), default='auto_applied', index=True,
                              comment='审批状态: auto_applied/pending/approved/rejected/ignored')
     approved_by = Column(Integer, nullable=True, comment='审批人ID')
     approved_at = Column(DateTime, nullable=True, comment='审批时间')

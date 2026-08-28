@@ -10,6 +10,7 @@
 安全边界：只读执行，任何非 SELECT 语句（INSERT/UPDATE/DELETE/DDL）直接拒绝。
 """
 import time
+import threading
 from typing import List, Optional
 
 from sqlalchemy import create_engine, text
@@ -24,6 +25,14 @@ from models.schema import DbSchema
 
 class SqlExecutionError(Exception):
     """SQL 执行错误（校验失败 / 连接失败 / 查询失败）"""
+
+
+# ── 数据源引擎缓存 ──────────────────────────────────────────
+# 每次查询都 create_engine + dispose 会导致连接池反复建连/销毁，
+# MySQL/PostgreSQL 数据源在并发下连接开销大、源库压力高。
+# 按数据源 id 缓存 Engine，连接指纹变化（改密码/改库）时自动重建。
+_engine_cache: dict = {}          # {datasource_id: (fingerprint, Engine)}
+_engine_lock = threading.Lock()
 
 
 def _validate_select_only(sql: str) -> None:
@@ -55,6 +64,7 @@ def _resolve_datasource(schema_name: Optional[str]) -> Optional[dict]:
         if not ds:
             return None
         return {
+            'id': ds.id,
             'db_type': ds.db_type,
             'host': ds.host,
             'port': ds.port,
@@ -114,6 +124,31 @@ def _build_engine_for_db_type(db_type: str, ds: dict) -> Engine:
     raise SqlExecutionError(f"暂不支持执行该数据库类型: {db_type}")
 
 
+def _get_cached_engine(ds: dict, db_type: str) -> Engine:
+    """按数据源缓存引擎；连接指纹变化（改密码/改库等）时重建。
+
+    指纹不含明文密码（用 password_enc 密文代表），改密码后指纹变化即触发重建，
+    旧引擎对象待引用归零后由 GC 回收，不主动 dispose（可能仍有请求在用）。
+    """
+    ds_id = ds.get('id')
+    fingerprint = (
+        ds.get('db_type') or db_type,
+        ds.get('host'), ds.get('port'), ds.get('database'),
+        ds.get('username'), ds.get('password_enc'),
+    )
+    if ds_id is None:
+        # 无 id（理论不出现，防御）：不缓存，直接构建
+        return _build_engine_for_db_type(db_type, ds)
+
+    with _engine_lock:
+        cached = _engine_cache.get(ds_id)
+        if cached is not None and cached[0] == fingerprint:
+            return cached[1]
+        engine = _build_engine_for_db_type(db_type, ds)
+        _engine_cache[ds_id] = (fingerprint, engine)
+        return engine
+
+
 def execute_sql(sql: str, schema_name: Optional[str] = None,
                 db_type: str = 'sqlite', max_rows: int = 100) -> dict:
     """执行 SQL 查询，返回 {columns, rows, row_count, duration_ms, error}。
@@ -139,11 +174,10 @@ def execute_sql(sql: str, schema_name: Optional[str] = None,
             resolved_schema = sql_schemas[0]
 
     ds = _resolve_datasource(resolved_schema)
-    engine = None
     try:
         if ds is not None:
             # 数据源类型优先于调用方兜底类型（跨库场景尤为重要）
-            engine = _build_engine_for_db_type(db_type, ds)
+            engine = _get_cached_engine(ds, db_type)
         elif db_type in ('sqlite', 'sqlite3'):
             from db import engine_main
             engine = engine_main
@@ -177,6 +211,3 @@ def execute_sql(sql: str, schema_name: Optional[str] = None,
     except Exception as e:
         logger.warning(f"SQL 执行失败: schema={resolved_schema} err={e}")
         raise SqlExecutionError(f"SQL 执行失败: {str(e)}")
-    finally:
-        if engine is not None:
-            engine.dispose()

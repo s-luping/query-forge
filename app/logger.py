@@ -2,10 +2,12 @@
 日志系统 — 按类型分离（统一写入 logs/，自动轮转）
   app.log      应用日志（请求、认证、业务）
   llm.log      大模型调用详情
-  pipeline.log SQL生成过程
-  sqlalchemy.log  数据库异常（WARNING 以上；不再逐句记录 SQL）
   audit.log    审计日志（写操作、权限变更）
   server.log   服务日志（uvicorn 启动/访问，按天轮转保留30天，由 main.py 配置）
+
+说明：SQL 生成过程（pipeline）链路追踪已改为写入数据库 QueryAuditLog.pipeline_log 字段，
+      供前端「链路追踪」弹窗展示，不再单独输出文件日志；
+      数据库异常统一走 app.log（WARNING 以上），不再单独维护 sqlalchemy 日志。
 """
 import logging
 import os
@@ -24,11 +26,15 @@ class BeijingFormatter(logging.Formatter):
         timestamp, BEIJING_TZ).timetuple())
 
 
-def _create_logger(name, filename, level=logging.INFO, fmt=None, console=False):
+def _create_logger(name, filename, level=logging.INFO, fmt=None, console=False,
+                   backup_count=5):
     log_logger = logging.getLogger(name)
     log_logger.setLevel(level)
     log_logger.propagate = False
-    handler = RotatingFileHandler(os.path.join(LOG_DIR, filename), maxBytes=10 * 1024 * 1024, encoding="utf-8")
+    # backupCount=5：达到 maxBytes 后轮转，保留最近 5 个历史文件（每个 10MB）
+    handler = RotatingFileHandler(os.path.join(LOG_DIR, filename),
+                                  maxBytes=10 * 1024 * 1024, backupCount=backup_count,
+                                  encoding="utf-8")
     handler.setFormatter(BeijingFormatter(
         fmt or "%(asctime)s - %(levelname)s - %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S"))
@@ -42,10 +48,6 @@ def _create_logger(name, filename, level=logging.INFO, fmt=None, console=False):
 
 logger = _create_logger("app", "app.log", fmt="%(asctime)s [%(levelname)s] %(module)s: %(message)s", console=True)
 llm_logger = _create_logger("llm", "llm.log", level=logging.DEBUG, fmt="%(asctime)s\n%(message)s\n" + "=" * 80)
-pipeline_logger = _create_logger("pipeline", "pipeline.log", level=logging.DEBUG, fmt="%(asctime)s\n%(message)s\n" + "=" * 80)
-# sqlalchemy 仅记录 WARNING 以上（不再每句 SQL 都写日志，避免日志无限膨胀）
-sqlalchemy_logger = _create_logger("sqlalchemy.engine", "sqlalchemy.log",
-                                   level=logging.WARNING, fmt="%(asctime)s %(message)s")
 audit_logger = _create_logger("audit", "audit.log", fmt="%(asctime)s | %(message)s")
 
 

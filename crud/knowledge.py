@@ -70,20 +70,44 @@ class KnowledgeCrud(BaseCrud):
         - 匹配范围：title + aliases(JSON) + content + payload(JSON 文本)
         - 作用域：scope_schema_id 为 NULL（全局）或匹配传入 schema id 的条目；
           relation 类型忽略 scope 限制（关系天然跨库，用于动态扩表）
+        - 匹配下推到 SQL LIKE：先按关键词粗筛出候选集，再在内存中打分排序，
+          避免把全部知识条目 all() 进内存（条目多时是全表扫描 + Python 循环）。
         - 在会话内完成序列化，避免返回分离对象后因属性过期触发 DetachedInstanceError
         - 返回字典（含 score）列表，top `limit`
         """
         if not keyword_set:
             return []
+        # 过滤空关键词（LIKE '%%' 会匹配所有行）
+        kws = [k for k in keyword_set if k and k.strip()]
+        if not kws:
+            return []
+
         with session_scope() as db:
-            items = db.query(KnowledgeItem).filter(KnowledgeItem.is_active == 1).all()
+            from sqlalchemy import or_, and_
+            q = db.query(KnowledgeItem).filter(KnowledgeItem.is_active == 1)
+
+            # 作用域下推（relation 类型豁免）
+            if scope_schema_id is not None:
+                q = q.filter(or_(
+                    KnowledgeItem.knowledge_type == 'relation',
+                    KnowledgeItem.scope_schema_id.is_(None),
+                    KnowledgeItem.scope_schema_id == scope_schema_id,
+                ))
+
+            # 关键词 LIKE 粗筛：任一关键词命中任一可匹配字段即进入候选集
+            like_conds = []
+            for kw in kws:
+                like_conds.append(or_(
+                    KnowledgeItem.title.like(f'%{kw}%'),
+                    KnowledgeItem.aliases.like(f'%{kw}%'),
+                    KnowledgeItem.content.like(f'%{kw}%'),
+                    KnowledgeItem.payload.like(f'%{kw}%'),
+                ))
+            q = q.filter(or_(*like_conds))
+
+            # 候选集通常已大幅缩小，再在内存中精确打分
             results = []
-            for it in items:
-                # 作用域过滤（relation 类型豁免）
-                if it.knowledge_type != 'relation' and scope_schema_id is not None:
-                    if it.scope_schema_id is not None and it.scope_schema_id != scope_schema_id:
-                        continue
-                # 构造可匹配文本
+            for it in q.all():
                 aliases = _parse_json(it.aliases, [])
                 alias_text = ' '.join(aliases) if isinstance(aliases, list) else ''
                 haystack = ' '.join([
@@ -92,7 +116,7 @@ class KnowledgeCrud(BaseCrud):
                     it.content or '',
                     it.payload or '',
                 ]).lower()
-                score = sum(1 for kw in keyword_set if kw and kw in haystack)
+                score = sum(1 for kw in kws if kw and kw.lower() in haystack)
                 if score > 0:
                     d = self.to_dict(it)
                     d['score'] = score

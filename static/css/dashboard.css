@@ -1,0 +1,29 @@
+/* dashboard.html — 仪表盘页专属样式 */
+body { background: #f5f6fa; }
+.stat-card { border-radius: 12px; padding: 20px; color: white; text-align: center; transition: transform .15s; }
+.stat-card:hover { transform: translateY(-2px); }
+.stat-card .stat-value { font-size: 30px; font-weight: 700; }
+.stat-card .stat-label { font-size: 13px; opacity: .9; margin-top: 4px; }
+.stat-card .stat-icon { font-size: 20px; margin-bottom: 6px; opacity: .85; }
+.bg-purple { background: linear-gradient(135deg, #667eea, #764ba2); }
+.bg-blue { background: linear-gradient(135deg, #2196f3, #1e88e5); }
+.bg-green { background: linear-gradient(135deg, #2d6a4f, #40916c); }
+.bg-orange { background: linear-gradient(135deg, #ffb703, #fb8500); }
+.bg-red { background: linear-gradient(135deg, #f5365c, #f56036); }
+.bg-teal { background: linear-gradient(135deg, #006d77, #83c5be); }
+.bg-gray { background: linear-gradient(135deg, #6c757d, #adb5bd); }
+.section-card { background: #fff; border-radius: 10px; border: 1px solid #e9ecef; margin-bottom: 16px; }
+.section-card .card-header { background: #fafbfc; border-bottom: 1px solid #eef0f2; font-weight: 600; font-size: 14px; padding: 12px 18px; display: flex; justify-content: space-between; align-items: center; }
+.section-card .card-body { padding: 0; }
+.quick-link { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 8px; color: #495057; font-size: 13px; cursor: pointer; transition: all .15s; }
+.quick-link:hover { background: #e7f1ff; border-color: #0d6efd; color: #0d6efd; text-decoration: none; }
+.quick-link i { font-size: 12px; }
+.badge-success { background: #40916c; }
+.badge-failed { background: #f5365c; }
+.badge-running { background: #2196f3; }
+.badge-pending { background: #ffb703; color: #333; }
+.empty-state { text-align: center; padding: 30px; color: #999; font-size: 13px; }
+.table th { font-size: 12px; color: #888; font-weight: 600; background: #fafbfc; }
+.table td { font-size: 13px; vertical-align: middle; }
+.greeting { font-size: 20px; font-weight: 700; color: #333; }
+.greeting-sub { font-size: 13px; color: #888; margin-bottom: 18px; }

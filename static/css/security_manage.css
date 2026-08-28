@@ -1,0 +1,7 @@
+/* security_manage.html — 安全中心页专属样式 */
+.stat-card { border-radius: 8px; padding: 18px; color: white; text-align: center; }
+.stat-value { font-size: 28px; font-weight: 700; }
+.stat-label { font-size: 13px; opacity: .9; }
+.stat-total { background: #315c8c; } .stat-blocked { background: #b94a48; }
+.stat-sensitive { background: #b87924; } .stat-rate { background: #34745d; }
+.sql-cell { max-width: 280px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

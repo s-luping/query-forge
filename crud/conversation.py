@@ -27,6 +27,31 @@ class ConversationCrud(BaseCrud):
     def count_by_user(self, user_id: int) -> int:
         return self.count(user_id=user_id)
 
+    def list_paged(self, user_id: Optional[int], is_admin: bool = False,
+                   limit: int = 20, offset: int = 0
+                   ) -> Tuple[List[Conversation], int]:
+        """分页对话列表 + 总数（一次会话，避免全量加载）
+
+        Args:
+            user_id: 用户 id；is_admin=True 时忽略（管理员看全部）
+            limit: 每页条数
+            offset: 偏移量
+
+        Returns:
+            (conversations, total)
+        """
+        from sqlalchemy import func
+        with session_scope() as db:
+            q = db.query(Conversation)
+            if not is_admin:
+                q = q.filter(Conversation.user_id == user_id)
+            total = q.count()
+            conversations = (q.order_by(Conversation.updated_at.desc())
+                             .offset(offset).limit(limit).all())
+            for c in conversations:
+                db.expunge(c)
+            return conversations, total
+
     def list_with_message_counts(self, user_id: Optional[int],
                                  is_admin: bool = False) -> List[Tuple[Conversation, int]]:
         """对话列表 + 各对话消息数（一次 GROUP BY 聚合，避免 N+1 count）"""

@@ -11,7 +11,7 @@ import json
 from datetime import datetime
 from typing import Optional, cast
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
 from app.auth import CurrentUser
@@ -622,13 +622,24 @@ def send_message(
 
 @router.get("")
 def list_conversations(
-    user: CurrentUser
+    user: CurrentUser,
+    limit: int = Query(20, ge=1, le=200),
+    offset: int = Query(0, ge=0),
 ):
-    """获取对话列表（管理员看全部，用户看自己）"""
+    """获取对话列表（分页，按更新时间倒序）。管理员看全部，用户看自己。
+
+    Args:
+        limit: 每页条数（默认 20，最大 200）
+        offset: 偏移量（分页游标）
+
+    Returns:
+        {"items": [...], "total": 总条数}
+    """
     user_id = user['user_id']
     is_admin = user.get('role') == 'admin'
 
-    conversations = conversation_crud.list_all() if is_admin else conversation_crud.list_by_user(user_id)
+    conversations, total = conversation_crud.list_paged(
+        user_id, is_admin, limit=limit, offset=offset)
     # schema id → name 映射（一次查询）
     schema_names = schema_crud.name_map()
     # 各对话消息数（一次 GROUP BY 聚合，避免 N+1 count）
@@ -652,7 +663,7 @@ def list_conversations(
             message_count=msg_counts.get(conv.id, 0)
         ))
 
-    return result
+    return {"items": result, "total": total}
 @router.get("/{conversation_id}/messages")
 def get_messages(
     conversation_id: int,

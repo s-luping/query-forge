@@ -89,6 +89,10 @@ def init_database():
         _ensure_column_sqlite(
             config.MAIN_DB_PATH, 'conversations', 'schema_tables', 'TEXT'
         )
+        # 高频过滤字段的普通索引（存量库补建；新库由 create_all 一并创建）
+        from db.sqlite_hooks import _ensure_indexes_sqlite, _ensure_telemetry_indexes
+        _ensure_indexes_sqlite(config.MAIN_DB_PATH)
+        _ensure_telemetry_indexes(config.TELEMETRY_DB_PATH)
 
     logger.info("主库表创建/检查完成")
     logger.info("遥测库表创建/检查完成")

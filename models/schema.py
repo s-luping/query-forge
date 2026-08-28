@@ -52,7 +52,7 @@ class DbColumn(MainBase):
     column_key = Column(String(10), default='', comment='键类型(PRI=主键)')
     foreign_key = Column(String(200), default='', comment='外键引用(table.column)')
     sample_values = Column(Text, comment='示例值(逗号分隔)')
-    sensitive_level = Column(String(20), default='public', comment='敏感等级: public/internal/sensitive/confidential')
+    sensitive_level = Column(String(20), default='public', index=True, comment='敏感等级: public/internal/sensitive/confidential')
     is_dimension = Column(Boolean, default=False, comment='是否维度字段(可分组)')
     is_measure = Column(Boolean, default=False, comment='是否度量字段(可聚合)')
     created_at = Column(DateTime, default=now_beijing, comment='创建时间（北京时间）')

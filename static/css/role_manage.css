@@ -1,0 +1,58 @@
+/* role_manage.css — 角色与权限页专属样式（依赖 common.css 的卡片基底） */
+.rm-page { max-width: 1100px; }
+.rm-title { font-size: 16px; font-weight: 600; color: #1e293b; }
+
+/* 分区卡片：左侧彩色竖条标识 */
+.rm-card { position: relative; }
+.rm-card .card-header { display: flex; align-items: center; gap: 8px; padding-left: 16px; }
+.rm-card .card-header::before { content: ''; width: 4px; height: 16px; border-radius: 2px; background: var(--rm-accent, #2563eb); }
+.rm-card.is-ds { --rm-accent: #2563eb; }
+.rm-card.is-schema { --rm-accent: #7c3aed; }
+.rm-card.is-table { --rm-accent: #059669; }
+.rm-card.is-knowledge { --rm-accent: #d97706; }
+.rm-hint { color: #94a3b8; font-size: 12px; margin: 0 0 12px; }
+
+/* 资源行 */
+.res-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 12px; align-items: center; padding: 7px 8px; border-radius: 8px; min-width: 0; transition: background .12s; }
+.res-row:hover { background: #f1f5f9; }
+.res-row.is-all { background: linear-gradient(90deg, #eff6ff, #f8fafc); border: 1px dashed #bfdbfe; }
+.res-row .lbl { min-width: 0; word-break: break-word; font-size: 13px; line-height: 1.4; color: #334155; }
+.res-row .sub { color: #94a3b8; font-size: 11px; margin-top: 2px; }
+.res-cell { min-width: 0; }
+.all-tag { display: inline-block; font-size: 10px; color: #2563eb; background: #dbeafe; padding: 1px 6px; border-radius: 8px; margin-left: 6px; vertical-align: middle; }
+
+/* 级别 segmented control */
+.lvl-group { display: inline-flex; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; background: #fff; }
+.lvl-btn { border: none; background: #fff; color: #64748b; font-size: 12px; padding: 5px 12px; cursor: pointer; border-right: 1px solid #e2e8f0; transition: all .15s; white-space: nowrap; line-height: 1.2; }
+.lvl-btn:last-child { border-right: none; }
+.lvl-btn:hover { background: #f1f5f9; }
+.lvl-btn.active.lvl-off { background: #94a3b8; color: #fff; }
+.lvl-btn.active.lvl-allow { background: #16a34a; color: #fff; }
+.lvl-btn.active.lvl-deny { background: #dc2626; color: #fff; }
+
+/* 折叠分组 */
+.res-group { margin-bottom: 8px; border: 1px solid #e8edf3; border-radius: 8px; background: #fff; overflow: hidden; }
+.res-group > summary { font-weight: 600; font-size: 13px; cursor: pointer; padding: 9px 12px; list-style: none; display: flex; align-items: center; gap: 6px; color: #334155; background: #f8fafc; }
+.res-group > summary:hover { background: #f1f5f9; }
+.res-group > summary::-webkit-details-marker { display: none; }
+.res-group[open] > summary { color: var(--rm-accent, #2563eb); border-bottom: 1px solid #e8edf3; }
+.res-group > summary .caret { color: #94a3b8; font-size: 11px; transition: transform .15s; display: inline-block; }
+.res-group[open] > summary .caret { transform: rotate(90deg); }
+.res-group .res-body { padding: 4px; }
+.res-group .count { font-size: 11px; color: #94a3b8; font-weight: 400; }
+
+/* 搜索框 */
+.search-box { max-width: 320px; border-radius: 8px; border-color: #e2e8f0; }
+.search-box:focus { border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37, 99, 235, .12); }
+
+/* 空态 */
+.area-empty { color: #94a3b8; font-size: 12px; text-align: center; padding: 18px 0; }
+
+/* 底部操作条 */
+.rm-actions { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 0 4px; }
+
+@media (max-width: 480px) {
+    .res-row { grid-template-columns: 1fr; }
+    .lvl-group { width: 100%; }
+    .lvl-btn { flex: 1; }
+}

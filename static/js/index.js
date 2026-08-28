@@ -1,0 +1,263 @@
+/* index.html — 管理后台框架页专属脚本 */
+// 本页未加载 app_common.js，内联提供与之一致的 QF.toast（非阻塞轻提示）。
+// 仅 confirm() 仍是需要用户确认的弹窗，例如下方登录过期的跳转确认。
+window.QF = window.QF || {};
+window.QF.toast = function (msg, type) {
+    const s = (msg == null ? '' : String(msg));
+    const colors = { danger: '#dc3545', success: '#28a745', warning: '#ffc107', info: '#0d6efd' };
+    const color = colors[type] || colors.info;
+    let host = document.getElementById('qf-toast-container');
+    if (!host) {
+        host = document.createElement('div');
+        host.id = 'qf-toast-container';
+        host.style.cssText = 'position:fixed;top:16px;right:16px;z-index:9999;display:flex;flex-direction:column;gap:8px;max-width:360px;';
+        document.body.appendChild(host);
+    }
+    const t = document.createElement('div');
+    t.style.cssText = 'background:#fff;border-left:4px solid ' + color + ';border-radius:6px;box-shadow:0 2px 12px rgba(0,0,0,.15);padding:10px 14px;font-size:13px;color:#333;display:flex;align-items:center;gap:8px;word-break:break-all;';
+    t.innerHTML = '<span style="width:8px;height:8px;border-radius:50%;background:' + color + ';flex:none;"></span><span></span>';
+    t.lastChild.textContent = s;   // textContent 防 XSS
+    host.appendChild(t);
+    setTimeout(function () { t.remove(); }, 2600);
+};
+
+// 全局 API 请求封装 — 子页面通过 window.apiRequest 调用
+window.apiRequest = async function (url, options = {}) {
+    const token = getCookie('token');
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    const resp = await fetch(url, { ...options, headers: { ...headers, ...options.headers } });
+    if (resp.status === 401) {
+        const data = await resp.json().catch(() => ({}));
+        const msg = data.detail || '登录已过期，请重新登录';
+        if (confirm(msg + '\n\n点击确定前往登录页面')) {
+            window.location.href = '/login';
+        }
+        throw new Error(msg);
+    }
+    return resp;
+};
+
+function getCookie(name) {
+    const value = `; ${document.cookie}`;
+    const parts = value.split(`; ${name}=`);
+    if (parts.length === 2) return parts.pop().split(';').shift();
+}
+
+// 从服务端获取当前用户（token 为 HttpOnly cookie，JS 无法读取，必须走后端接口）
+async function loadCurrentUser() {
+    try {
+        const resp = await fetch('/api/user/profile', { credentials: 'same-origin' });
+        if (!resp.ok) return null;
+        return await resp.json();
+    } catch (e) { return null; }
+}
+
+// 检查 embedding 模型下载状态
+async function checkEmbeddingStatus() {
+    try {
+        const resp = await window.apiRequest('/api/system/embedding-status');
+        const data = await resp.json();
+        if (!data.downloaded && !data.ready) {
+            showEmbeddingBanner();
+        } else {
+            const banner = document.getElementById('embedding-banner');
+            if (banner) banner.remove();
+        }
+    } catch (e) { /* 静默失败 */ }
+}
+
+function showEmbeddingBanner() {
+    const banner = document.createElement('div');
+    banner.id = 'embedding-banner';
+    banner.style.cssText = 'position:fixed;top:60px;left:50%;transform:translateX(-50%);z-index:9999;'
+        + 'background:#fff3cd;color:#856404;border:1px solid #ffc107;border-radius:8px;'
+        + 'padding:12px 24px;display:flex;align-items:center;gap:16px;box-shadow:0 4px 16px rgba(0,0,0,0.15);';
+    banner.innerHTML = `
+        <span>⚠️ Embedding 模型未下载，向量搜索功能不可用</span>
+        <button id="btn-download-embedding" style="background:#0d6efd;color:#fff;border:none;
+            border-radius:4px;padding:6px 16px;cursor:pointer;white-space:nowrap;">
+            📥 下载模型
+        </button>
+        <button onclick="this.parentElement.remove()" style="background:none;border:none;
+            font-size:18px;cursor:pointer;color:#856404;">×</button>
+    `;
+    document.body.appendChild(banner);
+    document.getElementById('btn-download-embedding').addEventListener('click', async function () {
+        this.textContent = '下载中...';
+        this.disabled = true;
+        try {
+            const resp = await window.apiRequest('/api/system/download-embedding', { method: 'POST' });
+            const data = await resp.json();
+            QF.toast(data.message, 'info');
+        } catch (e) {
+            QF.toast('启动下载失败: ' + e.message, 'danger');
+        }
+        this.textContent = '📥 下载模型';
+        this.disabled = false;
+    });
+}
+window.addEventListener('DOMContentLoaded', async function () {
+    const userInfo = document.getElementById('user-info');
+    const loginLink = document.getElementById('login-link');
+    const userDropdown = document.getElementById('user-dropdown');
+    // token 为 HttpOnly cookie，前端无法解码，统一走后端接口获取当前用户
+    const user = await loadCurrentUser();
+    if (user && user.username) {
+        userInfo.textContent = user.username;
+        userInfo.style.display = '';
+        loginLink.style.display = 'none';
+        // 管理后台仅管理员可访问（后端 /admin 守卫兜底）
+        if (user.role !== 'admin') {
+            window.location.href = '/';
+        }
+        checkEmbeddingStatus();
+        restoreMenuState();
+        // 默认打开仪表盘（仅首次加载，已有 tab 则不重复打开）
+        if (tabList.length === 0) {
+            openWindow('仪表盘', '/static/template/system/dashboard.html');
+        }
+
+        // 下拉菜单由 CSS 悬停驱动（.tpl-index-user-dropdown:hover，含悬停桥），
+        // 鼠标从用户名移入菜单不会消失；点击退出登录直接走 /logout
+        const logoutLink = userDropdown.querySelector('a[href="/logout"]');
+        if (logoutLink) {
+            logoutLink.addEventListener('click', function (e) {
+                e.preventDefault();
+                // token 为 HttpOnly cookie，前端无法清除，交由服务端 /logout 处理
+                window.location.href = '/logout';
+            });
+        }
+    } else {
+        // 未登录：后端 / 与模板守卫也会拦截，这里前端兜底跳转登录页
+        userInfo.style.display = 'none';
+        loginLink.style.display = '';
+        userDropdown.style.display = 'none';
+        window.location.href = '/login';
+    }
+});
+
+function toggleMenu(type) {
+    const el = document.getElementById('menu-' + type);
+    const isOpen = el.style.display === 'none';
+    el.style.display = isOpen ? '' : 'none';
+    // 组标题箭头旋转状态
+    document.querySelectorAll('.menu-group-title').forEach(t => {
+        if (t.getAttribute('onclick') === `toggleMenu('${type}')`) {
+            t.classList.toggle('open', isOpen);
+        }
+    });
+    // 展开状态记忆到 localStorage（刷新后保持）
+    try {
+        const key = 'qf_menu_open';
+        const saved = JSON.parse(localStorage.getItem(key) || '{}');
+        saved[type] = isOpen;
+        localStorage.setItem(key, JSON.stringify(saved));
+    } catch (e) { /* 静默失败 */ }
+}
+
+// 恢复上次菜单展开状态
+function restoreMenuState() {
+    try {
+        const saved = JSON.parse(localStorage.getItem('qf_menu_open') || '{}');
+        Object.keys(saved).forEach(type => {
+            const el = document.getElementById('menu-' + type);
+            if (el && saved[type]) {
+                el.style.display = '';
+                document.querySelectorAll('.menu-group-title').forEach(t => {
+                    if (t.getAttribute('onclick') === `toggleMenu('${type}')`) {
+                        t.classList.add('open');
+                    }
+                });
+            }
+        });
+    } catch (e) { /* 静默失败 */ }
+}
+
+const tabList = [];
+function openWindow(title, url) {
+    // 菜单选中高亮：优先精确匹配（含 hash），找不到再按去 hash 的 base URL 匹配
+    const baseUrl = url.split('#')[0];
+    document.querySelectorAll('.menu-item').forEach(el => el.classList.remove('active'));
+    let matched = document.querySelector(`.menu-item[onclick*="${url}"]`);
+    if (!matched) {
+        matched = document.querySelector(`.menu-item[onclick*="${baseUrl}"]`);
+    }
+    if (matched) matched.classList.add('active');
+    // 同一页面（忽略 hash）只开一个 tab，避免 sync/security 子页签多开
+    let tabIdx = tabList.findIndex(t => t.url.split('#')[0] === baseUrl);
+    if (tabIdx === -1) {
+        const tabId = 'tab-' + Date.now();
+        tabList.push({ id: tabId, title, url });
+        renderTabs(tabId);
+    } else {
+        // 已存在：更新标题并切换 hash 直达子页签
+        tabList[tabIdx].title = title;
+        tabList[tabIdx].url = url;
+        renderTabs(tabList[tabIdx].id);
+    }
+}
+function renderTabs(activeId) {
+    const tabBar = document.getElementById('tab-bar');
+    const tabContent = document.getElementById('tab-content');
+    // tabBar 全量重建（轻量）
+    tabBar.innerHTML = '';
+    // tabContent：复用已有 iframe，避免全部重载导致状态丢失
+    tabList.forEach(tab => {
+        const tabDiv = document.createElement('div');
+        tabDiv.className = 'tab' + (tab.id === activeId ? ' active' : '');
+        tabDiv.innerHTML = `<span>${tab.title}</span><span class='tab-close' onclick='closeTab("${tab.id}",event)'>×</span>`;
+        tabDiv.onclick = function (e) {
+            if (e.target.classList.contains('tab-close')) return;
+            renderTabs(tab.id);
+        };
+        tabBar.appendChild(tabDiv);
+        // 复用 iframe：同一 tab 只更新 src（hash 变化时页面自行按 hash 直达子页签）
+        let iframe = document.getElementById('iframe-' + tab.id);
+        if (!iframe) {
+            iframe = document.createElement('iframe');
+            iframe.className = 'tab-iframe';
+            iframe.id = 'iframe-' + tab.id;
+            tabContent.appendChild(iframe);
+        }
+        if (iframe.src !== location.origin + tab.url) {
+            iframe.src = tab.url;
+        }
+        iframe.classList.toggle('active', tab.id === activeId);
+    });
+    // 清理已关闭 tab 的残留 iframe（closeTab 时 splice 后旧 iframe 已无对应 tab）
+    tabContent.querySelectorAll('iframe').forEach(f => {
+        if (!tabList.some(t => 'iframe-' + t.id === f.id)) f.remove();
+    });
+}
+function closeTab(tabId, evt) {
+    evt.stopPropagation();
+    const idx = tabList.findIndex(t => t.id === tabId);
+    if (idx !== -1) {
+        const wasActive = document.querySelector('.tab.active') && tabList[idx].id === tabList.find(t => document.querySelector('.tab.active').textContent.trim().startsWith(t.title)).id;
+        tabList.splice(idx, 1);
+        if (tabList.length > 0) {
+            const newIdx = idx > 0 ? idx - 1 : 0;
+            renderTabs(tabList[newIdx].id);
+        } else {
+            renderTabs(null);
+        }
+    }
+}
+
+let dragData = null;
+function dragWindow(e, id) {
+    const win = document.getElementById(id);
+    dragData = {
+        win: win,
+        offsetX: e.clientX - win.offsetLeft,
+        offsetY: e.clientY - win.offsetTop
+    };
+    document.onmousemove = moveWindow;
+    document.onmouseup = function () { dragData = null; document.onmousemove = null; };
+}
+function moveWindow(e) {
+    if (!dragData) return;
+    dragData.win.style.left = (e.clientX - dragData.offsetX) + 'px';
+    dragData.win.style.top = (e.clientY - dragData.offsetY) + 'px';
+}

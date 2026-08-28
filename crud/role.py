@@ -78,6 +78,9 @@ class RoleCrud(BaseCrud):
                 user = db.query(User).filter(User.id == user_id).first()
                 if user:
                     user.role = 'admin' if any(r.code == 'admin' for r in roles) else 'user'
+        # 角色变更影响权限判定结果，立即失效缓存
+        from app.permissions import invalidate_permission_cache
+        invalidate_permission_cache()
 
     def get_permission_catalog(self) -> dict:
         """权限页面数据目录：固定页面/路由 + 六类资源（一次会话装载）"""
@@ -161,6 +164,9 @@ class RolePermissionCrud(BaseCrud):
                     access_type=p.get('access_type', 'ALLOW'),
                     filter_expression=p.get('filter_expression'),
                 ))
+        # 权限变更影响所有用户的可见性判定，立即失效缓存
+        from app.permissions import invalidate_permission_cache
+        invalidate_permission_cache()
 
     def list_role_grants(self, role_ids: List[int], resource_type: str = None):
         """查询角色在指定资源类型上的授权（用于权限判定）"""
