@@ -8,8 +8,8 @@ from collections import Counter
 from app.logger import logger
 
 # 优先使用项目本地字典，避免 pip 包缺少 dict.txt 导致分词失败
-# core/retrieval/keywords.py → 上溯 3 级到项目根
-_LOCAL_DICT = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'data', 'jieba', 'dict.txt')
+# core/ret_keywords.py → 上溯 2 级到项目根（__file__ 位于 core/ 下）
+_LOCAL_DICT = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'jieba', 'dict.txt')
 if os.path.exists(_LOCAL_DICT):
     jieba.set_dictionary(_LOCAL_DICT)
 

@@ -85,8 +85,8 @@ class ChatSession:
         self._log_step(pipeline_log, "STEP1_KEYWORDS", {
             "query": query, "keywords": keywords, "count": len(keywords)})
 
-        # Step 2: 字段召回（向量优先，DB 降级）
-        recalled_fields = self.retriever.recall_fields(keywords, schema_name)
+        # Step 2: 字段召回（向量优先，DB 降级；向量编码用原始 query 语义）
+        recalled_fields = self.retriever.recall_fields(keywords, schema_name, query=query)
         self._log_step(pipeline_log, "STEP2_RECALL", {
             "method": "vector" if self.retriever.vector_loaded else "database_query",
             "keywords": keywords, "recalled_count": len(recalled_fields),
@@ -274,7 +274,8 @@ class ChatSession:
 
         # Step 2-3: 针对新问题重新召回/聚合（仅链路追踪；失败降级不阻断主流程）
         try:
-            recalled_fields = self.retriever.recall_fields(keywords, schema_name)
+            recalled_fields = self.retriever.recall_fields(
+                keywords, schema_name, query=new_user_content)
             self._log_step(pipeline_log, "STEP2_RECALL", {
                 "method": "vector" if self.retriever.vector_loaded else "database_query",
                 "keywords": keywords, "recalled_count": len(recalled_fields),

@@ -56,6 +56,7 @@ class FieldRow:
     sensitive_level: str = 'public'
     is_dimension: bool = False
     is_measure: bool = False
+    table_description: str = ''
 
 
 _FLAT_COLS = (
@@ -316,7 +317,8 @@ def iter_field_rows(schema_name: Optional[str] = None,
                     table_grants_by_schema=None) -> List[FieldRow]:
     """字段行列表（旧 Schema ORM 属性形状），供 core 流水线使用"""
     with session_scope() as db:
-        q = (db.query(DbSchema.name, DbTable.name, DbColumn.name, DbColumn.data_type,
+        q = (db.query(DbSchema.name, DbTable.name, DbTable.description,
+                      DbColumn.name, DbColumn.data_type,
                       DbColumn.description, DbColumn.column_key, DbColumn.foreign_key,
                       DbColumn.sample_values, DbColumn.id, DbColumn.sensitive_level,
                       DbColumn.is_dimension, DbColumn.is_measure)
@@ -338,12 +340,13 @@ def iter_field_rows(schema_name: Optional[str] = None,
         if table_names:
             q = q.filter(DbTable.name.in_(table_names))
         return [FieldRow(
-            schema_name=r[0], table_name=r[1], column_name=r[2],
-            column_type=r[3] or '', column_description=r[4] or '',
-            column_key=r[5] or '', foreign_key=r[6] or '',
-            sample_values=r[7] or '', column_id=r[8],
-            sensitive_level=r[9] or 'public',
-            is_dimension=bool(r[10]), is_measure=bool(r[11]),
+            schema_name=r[0], table_name=r[1], table_description=r[2] or '',
+            column_name=r[3], column_type=r[4] or '',
+            column_description=r[5] or '',
+            column_key=r[6] or '', foreign_key=r[7] or '',
+            sample_values=r[8] or '', column_id=r[9],
+            sensitive_level=r[10] or 'public',
+            is_dimension=bool(r[11]), is_measure=bool(r[12]),
         ) for r in q.all()]
 # ═══════════════════════════════════════════════════════════════════
 # 删除 / 更新
