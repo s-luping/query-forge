@@ -4,6 +4,7 @@
 模型路径: D:\projects\QueryForge\models\embeddings\bge-m3
 """
 import os
+import re
 import threading
 import json
 
@@ -15,8 +16,8 @@ from app.logger import logger
 from crud.base import session_scope
 
 
-# core/retrieval/vector_store.py → 上溯 3 级到项目根
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+# core/ret_vector_store.py → 上溯 2 级到项目根（__file__ 位于 core/ 下）
+PROJECT_ROOT = os.path.dirname(os.path.dirname(__file__))
 MODEL_CACHE_DIR = os.path.join(PROJECT_ROOT, 'models', 'embeddings')
 VECTOR_INDEX_DIR = os.path.join(PROJECT_ROOT, 'db', 'vectors')
 
@@ -314,6 +315,61 @@ class SchemaVectorStore:
 
         self.field_index = VectorIndex(self.dimension)
 
+    @staticmethod
+    def _split_identifier(name: str) -> List[str]:
+        """把英文标识符拆词（OBJECT_NAME → object name / OBJECTID → object id），
+        提高 BGE-M3 对纯英文缩写字段名的语义召回命中率。"""
+        words = []
+        for part in re.split(r'[_\-\.\s]+', name or ''):
+            if not part:
+                continue
+            # 驼峰拆分：AccountName → Account Name；BUDGETID → BUDGET ID
+            sub = re.sub(r'([a-z0-9])([A-Z])', r'\1 \2', part)
+            for w in re.split(r'[\s]+', sub):
+                w = w.strip()
+                if w and w.lower() not in words:
+                    words.append(w.lower())
+        return words
+
+    @staticmethod
+    def _build_field_doc(s: Dict) -> str:
+        """构造字段索引文档文本（富文本，中文优先）
+
+        构成：库名 + 表名 + 表描述 + 字段名(含拆词) + 字段描述 + 类型 + 示例值。
+        相比旧格式 `表名.字段名: 描述`（描述常为空），混合中英文后 BGE-M3
+        对「用户口语 ↔ 英文字段名」的语义映射显著提升。
+        """
+        schema = s.get('schema_name', '') or ''
+        table = s.get('table_name', '') or ''
+        column = s.get('column_name', '') or ''
+        table_desc = (s.get('table_description') or '').strip()
+        col_desc = (s.get('column_description') or '').strip()
+        col_type = (s.get('column_type') or '').strip()
+        sample = (s.get('sample_values') or '').strip()
+
+        parts = []
+        # 库名 + 表名 + 表描述（中文语义主体）
+        loc = f"{schema}.{table}" if schema else table
+        parts.append(f"表 {loc}")
+        if table_desc:
+            parts.append(f"表描述 {table_desc}")
+        # 字段名 + 拆词（英文缩写的语义补充）
+        field_words = SchemaVectorStore._split_identifier(column)
+        field_part = column
+        if field_words and ' '.join(field_words).lower() != column.lower():
+            field_part = f"{column} ({' '.join(field_words)})"
+        parts.append(f"字段 {field_part}")
+        if col_desc:
+            parts.append(f"字段描述 {col_desc}")
+        if col_type:
+            parts.append(f"类型 {col_type}")
+        if sample and sample != 'NULL':
+            # 示例值可能很长（逗号分隔多个），取前 3 个即可
+            samples = [x.strip() for x in sample.split(',') if x.strip()][:3]
+            if samples:
+                parts.append(f"示例 {'、'.join(samples)}")
+        return '，'.join(parts)
+
     def build_from_schemas(self, schemas: List[Dict], schema_name: Optional[str] = None) -> Dict:
         if not schemas:
             return {'success': False, 'message': '没有数据'}
@@ -324,15 +380,14 @@ class SchemaVectorStore:
             table = s.get('table_name', '')
             column = s.get('column_name', '')
             desc = s.get('column_description', '') or ''
-            col_type = s.get('column_type', '') or ''
 
-            field_texts.append(f"{table}.{column}: {desc}")
+            field_texts.append(self._build_field_doc(s))
             field_meta.append({
                 'schema_name': s.get('schema_name', ''),
                 'table_name': table,
                 'field_name': column,
                 'description': desc,
-                'column_type': col_type,
+                'column_type': s.get('column_type', ''),
                 'sample_values': s.get('sample_values', '')
             })
 

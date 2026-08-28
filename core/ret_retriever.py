@@ -101,14 +101,18 @@ class SchemaRetriever:
             logger.warning(f"[SchemaRetriever] 向量索引加载失败，降级DB查询: {e}")
             return False
 
-    def search_vector(self, keywords: List[str]) -> Optional[List[Dict]]:
-        """向量检索字段；未加载或失败时返回 None"""
+    def search_vector(self, keywords: List[str],
+                      query: Optional[str] = None) -> Optional[List[Dict]]:
+        """向量检索字段；未加载或失败时返回 None
+
+        编码文本优先使用原始 query（完整语义），未提供时回退关键词拼接。
+        """
         if not self.vector_loaded or self.vector_store is None:
             return None
         try:
-            keyword_text = ' '.join(keywords)
+            text = (query or '').strip() or ' '.join(keywords)
             return self.vector_store.search_fields(
-                keyword_text, top_k=get_vector_config('FIELD_RECALL_TOP_K'))
+                text, top_k=get_vector_config('FIELD_RECALL_TOP_K'))
         except Exception as e:
             logger.warning(f"[SchemaRetriever] 向量检索失败，降级DB查询: {e}")
             return None
@@ -129,18 +133,20 @@ class SchemaRetriever:
         return results[:get_vector_config('FIELD_RECALL_TOP_K')]
 
     def recall_fields(self, keywords: List[str],
-                      schema_name: Optional[str] = None) -> List[Dict]:
+                      schema_name: Optional[str] = None,
+                      query: Optional[str] = None) -> List[Dict]:
         """字段召回统一入口：向量优先（懒加载）+ DB 关键词兜底合并。
 
         - 向量索引可能是历史构建（缺库/权限范围不一致），仅靠向量会漏召回
           未建索引库的表 → 用 DB 关键词召回做并集兜底，保证覆盖所有可见库。
         - 两条路径返回字段均以 DB 权限集合过滤/归一化（schema_name/column_name）。
         - 结果去重（同一字段以 DB 权威结构为准）。
+        - query: 原始用户问题，用于向量编码（语义完整度高于关键词拼接）。
         """
         if not self.vector_loaded and self.vector_error is None:
             self.try_load_vector_store(schema_name)
 
-        results = self.search_vector(keywords)
+        results = self.search_vector(keywords, query=query)
         merged: List[Dict] = []
         seen = set()
         if results:

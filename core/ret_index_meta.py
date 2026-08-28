@@ -96,6 +96,7 @@ def build_vector_index(schema_name: Optional[str] = None) -> Dict:
         schema_list = [{
             'schema_name': r.schema_name or schema_name or '',
             'table_name': r.table_name,
+            'table_description': r.table_description or '',
             'column_name': r.column_name,
             'column_description': r.column_description,
             'column_type': r.column_type,
