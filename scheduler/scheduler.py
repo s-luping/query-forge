@@ -13,7 +13,7 @@ from apscheduler.triggers.cron import CronTrigger
 from app.logger import logger
 from app.timezone import BEIJING_TZ
 from scheduler.jobs.usage_stats import aggregate_usage_stats
-from scheduler.jobs.retention import cleanup_telemetry
+from scheduler.jobs.retention import cleanup_telemetry, cleanup_main_db, wal_checkpoint
 from scheduler.jobs.schema_sync import run_scheduled_syncs
 
 
@@ -40,6 +40,24 @@ class SchedulerManager:
             replace_existing=True,
         )
         logger.info("已注册定时任务: cleanup_telemetry (每天 03:00)")
+
+        self.scheduler.add_job(
+            cleanup_main_db,
+            CronTrigger(hour=3, minute=30),
+            id='cleanup_main_db',
+            kwargs={'audit_retention_days': 90, 'sync_retention_days': 90,
+                    'result_retention_days': 30},
+            replace_existing=True,
+        )
+        logger.info("已注册定时任务: cleanup_main_db (每天 03:30)")
+
+        self.scheduler.add_job(
+            wal_checkpoint,
+            CronTrigger(hour=4, minute=0),
+            id='wal_checkpoint',
+            replace_existing=True,
+        )
+        logger.info("已注册定时任务: wal_checkpoint (每天 04:00)")
 
         self.scheduler.add_job(
             run_scheduled_syncs,

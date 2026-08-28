@@ -7,7 +7,7 @@
 """
 from typing import Optional, List
 
-from app.logger import logger, pipeline_logger
+from app.logger import logger
 from app.timezone import now_beijing
 from core.llm_client import LLMClient
 from core.gen_sql import SqlGenerator

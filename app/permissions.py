@@ -18,11 +18,54 @@
     confidential  → NONE
 """
 from typing import Optional, Dict, List
+import threading
+import time
 
 from crud.base import session_scope
 from crud.role import role_permission_crud, user_role_crud
 from models.schema import DbColumn, DbTable, DbSchema
+from models.datasource import DataSource
 from models.role import RolePermission, UserRole
+
+
+# ── 权限结果进程级 TTL 缓存 ─────────────────────────────────
+# 权限三件套（get_visible_schema_ids / get_table_grants_by_schema /
+# get_column_access_map）在单次 chat 请求内被调用 4~6 次，每次都是多表 join +
+# 全表查询。用短 TTL 缓存消除同请求内的重复查询；权限变更时主动失效（立即生效）。
+# TTL 短至 5 秒即可覆盖"一次请求内重复调用"的主诉求，同时将权限变更的
+# 最坏生效延迟控制在 5 秒内（且有主动失效兜底，改权限即清空）。
+_PERM_TTL = 5.0
+_perm_cache: Dict = {}
+_perm_lock = threading.Lock()
+
+
+def _identity(user: dict) -> tuple:
+    """用户身份指纹（含角色，is_admin 判定依赖 role/roles）"""
+    return (user.get('user_id'), user.get('role'),
+            tuple(sorted(user.get('roles', []) or [])))
+
+
+def _cache_get(key: tuple):
+    with _perm_lock:
+        item = _perm_cache.get(key)
+        if item is None:
+            return None
+        ts, val = item
+        if time.time() - ts > _PERM_TTL:
+            _perm_cache.pop(key, None)
+            return None
+        return val
+
+
+def _cache_set(key: tuple, val):
+    with _perm_lock:
+        _perm_cache[key] = (time.time(), val)
+
+
+def invalidate_permission_cache():
+    """权限变更后调用，立即清空缓存"""
+    with _perm_lock:
+        _perm_cache.clear()
 
 
 def is_admin(user: dict) -> bool:
@@ -62,12 +105,19 @@ def has_permission(user: dict, permission_code: str,
 def get_visible_schema_ids(user: dict) -> Optional[list]:
     """获取用户可见的 schema_id 列表。None=全部。[]=无。
 
-    权限语义（含 DENY 强制）：
-      - 角色含 ALLOW(resource_id=None) 或 datasource ALLOW → 该范围全部可见，再减去 DENY
-      - 角色含显式 ALLOW(具体 id) → 仅这些可见，再减去 DENY
-      - 角色仅有 DENY（无 ALLOW）→ 全部可见减去 DENY（管理员"仅拒绝"场景）
-      - 普通用户无任何授权 → 无可见；管理员无任何授权 → 保持超管全可见
+    层级门控语义（数据源为总闸，库/表授权不能脱离数据源生效）：
+      - datasource ALLOW(resource_id=None) → 全部数据源、全部库表可见
+      - datasource ALLOW(具体 id) → 该数据源下全部库表可见
+      - schema ALLOW(库) → 仅当该库所属数据源已授权时才生效；数据源未授权则库不可见
+      - schema DENY(具体 id) → 强制剔除；schema DENY(resource_id=None) → 全部不可见
+      - 普通用户无任何数据源/库授权 → 无可见（默认拒绝）
+      - 管理员无任何授权 → 超管全可见（保留）
     """
+    cache_key = ('visible_schema_ids',) + _identity(user)
+    cached = _cache_get(cache_key)
+    if cached is not None:
+        return cached
+
     with session_scope() as db:
         schema_grants = _role_grants(db, user, 'schema')
         ds_grants = _role_grants(db, user, 'datasource')
@@ -78,28 +128,41 @@ def get_visible_schema_ids(user: dict) -> Optional[list]:
         deny_all = any(g.resource_id is None for g in schema_grants
                        if g.access_type == 'DENY')
 
-        all_schema_ids = {r[0] for r in db.query(DbSchema.id).all()}
-        ds_schema_ids = set()
-        if allow_ds:
-            ds_schema_ids = {r[0] for r in db.query(DbSchema.id).filter(
-                DbSchema.datasource_id.in_({g.resource_id for g in allow_ds})).all()}
+        all_schema_rows = {r[0]: r[1] for r in db.query(
+            DbSchema.id, DbSchema.datasource_id).all()}
 
-        allow_all = any(g.resource_id is None for g in allow + allow_ds + ds_grants)
-        has_allow = bool(allow) or bool(allow_ds) or allow_all
+        # 已授权数据源集合（数据源为可见性总闸）
+        ds_allow_all = any(g.resource_id is None for g in allow_ds)
+        ds_allowed_ids = {g.resource_id for g in allow_ds if g.resource_id is not None}
+        if ds_allow_all:
+            authorized_ds = {r[0] for r in db.query(DataSource.id).all()}
+        else:
+            authorized_ds = ds_allowed_ids
+
+        ds_schema_ids = {sid for sid, dsid in all_schema_rows.items()
+                         if dsid in authorized_ds}
+        # schema ALLOW 仅在所属数据源已授权时生效（数据源门控）
+        schema_allowed = {g.resource_id for g in allow
+                          if g.resource_id in all_schema_rows
+                          and all_schema_rows[g.resource_id] in authorized_ds}
 
         if deny_all:
-            return []
-        if allow_all:
-            base = all_schema_ids
-        elif has_allow:
-            base = {g.resource_id for g in allow} | ds_schema_ids
+            result = []
+        elif ds_allow_all:
+            base = set(all_schema_rows.keys())
+            result = list(base - deny)
+        elif authorized_ds:
+            base = ds_schema_ids | schema_allowed
+            result = list(base - deny)
         else:
-            # 无显式 ALLOW
+            # 数据源与库均未授权
             if is_admin(user):
-                base = all_schema_ids       # 管理员无授权 → 超管全可见
+                result = list(all_schema_rows.keys())   # 管理员无授权 → 超管全可见
             else:
-                return []                   # 普通用户无授权 → 无可见
-        return list(base - deny)
+                result = []                              # 普通用户无授权 → 无可见
+
+    _cache_set(cache_key, result)
+    return result
 
 
 def is_schema_visible(user: dict, schema_name: Optional[str]) -> bool:
@@ -144,6 +207,11 @@ def get_table_grants_by_schema(user: dict) -> Dict[int, List[int]]:
     同时处理 DENY：仅配置 DENY 的 schema 会从全表集合中减去被拒表。
     admin 同样受角色 DENY 约束（但无 ALLOW 时仍全表可见）。
     """
+    cache_key = ('table_grants',) + _identity(user)
+    cached = _cache_get(cache_key)
+    if cached is not None:
+        return cached
+
     with session_scope() as db:
         rows = (db.query(DbTable.schema_id, DbTable.id, RolePermission.access_type)
             .join(RolePermission, RolePermission.resource_id == DbTable.id)
@@ -165,7 +233,9 @@ def get_table_grants_by_schema(user: dict) -> Dict[int, List[int]]:
                 all_in_schema = {r[0] for r in db.query(DbTable.id).filter(
                     DbTable.schema_id == schema_id).all()}
                 result[schema_id] = list(all_in_schema - dids)
-        return result
+
+    _cache_set(cache_key, result)
+    return result
 
 
 def is_table_visible(user: dict, schema_id: int, table_id: int,
@@ -216,6 +286,12 @@ def get_column_access_map(user: dict, schema_name: Optional[str] = None,
     - admin：默认全部 SELECT（保持超管），但被角色显式 DENY/NONE 的字段降级为 NONE
     - DENY 与 NONE 视为“强制不可用”，覆盖默认与其他级别
     """
+    cache_key = ('column_access',) + _identity(user) + (
+        schema_name, tuple(sorted(table_names)) if table_names else None)
+    cached = _cache_get(cache_key)
+    if cached is not None:
+        return cached
+
     with session_scope() as db:
         q = (db.query(DbColumn.id, DbColumn.sensitive_level)
              .join(DbTable, DbColumn.table_id == DbTable.id)
@@ -249,7 +325,8 @@ def get_column_access_map(user: dict, schema_name: Optional[str] = None,
                 if rank[at] > rank.get(current, 0):
                     result[rid] = at
 
-        return result
+    _cache_set(cache_key, result)
+    return result
 
 
 def filter_fields_by_permission(rows, user: dict) -> list:

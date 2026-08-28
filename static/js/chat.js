@@ -4,6 +4,10 @@
 // ── State ──────────────────────────────────────────────────
 let currentConvId = null;
 let isLoading = false;
+// 对话列表分页状态
+let convPage = 0;
+let convHasMore = false;
+const CONV_PAGE_SIZE = 20;
 
 // ── Init ───────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
@@ -14,13 +18,31 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // ── Conversation List ──────────────────────────────────────
 async function loadConvList() {
+    convPage = 0;
     try {
-        const resp = await apiRequest('/api/conversation');
+        const resp = await apiRequest(`/api/conversation?limit=${CONV_PAGE_SIZE}&offset=0`);
         if (!resp.ok) return;
-        const list = await resp.json();
+        const data = await resp.json();
+        const list = data.items || [];
+        convHasMore = list.length >= CONV_PAGE_SIZE && (data.total || 0) > list.length;
         renderConvList(list);
     } catch (e) {
         console.error('加载对话列表失败:', e);
+    }
+}
+
+async function loadMoreConvs() {
+    const nextOffset = (convPage + 1) * CONV_PAGE_SIZE;
+    try {
+        const resp = await apiRequest(`/api/conversation?limit=${CONV_PAGE_SIZE}&offset=${nextOffset}`);
+        if (!resp.ok) return;
+        const data = await resp.json();
+        const list = data.items || [];
+        convPage += 1;
+        convHasMore = (data.total || 0) > (convPage + 1) * CONV_PAGE_SIZE;
+        appendConvList(list);
+    } catch (e) {
+        console.error('加载更多对话失败:', e);
     }
 }
 
@@ -30,23 +52,56 @@ function renderConvList(list) {
         el.innerHTML = '<div style="padding:20px;text-align:center;color:#888;font-size:13px;">暂无对话</div>';
         return;
     }
-    el.innerHTML = list.map(c => `
+    el.innerHTML = list.map(convItemHtml).join('');
+    renderConvMoreBtn();
+}
+
+function appendConvList(list) {
+    if (!list || list.length === 0) {
+        convHasMore = false;
+        renderConvMoreBtn();
+        return;
+    }
+    const el = document.getElementById('convList');
+    // 先移除底部"加载更多"按钮（可能已渲染在末尾）
+    el.querySelector('.conv-more-btn')?.remove();
+    el.insertAdjacentHTML('beforeend', list.map(convItemHtml).join(''));
+    renderConvMoreBtn();
+}
+
+function convItemHtml(c) {
+    return `
         <div class="conv-item${c.id === currentConvId ? ' active' : ''}"
-             onclick="openConv(${c.id})">
+             data-id="${c.id}"
+             onclick="openConv(${c.id}, '${escapeAttr(c.title || '(无标题)')}')">
             <div class="conv-item-title">${escapeHtml(c.title || '(无标题)')}</div>
             <div class="conv-item-meta">${escapeHtml(c.schema_name || '默认')} · ${c.message_count} 条消息</div>
             <span class="conv-item-delete" onclick="event.stopPropagation();deleteConv(${c.id})" title="删除">×</span>
         </div>
-    `).join('');
+    `;
 }
 
-async function openConv(id) {
+function renderConvMoreBtn() {
+    const el = document.getElementById('convList');
+    el.querySelector('.conv-more-btn')?.remove();
+    if (convHasMore) {
+        el.insertAdjacentHTML('beforeend',
+            `<div class="conv-more-btn" onclick="loadMoreConvs()">加载更多</div>`);
+    }
+}
+
+async function openConv(id, title) {
     currentConvId = id;
-    loadConvList(); // refresh active state
+    // 本地切换 active 状态（不再全量重载列表）
+    document.querySelectorAll('.conv-item').forEach(el =>
+        el.classList.toggle('active', Number(el.dataset.id) === id));
 
     const emptyEl = document.getElementById('chatEmpty');
     if (emptyEl) emptyEl.style.display = 'none';
     document.getElementById('chatInputArea').style.display = 'block';
+
+    document.getElementById('chatHeader').textContent =
+        (title || 'Chat SQL') + ' — 连续对话';
 
     const msgContainer = document.getElementById('chatMessages');
     msgContainer.innerHTML = '<div style="text-align:center;color:#aaa;padding:40px;">加载中...</div>';
@@ -55,13 +110,6 @@ async function openConv(id) {
         const resp = await apiRequest(`/api/conversation/${id}/messages`);
         if (!resp.ok) throw new Error('加载失败');
         const messages = await resp.json();
-
-        // 获取标题
-        const convResp = await apiRequest('/api/conversation');
-        const convs = await convResp.json();
-        const conv = convs.find(c => c.id === id);
-        document.getElementById('chatHeader').textContent =
-            (conv ? conv.title : 'Chat SQL') + ' — 连续对话';
 
         msgContainer.innerHTML = '';
         messages.forEach(m => renderMessage(m));

@@ -133,3 +133,52 @@ def _rebuild_relation_table_nullable_schema_id(conn) -> None:
         f"INSERT INTO db_table_relations ({', '.join(col_names)}) VALUES ({placeholders})", rows)
     conn.execute("DROP TABLE _rel_old")
     logger.info("迁移: db_table_relations.schema_id 已置为可空")
+
+
+# 高频过滤/统计字段的普通索引（create_all 不会为存量表补索引，故迁移时幂等补建）
+_INDEX_MIGRATIONS = [
+    ('query_audit_logs', 'ix_query_audit_logs_was_blocked', 'was_blocked'),
+    ('query_audit_logs', 'ix_query_audit_logs_hit_sensitive', 'hit_sensitive'),
+    ('schema_change_logs', 'ix_schema_change_logs_approval_status', 'approval_status'),
+    ('schema_change_logs', 'ix_schema_change_logs_change_type', 'change_type'),
+    ('db_columns', 'ix_db_columns_sensitive_level', 'sensitive_level'),
+    # 遥测库 llm_calls 位于独立文件，单独在 _ensure_telemetry_indexes 处理
+]
+
+
+def _ensure_indexes_sqlite(db_path: str) -> None:
+    """SQLite 存量表补普通索引（幂等，CREATE INDEX IF NOT EXISTS）"""
+    import sqlite3 as _sqlite3
+    try:
+        conn = _sqlite3.connect(db_path)
+        try:
+            for table, idx_name, col in _INDEX_MIGRATIONS:
+                conn.execute(
+                    f'CREATE INDEX IF NOT EXISTS "{idx_name}" '
+                    f'ON "{table}" ("{col}")')
+            conn.commit()
+            logger.info("迁移: 主库普通索引已就绪")
+        finally:
+            conn.close()
+    except Exception as e:
+        logger.warning(f"迁移失败 主库普通索引: {e}")
+
+
+def _ensure_telemetry_indexes(db_path: str) -> None:
+    """遥测库 llm_calls 补普通索引（status / purpose）"""
+    import sqlite3 as _sqlite3
+    try:
+        conn = _sqlite3.connect(db_path)
+        try:
+            conn.execute(
+                'CREATE INDEX IF NOT EXISTS "ix_llm_calls_status" '
+                'ON "llm_calls" ("status")')
+            conn.execute(
+                'CREATE INDEX IF NOT EXISTS "ix_llm_calls_purpose" '
+                'ON "llm_calls" ("purpose")')
+            conn.commit()
+            logger.info("迁移: 遥测库普通索引已就绪")
+        finally:
+            conn.close()
+    except Exception as e:
+        logger.warning(f"迁移失败 遥测库普通索引: {e}")

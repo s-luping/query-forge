@@ -25,6 +25,8 @@ def aggregate_usage_stats(days_back: int = 7) -> dict:
     """
     today = now_beijing().date()
     start_date = today - timedelta(days=days_back)
+    # 用范围比较而非 func.date()：后者包住字段会导致索引失效，改为 >= 起算日零点
+    start_datetime = datetime.combine(start_date, datetime.min.time())
 
     # ── 1. 从遥测库读取聚合数据 ──
     with session_scope(telemetry=True) as tdb:
@@ -42,7 +44,7 @@ def aggregate_usage_stats(days_back: int = 7) -> dict:
             func.coalesce(func.sum(LLMCall.total_tokens), 0).label('total_tokens'),
             func.coalesce(func.sum(LLMCall.cost), 0.0).label('cost'),
         )
-        .filter(func.date(LLMCall.created_at) >= start_date)
+        .filter(LLMCall.created_at >= start_datetime)
         .group_by(
             func.date(LLMCall.created_at),
             LLMCall.user_id, LLMCall.provider, LLMCall.model,
