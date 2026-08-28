@@ -313,6 +313,8 @@ def create_conversation(
         pre_log.append({
             "step": "KNOWLEDGE_LOAD", "timestamp": _nb().strftime("%Y-%m-%d %H:%M:%S"),
             "data": {"knowledge_ids": knowledge_ids,
+                     "user_selected": bool(knowledge_ids),
+                     "note": "用户显式选择的知识库；链路第 8 步为自动概念召回(与勾选无关)" if not knowledge_ids else "",
                      "loaded": bool(knowledge_content),
                      "content_length": len(knowledge_content)},
         })
@@ -556,6 +558,8 @@ def send_message(
         pre_log.append({
             "step": "KNOWLEDGE_LOAD", "timestamp": _nb().strftime("%Y-%m-%d %H:%M:%S"),
             "data": {"knowledge_ids": conv_knowledge_ids,
+                     "user_selected": bool(conv_knowledge_ids),
+                     "note": "用户显式选择的知识库；链路第 8 步为自动概念召回(与勾选无关)" if not conv_knowledge_ids else "",
                      "loaded": bool(knowledge_content),
                      "content_length": len(knowledge_content)},
         })
