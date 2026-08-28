@@ -89,6 +89,10 @@ def init_database():
         _ensure_column_sqlite(
             config.MAIN_DB_PATH, 'conversations', 'schema_tables', 'TEXT'
         )
+        # 对话支持多知识库（knowledge_ids JSON 数组；存量库增量迁移）
+        _ensure_column_sqlite(
+            config.MAIN_DB_PATH, 'conversations', 'knowledge_ids', 'TEXT'
+        )
         # 高频过滤字段的普通索引（存量库补建；新库由 create_all 一并创建）
         from db.sqlite_hooks import _ensure_indexes_sqlite, _ensure_telemetry_indexes
         _ensure_indexes_sqlite(config.MAIN_DB_PATH)

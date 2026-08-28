@@ -9,7 +9,7 @@
 """
 import json
 from datetime import datetime
-from typing import Optional, cast
+from typing import List, Optional, cast
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
@@ -41,14 +41,16 @@ class CreateConversationRequest(BaseModel):
     schema_name: Optional[str] = None
     db_type: str = "sqlite"
     llm_config_id: Optional[int] = None
-    knowledge_id: Optional[int] = None
+    knowledge_id: Optional[int] = None            # 兼容旧版单条
+    knowledge_ids: Optional[List[int]] = None     # 多知识库
 
 
 class SendMessageRequest(BaseModel):
     content: str
     # 对话过程中可随时切换模型 / 知识库（显式传值则切换并持久化；不传沿用会话配置）
     llm_config_id: Optional[int] = None
-    knowledge_id: Optional[int] = None
+    knowledge_id: Optional[int] = None            # 兼容旧版单条
+    knowledge_ids: Optional[List[int]] = None     # 多知识库
 
 
 class ConversationItem(BaseModel):
@@ -189,14 +191,31 @@ def _safe_parse_result(raw) -> Optional[dict]:
         return None
 
 
-def _get_knowledge_safe(user_id: int, knowledge_id: Optional[int] = None) -> str:
-    """获取知识内容（安全版本，失败返回空字符串）"""
-    if not knowledge_id:
+def _resolve_knowledge_ids(knowledge_ids: Optional[List[int]] = None,
+                           knowledge_id: Optional[int] = None) -> List[int]:
+    """归一化知识库选择：优先 knowledge_ids（多选），兼容 knowledge_id（旧版单条）"""
+    if knowledge_ids:
+        return [int(i) for i in knowledge_ids if i]
+    if knowledge_id:
+        return [int(knowledge_id)]
+    return []
+
+
+def _get_knowledge_safe(user_id: int, knowledge_id: Optional[int] = None,
+                        knowledge_ids: Optional[List[int]] = None) -> str:
+    """获取知识内容（支持多条拼接，安全版本，失败返回空字符串）"""
+    ids = _resolve_knowledge_ids(knowledge_ids, knowledge_id)
+    if not ids:
         return ""
     try:
         from app.routers.knowledge_router import get_knowledge_safe
-        knowledge = get_knowledge_safe(user_id, knowledge_id)
-        return knowledge.get("content", "") if knowledge else ""
+        parts = []
+        for kid in ids:
+            knowledge = get_knowledge_safe(user_id, kid)
+            content = knowledge.get("content", "") if knowledge else ""
+            if content:
+                parts.append(content)
+        return "\n\n".join(parts)
     except Exception:
         return ""
 
@@ -280,7 +299,10 @@ def create_conversation(
 
     try:
         llm_client = _build_llm_client(user_id, request.llm_config_id)
-        knowledge_content = _get_knowledge_safe(user_id, request.knowledge_id)
+        # 知识库支持多选（knowledge_ids 优先，兼容旧版 knowledge_id）
+        knowledge_ids = _resolve_knowledge_ids(request.knowledge_ids, request.knowledge_id)
+        knowledge_content = _get_knowledge_safe(
+            user_id, knowledge_ids=knowledge_ids)
 
         pre_log.append({
             "step": "LLM_CONFIG_LOAD", "timestamp": _nb().strftime("%Y-%m-%d %H:%M:%S"),
@@ -290,7 +312,7 @@ def create_conversation(
         })
         pre_log.append({
             "step": "KNOWLEDGE_LOAD", "timestamp": _nb().strftime("%Y-%m-%d %H:%M:%S"),
-            "data": {"knowledge_id": request.knowledge_id,
+            "data": {"knowledge_ids": knowledge_ids,
                      "loaded": bool(knowledge_content),
                      "content_length": len(knowledge_content)},
         })
@@ -331,7 +353,8 @@ def create_conversation(
                 schema_id=schema_id,
                 db_type=db_type,
                 llm_config_id=request.llm_config_id,
-                knowledge_id=request.knowledge_id,
+                knowledge_id=knowledge_ids[0] if knowledge_ids else request.knowledge_id,
+                knowledge_ids=json.dumps(knowledge_ids, ensure_ascii=False) if knowledge_ids else None,
                 schema_tables=json.dumps(result.get('tables') or [], ensure_ascii=False)
             )
             db.add(conversation)
@@ -460,6 +483,15 @@ def send_message(
             conv_db_type = conversation.db_type
             conv_llm_config_id = conversation.llm_config_id
             conv_knowledge_id = conversation.knowledge_id
+            # 已存的多选知识库（JSON 数组），旧对话为空则回退单条 knowledge_id
+            conv_knowledge_ids = []
+            if conversation.knowledge_ids:
+                try:
+                    conv_knowledge_ids = json.loads(conversation.knowledge_ids) or []
+                except (json.JSONDecodeError, TypeError):
+                    conv_knowledge_ids = []
+            if not conv_knowledge_ids and conv_knowledge_id:
+                conv_knowledge_ids = [conv_knowledge_id]
             # 在 session 关闭前取出首轮表集合（避免退出 with 后 detached 访问报错）
             conv_schema_tables = conversation.schema_tables
 
@@ -467,21 +499,27 @@ def send_message(
         # 请求显式传值 → 本次生效并持久化到会话（后续轮次沿用）；不传 → 沿用会话已存配置
         if request.llm_config_id is not None:
             conv_llm_config_id = request.llm_config_id
-        if request.knowledge_id is not None:
-            conv_knowledge_id = request.knowledge_id
-        if (request.llm_config_id is not None or request.knowledge_id is not None):
+        if request.knowledge_ids is not None or request.knowledge_id is not None:
+            conv_knowledge_ids = _resolve_knowledge_ids(
+                request.knowledge_ids, request.knowledge_id)
+            conv_knowledge_id = conv_knowledge_ids[0] if conv_knowledge_ids else None
+        if (request.llm_config_id is not None
+                or request.knowledge_ids is not None
+                or request.knowledge_id is not None):
             with session_scope() as db_upd:
                 db_upd.query(Conversation).filter(
                     Conversation.id == conversation_id
                 ).update({
                     'llm_config_id': conv_llm_config_id,
                     'knowledge_id': conv_knowledge_id,
+                    'knowledge_ids': (json.dumps(conv_knowledge_ids, ensure_ascii=False)
+                                      if conv_knowledge_ids else None),
                     'updated_at': now_beijing(),
                 })
                 db_upd.commit()
             logger.info(
                 f"对话 {conversation_id} 配置切换: "
-                f"llm_config_id={conv_llm_config_id}, knowledge_id={conv_knowledge_id}")
+                f"llm_config_id={conv_llm_config_id}, knowledge_ids={conv_knowledge_ids}")
 
         # 从三层模型重建 schema CSV（fallback 全量，用于未记录首轮表集合的旧对话）
         schema_csv = _rebuild_schema_csv(schema_name)
@@ -513,10 +551,11 @@ def send_message(
                      "config_id": conv_llm_config_id},
         })
         # 跟进消息的知识内容需在日志步骤前加载（避免引用未赋值变量）
-        knowledge_content = _get_knowledge_safe(user_id, conv_knowledge_id)
+        knowledge_content = _get_knowledge_safe(
+            user_id, knowledge_ids=conv_knowledge_ids)
         pre_log.append({
             "step": "KNOWLEDGE_LOAD", "timestamp": _nb().strftime("%Y-%m-%d %H:%M:%S"),
-            "data": {"knowledge_id": conv_knowledge_id,
+            "data": {"knowledge_ids": conv_knowledge_ids,
                      "loaded": bool(knowledge_content),
                      "content_length": len(knowledge_content)},
         })
