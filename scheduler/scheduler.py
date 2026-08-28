@@ -4,7 +4,7 @@
 任务清单：
   - aggregate_usage  每小时聚合 LLM 用量到 llm_usage_stats（回溯 7 天幂等覆盖）
   - cleanup_telemetry 每天凌晨 3 点清理过期遥测数据（默认保留 90 天）
-  - run_scheduled_syncs 每 10 分钟检查并执行到期的元数据同步任务
+  - run_scheduled_syncs 每 10 分钟巡检并执行到期的元数据同步任务（任务自身的 interval/cron 配置由此驱动）
 """
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger

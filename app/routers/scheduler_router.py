@@ -14,7 +14,9 @@ router = APIRouter()
 _JOB_LABELS = {
     'aggregate_usage': 'LLM 用量聚合',
     'cleanup_telemetry': '遥测数据清理',
-    'run_scheduled_syncs': '元数据同步检查',
+    'cleanup_main_db': '主库数据清理',
+    'wal_checkpoint': 'WAL 日志回收',
+    'run_scheduled_syncs': '同步任务调度巡检',
 }
 
 
