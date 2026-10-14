@@ -491,11 +491,11 @@ def send_message(
 
     try:
         with session_scope() as db:
-            # 验证对话归属
-            conversation = db.query(Conversation).filter(
-                Conversation.id == conversation_id,
-                Conversation.user_id == user_id
-            ).first()
+            # 验证对话归属（admin 与列表权限一致，可访问全部对话）
+            q = db.query(Conversation).filter(Conversation.id == conversation_id)
+            if user.get('role') != 'admin':
+                q = q.filter(Conversation.user_id == user_id)
+            conversation = q.first()
             if not conversation:
                 raise HTTPException(status_code=404, detail="对话不存在")
     
@@ -771,13 +771,14 @@ def get_messages(
     user_id = user['user_id']
 
     with session_scope() as db:
-        conversation = db.query(Conversation).filter(
-            Conversation.id == conversation_id,
-            Conversation.user_id == user_id
-        ).first()
+        # admin 与列表权限一致，可查看全部对话的消息
+        q = db.query(Conversation).filter(Conversation.id == conversation_id)
+        if user.get('role') != 'admin':
+            q = q.filter(Conversation.user_id == user_id)
+        conversation = q.first()
         if not conversation:
             raise HTTPException(status_code=404, detail="对话不存在")
-    
+
         messages = db.query(ConversationMessage).filter(
             ConversationMessage.conversation_id == conversation_id
         ).order_by(ConversationMessage.created_at.asc()).all()
@@ -805,10 +806,11 @@ def delete_conversation(
     user_id = user['user_id']
 
     with session_scope() as db:
-        conversation = db.query(Conversation).filter(
-            Conversation.id == conversation_id,
-            Conversation.user_id == user_id
-        ).first()
+        # admin 与列表权限一致，可删除全部对话
+        q = db.query(Conversation).filter(Conversation.id == conversation_id)
+        if user.get('role') != 'admin':
+            q = q.filter(Conversation.user_id == user_id)
+        conversation = q.first()
         if not conversation:
             raise HTTPException(status_code=404, detail="对话不存在")
     
