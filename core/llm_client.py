@@ -81,7 +81,7 @@ def _get_session() -> requests.Session:
             pool_connections=5,
             pool_maxsize=10,
             max_retries=Retry(total=2, backoff_factor=0.5,
-                              status_forcelist=[502, 503, 504]),
+                              status_forcelist=[429, 502, 503, 504]),
         )
         _session.mount('http://', adapter)
         _session.mount('https://', adapter)
@@ -112,6 +112,14 @@ class LLMClient:
         self.max_tokens = max_tokens
         self.timeout = timeout
         self.temperature = temperature
+
+    def _endpoint_url(self) -> str:
+        """补全聊天补全端点 — base_url 填根地址（如 https://open.bigmodel.cn/api/paas/v4/）
+        时自动拼接 /chat/completions；已含该端点则原样返回"""
+        base = (self.base_url or '').rstrip('/')
+        if base.endswith('/chat/completions'):
+            return base
+        return base + '/chat/completions'
 
     def _extract_sql(self, text: str) -> str:
         """从API响应文本中提取SQL（去除markdown代码块标记）"""
@@ -214,7 +222,7 @@ class LLMClient:
 
         try:
             response = _get_session().post(
-                self.base_url,
+                self._endpoint_url(),
                 headers=headers,
                 json=payload,
                 timeout=self.timeout
@@ -295,7 +303,7 @@ class LLMClient:
 
         try:
             response = _get_session().post(
-                self.base_url,
+                self._endpoint_url(),
                 headers=headers,
                 json=payload,
                 timeout=self.timeout
@@ -359,7 +367,7 @@ class LLMClient:
             }
 
             response = _get_session().post(
-                self.base_url,
+                self._endpoint_url(),
                 headers=headers,
                 json=payload,
                 timeout=30
