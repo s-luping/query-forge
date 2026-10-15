@@ -6,15 +6,35 @@
 """
 from dataclasses import dataclass
 from datetime import datetime
-from typing import List, Optional, Tuple, Dict
+from typing import Dict, List, Optional, Tuple
 
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
-from models.schema import DbSchema, DbTable, DbColumn
-from models.datasource import DataSource
+from app.cache import ttl_cache
 from crud.base import session_scope
+from models.datasource import DataSource
+from models.schema import DbColumn, DbSchema, DbTable
 
+# ── 元库查询短 TTL 缓存（纲领 §3.2：列表/详情必须有限流、审计、短 TTL 缓存） ──
+# 元库为人工标注数据，写入频率极低；列表/详情在单页面内被反复拉取（如 /schemas
+# 与 /tables 级联、知识作用域、同步页选库），短 TTL 只消除同页面内重复查询，
+# 写路径主动 invalidate，保证改完立即生效，不受 TTL 拖延。
+_META_CACHE_TTL = 10.0
+_META_CACHE_NS = 'schema_meta'
+
+
+def invalidate_schema_cache() -> None:
+    """元库（三层表）发生写入/删除后调用，立即清空读缓存"""
+    ttl_cache.invalidate(_META_CACHE_NS)
+
+
+def _meta_key(db, *args, **kwargs):
+    """缓存键：剔除 ORM Session（不可哈希），仅按业务参数区分
+
+    函数名由 app.cache 装饰器统一加前缀，故此处只需业务参数。
+    """
+    return (args, tuple(sorted(kwargs.items())))
 
 # ═══════════════════════════════════════════════════════════════════
 # 平铺视图（兼容旧 Schema ORM 的形状）
@@ -212,6 +232,7 @@ def save_parsed_results(parsed_results: List[dict], user_id: int, db: Session,
                 new_count += 1
 
     db.commit()
+    invalidate_schema_cache()
     return new_count, duplicate_count, touched_schemas
 
 
@@ -231,11 +252,13 @@ def get_schema_name_by_id(db: Session, schema_id: Optional[int]) -> Optional[str
     return row[0] if row else None
 
 
+@ttl_cache.cached(ttl=_META_CACHE_TTL, namespace=_META_CACHE_NS, key_fn=_meta_key)
 def get_schema_name_map(db: Session) -> dict:
     """id → name 映射（列表页批量解析用）"""
     return {r[0]: r[1] for r in db.query(DbSchema.id, DbSchema.name).all()}
 
 
+@ttl_cache.cached(ttl=_META_CACHE_TTL, namespace=_META_CACHE_NS, key_fn=_meta_key)
 def list_schema_names(db: Session, visible_schema_ids=None) -> List[str]:
     q = db.query(DbSchema.name)
     if visible_schema_ids is not None:
@@ -245,6 +268,7 @@ def list_schema_names(db: Session, visible_schema_ids=None) -> List[str]:
     return [r[0] for r in q.distinct().all()]
 
 
+@ttl_cache.cached(ttl=_META_CACHE_TTL, namespace=_META_CACHE_NS, key_fn=_meta_key)
 def list_schema_types(db: Session, visible_schema_ids=None) -> Dict[str, str]:
     """库名 → db_type 映射（供前端"选库自动带出类型"）"""
     q = db.query(DbSchema.name, DbSchema.db_type)
@@ -263,6 +287,7 @@ def get_schema_type_by_name(db: Session, schema_name: Optional[str]) -> str:
     return (row[0] or '') if row else ''
 
 
+@ttl_cache.cached(ttl=_META_CACHE_TTL, namespace=_META_CACHE_NS, key_fn=_meta_key)
 def list_schemas_with_datasource(db: Session, visible_schema_ids=None):
     """库列表（含数据源分组信息）— 数据源 → 数据库 → 表 展示层级
 
@@ -283,6 +308,7 @@ def list_schemas_with_datasource(db: Session, visible_schema_ids=None):
     ]
 
 
+@ttl_cache.cached(ttl=_META_CACHE_TTL, namespace=_META_CACHE_NS, key_fn=_meta_key)
 def list_tables(db: Session, schema_name=None, visible_schema_ids=None,
                 table_grants_by_schema=None) -> List[Tuple[str, str]]:
     """返回 [(table_name, description)]"""
@@ -364,6 +390,7 @@ def delete_schema_by_name(db: Session, schema_name: str) -> int:
         db.query(DbTable).filter(DbTable.id.in_(table_ids)).delete(synchronize_session=False)
     db.query(DbSchema).filter(DbSchema.id == schema.id).delete(synchronize_session=False)
     db.commit()
+    invalidate_schema_cache()
     return col_count
 
 
@@ -379,6 +406,7 @@ def delete_table(db: Session, schema_name: str, table_name: str) -> int:
     col_count = db.query(DbColumn).filter(DbColumn.table_id == table.id).delete(synchronize_session=False)
     db.query(DbTable).filter(DbTable.id == table.id).delete(synchronize_session=False)
     db.commit()
+    invalidate_schema_cache()
     return col_count
 
 
@@ -388,6 +416,7 @@ def delete_column_by_id(db: Session, column_id: int) -> bool:
         return False
     db.delete(col)
     db.commit()
+    invalidate_schema_cache()
     return True
 
 
@@ -397,6 +426,7 @@ def update_sample_values(db: Session, column_id: int, sample_values: str) -> boo
         return False
     col.sample_values = sample_values
     db.commit()
+    invalidate_schema_cache()
     return True
 
 
@@ -415,6 +445,7 @@ def update_column_metadata(db: Session, column_id: int,
     if description is not None:
         col.description = description
     db.commit()
+    invalidate_schema_cache()
     return True
 
 
@@ -422,6 +453,7 @@ def update_column_metadata(db: Session, column_id: int,
 # 统计
 # ═══════════════════════════════════════════════════════════════════
 
+@ttl_cache.cached(ttl=_META_CACHE_TTL, namespace=_META_CACHE_NS, key_fn=_meta_key)
 def stats(db: Session, visible_schema_ids=None, table_grants_by_schema=None) -> dict:
     base_cols = (db.query(func.count(DbColumn.id))
                  .join(DbTable, DbColumn.table_id == DbTable.id)
