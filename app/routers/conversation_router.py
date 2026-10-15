@@ -460,8 +460,8 @@ def create_conversation(
             "conversation": {
                 "id": conversation_id,
                 "title": title,
-                "schema_name": request.schema_name,
-                "db_type": request.db_type
+                "schema_name": payload.schema_name,
+                "db_type": payload.db_type
             },
             "message": {
                 "id": assistant_msg_id,
