@@ -13,8 +13,9 @@ from sqlalchemy.orm import Session
 
 from app.cache import ttl_cache
 from crud.base import session_scope
+from models.conversation import Conversation
 from models.datasource import DataSource
-from models.schema import DbColumn, DbSchema, DbTable
+from models.schema import DbColumn, DbSchema, DbTable, DbTableRelation
 
 # ── 元库查询短 TTL 缓存（纲领 §3.2：列表/详情必须有限流、审计、短 TTL 缓存） ──
 # 元库为人工标注数据，写入频率极低；列表/详情在单页面内被反复拉取（如 /schemas
@@ -388,6 +389,15 @@ def delete_schema_by_name(db: Session, schema_name: str) -> int:
     if table_ids:
         col_count = db.query(DbColumn).filter(DbColumn.table_id.in_(table_ids)).delete(synchronize_session=False)
         db.query(DbTable).filter(DbTable.id.in_(table_ids)).delete(synchronize_session=False)
+    # 表关系：左右任一侧引用该 schema 的关系随删除（关系失去依托即无意义）
+    db.query(DbTableRelation).filter(or_(
+        DbTableRelation.schema_id == schema.id,
+        DbTableRelation.left_schema_id == schema.id,
+        DbTableRelation.right_schema_id == schema.id,
+    )).delete(synchronize_session=False)
+    # 对话历史保留，仅解除与该 schema 的关联
+    db.query(Conversation).filter(Conversation.schema_id == schema.id).update(
+        {Conversation.schema_id: None}, synchronize_session=False)
     db.query(DbSchema).filter(DbSchema.id == schema.id).delete(synchronize_session=False)
     db.commit()
     invalidate_schema_cache()
