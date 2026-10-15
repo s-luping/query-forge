@@ -164,7 +164,7 @@ pip install -r requirements.txt
 python download_model.py
 ```
 
-> 向量索引构建的详细原理和流程，请参考 [docs/VECTOR_INDEX.md](docs/VECTOR_INDEX.md)
+> 向量索引与 NL2SQL 链路的详细设计，请参考 [docs/NL2SQL设计与实现.md](docs/NL2SQL设计与实现.md) 与 [docs/系统架构设计.md](docs/系统架构设计.md)
 
 ### 4. 启动服务
 
@@ -231,11 +231,12 @@ start_server.bat
 
 | 文档 | 说明 |
 |------|------|
-| [docs/AI_MEMORY.md](docs/AI_MEMORY.md) | AI 开发者/维护者速查手册（架构、约定、已知坑） |
-| [docs/SYSTEM_DESCRIPTION.md](docs/SYSTEM_DESCRIPTION.md) | 系统功能与架构权威说明 |
-| [docs/chatsql_flow.md](docs/chatsql_flow.md) | ChatSQL 生成链路流程图（Mermaid） |
-| [docs/VECTOR_INDEX.md](docs/VECTOR_INDEX.md) | 向量索引技术详解 |
-| [docs/系统诊断与优化报告.md](docs/系统诊断与优化报告.md) | 系统诊断与优化实施记录 |
+| [docs/系统使用文档.md](docs/系统使用文档.md) | 面向业务用户与管理员的使用手册 |
+| [docs/系统架构设计.md](docs/系统架构设计.md) | 总体架构、三库分离、权限与安全体系 |
+| [docs/NL2SQL设计与实现.md](docs/NL2SQL设计与实现.md) | NL2SQL 全链路（召回/聚合/知识/网关/执行）设计与实现 |
+| [docs/部署运维手册.md](docs/部署运维手册.md) | 安装部署、配置项、日常运维、故障排查 |
+| [docs/资产总表.md](docs/资产总表.md) | 接口/表/页面/作业登记总表（开发纲领 §5，CI 核对） |
+| docs/NL2SQL经典场景测试报告.pdf · docs/NL2SQL验证测试报告.pdf | NL2SQL 测试报告 |
 
 ---
 
