@@ -13,7 +13,7 @@ ORM 模型：
     AppSessionLocal = SessionLocal
 """
 from models.base import MainBase, TelemetryBase
-from models.role import Role, UserRole, RolePermission
+from models.role import Role, RolePermission, UserRole
 
 # 旧 Base（供未迁移脚本使用）
 Base = MainBase

@@ -2,9 +2,11 @@
 """关键词抽取 - jieba 分词 + 停用词过滤 + TF 统计"""
 import os
 import re
-import jieba
-from typing import List, Set
 from collections import Counter
+from typing import List, Set
+
+import jieba
+
 from app.logger import logger
 
 # 优先使用项目本地字典，避免 pip 包缺少 dict.txt 导致分词失败

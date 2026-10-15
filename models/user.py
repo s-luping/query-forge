@@ -1,10 +1,9 @@
 """用户基础模型。权限关系由 models.role 的 RBAC 模型统一管理。"""
-from datetime import datetime
 
 from sqlalchemy import Column, DateTime, Float, Integer, String
 
-from models.base import MainBase
 from app.timezone import now_beijing
+from models.base import MainBase
 
 
 class User(MainBase):

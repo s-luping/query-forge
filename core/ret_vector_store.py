@@ -1,20 +1,21 @@
 # -*- coding: UTF-8 -*-
 """
 向量存储模块 - 使用 sentence-transformers (纯Python实现，无需FAISS)
-模型路径: D:\projects\QueryForge\models\embeddings\bge-m3
+模型路径: D:\\projects\\QueryForge\\models\\embeddings\bge-m3
 """
+import json
 import os
 import re
 import threading
-import json
 
 os.environ.setdefault('HF_ENDPOINT', 'https://modelscope.cn')
 
+from typing import Dict, List, Optional, Tuple
+
 import numpy as np
-from typing import List, Dict, Tuple, Optional
+
 from app.logger import logger
 from crud.base import session_scope
-
 
 # core/ret_vector_store.py → 上溯 2 级到项目根（__file__ 位于 core/ 下）
 PROJECT_ROOT = os.path.dirname(os.path.dirname(__file__))
@@ -153,7 +154,7 @@ class EmbeddingModel:
                             logger.info(f"从本地加载模型: {local_path}")
                         else:
                             cls._set_db_ready(False)
-                            raise RuntimeError(f"未找到本地模型，请先运行 download_model.py 下载模型")
+                            raise RuntimeError("未找到本地模型，请先运行 download_model.py 下载模型")
 
                         cls._dimension = cls._instance.get_sentence_embedding_dimension()
                         cls._set_db_path(local_path)  # 确保路径已缓存

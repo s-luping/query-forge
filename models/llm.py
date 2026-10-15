@@ -6,11 +6,20 @@ Token/对话数据放置架构：
     关联层  conversation_messages.llm_call_id（主库，跨库逻辑引用）
     聚合层  llm_usage_stats  （主库）按 天×用户×模型 汇总，scheduler 定时刷新
 """
-from datetime import datetime
-from sqlalchemy import Column, Integer, String, Text, Float, DateTime, Boolean, Date, UniqueConstraint
-from models.base import MainBase, TelemetryBase
-from app.timezone import now_beijing
+from sqlalchemy import (
+    Boolean,
+    Column,
+    Date,
+    DateTime,
+    Float,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+)
 
+from app.timezone import now_beijing
+from models.base import MainBase, TelemetryBase
 
 # ═══════════════════════════════════════════════════════════════════
 # 主库表

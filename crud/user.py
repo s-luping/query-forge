@@ -9,7 +9,7 @@
 """
 from typing import Optional
 
-from crud.base import BaseCrud, session_scope
+from crud.base import BaseCrud
 from models.user import User
 
 

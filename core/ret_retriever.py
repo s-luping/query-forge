@@ -9,20 +9,22 @@
 修复记录：原 ChatSession._recall_fields 检查 info['fields']['is_built']，
 而 get_vector_index_info 返回 key 为 'indexes'，导致向量召回从未生效。
 """
-from typing import List, Dict, Optional
-
 import json
+from typing import Dict, List, Optional
 
 import numpy as np
 
 from app.logger import logger
-from app.permissions import (filter_fields_by_permission, get_table_grants_by_schema,
-                             get_visible_schema_ids)
-from services import schema_service
-from core.ret_vector_store import SchemaVectorStore, get_vector_config
+from app.permissions import (
+    filter_fields_by_permission,
+    get_table_grants_by_schema,
+    get_visible_schema_ids,
+)
 from core.ret_keywords import KeywordExtractor
+from core.ret_vector_store import SchemaVectorStore, get_vector_config
 from crud.base import session_scope
 from crud.schema import relation_crud
+from services import schema_service
 
 
 class SchemaRetriever:
@@ -126,7 +128,7 @@ class SchemaRetriever:
             from services.vector_service import auto_build_vector_index
             result = auto_build_vector_index('default', meta.get('field_count', 0))
             if result:
-                logger.info(f"[SchemaRetriever] stale 索引后台重建已触发")
+                logger.info("[SchemaRetriever] stale 索引后台重建已触发")
         except Exception as e:
             logger.warning(f"[SchemaRetriever] stale 懒重建触发失败: {e}")
 

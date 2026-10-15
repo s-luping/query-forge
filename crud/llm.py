@@ -7,7 +7,7 @@
 from typing import List, Optional
 
 from crud.base import BaseCrud, session_scope
-from models.llm import LLMConfig, LLMUsageStat, LLMCall, LLMPrompt
+from models.llm import LLMCall, LLMConfig, LLMPrompt, LLMUsageStat
 
 
 class LLMConfigCrud(BaseCrud):

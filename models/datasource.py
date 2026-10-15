@@ -4,9 +4,10 @@
 DataSource 原定义于 models/sync.py，现独立成模型文件以对应数据源管理功能。
 同步任务（SyncJobConfig 等）仍见 models/sync.py。
 """
-from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey
-from models.base import MainBase
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text
+
 from app.timezone import now_beijing
+from models.base import MainBase
 
 
 class DataSource(MainBase):

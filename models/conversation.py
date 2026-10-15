@@ -5,10 +5,10 @@
 - conversations.context_prompt_id  → llm_telemetry.llm_prompts.id（跨库逻辑引用）
 跨库无法建外键，由 services/llm/telemetry.py 统一维护一致性。
 """
-from datetime import datetime
-from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime, ForeignKey
-from models.base import MainBase
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Text
+
 from app.timezone import now_beijing
+from models.base import MainBase
 
 
 class Conversation(MainBase):

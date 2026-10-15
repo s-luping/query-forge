@@ -16,6 +16,7 @@ def _get_fernet():
     global _fernet_instance
     if _fernet_instance is None:
         from cryptography.fernet import Fernet
+
         from app.config import FERNET_KEY
         if FERNET_KEY:
             # 独立 Fernet 密钥（推荐），与 JWT 签名密钥分离

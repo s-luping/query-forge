@@ -10,7 +10,6 @@ import json
 import re
 from typing import Any, Dict, List
 
-
 # ── 共享异常 ──────────────────────────────────────────────
 
 class DDLParseError(Exception):

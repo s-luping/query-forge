@@ -2,6 +2,7 @@
 """验证 get_visible_schema_ids 的数据源门控 + 超管兜底语义。"""
 import sqlite3
 import sys
+
 sys.path.insert(0, r'D:\projects\query-forge')
 
 from app.permissions import get_visible_schema_ids

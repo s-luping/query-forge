@@ -17,16 +17,14 @@
     sensitive     → FILTER
     confidential  → NONE
 """
-from typing import Optional, Dict, List
 import threading
 import time
+from typing import Dict, List, Optional
 
 from crud.base import session_scope
-from crud.role import role_permission_crud, user_role_crud
-from models.schema import DbColumn, DbTable, DbSchema
 from models.datasource import DataSource
 from models.role import RolePermission, UserRole
-
+from models.schema import DbColumn, DbSchema, DbTable
 
 # ── 权限结果进程级 TTL 缓存 ─────────────────────────────────
 # 权限三件套（get_visible_schema_ids / get_table_grants_by_schema /

@@ -6,10 +6,10 @@ category 分类：
 - runtime      运行时状态缓存（EMBEDDING_MODEL_READY / EMBEDDING_MODEL_PATH），系统自动维护
 - vector       向量检索业务参数（VECTOR_INDEX_THRESHOLD / FIELD_RECALL_TOP_K / MAX_TABLES）
 """
-from datetime import datetime
-from sqlalchemy import Column, Integer, String, Text, DateTime
-from models.base import MainBase
+from sqlalchemy import Column, DateTime, Integer, String, Text
+
 from app.timezone import now_beijing
+from models.base import MainBase
 
 
 class SystemSetting(MainBase):

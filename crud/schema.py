@@ -6,7 +6,7 @@
 from typing import List, Optional
 
 from crud.base import BaseCrud, session_scope
-from models.schema import DbSchema, DbTable, DbColumn, DbTableRelation
+from models.schema import DbColumn, DbSchema, DbTable, DbTableRelation
 
 
 class SchemaCrud(BaseCrud):

@@ -25,8 +25,6 @@ STALE_RUNNING_HOURS = 6
 
 def run_scheduled_syncs():
     """检查并执行所有到期的同步任务"""
-    from crud.base import session_scope
-    from models.sync import SyncJobConfig
 
     try:
         due_job_ids = _collect_due_jobs()
@@ -91,8 +89,8 @@ def _collect_due_jobs() -> list:
 def _run_job_safely(job_id: int):
     """后台线程执行单个同步任务（会话与调度巡检完全隔离）"""
     from crud.base import session_scope
-    from models.sync import SyncJobConfig
     from models.datasource import DataSource
+    from models.sync import SyncJobConfig
     from services.sync_engine import SyncEngine
 
     try:

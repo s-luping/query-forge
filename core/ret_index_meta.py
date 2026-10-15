@@ -7,8 +7,8 @@
   - build_vector_index：全量构建某个 schema 的字段向量索引
   - get_vector_index_info：查询索引状态（优先 DB 元数据，回退磁盘检查）
 """
-from datetime import datetime
-from typing import Optional, Dict
+from typing import Dict, Optional
+
 from app.timezone import now_beijing
 from crud.base import session_scope
 

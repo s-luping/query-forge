@@ -3,12 +3,12 @@
 
 输出标准化变更记录列表，供 SyncEngine 应用和记录。
 """
-from dataclasses import dataclass
-from typing import List, Dict
 import json
+from dataclasses import dataclass
+from typing import Dict, List
 
-from services.sync_connectors import TableMetadata, ColumnMetadata
-from models.schema import DbTable, DbColumn
+from models.schema import DbColumn, DbTable
+from services.sync_connectors import ColumnMetadata, TableMetadata
 
 
 @dataclass

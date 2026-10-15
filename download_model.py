@@ -56,7 +56,7 @@ def download_model():
         from modelscope import snapshot_download
         print("正在从 ModelScope 下载模型，请稍候...")
         model_dir = snapshot_download(model_name, cache_dir=MODEL_SAVE_DIR)
-        print(f"\n✓ 模型下载成功！")
+        print("\n✓ 模型下载成功！")
         print(f"  模型路径: {model_dir}")
 
         print("\n检查模型文件...")
@@ -79,7 +79,7 @@ def download_model():
             from modelscope import snapshot_download
             print("正在从 ModelScope 下载模型，请稍候...")
             model_dir = snapshot_download(model_name, cache_dir=MODEL_SAVE_DIR)
-            print(f"\n✓ 模型下载成功！")
+            print("\n✓ 模型下载成功！")
             print(f"  模型路径: {model_dir}")
             _update_db_status(True, model_dir)
             return True
