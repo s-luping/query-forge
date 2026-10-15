@@ -4,17 +4,24 @@
 任务清单：
   - aggregate_usage  每小时聚合 LLM 用量到 llm_usage_stats（回溯 7 天幂等覆盖）
   - cleanup_telemetry 每天凌晨 3 点清理过期遥测数据（默认保留 90 天）
+  - cleanup_logs_db 每天凌晨 3 点 10 分清理日志库过期数据（审计/同步历史，默认 90 天）
+  - cleanup_main_db 每天凌晨 3 点 30 分清空主库过期查询结果 JSON（默认 30 天）
   - run_scheduled_syncs 每 10 分钟巡检并执行到期的元数据同步任务（任务自身的 interval/cron 配置由此驱动）
 """
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from apscheduler.triggers.interval import IntervalTrigger
 from apscheduler.triggers.cron import CronTrigger
+from apscheduler.triggers.interval import IntervalTrigger
 
 from app.logger import logger
 from app.timezone import BEIJING_TZ
-from scheduler.jobs.usage_stats import aggregate_usage_stats
-from scheduler.jobs.retention import cleanup_telemetry, cleanup_main_db, wal_checkpoint
+from scheduler.jobs.retention import (
+    cleanup_logs_db,
+    cleanup_main_db,
+    cleanup_telemetry,
+    wal_checkpoint,
+)
 from scheduler.jobs.schema_sync import run_scheduled_syncs
+from scheduler.jobs.usage_stats import aggregate_usage_stats
 
 
 class SchedulerManager:
@@ -42,11 +49,19 @@ class SchedulerManager:
         logger.info("已注册定时任务: cleanup_telemetry (每天 03:00)")
 
         self.scheduler.add_job(
+            cleanup_logs_db,
+            CronTrigger(hour=3, minute=10),
+            id='cleanup_logs_db',
+            kwargs={'audit_retention_days': 90, 'sync_retention_days': 90},
+            replace_existing=True,
+        )
+        logger.info("已注册定时任务: cleanup_logs_db (每天 03:10)")
+
+        self.scheduler.add_job(
             cleanup_main_db,
             CronTrigger(hour=3, minute=30),
             id='cleanup_main_db',
-            kwargs={'audit_retention_days': 90, 'sync_retention_days': 90,
-                    'result_retention_days': 30},
+            kwargs={'result_retention_days': 30},
             replace_existing=True,
         )
         logger.info("已注册定时任务: cleanup_main_db (每天 03:30)")

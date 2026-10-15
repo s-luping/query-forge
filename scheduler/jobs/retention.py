@@ -3,14 +3,14 @@
 
 默认保留 90 天，由 scheduler 每天凌晨执行一次。
 """
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 from sqlalchemy import text
 
 from app.logger import logger
 from app.timezone import now_beijing
 from crud.base import session_scope
-from db.engine import engine_main, engine_telemetry, is_sqlite
+from db.engine import engine_logs, engine_main, engine_telemetry, is_sqlite
 from models.llm import LLMCall, LLMPrompt
 
 
@@ -55,40 +55,32 @@ def cleanup_telemetry(retention_days: int = 90) -> dict:
         return {"calls_deleted": 0, "prompts_deleted": 0, "error": str(e)}
 
 
-def cleanup_main_db(audit_retention_days: int = 90,
-                    sync_retention_days: int = 90,
-                    result_retention_days: int = 30) -> dict:
-    """清理主库过期数据 — 堵住三张无上限增长表
+def cleanup_logs_db(audit_retention_days: int = 90,
+                    sync_retention_days: int = 90) -> dict:
+    """清理日志库过期数据 — 堵住三张无上限增长表
 
     步骤：
       1. 删除 query_audit_logs 中早于 audit_retention_days 的记录
       2. 删除 sync_run_logs / schema_change_logs 中早于 sync_retention_days 的记录
-      3. 清空 conversation_messages.result_data 中早于 result_retention_days 的查询结果
-         （只清结果 JSON，不删对话历史；结果可从源库重新执行获得）
 
     注意：删除顺序先 change_logs 后 run_logs，避免外键约束（change 引用 run）报错。
 
     Args:
         audit_retention_days: 审计日志保留天数（默认 90）
         sync_retention_days: 同步历史/变更记录保留天数（默认 90）
-        result_retention_days: 对话查询结果 JSON 保留天数（默认 30）
 
     Returns:
-        {"audit_deleted": int, "changes_deleted": int, "runs_deleted": int,
-         "results_cleared": int}
+        {"audit_deleted": int, "changes_deleted": int, "runs_deleted": int}
     """
     from models.security import QueryAuditLog
-    from models.sync import SyncRunLog, SchemaChangeLog
-    from models.conversation import ConversationMessage
+    from models.sync import SchemaChangeLog, SyncRunLog
 
     audit_cutoff = now_beijing() - timedelta(days=audit_retention_days)
     sync_cutoff = now_beijing() - timedelta(days=sync_retention_days)
-    result_cutoff = now_beijing() - timedelta(days=result_retention_days)
-    result = {"audit_deleted": 0, "changes_deleted": 0,
-              "runs_deleted": 0, "results_cleared": 0}
+    result = {"audit_deleted": 0, "changes_deleted": 0, "runs_deleted": 0}
 
     try:
-        with session_scope() as db:
+        with session_scope(logs=True) as db:
             # 1. 过期审计日志
             result["audit_deleted"] = db.query(QueryAuditLog).filter(
                 QueryAuditLog.created_at < audit_cutoff
@@ -102,7 +94,39 @@ def cleanup_main_db(audit_retention_days: int = 90,
                 SyncRunLog.started_at < sync_cutoff
             ).delete(synchronize_session=False)
 
-            # 3. 清空过期查询结果（保留对话记录本身，仅释放大 JSON）
+        logger.info(
+            f"cleanup_logs_db: 审计 {result['audit_deleted']} 条，"
+            f"变更 {result['changes_deleted']} 条，同步历史 {result['runs_deleted']} 条"
+            f"（审计/同步保留 {sync_retention_days} 天）"
+        )
+        return result
+    except Exception as e:
+        logger.error(f"cleanup_logs_db 失败: {e}")
+        result["error"] = str(e)
+        return result
+
+
+def cleanup_main_db(result_retention_days: int = 30) -> dict:
+    """清理主库过期数据 — 清空对话消息里的大 JSON 查询结果
+
+    步骤：
+      清空 conversation_messages.result_data 中早于 result_retention_days 的查询结果
+      （只清结果 JSON，不删对话历史；结果可从源库重新执行获得）
+
+    Args:
+        result_retention_days: 对话查询结果 JSON 保留天数（默认 30）
+
+    Returns:
+        {"results_cleared": int}
+    """
+    from models.conversation import ConversationMessage
+
+    result_cutoff = now_beijing() - timedelta(days=result_retention_days)
+    result = {"results_cleared": 0}
+
+    try:
+        with session_scope() as db:
+            # 清空过期查询结果（保留对话记录本身，仅释放大 JSON）
             result["results_cleared"] = db.query(ConversationMessage).filter(
                 ConversationMessage.created_at < result_cutoff,
                 ConversationMessage.result_data.isnot(None),
@@ -110,10 +134,8 @@ def cleanup_main_db(audit_retention_days: int = 90,
                      synchronize_session=False)
 
         logger.info(
-            f"cleanup_main_db: 审计 {result['audit_deleted']} 条，"
-            f"变更 {result['changes_deleted']} 条，同步历史 {result['runs_deleted']} 条，"
-            f"查询结果 {result['results_cleared']} 条（审计/同步保留 {sync_retention_days} 天，"
-            f"结果保留 {result_retention_days} 天）"
+            f"cleanup_main_db: 查询结果 {result['results_cleared']} 条"
+            f"（结果保留 {result_retention_days} 天）"
         )
         return result
     except Exception as e:
@@ -132,18 +154,20 @@ def wal_checkpoint() -> dict:
     if not is_sqlite:
         return {"skipped": True, "reason": "非 SQLite 模式"}
 
-    result = {"main_truncated": 0, "telemetry_truncated": 0}
+    result = {"main_truncated": 0, "telemetry_truncated": 0, "logs_truncated": 0}
     try:
-        # 主库与遥测库均为独立 SQLite 文件，需各自 checkpoint
+        # 主库 / 遥测库 / 日志库均为独立 SQLite 文件，需各自 checkpoint
         for key, engine in (("main_truncated", engine_main),
-                            ("telemetry_truncated", engine_telemetry)):
+                            ("telemetry_truncated", engine_telemetry),
+                            ("logs_truncated", engine_logs)):
             with engine.connect() as conn:
                 row = conn.execute(
                     text("PRAGMA wal_checkpoint(TRUNCATE)")).fetchone()
                 # row 形如 (busy, log, checkpointed)；checkpointed 为已回写页数
                 result[key] = row[2] if row and len(row) > 2 else 0
         logger.info(f"wal_checkpoint: 主库回写 {result['main_truncated']} 页，"
-                    f"遥测库回写 {result['telemetry_truncated']} 页")
+                    f"遥测库回写 {result['telemetry_truncated']} 页，"
+                    f"日志库回写 {result['logs_truncated']} 页")
         return result
     except Exception as e:
         logger.error(f"wal_checkpoint 失败: {e}")

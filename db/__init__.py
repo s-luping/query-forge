@@ -7,18 +7,21 @@
   db/seed.py          种子数据（系统配置/管理员/角色）
   db/database.py      get_setting + init_database 编排
 
-会话工厂：
+会话工厂（三库分离）：
     SessionLocal           → 主库（用户/配置/Schema/知识/对话/统计/设置）
     TelemetrySessionLocal  → 遥测库（llm_calls / llm_prompts）
+    LogsSessionLocal       → 日志库（query_audit_logs / sync_run_logs / schema_change_logs）
 
 兼容别名：
     AppSessionLocal = SessionLocal
 """
 from db.database import (
-    engine_main,
-    engine_telemetry,
+    LogsSessionLocal,
     SessionLocal,
     TelemetrySessionLocal,
+    engine_logs,
+    engine_main,
+    engine_telemetry,
     get_setting,
     init_database,
     is_sqlite,

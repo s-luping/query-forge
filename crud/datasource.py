@@ -11,7 +11,7 @@ from typing import Optional
 from crud.base import BaseCrud, session_scope
 from models.datasource import DataSource
 from models.schema import DbSchema
-from models.sync import SyncJobConfig, SyncRunLog, SchemaChangeLog
+from models.sync import SchemaChangeLog, SyncJobConfig, SyncRunLog
 
 
 class DataSourceCrud(BaseCrud):
@@ -45,7 +45,10 @@ class DataSourceCrud(BaseCrud):
     def delete_cascade(self, ds_id: int) -> int:
         """级联删除数据源：变更记录 → 执行历史 → 同步任务 → 解除库绑定 → 数据源。
 
-        主库开启外键约束，须按依赖顺序清理；返回清理的同步任务数。
+        跨库拆分：前两步（日志表）在日志库执行，后续在主库执行。
+        主库原开外键约束按依赖顺序清理；日志库无外键，顺序无关但保持先日志后主库，
+        避免中途失败时主库配置已删而日志残留引用失效的 id。
+        返回清理的同步任务数。
         """
         with session_scope() as db:
             ds = db.query(DataSource).filter(DataSource.id == ds_id).first()
@@ -53,16 +56,17 @@ class DataSourceCrud(BaseCrud):
                 return -1
             job_ids = [j[0] for j in db.query(SyncJobConfig.id).filter(
                 SyncJobConfig.datasource_id == ds_id).all()]
-            # 1) 变更记录（引用 datasource_id / job_id）
-            db.query(SchemaChangeLog).filter(
+        # 1) 日志库：变更记录（引用 datasource_id / job_id）→ 执行历史（引用 job_id）
+        with session_scope(logs=True) as ldb:
+            ldb.query(SchemaChangeLog).filter(
                 SchemaChangeLog.datasource_id == ds_id).delete()
-            # 2) 执行历史（引用 job_id）
             if job_ids:
-                db.query(SyncRunLog).filter(SyncRunLog.job_id.in_(job_ids)).delete()
-            # 3) 同步任务
+                ldb.query(SyncRunLog).filter(SyncRunLog.job_id.in_(job_ids)).delete()
+        # 2) 主库：同步任务 → 解除库绑定 → 数据源
+        with session_scope() as db:
             db.query(SyncJobConfig).filter(
                 SyncJobConfig.datasource_id == ds_id).delete()
-            # 4) 该数据源同步出的库解除绑定（保留结构元数据，不误删）
+            # 该数据源同步出的库解除绑定（保留结构元数据，不误删）
             db.query(DbSchema).filter(DbSchema.datasource_id == ds_id).update(
                 {DbSchema.datasource_id: None})
             db.delete(ds)

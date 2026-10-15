@@ -6,6 +6,7 @@
 SessionLocal / TelemetrySessionLocal / is_sqlite 标志。
 """
 import re
+import time
 
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
@@ -13,6 +14,7 @@ from sqlalchemy.pool import QueuePool
 
 import app.config as config
 from app.logger import logger
+from app.response import get_request_id
 
 # ── 方言检测 ──────────────────────────────────────────────
 
@@ -21,12 +23,12 @@ def _is_sqlite_url(url: str) -> bool:
 
 
 def _resolve_urls():
-    """解析主库与遥测库连接 URL。
+    """解析主库 / 遥测库 / 日志库连接 URL。
 
-    规则：
-      - DATABASE_URL 留空 → SQLite 默认路径
-      - TELEMETRY_DATABASE_URL 留空 + SQLite 模式 → 独立遥测文件
-      - TELEMETRY_DATABASE_URL 留空 + 外部数据库 → 与主库同址（表通过不同 Base 隔离）
+    规则（三个库一致）：
+      - *_DATABASE_URL 留空 → SQLite 默认路径
+      - 遥测/日志 URL 留空 + SQLite 模式 → 独立文件
+      - 遥测/日志 URL 留空 + 外部数据库 → 与主库同址（表通过不同 Base 隔离）
     """
     if config.DATABASE_URL:
         main_url = config.DATABASE_URL
@@ -41,7 +43,15 @@ def _resolve_urls():
         # 外部数据库：遥测表与主库同址，通过 ORM Base 类隔离
         telemetry_url = main_url
 
-    return main_url, telemetry_url
+    if config.LOGS_DATABASE_URL:
+        logs_url = config.LOGS_DATABASE_URL
+    elif _is_sqlite_url(main_url):
+        logs_url = f'sqlite:///{config.LOGS_DB_PATH}'
+    else:
+        # 外部数据库：日志表与主库同址，通过 ORM Base 类隔离
+        logs_url = main_url
+
+    return main_url, telemetry_url, logs_url
 
 
 def _mask_url(url: str) -> str:
@@ -91,24 +101,56 @@ def create_db_engine(db_url: str, *, foreign_keys: bool = False):
 import os
 
 if not config.DATABASE_URL:
-    for _db_path in [config.MAIN_DB_PATH, config.TELEMETRY_DB_PATH]:
+    for _db_path in [config.MAIN_DB_PATH, config.TELEMETRY_DB_PATH,
+                     config.LOGS_DB_PATH]:
         _db_dir = os.path.dirname(_db_path)
         if _db_dir and not os.path.exists(_db_dir):
             os.makedirs(_db_dir)
             logger.info(f"创建数据库目录: {_db_dir}")
 
-# ── 创建双库引擎 ──────────────────────────────────────────
-_main_url, _telemetry_url = _resolve_urls()
+# ── 创建三库引擎 ──────────────────────────────────────────
+_main_url, _telemetry_url, _logs_url = _resolve_urls()
 
 engine_main = create_db_engine(_main_url, foreign_keys=True)
 engine_telemetry = create_db_engine(_telemetry_url, foreign_keys=False)
+# 日志库不开外键：三张日志表的跨库引用（users/sync_job_configs/data_sources）
+# 已降级为普通索引列，由应用层级联清理保证完整性
+engine_logs = create_db_engine(_logs_url, foreign_keys=False)
 
-# 外部数据库模式下，遥测引擎与主引擎相同
+# 外部数据库模式下，遥测/日志引擎与主引擎相同
 is_sqlite = _is_sqlite_url(_main_url)
 _telemetry_same_as_main = (_telemetry_url == _main_url)
+_logs_same_as_main = (_logs_url == _main_url)
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine_main)
 TelemetrySessionLocal = sessionmaker(
     autocommit=False, autoflush=False,
     bind=engine_telemetry if not _telemetry_same_as_main else engine_main,
 )
+LogsSessionLocal = sessionmaker(
+    autocommit=False, autoflush=False,
+    bind=engine_logs if not _logs_same_as_main else engine_main,
+)
+
+# ── 慢 SQL 观测（纲领 §4.1）— 只记语句文本，不记参数（防敏感值入日志） ──
+_sql_start: dict = {}
+
+
+@event.listens_for(engine_main, 'before_cursor_execute')
+@event.listens_for(engine_telemetry, 'before_cursor_execute')
+@event.listens_for(engine_logs, 'before_cursor_execute')
+def _before_cursor(conn, cursor, statement, parameters, context, executemany):
+    _sql_start[id(conn)] = (time.time(), statement)
+
+
+@event.listens_for(engine_main, 'after_cursor_execute')
+@event.listens_for(engine_telemetry, 'after_cursor_execute')
+@event.listens_for(engine_logs, 'after_cursor_execute')
+def _after_cursor(conn, cursor, statement, parameters, context, executemany):
+    started = _sql_start.pop(id(conn), None)
+    if not started:
+        return
+    duration_ms = (time.time() - started[0]) * 1000
+    if duration_ms >= config.SLOW_SQL_MS:
+        rid = get_request_id() or '-'
+        logger.warning(f'[SLOW SQL] [{rid}] {duration_ms:.0f}ms {started[1][:200]}')

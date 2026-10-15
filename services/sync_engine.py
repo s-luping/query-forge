@@ -8,20 +8,19 @@
 """
 import json
 import time
-from datetime import datetime
 from typing import List, Optional, Tuple
 
+from app.crypto import decrypt_secret
 from app.logger import logger
 from app.timezone import now_beijing
-from app.crypto import decrypt_secret
 from crud.base import tx_scope
-from models.schema import DbSchema, DbTable, DbColumn
 from models.datasource import DataSource
-from models.sync import SyncJobConfig, SyncRunLog, SchemaChangeLog
-from services.sync_connectors import get_connector
-from services.sync_connectors import BaseConnector
-from services.sync_diff import diff_metadata, ChangeRecord
+from models.schema import DbColumn, DbSchema, DbTable
+from models.sync import SchemaChangeLog, SyncJobConfig, SyncRunLog
+from services.schema_service import invalidate_schema_cache
 from services.sync_classify import classify_column
+from services.sync_connectors import BaseConnector, get_connector
+from services.sync_diff import ChangeRecord, diff_metadata
 
 
 class SyncEngine:
@@ -38,43 +37,51 @@ class SyncEngine:
     # ── 公共入口 ──────────────────────────────────────────────────
 
     def run(self) -> SyncRunLog:
-        """执行同步，返回 SyncRunLog"""
+        """执行同步，返回 SyncRunLog
+
+        跨库事务说明：执行记录/变更记录在日志库（logs.db），元数据与任务
+        状态在主库（queryforge.db），两者无分布式事务，按「日志先行落库、
+        主库独立提交」顺序执行；主库失败时回滚主库，日志库 run_log 标记
+        failed（与原失败路径一致）。
+        """
         start = time.time()
         try:
-            with tx_scope() as db:
-                # 1. 创建执行记录
+            # 1. 创建执行记录（日志库，独立事务先拿主键）
+            with tx_scope(logs=True) as ldb:
                 run_log = SyncRunLog(
                     job_id=self.job.id,
                     triggered_by=self.triggered_by,
                     started_at=now_beijing(),
                     status='running',
                 )
-                db.add(run_log)
-                db.commit()
-                db.refresh(run_log)
+                ldb.add(run_log)
+                ldb.commit()
+                ldb.refresh(run_log)
                 self._run_log = run_log
 
-                # 2. 解密密码 + 创建连接器
-                password = decrypt_secret(self.datasource.password_enc)
-                self._connector = get_connector(
-                    self.datasource.db_type,
-                    host=self.datasource.host,
-                    port=self.datasource.port,
-                    database=self.datasource.database,
-                    username=self.datasource.username,
-                    password=password,
-                )
+            # 2. 解密密码 + 创建连接器
+            password = decrypt_secret(self.datasource.password_enc)
+            self._connector = get_connector(
+                self.datasource.db_type,
+                host=self.datasource.host,
+                port=self.datasource.port,
+                database=self.datasource.database,
+                username=self.datasource.username,
+                password=password,
+                extra_params=self.datasource.extra_params,
+            )
 
-                # 3. 读取源库元数据
-                include_tables = _parse_csv(self.job.include_tables)
-                exclude_tables = _parse_csv(self.job.exclude_tables)
-                source_tables = self._connector.read_metadata(
-                    include_tables=include_tables or None,
-                    exclude_tables=exclude_tables or None,
-                )
-                logger.info(f"同步[{self.job.target_schema_name}]: 源库读取 {len(source_tables)} 张表")
+            # 3. 读取源库元数据
+            include_tables = _parse_csv(self.job.include_tables)
+            exclude_tables = _parse_csv(self.job.exclude_tables)
+            source_tables = self._connector.read_metadata(
+                include_tables=include_tables or None,
+                exclude_tables=exclude_tables or None,
+            )
+            logger.info(f"同步[{self.job.target_schema_name}]: 源库读取 {len(source_tables)} 张表")
 
-                # 4. 获取存储的元数据
+            # 4-6. 主库事务：读取/创建元数据 → Diff → 应用变更
+            with tx_scope() as db:
                 stored_schema, stored_tables, stored_cols_map = self._get_stored_metadata(db)
                 if stored_schema is None:
                     stored_schema = self._create_target_schema(db)
@@ -86,38 +93,41 @@ class SyncEngine:
                 # 6. 应用变更
                 stats = self._apply_changes(db, stored_schema, changes)
 
-                # 7. 记录变更日志
-                self._log_changes(db, run_log.id, changes)
+            # 7. 记录变更日志（日志库）
+            self._log_changes(run_log.id, changes)
 
-                # 8. 完成
-                run_log.finished_at = now_beijing()
-                run_log.status = 'success'
-                run_log.tables_total = len(source_tables)
-                run_log.tables_synced = stats['tables_touched']
-                run_log.columns_added = stats['columns_added']
-                run_log.columns_modified = stats['columns_modified']
-                run_log.columns_removed = stats['columns_removed']
-                run_log.changes_auto = stats['changes_auto']
-                run_log.changes_pending = stats['changes_pending']
-                run_log.duration_ms = int((time.time() - start) * 1000)
-                run_log.summary = json.dumps({
-                    'source_tables': len(source_tables),
-                    'changes': len(changes),
-                    **stats,
-                }, ensure_ascii=False)
-                db.commit()
+            # 8. 完成执行记录（日志库）
+            run_log.finished_at = now_beijing()
+            run_log.status = 'success'
+            run_log.tables_total = len(source_tables)
+            run_log.tables_synced = stats['tables_touched']
+            run_log.columns_added = stats['columns_added']
+            run_log.columns_modified = stats['columns_modified']
+            run_log.columns_removed = stats['columns_removed']
+            run_log.changes_auto = stats['changes_auto']
+            run_log.changes_pending = stats['changes_pending']
+            run_log.duration_ms = int((time.time() - start) * 1000)
+            run_log.summary = json.dumps({
+                'source_tables': len(source_tables),
+                'changes': len(changes),
+                **stats,
+            }, ensure_ascii=False)
+            with tx_scope(logs=True) as ldb:
+                ldb.merge(self._run_log)
+                ldb.commit()
 
-                # 9. 更新任务状态
+            # 9. 更新任务状态（主库）
+            with tx_scope() as db:
                 self.job.last_synced_at = now_beijing()
                 self.job.last_sync_status = 'success'
                 db.merge(self.job)
                 db.commit()
 
-                # 10. 触发索引重建
-                self._trigger_index_rebuild(stored_schema.name)
+            # 10. 触发索引重建
+            self._trigger_index_rebuild(stored_schema.name)
 
-                logger.info(f"同步完成: {run_log.summary}")
-                return run_log
+            logger.info(f"同步完成: {run_log.summary}")
+            return run_log
 
         except Exception as e:
             logger.error(f"同步失败: {e}", exc_info=True)
@@ -132,19 +142,24 @@ class SyncEngine:
             self.job.last_synced_at = now
             self.job.last_sync_status = 'failed'
             try:
+                # 主库：任务失败状态
                 with tx_scope() as db:
-                    # merge 而非 add：run_log 可能已在步骤1提交（有主键），
-                    # add 会按新行 INSERT 导致主键冲突
-                    if self._run_log is not None:
-                        db.merge(self._run_log)
                     db.merge(self.job)
                     db.commit()
+                # 日志库：执行记录失败状态（merge 而非 add：run_log 可能已
+                # 在步骤1提交（有主键），add 会按新行 INSERT 导致主键冲突）
+                if self._run_log is not None:
+                    with tx_scope(logs=True) as ldb:
+                        ldb.merge(self._run_log)
+                        ldb.commit()
             except Exception as e2:
                 logger.error(f"同步失败状态落库异常: {e2}", exc_info=True)
             return self._run_log
         finally:
             if self._connector:
                 self._connector.close()
+            # 无论成功/失败都可能已写入部分元数据变更，统一失效读缓存
+            invalidate_schema_cache()
 
     # ── 内部方法 ──────────────────────────────────────────────────
 
@@ -299,7 +314,6 @@ class SyncEngine:
                         continue
 
                     new_val = json.loads(ch.new_value)
-                    old_val = json.loads(ch.old_value) if ch.old_value else {}
 
                     # 更新字段属性
                     col.data_type = new_val.get('data_type', col.data_type)
@@ -332,24 +346,25 @@ class SyncEngine:
         stats['tables_touched'] = len(touched_tables)
         return stats
 
-    def _log_changes(self, db, run_log_id: int, changes: List[ChangeRecord]):
-        """记录变更日志"""
-        for ch in changes:
-            log_entry = SchemaChangeLog(
-                run_log_id=run_log_id,
-                job_id=self.job.id,
-                datasource_id=self.datasource.id,
-                target_schema_name=self.job.target_schema_name,
-                change_type=ch.change_type,
-                object_type=ch.object_type,
-                object_name=ch.object_name,
-                old_value=ch.old_value,
-                new_value=ch.new_value,
-                auto_classified_level=getattr(ch, 'auto_classified_level', ''),
-                approval_status='pending' if ch.is_high_risk else 'auto_applied',
-            )
-            db.add(log_entry)
-        db.commit()
+    def _log_changes(self, run_log_id: int, changes: List[ChangeRecord]):
+        """记录变更日志（日志库独立会话）"""
+        with tx_scope(logs=True) as ldb:
+            for ch in changes:
+                log_entry = SchemaChangeLog(
+                    run_log_id=run_log_id,
+                    job_id=self.job.id,
+                    datasource_id=self.datasource.id,
+                    target_schema_name=self.job.target_schema_name,
+                    change_type=ch.change_type,
+                    object_type=ch.object_type,
+                    object_name=ch.object_name,
+                    old_value=ch.old_value,
+                    new_value=ch.new_value,
+                    auto_classified_level=getattr(ch, 'auto_classified_level', ''),
+                    approval_status='pending' if ch.is_high_risk else 'auto_applied',
+                )
+                ldb.add(log_entry)
+            ldb.commit()
 
     def _trigger_index_rebuild(self, schema_name: str):
         """同步后标记向量索引过期（懒重建，不立即全量构建）

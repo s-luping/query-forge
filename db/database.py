@@ -16,12 +16,19 @@ from app.logger import logger
 
 # 从 engine.py 引入引擎与会话工厂（统一导出点）
 from db.engine import (
-    engine_main,
-    engine_telemetry,
+    LogsSessionLocal,
     SessionLocal,
     TelemetrySessionLocal,
+    engine_logs,
+    engine_main,
+    engine_telemetry,
     is_sqlite,
 )
+
+# 统一导出点：db 包从此处转发，供上层统一 import
+__all__ = ['SessionLocal', 'TelemetrySessionLocal', 'LogsSessionLocal',
+           'engine_main', 'engine_telemetry', 'engine_logs',
+           'is_sqlite', 'get_setting', 'init_database']
 
 
 def get_setting(key: str, default: str = '') -> str:
@@ -44,15 +51,12 @@ def init_database():
     流程：
       1. create_all 创建主库表（MainBase）
       2. create_all 创建遥测库表（TelemetryBase）
-         SQLite 模式：遥测库为独立引擎；外部数据库：与主库同引擎
-      3. SQLite 专用：轻量增量迁移（_ensure_column_sqlite）
-      4. 种子数据：系统配置 + 默认管理员 + 角色
+      3. create_all 创建日志库表（LogsBase）
+         SQLite 模式：遥测/日志库为独立引擎；外部数据库：与主库同引擎
+      4. SQLite 专用：轻量增量迁移（_ensure_column_sqlite）+ 日志表归档迁移
+      5. 种子数据：系统配置 + 默认管理员 + 角色
     """
-    from models.base import MainBase, TelemetryBase
-    from models import (
-        user, role, schema, knowledge, conversation,
-        llm, system, vector_index, security, sync, datasource,
-    )  # noqa: F401
+    from models.base import LogsBase, MainBase, TelemetryBase
 
     # 1. 创建表结构
     MainBase.metadata.create_all(engine_main)
@@ -63,7 +67,13 @@ def init_database():
     else:
         TelemetryBase.metadata.create_all(engine_main)
 
-    # 3. SQLite 专用轻量迁移（外部数据库通过 create_all 建全量表，无需迁移）
+    # 3. 日志表：SQLite 独立引擎 / 外部数据库同引擎
+    if engine_logs is not engine_main:
+        LogsBase.metadata.create_all(engine_logs)
+    else:
+        LogsBase.metadata.create_all(engine_main)
+
+    # 4. SQLite 专用轻量迁移（外部数据库通过 create_all 建全量表，无需迁移）
     if is_sqlite:
         from db.sqlite_hooks import _ensure_column_sqlite
         _ensure_column_sqlite(
@@ -94,15 +104,24 @@ def init_database():
             config.MAIN_DB_PATH, 'conversations', 'knowledge_ids', 'TEXT'
         )
         # 高频过滤字段的普通索引（存量库补建；新库由 create_all 一并创建）
-        from db.sqlite_hooks import _ensure_indexes_sqlite, _ensure_telemetry_indexes
+        from db.sqlite_hooks import (
+            _ensure_indexes_sqlite,
+            _ensure_logs_indexes,
+            _ensure_telemetry_indexes,
+        )
         _ensure_indexes_sqlite(config.MAIN_DB_PATH)
         _ensure_telemetry_indexes(config.TELEMETRY_DB_PATH)
+        _ensure_logs_indexes(config.LOGS_DB_PATH)
+        # 存量库归档：主库三张日志表迁入日志库（幂等，已迁过则跳过）
+        from db.sqlite_hooks import _migrate_logs_tables
+        _migrate_logs_tables(config.MAIN_DB_PATH, config.LOGS_DB_PATH)
 
     logger.info("主库表创建/检查完成")
     logger.info("遥测库表创建/检查完成")
+    logger.info("日志库表创建/检查完成")
 
     # 4. 种子数据（所有数据库通用）
-    from db.seed import _seed_system_settings, create_default_admin, _seed_roles
+    from db.seed import _seed_roles, _seed_system_settings, create_default_admin
     _seed_system_settings()
     create_default_admin()
     _seed_roles()
