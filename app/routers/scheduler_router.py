@@ -1,10 +1,11 @@
 """系统定时任务监控与控制接口。"""
-from typing import Optional
 from datetime import datetime, timedelta
+from typing import Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 
 from app.auth import AdminUser
+from app.limiter import LIMIT_READ, LIMIT_WRITE, limiter
 from app.logger import log_audit
 from app.timezone import BEIJING_TZ
 from scheduler.scheduler import scheduler_manager
@@ -44,7 +45,8 @@ def _job_item(job):
 
 
 @router.get('/tasks')
-def list_scheduler_tasks(user: AdminUser):
+@limiter.limit(LIMIT_READ)
+def list_scheduler_tasks(request: Request, user: AdminUser):
     """列出系统 APScheduler 任务。"""
     scheduler = scheduler_manager.scheduler
     return {
@@ -55,7 +57,8 @@ def list_scheduler_tasks(user: AdminUser):
 
 
 @router.post('/tasks/{job_id}/run')
-def run_scheduler_task(job_id: str, user: AdminUser):
+@limiter.limit(LIMIT_WRITE)
+def run_scheduler_task(request: Request, job_id: str, user: AdminUser):
     scheduler = scheduler_manager.scheduler
     if not scheduler.running:
         raise HTTPException(status_code=503, detail='调度器尚未启动')
@@ -75,7 +78,8 @@ def run_scheduler_task(job_id: str, user: AdminUser):
 
 
 @router.post('/tasks/{job_id}/pause')
-def pause_scheduler_task(job_id: str, user: AdminUser):
+@limiter.limit(LIMIT_WRITE)
+def pause_scheduler_task(request: Request, job_id: str, user: AdminUser):
     scheduler = scheduler_manager.scheduler
     if scheduler.get_job(job_id) is None:
         raise HTTPException(status_code=404, detail='定时任务不存在')
@@ -85,7 +89,8 @@ def pause_scheduler_task(job_id: str, user: AdminUser):
 
 
 @router.post('/tasks/{job_id}/resume')
-def resume_scheduler_task(job_id: str, user: AdminUser):
+@limiter.limit(LIMIT_WRITE)
+def resume_scheduler_task(request: Request, job_id: str, user: AdminUser):
     scheduler = scheduler_manager.scheduler
     if scheduler.get_job(job_id) is None:
         raise HTTPException(status_code=404, detail='定时任务不存在')

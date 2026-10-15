@@ -8,17 +8,19 @@
 - api_key 列存 Fernet 密文（app/security/crypto.py），读取时解密。
 """
 from datetime import datetime
-from typing import Optional, List
+from typing import List, Optional
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel
 
 from app.auth import CurrentUser
-from app.logger import logger, log_audit
-from app.crypto import encrypt_secret, decrypt_secret, mask_api_key
+from app.crypto import decrypt_secret, encrypt_secret, mask_api_key
+from app.limiter import LIMIT_READ, LIMIT_TEST, LIMIT_WRITE, limiter
+from app.logger import log_audit, logger
+from app.response import ErrorCode, fail
 from core import LLMClient
-from models.llm import LLMConfig, LLMCall, LLMPrompt
 from crud.base import session_scope
+from models.llm import LLMCall, LLMConfig, LLMPrompt
 
 log_router = APIRouter()
 config_router = APIRouter()
@@ -97,7 +99,8 @@ def _call_to_item(call: LLMCall, prompt_content: Optional[str]) -> LLMLogItem:
 
 
 @log_router.get("/list", response_model=LLMLogListResponse)
-def get_llm_logs(user: CurrentUser,
+@limiter.limit(LIMIT_READ)
+def get_llm_logs(request: Request, user: CurrentUser,
                  limit: int = Query(20, ge=1, le=100), offset: int = Query(0, ge=0),
                  status: Optional[str] = None):
     """获取LLM调用记录列表（管理员看全部，用户看自己）"""
@@ -120,7 +123,8 @@ def get_llm_logs(user: CurrentUser,
 
 
 @log_router.get("/stats", response_model=LLMLogStats)
-def get_llm_stats(user: CurrentUser):
+@limiter.limit(LIMIT_READ)
+def get_llm_stats(request: Request, user: CurrentUser):
     """获取LLM调用统计（管理员看全部，用户看自己）"""
     user_id = user['user_id']; is_admin = user.get('role') == 'admin'
     try:
@@ -155,7 +159,8 @@ def get_llm_stats(user: CurrentUser):
 
 
 @log_router.get("/{log_id}", response_model=LLMLogItem)
-def get_llm_log(log_id: int, user: CurrentUser):
+@limiter.limit(LIMIT_READ)
+def get_llm_log(request: Request, log_id: int, user: CurrentUser):
     """获取单条LLM调用记录"""
     user_id = user['user_id']; is_admin = user.get('role') == 'admin'
     try:
@@ -177,7 +182,8 @@ def get_llm_log(log_id: int, user: CurrentUser):
 
 
 @log_router.delete("/{log_id}")
-def delete_llm_log(log_id: int, user: CurrentUser):
+@limiter.limit(LIMIT_WRITE)
+def delete_llm_log(request: Request, log_id: int, user: CurrentUser):
     """删除单条LLM调用记录"""
     user_id = user['user_id']; is_admin = user.get('role') == 'admin'
     try:
@@ -250,7 +256,8 @@ def _get_editable_config(db, config_id: int, user: dict):
 
 
 @config_router.get("/list", response_model=LLMConfigListResponse)
-def get_configs(user: CurrentUser):
+@limiter.limit(LIMIT_READ)
+def get_configs(request: Request, user: CurrentUser):
     try:
         with session_scope() as db:
             configs = _get_visible_configs(db, user['user_id'])
@@ -270,28 +277,29 @@ def get_configs(user: CurrentUser):
 
 
 @config_router.post("/create")
-def create_config(request: LLMConfigCreate, user: CurrentUser):
+@limiter.limit(LIMIT_WRITE)
+def create_config(request: Request, payload: LLMConfigCreate, user: CurrentUser):
     try:
         user_id = user['user_id']
         with session_scope() as db:
-            if request.is_public and not _is_admin(user):
+            if payload.is_public and not _is_admin(user):
                 raise HTTPException(status_code=403, detail="仅管理员可创建公共配置")
             if db.query(LLMConfig).filter(LLMConfig.user_id == user_id,
-                    LLMConfig.provider == request.provider, LLMConfig.model == request.model).first():
+                    LLMConfig.provider == payload.provider, LLMConfig.model == payload.model).first():
                 raise HTTPException(status_code=400, detail="该供应商+模型已存在配置")
-            if request.is_default:
+            if payload.is_default:
                 db.query(LLMConfig).filter(
                     LLMConfig.user_id == user_id, LLMConfig.is_default == True
                 ).update({'is_default': False})
             config = LLMConfig(
-                user_id=user_id, provider=request.provider, model=request.model,
-                api_key=encrypt_secret(request.api_key), base_url=request.base_url,
-                max_tokens=request.max_tokens, temperature=request.temperature,
-                timeout=request.timeout, is_default=request.is_default,
-                is_public=request.is_public and _is_admin(user), description=request.description)
+                user_id=user_id, provider=payload.provider, model=payload.model,
+                api_key=encrypt_secret(payload.api_key), base_url=payload.base_url,
+                max_tokens=payload.max_tokens, temperature=payload.temperature,
+                timeout=payload.timeout, is_default=payload.is_default,
+                is_public=payload.is_public and _is_admin(user), description=payload.description)
             db.add(config)
             db.flush()   # 立即取回自增 id
-            log_audit(user, "create_config", f"{request.provider}/{request.model}")
+            log_audit(user, "create_config", f"{payload.provider}/{payload.model}")
             return {"message": "配置创建成功", "id": config.id}
     except HTTPException:
         raise
@@ -301,7 +309,8 @@ def create_config(request: LLMConfigCreate, user: CurrentUser):
 
 
 @config_router.put("/{config_id}")
-def update_config(config_id: int, request: LLMConfigUpdate, user: CurrentUser):
+@limiter.limit(LIMIT_WRITE)
+def update_config(request: Request, config_id: int, payload: LLMConfigUpdate, user: CurrentUser):
     try:
         with session_scope() as db:
             config = _get_editable_config(db, config_id, user)
@@ -312,13 +321,13 @@ def update_config(config_id: int, request: LLMConfigUpdate, user: CurrentUser):
                 if val is not None:
                     setattr(config, attr, val)
             # api_key 单独处理：非空才覆盖并加密
-            if request.api_key is not None and request.api_key != '':
-                config.api_key = encrypt_secret(request.api_key)
-            if request.is_active is not None:
-                config.is_active = request.is_active
-            if request.is_public is not None and _is_admin(user):
-                config.is_public = request.is_public
-            if request.is_default:
+            if payload.api_key is not None and payload.api_key != '':
+                config.api_key = encrypt_secret(payload.api_key)
+            if payload.is_active is not None:
+                config.is_active = payload.is_active
+            if payload.is_public is not None and _is_admin(user):
+                config.is_public = payload.is_public
+            if payload.is_default:
                 db.query(LLMConfig).filter(
                     LLMConfig.user_id == config.user_id,
                     LLMConfig.is_default == True, LLMConfig.id != config_id
@@ -334,7 +343,8 @@ def update_config(config_id: int, request: LLMConfigUpdate, user: CurrentUser):
 
 
 @config_router.delete("/{config_id}")
-def delete_config(config_id: int, user: CurrentUser):
+@limiter.limit(LIMIT_WRITE)
+def delete_config(request: Request, config_id: int, user: CurrentUser):
     try:
         with session_scope() as db:
             config = _get_editable_config(db, config_id, user)
@@ -351,27 +361,29 @@ def delete_config(config_id: int, user: CurrentUser):
 
 
 @config_router.post("/test")
-def test_connection(request: TestConnectionRequest, user: CurrentUser):
+@limiter.limit(LIMIT_TEST)
+def test_connection(request: Request, payload: TestConnectionRequest, user: CurrentUser):
     try:
-        api_key = request.api_key; base_url = request.base_url
-        if not api_key and request.config_id:
+        api_key = payload.api_key; base_url = payload.base_url
+        if not api_key and payload.config_id:
             with session_scope() as db:
-                config = _get_editable_config(db, request.config_id, user)
+                config = _get_editable_config(db, payload.config_id, user)
                 if config:
                     api_key = decrypt_secret(config.api_key)
                     base_url = base_url or config.base_url
         if not api_key:
-            return {"success": False, "message": "API密钥未配置"}
-        client = LLMClient(provider=request.provider, api_key=api_key, model=request.model,
-                           base_url=base_url, max_tokens=request.max_tokens or 8000)
+            return fail(ErrorCode.BAD_REQUEST, "API密钥未配置")
+        client = LLMClient(provider=payload.provider, api_key=api_key, model=payload.model,
+                           base_url=base_url, max_tokens=payload.max_tokens or 8000)
         return client.test_connection()
     except Exception as e:
         logger.error(f"测试连接失败: {e}")
-        return {"success": False, "message": f"测试失败: {str(e)}"}
+        return fail(ErrorCode.INTERNAL, f"测试失败: {str(e)}")
 
 
 @config_router.post("/set-default/{config_id}")
-def set_default_config(config_id: int, user: CurrentUser):
+@limiter.limit(LIMIT_WRITE)
+def set_default_config(request: Request, config_id: int, user: CurrentUser):
     try:
         user_id = user['user_id']
         with session_scope() as db:
@@ -393,7 +405,8 @@ def set_default_config(config_id: int, user: CurrentUser):
 
 
 @config_router.get("/default")
-def get_default_config(user: CurrentUser):
+@limiter.limit(LIMIT_READ)
+def get_default_config(request: Request, user: CurrentUser):
     try:
         user_id = user['user_id']
         with session_scope() as db:

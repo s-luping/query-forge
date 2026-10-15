@@ -5,20 +5,20 @@
 - 管理员：用户管理（列表/创建/分配角色/启用禁用/重置密码/删除）
   角色分配走 /api/permission/users/{user_id}/roles（见 permission_router.py）
 """
-from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
 from app.auth import AdminUser, CurrentUser, hash_password, verify_password
-from app.logger import logger, log_audit
-from app.timezone import now_beijing
+from app.limiter import LIMIT_READ, LIMIT_WRITE, limiter
+from app.logger import log_audit, logger
 from app.routers.auth_router import _validate_password_strength
-from models.user import User
-from models.role import Role, UserRole
+from app.timezone import now_beijing
 from crud.base import session_scope
 from crud.user import user_crud
+from models.role import Role, UserRole
+from models.user import User
 
 router = APIRouter()
 
@@ -30,8 +30,10 @@ class ChangePasswordRequest(BaseModel):
 
 
 @router.post("/change-password")
+@limiter.limit(LIMIT_WRITE)
 async def change_password(
-    request: ChangePasswordRequest,
+    payload: ChangePasswordRequest,
+    request: Request,
     current_user: CurrentUser,
 ):
     """修改用户密码"""
@@ -53,16 +55,16 @@ async def change_password(
                 raise HTTPException(status_code=404, detail="用户不存在")
 
             # 验证当前密码（bcrypt；历史明文自动升级）
-            if not verify_password(request.current_password, user.password or ''):
+            if not verify_password(payload.current_password, user.password or ''):
                 logger.warning(f"用户 {username} 当前密码验证失败")
                 raise HTTPException(status_code=400, detail="当前密码不正确")
 
             # 统一强密码策略
-            _validate_password_strength(request.new_password)
+            _validate_password_strength(payload.new_password)
 
             # 更新密码（哈希）+ 刷新 pwd_ts 使所有旧 token 失效
             import time as _time
-            user.password = hash_password(request.new_password)
+            user.password = hash_password(payload.new_password)
             user.pwd_ts = _time.time()
             user.last_login = now_beijing()
 
@@ -80,7 +82,8 @@ async def change_password(
 
 
 @router.get("/profile")
-async def get_user_profile(current_user: CurrentUser):
+@limiter.limit(LIMIT_READ)
+async def get_user_profile(request: Request, current_user: CurrentUser):
     """获取用户基本信息"""
     user_id = current_user['user_id']
 
@@ -132,7 +135,8 @@ def _get_user_or_404(db, user_id: int) -> User:
 
 
 @router.get("/list")
-def list_users(user: AdminUser):
+@limiter.limit(LIMIT_READ)
+def list_users(request: Request, user: AdminUser):
     """管理员：用户列表（全字段，含启用状态/注册/最后登录）"""
     with session_scope() as db:
         users = db.query(User).order_by(User.id.asc()).all()
@@ -147,7 +151,8 @@ def list_users(user: AdminUser):
             "last_login": u.last_login,
         } for u in users]
 @router.post("/create")
-def create_user(req: UserCreateRequest, user: AdminUser):
+@limiter.limit(LIMIT_WRITE)
+def create_user(request: Request, req: UserCreateRequest, user: AdminUser):
     """管理员：创建用户；新用户默认绑定 user 角色。"""
     if len(req.username) < 3:
         raise HTTPException(status_code=400, detail="用户名至少需要3个字符")
@@ -188,7 +193,8 @@ def create_user(req: UserCreateRequest, user: AdminUser):
 
 
 @router.put("/{user_id}")
-def update_user(user_id: int, req: UserUpdateRequest, user: AdminUser):
+@limiter.limit(LIMIT_WRITE)
+def update_user(request: Request, user_id: int, req: UserUpdateRequest, user: AdminUser):
     """管理员：更新用户（当前前端仅用于启用/禁用；角色分配见 permission_router）。"""
     try:
         with session_scope() as db:
@@ -220,7 +226,8 @@ def update_user(user_id: int, req: UserUpdateRequest, user: AdminUser):
 
 
 @router.post("/{user_id}/reset-password")
-def reset_user_password(user_id: int, req: ResetPasswordRequest, user: AdminUser):
+@limiter.limit(LIMIT_WRITE)
+def reset_user_password(request: Request, user_id: int, req: ResetPasswordRequest, user: AdminUser):
     """管理员：重置用户密码（强密码策略；pwd_ts 刷新使该用户所有旧 token 失效）"""
     _validate_password_strength(req.new_password)
 
@@ -241,7 +248,8 @@ def reset_user_password(user_id: int, req: ResetPasswordRequest, user: AdminUser
 
 
 @router.delete("/{user_id}")
-def delete_user(user_id: int, user: AdminUser):
+@limiter.limit(LIMIT_WRITE)
+def delete_user(request: Request, user_id: int, user: AdminUser):
     """管理员：删除用户（含其授权、对话、模型配置、知识等关联数据清理）
 
     安全约束：不能删除自己；不能删除最后一名管理员（建议改为禁用）。
@@ -256,14 +264,13 @@ def delete_user(user_id: int, user: AdminUser):
 
             uid = target.id
             # 清理外键关联（主库开启 FOREIGN KEY，必须先删子表）
-            from models.security import QueryAuditLog
-            from models.role import UserRole
             from models.conversation import Conversation, ConversationMessage
-            from models.llm import LLMConfig
-            from models.knowledge import KnowledgeItem
             from models.datasource import DataSource
-            db.query(UserRole).filter(UserRole.user_id == uid).delete()
-            # 其创建的知识由角色资源权限引用时，一并清理相关授权
+            from models.knowledge import KnowledgeItem
+            from models.llm import LLMConfig
+            from models.role import UserRole
+            from models.security import QueryAuditLog
+            db.query(UserRole).filter(UserRole.user_id == uid).delete()            # 其创建的知识由角色资源权限引用时，一并清理相关授权
             owned_knowledge_ids = [k.id for k in db.query(KnowledgeItem).filter(
                 KnowledgeItem.user_id == uid).all()]
             if owned_knowledge_ids:
@@ -280,13 +287,15 @@ def delete_user(user_id: int, user: AdminUser):
             db.query(Conversation).filter(Conversation.user_id == uid).delete()
             # 私有模型配置
             db.query(LLMConfig).filter(LLMConfig.user_id == uid).delete()
-            # 审计日志（保留管理员删除动作的审计；被删用户的历史查询记录一并清除）
-            db.query(QueryAuditLog).filter(QueryAuditLog.user_id == uid).delete()
             # 数据源创建者置空
             db.query(DataSource).filter(DataSource.created_by == uid).update(
                 {DataSource.created_by: None})
 
             db.delete(target)
+        # 审计日志在日志库（跨库无外键，主库事务提交后单独清理；
+        # 保留管理员删除动作的审计，被删用户的历史查询记录一并清除）
+        with session_scope(logs=True) as ldb:
+            ldb.query(QueryAuditLog).filter(QueryAuditLog.user_id == uid).delete()
         log_audit(user, "delete_user", f"target={target.username} user_id={uid}")
         logger.info(f"管理员 {user['username']} 删除用户: {target.username}")
         return {"message": f"用户 {target.username} 已删除"}

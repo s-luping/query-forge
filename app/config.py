@@ -33,10 +33,15 @@ DATABASE_URL = ''
 # 遥测库连接串：留空时 SQLite 模式用独立文件，外部数据库模式与主库同址
 # 如需独立遥测库，填入对应的连接串
 TELEMETRY_DATABASE_URL = ''
+# 日志库连接串：留空时 SQLite 模式用独立文件，外部数据库模式与主库同址
+# 日志库存放 query_audit_logs / sync_run_logs / schema_change_logs 三张
+# 追加型高频写表，与主库（配置/元数据/业务数据）物理隔离
+LOGS_DATABASE_URL = ''
 
 # SQLite 默认路径（仅在 DATABASE_URL 留空时使用）
 MAIN_DB_PATH = os.path.join(DB_DIR, 'queryforge.db')
 TELEMETRY_DB_PATH = os.path.join(DB_DIR, 'llm_telemetry.db')
+LOGS_DB_PATH = os.path.join(DB_DIR, 'logs.db')
 
 # ── 数据库连接池（SQLAlchemy QueuePool 复用，减少建连/断连开销） ──
 DB_POOL_SIZE = 10
@@ -48,7 +53,11 @@ DB_ECHO = False
 # ── 运行配置 ───────────────────────────────────────────────
 HOST = '0.0.0.0'
 PORT = 8888
-DEBUG = False
+DEBUG = True
+
+# ── 可观测性（纲领 §4.1：traceId 串前后端，慢接口/慢SQL可观测） ──
+SLOW_REQUEST_MS = 1000   # 接口耗时超过该阈值记 [SLOW] WARNING
+SLOW_SQL_MS = 500        # SQL 语句耗时超过该阈值记 [SLOW SQL] WARNING
 
 # ── 系统设置初始值（首次启动写入 system_settings 表；运行期数据库优先） ──
 ACCESS_TOKEN_EXPIRE_MINUTES = 4320          # 登录令牌有效期（分钟），auth 分类可改
