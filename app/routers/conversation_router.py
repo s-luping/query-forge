@@ -72,6 +72,7 @@ class MessageItem(BaseModel):
     error_message: Optional[str]
     columns: Optional[list]
     query_result: Optional[dict] = None
+    llm_info: Optional[dict] = None
     created_at: str
 
 
@@ -193,6 +194,48 @@ def _build_llm_client(user_id: int, llm_config_id: Optional[int] = None) -> LLMC
     return llm_client
 
 
+def _llm_info_from_result(llm_client: "LLMClient", result: dict) -> dict:
+    """从生成结果组装 llm_info（模型/耗时/Token），供前端消息气泡展示"""
+    tokens = result.get('tokens', {}) or {}
+    return {
+        'provider': getattr(llm_client, 'provider', '') or '',
+        'model': getattr(llm_client, 'model', '') or '',
+        'duration_ms': result.get('duration_ms', 0) or 0,
+        'prompt_tokens': tokens.get('prompt_tokens', 0),
+        'completion_tokens': tokens.get('completion_tokens', 0),
+        'reasoning_tokens': tokens.get('reasoning_tokens', 0),
+        'total_tokens': tokens.get('total_tokens', 0),
+    }
+
+
+def _get_llm_infos_by_call_ids(call_ids: List[int]) -> dict:
+    """按 llm_call_id 批量查遥测调用明细，返回 {call_id: llm_info}
+
+    历史消息的模型/耗时/Token 存在遥测库（跨库），此处一次性取回避免 N+1。
+    """
+    ids = [cid for cid in call_ids if cid]
+    if not ids:
+        return {}
+    from models.llm import LLMCall
+    try:
+        with session_scope(telemetry=True) as db:
+            rows = db.query(LLMCall).filter(LLMCall.id.in_(ids)).all()
+            return {
+                r.id: {
+                    'provider': r.provider or '',
+                    'model': r.model or '',
+                    'duration_ms': r.duration_ms or 0,
+                    'prompt_tokens': r.prompt_tokens or 0,
+                    'completion_tokens': r.completion_tokens or 0,
+                    'reasoning_tokens': r.reasoning_tokens or 0,
+                    'total_tokens': r.total_tokens or 0,
+                } for r in rows
+            }
+    except Exception as e:
+        logger.warning(f"[conversation_router] 查询遥测调用明细失败: {e}")
+        return {}
+
+
 def _safe_parse_columns(raw) -> Optional[list]:
     """安全解析 columns JSON，兼容历史脏数据"""
     if not raw:
@@ -267,6 +310,7 @@ def _record_telemetry(user_id: int, llm_client: LLMClient, question: str,
         duration_ms=result.get('duration_ms', 0),
         prompt_tokens=tokens.get('prompt_tokens', 0),
         completion_tokens=tokens.get('completion_tokens', 0),
+        reasoning_tokens=tokens.get('reasoning_tokens', 0),
         total_tokens=tokens.get('total_tokens', 0),
         status='success' if result.get('is_valid') else 'warning',
         error_message=result.get('error_message') if not result.get('is_valid') else None,
@@ -472,6 +516,7 @@ def create_conversation(
                 "columns": result.get('columns'),
                 "raw_response": result.get('raw_response', ''),
                 "tokens": result.get('tokens', {}),
+                "llm_info": _llm_info_from_result(llm_client, result),
                 "query_result": query_result,
                 "need_more_info": result.get('need_more_info', False),
                 "missing_info": result.get('missing_info'),
@@ -716,6 +761,7 @@ def send_message(
                 "columns": result.get('columns'),
                 "raw_response": result.get('raw_response', ''),
                 "tokens": result.get('tokens', {}),
+                "llm_info": _llm_info_from_result(llm_client, result),
                 "query_result": query_result,
                 "need_more_info": result.get('need_more_info', False),
                 "missing_info": result.get('missing_info'),
@@ -797,7 +843,11 @@ def get_messages(
         messages = db.query(ConversationMessage).filter(
             ConversationMessage.conversation_id == conversation_id
         ).order_by(ConversationMessage.created_at.asc()).all()
-    
+
+        # 批量取回 assistant 消息关联的遥测明细（模型/耗时/Token）
+        call_map = _get_llm_infos_by_call_ids(
+            [m.llm_call_id for m in messages if m.role == 'assistant'])
+
         return [
             MessageItem(
                 id=msg.id,
@@ -808,6 +858,7 @@ def get_messages(
                 error_message=msg.error_message,
                 columns=_safe_parse_columns(msg.columns),
                 query_result=_safe_parse_result(msg.result_data),
+                llm_info=call_map.get(msg.llm_call_id) if msg.role == 'assistant' else None,
                 created_at=msg.created_at.isoformat() if msg.created_at else ""
             )
             for msg in messages

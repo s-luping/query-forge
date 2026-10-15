@@ -20,6 +20,7 @@ CREATE TABLE llm_calls (
 	duration_ms FLOAT, 
 	prompt_tokens INTEGER, 
 	completion_tokens INTEGER, 
+	reasoning_tokens INTEGER, 
 	total_tokens INTEGER, 
 	cost FLOAT, 
 	status VARCHAR(20), 

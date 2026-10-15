@@ -108,6 +108,7 @@ class LLMCall(TelemetryBase):
     duration_ms = Column(Float, comment='耗时(毫秒)')
     prompt_tokens = Column(Integer, default=0, comment='输入Token')
     completion_tokens = Column(Integer, default=0, comment='输出Token')
+    reasoning_tokens = Column(Integer, default=0, comment='输出中的思考Token(深度思考模型)')
     total_tokens = Column(Integer, default=0, comment='总Token')
     cost = Column(Float, default=0.0, comment='调用成本')
     status = Column(String(20), default='success', index=True, comment='状态(success/warning/error)')

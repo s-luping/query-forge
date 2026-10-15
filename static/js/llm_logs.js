@@ -138,12 +138,11 @@
                 tr.appendChild(tdDur);
 
                 const tdTokens = document.createElement('td');
+                let tip = `总 ${item.total_tokens || 0} / 输入 ${item.prompt_tokens || 0} / 输出 ${item.completion_tokens || 0}`;
+                if (item.reasoning_tokens) tip += `（含思考 ${item.reasoning_tokens}）`;
+                tdTokens.title = tip;
                 const smallTokens = document.createElement('small');
-                smallTokens.textContent = String(item.total_tokens || 0);
-                const spanTokens = document.createElement('span');
-                spanTokens.className = 'text-muted';
-                spanTokens.textContent = `(${item.prompt_tokens || 0}/${item.completion_tokens || 0})`;
-                smallTokens.appendChild(spanTokens);
+                smallTokens.textContent = `${item.total_tokens || 0} (${item.prompt_tokens || 0}/${item.completion_tokens || 0})`;
                 tdTokens.appendChild(smallTokens);
                 tr.appendChild(tdTokens);
 
@@ -291,7 +290,7 @@
                         </div>
                         <div class="col-md-2 detail-item">
                             <div class="detail-label">输出Token</div>
-                            <div class="detail-value">${item.completion_tokens || 0}</div>
+                            <div class="detail-value">${item.completion_tokens || 0}${item.reasoning_tokens ? `<br><small class="text-muted">含思考 ${item.reasoning_tokens}</small>` : ''}</div>
                         </div>
                         <div class="col-md-2 detail-item">
                             <div class="detail-label">总Token</div>

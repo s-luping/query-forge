@@ -243,6 +243,7 @@ class ChatSession:
                 "tokens": {
                     "prompt_tokens": jt.get('prompt_tokens', 0),
                     "completion_tokens": jt.get('completion_tokens', 0),
+                    "reasoning_tokens": jt.get('reasoning_tokens', 0),
                     "total_tokens": jt.get('total_tokens', 0),
                 },
             }
@@ -295,6 +296,7 @@ class ChatSession:
             "tokens": {
                 "prompt_tokens": llm_result.get("prompt_tokens", 0),
                 "completion_tokens": llm_result.get("completion_tokens", 0),
+                "reasoning_tokens": llm_result.get("reasoning_tokens", 0),
                 "total_tokens": llm_result.get("total_tokens", 0)
             }
         }
@@ -535,6 +537,7 @@ class ChatSession:
                 "tokens": {
                     "prompt_tokens": jt.get('prompt_tokens', 0),
                     "completion_tokens": jt.get('completion_tokens', 0),
+                    "reasoning_tokens": jt.get('reasoning_tokens', 0),
                     "total_tokens": jt.get('total_tokens', 0),
                 },
             }
@@ -587,6 +590,7 @@ class ChatSession:
             "tokens": {
                 "prompt_tokens": llm_result.get("prompt_tokens", 0),
                 "completion_tokens": llm_result.get("completion_tokens", 0),
+                "reasoning_tokens": llm_result.get("reasoning_tokens", 0),
                 "total_tokens": llm_result.get("total_tokens", 0)
             }
         }
