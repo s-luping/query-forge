@@ -5,13 +5,13 @@
 第一轮走完整召回流水线（委托 core.retrieval.SchemaRetriever），
 后续轮次直接复用对话历史 + 首轮已确定的 schema 上下文。
 """
-from typing import Optional, List
+from typing import Dict, List, Optional
 
 from app.logger import logger
 from app.timezone import now_beijing
-from core.llm_client import LLMClient
-from core.gen_sql import SqlGenerator
 from core.gen_audit import write_query_audit_log
+from core.gen_sql import SqlGenerator
+from core.llm_client import LLMClient
 from core.ret_keywords import KeywordExtractor
 from core.ret_retriever import SchemaRetriever
 
@@ -597,8 +597,12 @@ class ChatSession:
                               schema_name: Optional[str]):
         """记录权限裁剪统计：库级可见性 / 表级白名单 / 字段级访问分布"""
         from collections import Counter
-        from app.permissions import (get_visible_schema_ids, get_table_grants_by_schema,
-                                     get_column_access_map)
+
+        from app.permissions import (
+            get_column_access_map,
+            get_table_grants_by_schema,
+            get_visible_schema_ids,
+        )
         try:
             visible = get_visible_schema_ids(self.user)
             table_grants = get_table_grants_by_schema(self.user)

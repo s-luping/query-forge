@@ -16,10 +16,14 @@ from typing import Dict, List, Optional, Tuple
 import sqlglot
 from sqlglot import exp
 
-from models.schema import DbColumn, DbTable, DbSchema
+from app.permissions import (
+    get_column_access_map,
+    get_row_scope_rules,
+    get_table_grants_by_schema,
+    is_admin,
+)
 from crud.base import session_scope
-from app.permissions import (is_admin, get_column_access_map, get_row_scope_rules,
-                             get_table_grants_by_schema)
+from models.schema import DbColumn, DbSchema, DbTable
 
 logger = logging.getLogger(__name__)
 
