@@ -210,6 +210,23 @@ body {
     color: #dc3545;
 }
 
+/* 助手消息元信息行：模型 · 耗时 · Token */
+.msg-llm-meta {
+    margin-top: 8px;
+    padding-top: 6px;
+    border-top: 1px dashed #e8e8e8;
+    font-size: 11px;
+    color: #8a94a6;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    align-items: center;
+}
+.msg-llm-meta i {
+    font-style: normal;
+    color: #c8cdd6;
+}
+
 /* ── Input Area ───────────────────────── */
 .chat-input-area {
     border-top: 1px solid #e0e0e0;

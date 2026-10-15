@@ -134,6 +134,105 @@ class LLMClient:
             end = len(text)
         return text[start:end].strip()
 
+    # ── 多厂商响应适配 ──────────────────────────────────────────
+    # 三派 usage 格式（2026 现状）：
+    #   1. OpenAI 兼容派（GPT chat completions / DeepSeek / 智谱 GLM /
+    #      豆包-火山方舟 / 通义千问百炼 / 腾讯混元）:
+    #        usage.prompt_tokens / completion_tokens / total_tokens
+    #        思考明细 usage.completion_tokens_details.reasoning_tokens（已含在 completion 内）
+    #   2. OpenAI Responses/新版字段: usage.input_tokens / output_tokens /
+    #        output_tokens_details.reasoning_tokens（部分网关只透传新字段）
+    #   3. Anthropic Claude 原生: usage.input_tokens / output_tokens
+    #   4. Gemini 原生: usageMetadata.promptTokenCount / candidatesTokenCount /
+    #        totalTokenCount / thoughtsTokenCount（thoughts 不含在 candidates 内）
+    # 实际请求统一走 OpenAI 兼容 /chat/completions；第 3/4 派主要来自
+    # 厂商原生形状或 one-api 等网关的透传差异，此处按字段名兜底识别。
+
+    @staticmethod
+    def _pick_int(d: dict, *keys) -> int:
+        """按优先级从 dict 取第一个非负整数字段"""
+        for k in keys:
+            v = d.get(k)
+            if isinstance(v, (int, float)) and v > 0:
+                return int(v)
+        return 0
+
+    @classmethod
+    def _normalize_usage(cls, result: dict) -> dict:
+        """把各厂商 usage 统一为 prompt/completion/reasoning/total 四项。
+
+        语义约定：completion 为"输出总消耗（含思考）"，reasoning 是其中
+        思考部分的明细（OpenAI/豆包/DeepSeek 原生已含在 completion 内，
+        Gemini 的 thoughtsTokenCount 需手动并入）。total 缺失时按入+出补齐。
+        """
+        usage = result.get('usage') or {}
+        if not isinstance(usage, dict):
+            usage = {}
+        if not usage:
+            usage = result.get('usageMetadata') or {}
+        if not isinstance(usage, dict):
+            usage = {}
+
+        prompt = cls._pick_int(usage, 'prompt_tokens', 'input_tokens', 'promptTokenCount')
+
+        details = usage.get('completion_tokens_details') or {}
+        out_details = usage.get('output_tokens_details') or {}
+        if not isinstance(details, dict):
+            details = {}
+        if not isinstance(out_details, dict):
+            out_details = {}
+
+        if 'candidatesTokenCount' in usage or 'promptTokenCount' in usage:
+            # Gemini 原生：思考 token 单列，需并入输出总数
+            reasoning = cls._pick_int(usage, 'thoughtsTokenCount')
+            completion = cls._pick_int(usage, 'candidatesTokenCount') + reasoning
+        else:
+            reasoning = cls._pick_int(details, 'reasoning_tokens') \
+                or cls._pick_int(out_details, 'reasoning_tokens') \
+                or cls._pick_int(usage, 'reasoning_tokens')
+            completion = cls._pick_int(
+                usage, 'completion_tokens', 'output_tokens', 'candidatesTokenCount')
+
+        total = cls._pick_int(usage, 'total_tokens', 'totalTokenCount') \
+            or (prompt + completion)
+        return {
+            'prompt_tokens': prompt,
+            'completion_tokens': completion,
+            'reasoning_tokens': reasoning,
+            'total_tokens': total,
+        }
+
+    @staticmethod
+    def _extract_content(result: dict) -> str:
+        """按响应形状提取文本：
+        OpenAI 兼容: choices[0].message.content（或旧版 choices[0].text）
+        Claude 原生: content[{type:'text', text:...}]
+        Gemini 原生: candidates[0].content.parts[{text:...}]
+        """
+        try:
+            choices = result.get('choices')
+            if isinstance(choices, list) and choices:
+                first = choices[0] or {}
+                msg = first.get('message') or {}
+                content = msg.get('content')
+                if content is not None:
+                    return str(content).strip()
+                if first.get('text') is not None:
+                    return str(first['text']).strip()
+            blocks = result.get('content')
+            if isinstance(blocks, list) and blocks:
+                texts = [b.get('text', '') for b in blocks
+                         if isinstance(b, dict) and b.get('type') == 'text']
+                return '\n'.join(t for t in texts if t).strip()
+            candidates = result.get('candidates')
+            if isinstance(candidates, list) and candidates:
+                parts = ((candidates[0] or {}).get('content') or {}).get('parts') or []
+                texts = [p.get('text', '') for p in parts if isinstance(p, dict)]
+                return '\n'.join(t for t in texts if t).strip()
+        except Exception:
+            pass
+        return ''
+
     def call_real_llm_api(self, prompt: str) -> str:
         """调用大模型API，返回SQL"""
         result = self.call_llm_with_details(prompt)
@@ -170,6 +269,7 @@ class LLMClient:
         tokens_meta = {
             'prompt_tokens': result.get('prompt_tokens', 0),
             'completion_tokens': result.get('completion_tokens', 0),
+            'reasoning_tokens': result.get('reasoning_tokens', 0),
             'total_tokens': result.get('total_tokens', 0),
         }
         if start != -1 and end != -1 and end > start:
@@ -235,23 +335,25 @@ class LLMClient:
             raise ValueError(error_msg)
 
         result = response.json()
-        if 'choices' not in result or not result['choices']:
-            error_msg = f"API响应缺少choices字段: {result}"
+        raw_sql = self._extract_content(result)
+        if not raw_sql:
+            error_msg = f"API响应中未找到文本内容: {str(result)[:500]}"
             llm_logger.error(f"【响应异常】{error_msg}")
             raise ValueError(error_msg)
 
-        raw_sql = result['choices'][0]['message']['content'].strip()
         sql = self._extract_sql(raw_sql)
 
         elapsed_time = time.time() - start_time
 
-        prompt_tokens = result.get('usage', {}).get('prompt_tokens', 0)
-        completion_tokens = result.get('usage', {}).get('completion_tokens', 0)
-        total_tokens = result.get('usage', {}).get('total_tokens', 0)
+        tokens = self._normalize_usage(result)
+        prompt_tokens = tokens['prompt_tokens']
+        completion_tokens = tokens['completion_tokens']
+        reasoning_tokens = tokens['reasoning_tokens']
+        total_tokens = tokens['total_tokens']
 
         llm_logger.info(f"【响应内容】\n{raw_sql}")
         llm_logger.info(f"【提取SQL】\n{sql}")
-        llm_logger.info(f"【Token消耗】输入: {prompt_tokens}, 输出: {completion_tokens}, 总计: {total_tokens}")
+        llm_logger.info(f"【Token消耗】输入: {prompt_tokens}, 输出: {completion_tokens}（含思考 {reasoning_tokens}）, 总计: {total_tokens}")
         llm_logger.info(f"【耗时】{elapsed_time:.2f}秒")
 
         return {
@@ -260,9 +362,7 @@ class LLMClient:
             'provider': self.provider,
             'model': self.model,
             'duration_ms': round(elapsed_time * 1000, 2),
-            'prompt_tokens': prompt_tokens,
-            'completion_tokens': completion_tokens,
-            'total_tokens': total_tokens
+            **tokens
         }
 
     def chat(self, messages: list, max_tokens: Optional[int] = None,
@@ -316,23 +416,25 @@ class LLMClient:
             raise ValueError(error_msg)
 
         result = response.json()
-        if 'choices' not in result or not result['choices']:
-            error_msg = f"API响应缺少choices字段: {result}"
+        raw_sql = self._extract_content(result)
+        if not raw_sql:
+            error_msg = f"API响应中未找到文本内容: {str(result)[:500]}"
             llm_logger.error(f"【多轮对话响应异常】{error_msg}")
             raise ValueError(error_msg)
 
-        raw_sql = result['choices'][0]['message']['content'].strip()
         sql = self._extract_sql(raw_sql)
 
         elapsed_time = time.time() - start_time
 
-        prompt_tokens = result.get('usage', {}).get('prompt_tokens', 0)
-        completion_tokens = result.get('usage', {}).get('completion_tokens', 0)
-        total_tokens = result.get('usage', {}).get('total_tokens', 0)
+        tokens = self._normalize_usage(result)
+        prompt_tokens = tokens['prompt_tokens']
+        completion_tokens = tokens['completion_tokens']
+        reasoning_tokens = tokens['reasoning_tokens']
+        total_tokens = tokens['total_tokens']
 
         llm_logger.info(f"【多轮对话响应】\n{raw_sql}")
         llm_logger.info(f"【提取SQL】\n{sql}")
-        llm_logger.info(f"【Token消耗】输入: {prompt_tokens}, 输出: {completion_tokens}, 总计: {total_tokens}")
+        llm_logger.info(f"【Token消耗】输入: {prompt_tokens}, 输出: {completion_tokens}（含思考 {reasoning_tokens}）, 总计: {total_tokens}")
         llm_logger.info(f"【耗时】{elapsed_time:.2f}秒")
 
         return {
@@ -341,9 +443,7 @@ class LLMClient:
             'provider': self.provider,
             'model': self.model,
             'duration_ms': round(elapsed_time * 1000, 2),
-            'prompt_tokens': prompt_tokens,
-            'completion_tokens': completion_tokens,
-            'total_tokens': total_tokens
+            **tokens
         }
 
     def test_connection(self) -> dict:

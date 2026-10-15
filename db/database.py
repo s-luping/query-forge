@@ -103,6 +103,10 @@ def init_database():
         _ensure_column_sqlite(
             config.MAIN_DB_PATH, 'conversations', 'knowledge_ids', 'TEXT'
         )
+        # 存量遥测库补列：深度思考模型的输出 Token 明细
+        _ensure_column_sqlite(
+            config.TELEMETRY_DB_PATH, 'llm_calls', 'reasoning_tokens', 'INTEGER'
+        )
         # 高频过滤字段的普通索引（存量库补建；新库由 create_all 一并创建）
         from db.sqlite_hooks import (
             _ensure_indexes_sqlite,

@@ -149,6 +149,27 @@ async function deleteConv(id) {
 }
 
 // ── Messages ───────────────────────────────────────────────
+// 助手消息元信息行：模型 · 耗时 · Token（info 结构见后端 llm_info）
+function llmMetaHtml(info) {
+    if (!info || (!info.model && !info.total_tokens && !info.duration_ms)) return '';
+    const parts = [];
+    if (info.model) parts.push(`模型 ${escapeHtml(info.model)}`);
+    if (info.duration_ms != null && info.duration_ms > 0) {
+        const sec = info.duration_ms / 1000;
+        parts.push(`耗时 ${sec >= 100 ? Math.round(sec) : sec.toFixed(1)}s`);
+    }
+    if (info.total_tokens) {
+        let tk = `Token ${info.total_tokens}`;
+        if (info.prompt_tokens || info.completion_tokens) {
+            tk += `（入 ${info.prompt_tokens || 0} / 出 ${info.completion_tokens || 0}`;
+            if (info.reasoning_tokens) tk += `，含思考 ${info.reasoning_tokens}`;
+            tk += '）';
+        }
+        parts.push(tk);
+    }
+    return `<div class="msg-llm-meta">${parts.map(p => `<span>${p}</span>`).join('<i>·</i>')}</div>`;
+}
+
 function renderMessage(msg) {
     const container = document.getElementById('chatMessages');
 
@@ -204,6 +225,7 @@ function renderMessage(msg) {
         }
 
         html += '</div>';
+        html += llmMetaHtml(msg.llm_info);
         row.innerHTML = html;
         container.appendChild(row);
     }
@@ -283,7 +305,8 @@ async function sendMsg() {
             is_valid: data.assistant_message.is_valid,
             error_message: data.assistant_message.error_message,
             columns: data.assistant_message.columns,
-            query_result: data.assistant_message.query_result
+            query_result: data.assistant_message.query_result,
+            llm_info: data.assistant_message.llm_info
         });
 
         loadConvList(); // refresh sidebar
@@ -411,7 +434,8 @@ async function createConv() {
             is_valid: data.message.is_valid,
             error_message: data.message.error_message,
             columns: data.message.columns,
-            query_result: data.message.query_result
+            query_result: data.message.query_result,
+            llm_info: data.message.llm_info
         });
 
         loadConvList();

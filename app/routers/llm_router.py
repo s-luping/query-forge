@@ -51,6 +51,7 @@ class LLMLogItem(BaseModel):
     duration_ms: Optional[float]
     prompt_tokens: Optional[int]
     completion_tokens: Optional[int]
+    reasoning_tokens: Optional[int] = 0
     total_tokens: Optional[int]
     cost: Optional[float] = None
     status: Optional[str]
@@ -90,6 +91,7 @@ def _call_to_item(call: LLMCall, prompt_content: Optional[str]) -> LLMLogItem:
         duration_ms=call.duration_ms,
         prompt_tokens=call.prompt_tokens,
         completion_tokens=call.completion_tokens,
+        reasoning_tokens=call.reasoning_tokens,
         total_tokens=call.total_tokens,
         cost=call.cost,
         status=call.status,
