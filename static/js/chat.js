@@ -253,14 +253,19 @@ async function sendMsg() {
         // 后端还会把会话知识库清空（[] 非 None 会被持久化）。
         const llmVal = document.getElementById('chatLlmConfig').value || null;
         const kbIds = getSelectedKbIds();
+        // 兜底超时：与建对话路径一致，防止后端长生成时前端无限等待
+        const timeoutCtrl = new AbortController();
+        const timer = setTimeout(() => timeoutCtrl.abort(), GEN_TIMEOUT_MS);
         const resp = await apiRequest(`/api/conversation/${currentConvId}/messages`, {
             method: 'POST',
+            signal: timeoutCtrl.signal,
             body: JSON.stringify({
                 content,
                 llm_config_id: llmVal ? parseInt(llmVal) : null,
                 knowledge_ids: kbIds.map(id => parseInt(id))
             })
         });
+        clearTimeout(timer);
         if (!resp.ok) throw new Error((await resp.json()).detail || '请求失败');
 
         // 发送成功后把本次选择写回记忆（切走再切回可恢复最新选择）
@@ -284,11 +289,12 @@ async function sendMsg() {
         loadConvList(); // refresh sidebar
     } catch (e) {
         document.getElementById('loadingMsg')?.remove();
+        const isTimeout = (e && e.name === 'AbortError');
         renderMessage({
             role: 'assistant',
             sql: '',
             is_valid: false,
-            error_message: '发送失败: ' + e.message
+            error_message: isTimeout ? `生成超时（${GEN_TIMEOUT_MS / 60000}分钟），请重试` : ('发送失败: ' + e.message)
         });
     }
 
@@ -300,6 +306,12 @@ async function sendMsg() {
 
 // ── New Conversation ───────────────────────────────────────
 let _convSubmitting = false;
+
+// 生成类请求的前端兜底超时（毫秒）：
+// 后端首条消息链路 = 可行性判断 + SQL 生成 共两次 LLM 调用（每次各受
+// LLM 配置 timeout 约束，默认 300s）+ SQL 执行时间，最坏 ≈ 2×timeout + SQL。
+// 660s 覆盖默认配置的最坏情况；此前 60s 会过早掐断正常生成（报"生成超时（60秒）"）。
+const GEN_TIMEOUT_MS = 660000;
 
 function showNewConvModal() {
     resetNewConvForm();
@@ -356,9 +368,9 @@ async function createConv() {
     scrollToBottom();
 
     try {
-        // 60 秒超时兜底（含模型加载 + LLM 调用 + 查询执行）
+        // 兜底超时见 GEN_TIMEOUT_MS 注释（勿改回 60s）
         const timeoutCtrl = new AbortController();
-        const timer = setTimeout(() => timeoutCtrl.abort(), 60000);
+        const timer = setTimeout(() => timeoutCtrl.abort(), GEN_TIMEOUT_MS);
         const resp = await fetch('/api/conversation', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -411,7 +423,7 @@ async function createConv() {
             role: 'assistant',
             sql: '',
             is_valid: false,
-            error_message: isTimeout ? '生成超时（60秒），请重试' : ('创建对话失败: ' + e.message)
+            error_message: isTimeout ? `生成超时（${GEN_TIMEOUT_MS / 60000}分钟），请重试` : ('创建对话失败: ' + e.message)
         });
         document.getElementById('chatHeader').textContent = '生成失败 — 连续对话';
     } finally {
