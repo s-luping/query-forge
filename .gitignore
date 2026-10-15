@@ -1,20 +1,86 @@
-__pycache__
-.idea
-.vscode
-.venv
-*.zip
-/logs
+# ============================================================
+# query-forge .gitignore（按类别分组，新增规则见各分组）
+# ============================================================
+
+# ---------- Python 字节码 / 打包 ----------
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# ---------- 虚拟环境 ----------
+.venv/
+venv/
+ENV/
+
+# ---------- IDE ----------
+.idea/
+.vscode/
+
+# ---------- 测试 / 静态检查 / 类型检查缓存 ----------
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.hypothesis/
+
+# ---------- 覆盖率 ----------
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+
+# ---------- SQLite 数据库（主库/telemetry 库 + WAL/SHM  sidecar）----------
 *.db
 *.db-shm
 *.db-wal
-*.jsonl
+*.sqlite
+*.sqlite3
+
+# ---------- 日志 ----------
+/logs/
+*.log
+
+# ---------- 运行时产物 / 临时文件 ----------
+db/temp/
+db/vectors/
+models/embeddings/
+/scripts/temp/
+.ddl_check/
+tmp/
+temp/
+*.tmp
+*.bak
+*.old
+*.orig
+*.rej
+
+# ---------- 归档 ----------
+*.zip
+
+# ---------- 敏感配置与密钥（.env.example 除外）----------
 .env
+.env.*
+!.env.example
 .runtime_secrets
-.workbuddy
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa
+id_rsa.pub
 
+# ---------- 对话/调试记录 ----------
+*.jsonl
 
-db/temp
-db/vectors
-models/embeddings
+# ---------- 系统垃圾 ----------
+.DS_Store
+Thumbs.db
+desktop.ini
 
-/scripts/temp
+# ---------- 前端依赖（备用）----------
+node_modules/
+
+# ---------- WorkBuddy 本地数据 ----------
+.workbuddy/
