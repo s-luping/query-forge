@@ -50,3 +50,8 @@ torch==2.6.0
 sentence-transformers>=3.0.0,<4.0.0
 # 模型下载脚本（download_model.py）
 modelscope>=1.15.0
+
+# --- 开发/CI 工具（纲领 §2：提交前过 lint/test；§6.3 反模式守卫）---
+ruff>=0.6.0
+pytest>=8.0.0
+pre-commit>=3.5.0
