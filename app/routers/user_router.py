@@ -237,8 +237,10 @@ def reset_user_password(request: Request, user_id: int, req: ResetPasswordReques
             target = _get_user_or_404(db, user_id)
             target.password = hash_password(req.new_password)
             target.pwd_ts = _time.time()
-        logger.info(f"管理员 {user['username']} 重置用户密码: {target.username}")
-        log_audit(user, "reset_password", f"target={target.username}")
+            # 会话关闭后 target 已过期+脱离，日志要用的属性先取出
+            target_username = target.username
+        logger.info(f"管理员 {user['username']} 重置用户密码: {target_username}")
+        log_audit(user, "reset_password", f"target={target_username}")
         return {"message": "密码已重置，该用户旧登录状态已全部失效"}
     except HTTPException:
         raise
@@ -292,13 +294,15 @@ def delete_user(request: Request, user_id: int, user: AdminUser):
                 {DataSource.created_by: None})
 
             db.delete(target)
+            # 会话关闭后 target 已过期+脱离，日志要用的属性先取出
+            target_username = target.username
         # 审计日志在日志库（跨库无外键，主库事务提交后单独清理；
         # 保留管理员删除动作的审计，被删用户的历史查询记录一并清除）
         with session_scope(logs=True) as ldb:
             ldb.query(QueryAuditLog).filter(QueryAuditLog.user_id == uid).delete()
-        log_audit(user, "delete_user", f"target={target.username} user_id={uid}")
-        logger.info(f"管理员 {user['username']} 删除用户: {target.username}")
-        return {"message": f"用户 {target.username} 已删除"}
+        log_audit(user, "delete_user", f"target={target_username} user_id={uid}")
+        logger.info(f"管理员 {user['username']} 删除用户: {target_username}")
+        return {"message": f"用户 {target_username} 已删除"}
     except HTTPException:
         raise
     except Exception as e:

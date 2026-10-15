@@ -77,9 +77,13 @@ class ColumnCrud(BaseCrud):
         if not table_ids:
             return []
         with session_scope() as db:
-            return (db.query(DbColumn)
+            rows = (db.query(DbColumn)
                     .filter(DbColumn.table_id.in_(table_ids))
                     .order_by(DbColumn.ordinal).all())
+            # expunge 后再返回，避免会话外访问过期属性触发 DetachedInstanceError
+            for r in rows:
+                db.expunge(r)
+            return rows
 
     def get_by_table_and_name(self, table_id: int, name: str) -> Optional[DbColumn]:
         return self.get_one(table_id=table_id, name=name)

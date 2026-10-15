@@ -20,12 +20,17 @@ class LLMConfigCrud(BaseCrud):
         """取用户可用配置（公开配置 或 本人配置）"""
         from sqlalchemy import or_
         with session_scope() as db:
-            return (db.query(LLMConfig)
-                    .filter(LLMConfig.id == config_id,
-                            LLMConfig.is_active == True,
-                            or_(LLMConfig.is_public == True,
-                                LLMConfig.user_id == user_id))
-                    .first())
+            obj = (db.query(LLMConfig)
+                   .filter(LLMConfig.id == config_id,
+                           LLMConfig.is_active == True,
+                           or_(LLMConfig.is_public == True,
+                               LLMConfig.user_id == user_id))
+                   .first())
+            # session_scope 退出会 commit（属性过期）+ close（脱离），
+            # 必须 expunge 后再返回，否则会话外访问属性触发 DetachedInstanceError
+            if obj is not None:
+                db.expunge(obj)
+            return obj
 
     def list_by_user(self, user_id: int) -> List[LLMConfig]:
         return self.list(user_id=user_id, order_by='created_at', desc=True)
@@ -36,10 +41,14 @@ class LLMConfigCrud(BaseCrud):
             return self.list_all(order_by='created_at', desc=True)
         from sqlalchemy import or_
         with session_scope() as db:
-            return (db.query(LLMConfig)
+            rows = (db.query(LLMConfig)
                     .filter(or_(LLMConfig.user_id == user_id,
                                 LLMConfig.is_public == True))
                     .order_by(LLMConfig.created_at.desc()).all())
+            # expunge 后再返回，避免会话外访问过期属性（同 get_active_for_user）
+            for r in rows:
+                db.expunge(r)
+            return rows
 
 
 class LLMUsageStatCrud(BaseCrud):
