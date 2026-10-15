@@ -2,74 +2,188 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>系统定时任务</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>定时任务中心</title>
     <link rel="stylesheet" href="/static/css/bootstrap.min.css">
+    <link rel="stylesheet" href="/static/css/all.min.css">
     <link rel="stylesheet" href="/static/css/common.css">
     <style>
-        body { background: #f6f8fb; }
+        .nav-tabs .nav-link { color: #495057; font-weight: 500; }
+        .nav-tabs .nav-link.active { color: #667eea; border-bottom: 2px solid #667eea; }
+        .badge-success { background: #40916c; }
+        .badge-failed { background: #f5365c; }
+        .badge-running { background: #2196f3; }
+        .badge-paused { background: #6c757d; }
+        .badge-enabled { background: #40916c; }
+        .badge-manual { background: #667eea; }
+        .badge-scheduler { background: #adb5bd; color: #333; }
+        .empty-state { text-align: center; padding: 40px; color: #999; }
         .status-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; margin-right: 5px; }
-        .status-dot.on { background: #198754; } .status-dot.off { background: #dc3545; }
-        .task-card { border: 1px solid #e5e9ef; border-radius: 8px; background: #fff; }
-        .task-card + .task-card { margin-top: 12px; }
-        .task-meta { color: #6c757d; font-size: 12px; }
+        .status-dot.on { background: #40916c; } .status-dot.off { background: #dc3545; }
+        .modal-body pre { white-space: pre-wrap; word-break: break-all; font-size: 12px; background: #f8f9fa; padding: 12px; border-radius: 6px; }
+        .cron-presets .btn { font-size: 12px; }
+        .param-hint { font-size: 12px; color: #6c757d; }
         code { color: #495057; }
     </style>
 </head>
 <body>
 <div class="container-fluid py-3">
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <div><h5 class="mb-1">系统定时任务</h5><div class="text-muted small">调度器时区：Asia/Shanghai（北京时间）</div></div>
-        <button class="btn btn-outline-secondary btn-sm" onclick="loadTasks()">刷新</button>
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <h5 class="mb-0">定时任务中心</h5>
+        <div class="small text-muted" id="schedulerState">加载中...</div>
     </div>
-    <div id="schedulerState" class="alert alert-secondary py-2">加载中...</div>
-    <div id="taskList"></div>
+
+    <ul class="nav nav-tabs mb-3" id="pageTabs">
+        <li class="nav-item"><a class="nav-link active" href="#" onclick="return navTab('jobs')">任务管理</a></li>
+        <li class="nav-item"><a class="nav-link" href="#" onclick="return navTab('logs')">执行日志</a></li>
+    </ul>
+
+    <!-- ===== Tab: 任务管理 ===== -->
+    <div id="tab-jobs">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>任务列表</span>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-sm btn-primary" onclick="showJobModal()"><i class="fas fa-plus"></i> 新增任务</button>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="loadJobs()"><i class="fas fa-sync"></i> 刷新</button>
+                </div>
+            </div>
+            <div class="card-body p-0">
+                <table class="table table-hover table-sm mb-0 align-middle">
+                    <thead><tr>
+                        <th>ID</th><th>任务名称</th><th>处理器</th><th>调度规则</th>
+                        <th>状态</th><th>最近执行</th><th>下次执行</th><th style="min-width:230px">操作</th>
+                    </tr></thead>
+                    <tbody id="jobTable"><tr><td colspan="8" class="empty-state">加载中...</td></tr></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== Tab: 执行日志 ===== -->
+    <div id="tab-logs" style="display:none;">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <div class="d-flex align-items-center gap-2">
+                    <span>执行日志</span>
+                    <select class="form-select form-select-sm" id="logJobFilter" style="width:auto;" onchange="resetLogPage()"></select>
+                    <select class="form-select form-select-sm" id="logStatusFilter" style="width:auto;" onchange="resetLogPage()">
+                        <option value="">全部状态</option>
+                        <option value="success">成功</option>
+                        <option value="failed">失败</option>
+                        <option value="running">运行中</option>
+                    </select>
+                </div>
+                <button class="btn btn-sm btn-outline-danger" onclick="clearLogs()"><i class="fas fa-trash"></i> 清空日志</button>
+            </div>
+            <div class="card-body p-0">
+                <table class="table table-hover table-sm mb-0">
+                    <thead><tr>
+                        <th>任务</th><th>触发方式</th><th>状态</th><th>开始时间</th><th>耗时</th><th>结果 / 错误</th><th style="min-width:70px">详情</th>
+                    </tr></thead>
+                    <tbody id="logTable"><tr><td colspan="7" class="empty-state">加载中...</td></tr></tbody>
+                </table>
+            </div>
+            <div class="card-footer py-2"><div id="logPager"></div></div>
+        </div>
+    </div>
 </div>
-<script src="/static/js/app_common.js"></script>
-<script>
-const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-async function loadTasks() {
-    try {
-        const resp = await apiRequest('/api/scheduler/tasks');
-        const data = await resp.json();
-        document.getElementById('schedulerState').className = `alert ${data.running ? 'alert-success' : 'alert-danger'} py-2`;
-        document.getElementById('schedulerState').innerHTML = `<span class="status-dot ${data.running ? 'on' : 'off'}"></span>调度器${data.running ? '运行中' : '未启动'} · ${esc(data.timezone)}`;
-        document.getElementById('taskList').innerHTML = (data.items || []).map(task => `
-            <div class="task-card p-3">
-                <div class="d-flex justify-content-between align-items-start gap-3">
-                    <div>
-                        <h6 class="mb-1">${esc(task.name)}</h6>
-                        <div class="task-meta">任务 ID：<code>${esc(task.job_id)}</code> · 函数：<code>${esc(task.function)}</code></div>
+
+<!-- ===== 任务 新增/编辑 模态框 ===== -->
+<div class="modal fade" id="jobModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="jobModalTitle">新增任务</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="jobForm">
+                    <input type="hidden" id="jobId">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">任务名称 <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="jobName" maxlength="100" placeholder="如：每天凌晨清理遥测数据">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">处理器 <span class="text-danger">*</span></label>
+                            <select class="form-select" id="jobHandler" onchange="onHandlerChange()"></select>
+                            <div class="form-text" id="handlerDesc"></div>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label d-block">调度类型</label>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="radio" name="scheduleType" id="typeCron" value="cron" checked onchange="onScheduleTypeChange()">
+                                <label class="form-check-label" for="typeCron">Cron 表达式</label>
+                            </div>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="radio" name="scheduleType" id="typeInterval" value="interval" onchange="onScheduleTypeChange()">
+                                <label class="form-check-label" for="typeInterval">固定间隔</label>
+                            </div>
+                        </div>
+                        <div class="col-12" id="cronGroup">
+                            <label class="form-label">Cron 表达式（分 时 日 月 周） <span class="text-danger">*</span></label>
+                            <div class="input-group">
+                                <input type="text" class="form-control" id="jobCron" placeholder="0 3 * * *">
+                                <button class="btn btn-outline-secondary" type="button" onclick="previewCron()">预览下次执行</button>
+                            </div>
+                            <div class="cron-presets mt-2 d-flex flex-wrap gap-1">
+                                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="setCron('* * * * *')">每分钟</button>
+                                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="setCron('0 * * * *')">每小时</button>
+                                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="setCron('0 3 * * *')">每天 03:00</button>
+                                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="setCron('0 3 * * 1')">每周一 03:00</button>
+                                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="setCron('0 3 1 * *')">每月 1 号 03:00</button>
+                            </div>
+                            <div class="form-text" id="cronPreview"></div>
+                        </div>
+                        <div class="col-md-6" id="intervalGroup" style="display:none;">
+                            <label class="form-label">执行间隔（秒） <span class="text-danger">*</span></label>
+                            <input type="number" class="form-control" id="jobInterval" min="10" value="600">
+                            <div class="form-text">最小 10 秒</div>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">任务参数（JSON）</label>
+                            <textarea class="form-control" id="jobParams" rows="2">{}</textarea>
+                            <div class="param-hint" id="paramHint"></div>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">错过触发宽限（秒）</label>
+                            <input type="number" class="form-control" id="jobMisfire" min="0" max="86400" value="60">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">最大并发实例</label>
+                            <input type="number" class="form-control" id="jobMaxInstances" min="1" max="10" value="1">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">描述</label>
+                            <input type="text" class="form-control" id="jobDesc" maxlength="300">
+                        </div>
                     </div>
-                    <span class="badge ${task.paused ? 'bg-secondary' : 'bg-success'}">${task.paused ? '已暂停' : '运行中'}</span>
-                </div>
-                <div class="row mt-3 g-2 small">
-                    <div class="col-md-4"><span class="text-muted">触发规则</span><br>${esc(task.trigger)}</div>
-                    <div class="col-md-4"><span class="text-muted">下次执行</span><br>${esc(task.next_run_time || '未计划')}</div>
-                    <div class="col-md-4"><span class="text-muted">最大并发</span><br>${esc(task.max_instances)}</div>
-                </div>
-                <div class="mt-3 d-flex gap-2">
-                    <button class="btn btn-sm btn-outline-primary" onclick="runTask('${esc(task.job_id)}')">立即执行</button>
-                    ${task.paused ? `<button class="btn btn-sm btn-outline-success" onclick="resumeTask('${esc(task.job_id)}')">恢复</button>` : `<button class="btn btn-sm btn-outline-warning" onclick="pauseTask('${esc(task.job_id)}')">暂停</button>`}
-                </div>
-            </div>`).join('') || '<div class="text-muted">暂无系统定时任务</div>';
-    } catch (error) {
-        document.getElementById('schedulerState').className = 'alert alert-danger py-2';
-        document.getElementById('schedulerState').textContent = '加载失败：' + error.message;
-    }
-}
-async function taskAction(id, action) {
-    const resp = await apiRequest(`/api/scheduler/tasks/${id}/${action}`, { method: 'POST' });
-    const data = await resp.json();
-    if (!resp.ok) return QF.toast(data.detail || '操作失败', 'danger');
-    QF.toast(data.message || '操作成功', 'success');
-    loadTasks();
-}
-function runTask(id) { taskAction(id, 'run'); }
-function pauseTask(id) { taskAction(id, 'pause'); }
-function resumeTask(id) { taskAction(id, 'resume'); }
-loadTasks();
-setInterval(loadTasks, 15000);
-</script>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" onclick="saveJob()"><i class="fas fa-save"></i> 保存</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ===== 日志详情 模态框 ===== -->
+<div class="modal fade" id="logModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">执行详情</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="logDetail"></div>
+        </div>
+    </div>
+</div>
+
+<script src="/static/js/bootstrap.bundle.min.js"></script>
+<script src="/static/js/app_common.js"></script>
+<script src="/static/js/scheduler_manage.js"></script>
 </body>
 </html>

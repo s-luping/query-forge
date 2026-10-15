@@ -22,7 +22,8 @@ from db.sqlite_hooks import _migrate_logs_tables  # noqa: E402
 def _all_models():
     import importlib
     for mod in ('user', 'role', 'schema', 'knowledge', 'conversation', 'llm',
-                'system', 'vector_index', 'security', 'sync', 'datasource'):
+                'system', 'vector_index', 'security', 'sync', 'datasource',
+                'scheduler'):
         importlib.import_module(f'models.{mod}')
 
 
@@ -40,7 +41,8 @@ def test_log_tables_belong_to_logs_base():
             f'{model.__tablename__} 不应仍在主库 metadata')
 
     assert set(LogsBase.metadata.tables) == {
-        'query_audit_logs', 'sync_run_logs', 'schema_change_logs'}
+        'query_audit_logs', 'sync_run_logs', 'schema_change_logs',
+        'scheduler_job_logs'}
 
 
 def test_cross_db_fk_downgraded_to_plain_column():

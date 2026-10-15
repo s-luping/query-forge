@@ -26,6 +26,25 @@ CREATE INDEX ix_query_audit_logs_hit_sensitive ON query_audit_logs (hit_sensitiv
 CREATE INDEX ix_query_audit_logs_user_id ON query_audit_logs (user_id);
 CREATE INDEX ix_query_audit_logs_was_blocked ON query_audit_logs (was_blocked);
 
+-- ── scheduler_job_logs ──
+CREATE TABLE scheduler_job_logs (
+	id INTEGER NOT NULL, 
+	job_id INTEGER NOT NULL, 
+	job_name VARCHAR(100), 
+	handler VARCHAR(100), 
+	params TEXT, 
+	"trigger" VARCHAR(20), 
+	status VARCHAR(20), 
+	error_message TEXT, 
+	result_summary TEXT, 
+	started_at DATETIME, 
+	finished_at DATETIME, 
+	duration_ms INTEGER, 
+	PRIMARY KEY (id)
+);
+CREATE INDEX ix_scheduler_job_logs_job_id ON scheduler_job_logs (job_id);
+CREATE INDEX ix_scheduler_job_logs_status ON scheduler_job_logs (status);
+
 -- ── schema_change_logs ──
 CREATE TABLE schema_change_logs (
 	id INTEGER NOT NULL, 

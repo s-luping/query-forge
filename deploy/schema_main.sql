@@ -238,6 +238,31 @@ CREATE TABLE roles (
 );
 CREATE UNIQUE INDEX ix_roles_code ON roles (code);
 
+-- ── scheduler_jobs ──
+CREATE TABLE scheduler_jobs (
+	id INTEGER NOT NULL, 
+	name VARCHAR(100) NOT NULL, 
+	handler VARCHAR(100) NOT NULL, 
+	schedule_type VARCHAR(20), 
+	cron_expr VARCHAR(100), 
+	interval_seconds INTEGER, 
+	params TEXT, 
+	status VARCHAR(20), 
+	is_system BOOLEAN, 
+	misfire_grace_time INTEGER, 
+	max_instances INTEGER, 
+	description VARCHAR(300), 
+	last_run_at DATETIME, 
+	last_run_status VARCHAR(20), 
+	last_run_duration_ms INTEGER, 
+	created_at DATETIME, 
+	updated_at DATETIME, 
+	PRIMARY KEY (id), 
+	CONSTRAINT uix_scheduler_job_name UNIQUE (name)
+);
+CREATE INDEX ix_scheduler_jobs_handler ON scheduler_jobs (handler);
+CREATE INDEX ix_scheduler_jobs_status ON scheduler_jobs (status);
+
 -- ── sync_job_configs ──
 CREATE TABLE sync_job_configs (
 	id INTEGER NOT NULL, 
