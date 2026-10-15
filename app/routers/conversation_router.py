@@ -8,26 +8,26 @@
 - 首轮 schema 上下文 prompt 通过 conversation.context_prompt_id 关联去重 prompt
 """
 import json
-from datetime import datetime
 from typing import List, Optional, cast
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel
 
 from app.auth import CurrentUser
-from app.logger import logger
 from app.crypto import decrypt_secret
-from core import LLMClient
-from core.gen_sql import SqlGenerator
-from core.gen_chat import ChatSession
+from app.limiter import LIMIT_HEAVY, LIMIT_READ, LIMIT_WRITE, limiter
+from app.logger import logger
+from app.response import ok, ok_msg
 from app.timezone import now_beijing
-from models.conversation import Conversation, ConversationMessage
-from services import telemetry
-from services import schema_service
-from services.sql_executor import execute_sql, SqlExecutionError
+from core import LLMClient
+from core.gen_chat import ChatSession
+from core.gen_sql import SqlGenerator
 from crud.base import session_scope
 from crud.conversation import conversation_crud
 from crud.schema import schema_crud
+from models.conversation import Conversation, ConversationMessage
+from services import schema_service, telemetry
+from services.sql_executor import SqlExecutionError, execute_sql
 
 router = APIRouter()
 
@@ -293,11 +293,16 @@ def _execute_generated_sql(sql: str, schema_name: Optional[str],
 
 
 @router.post("")
+@limiter.limit(LIMIT_HEAVY)
 def create_conversation(
-    request: CreateConversationRequest,
+    request: Request,
+    payload: CreateConversationRequest,
     user: CurrentUser
 ):
-    """创建新对话 + 首轮 SQL 生成"""
+    """创建新对话 + 首轮 SQL 生成（重接口：含 LLM 生成）
+
+    注意：body 参数命名为 payload，request 名留给 slowapi 定位 Request。
+    """
     user_id = user['user_id']
 
     # 链路追踪：前置步骤（鉴权/模型/知识库）
@@ -305,31 +310,31 @@ def create_conversation(
     from app.timezone import now_beijing as _nb
     pre_log = [{
         "step": "AUTH_SCHEMA_CHECK", "timestamp": _nb().strftime("%Y-%m-%d %H:%M:%S"),
-        "data": {"schema_name": request.schema_name, "role": user.get('role', ''),
+        "data": {"schema_name": payload.schema_name, "role": user.get('role', ''),
                  "passed": True},
     }]
 
     # 库级可见性二次校验（防绕过前端下拉直接请求无权限库）
-    if not is_schema_visible(user, request.schema_name):
+    if not is_schema_visible(user, payload.schema_name):
         pre_log[-1]["data"]["passed"] = False
         pre_log[-1]["data"]["reason"] = "库级可见性校验未通过"
         raise HTTPException(status_code=403, detail="无权访问该数据库")
 
     # 数据库类型：选了库则以库类型为准；全库模式（None）从可见库推断（供 LLM 引用符提示）
-    db_type = request.db_type
-    if request.schema_name:
+    db_type = payload.db_type
+    if payload.schema_name:
         with session_scope() as db_cfg:
             db_type = schema_service.get_schema_type_by_name(
-                db_cfg, request.schema_name) or db_type
+                db_cfg, payload.schema_name) or db_type
     else:
         inferred = _infer_visible_db_type(user)
         if inferred:
             db_type = inferred
 
     try:
-        llm_client = _build_llm_client(user_id, request.llm_config_id)
+        llm_client = _build_llm_client(user_id, payload.llm_config_id)
         # 知识库支持多选（knowledge_ids 优先，兼容旧版 knowledge_id）
-        knowledge_ids = _resolve_knowledge_ids(request.knowledge_ids, request.knowledge_id)
+        knowledge_ids = _resolve_knowledge_ids(payload.knowledge_ids, payload.knowledge_id)
         knowledge_content = _get_knowledge_safe(
             user_id, knowledge_ids=knowledge_ids)
 
@@ -337,7 +342,7 @@ def create_conversation(
             "step": "LLM_CONFIG_LOAD", "timestamp": _nb().strftime("%Y-%m-%d %H:%M:%S"),
             "data": {"provider": getattr(llm_client, 'provider', '') or 'default',
                      "model": getattr(llm_client, 'model', '') or 'default',
-                     "config_id": request.llm_config_id},
+                     "config_id": payload.llm_config_id},
         })
         pre_log.append({
             "step": "KNOWLEDGE_LOAD", "timestamp": _nb().strftime("%Y-%m-%d %H:%M:%S"),
@@ -357,8 +362,8 @@ def create_conversation(
 
         # 第一轮：走完整流水线
         result = session.process_first_message(
-            query=request.query,
-            schema_name=request.schema_name,
+            query=payload.query,
+            schema_name=payload.schema_name,
             db_type=db_type,
             knowledge_content=knowledge_content,
             pre_log=pre_log,
@@ -368,24 +373,24 @@ def create_conversation(
         if result.get('need_more_info') or not result.get('is_valid'):
             query_result = None
         else:
-            exec_schema = request.schema_name or _resolve_fallback_schema(
+            exec_schema = payload.schema_name or _resolve_fallback_schema(
                 user, result.get('sql', ''))
             query_result = _execute_generated_sql(
                 result.get('sql', ''), exec_schema, db_type)
 
         # 保存到数据库
         with session_scope() as db:
-            title = request.query[:80] + ("..." if len(request.query) > 80 else "")
+            title = payload.query[:80] + ("..." if len(payload.query) > 80 else "")
 
-            schema_id = schema_service.get_schema_id_by_name(db, request.schema_name)
+            schema_id = schema_service.get_schema_id_by_name(db, payload.schema_name)
 
             conversation = Conversation(
                 user_id=user_id,
                 title=title,
                 schema_id=schema_id,
                 db_type=db_type,
-                llm_config_id=request.llm_config_id,
-                knowledge_id=knowledge_ids[0] if knowledge_ids else request.knowledge_id,
+                llm_config_id=payload.llm_config_id,
+                knowledge_id=knowledge_ids[0] if knowledge_ids else payload.knowledge_id,
                 knowledge_ids=json.dumps(knowledge_ids, ensure_ascii=False) if knowledge_ids else None,
                 schema_tables=json.dumps(result.get('tables') or [], ensure_ascii=False)
             )
@@ -396,7 +401,7 @@ def create_conversation(
             user_msg = ConversationMessage(
                 conversation_id=conversation.id,
                 role="user",
-                content=request.query
+                content=payload.query
             )
             db.add(user_msg)
 
@@ -421,10 +426,10 @@ def create_conversation(
             db.commit()
         # 保存 LLM 调用记录（遥测库）+ 回填关联键（主库）
         call_id = _record_telemetry(
-            user_id, llm_client, request.query,
-            conditions=f"schema={request.schema_name}, db_type={request.db_type}",
+            user_id, llm_client, payload.query,
+            conditions=f"schema={payload.schema_name}, db_type={payload.db_type}",
             result=result, conversation_id=conversation_id,
-            config_id=request.llm_config_id)
+            config_id=payload.llm_config_id)
 
         prompt_text = (result.get('messages') or [{}])[0].get('content')
         prompt_id = telemetry.get_or_create_prompt(prompt_text) if prompt_text else None
@@ -481,12 +486,18 @@ def create_conversation(
 
 
 @router.post("/{conversation_id}/messages")
+@limiter.limit(LIMIT_HEAVY)
 def send_message(
     conversation_id: int,
-    request: SendMessageRequest,
+    request: Request,
+    payload: SendMessageRequest,
     user: CurrentUser
 ):
-    """发送跟进消息 + 生成修正 SQL"""
+    """发送跟进消息 + 生成修正 SQL
+
+    注意：body 参数命名为 payload（不能用 request），request 名须留给
+    Starlette Request 供 slowapi 限流按参数名查找。
+    """
     user_id = user['user_id']
 
     try:
@@ -529,15 +540,15 @@ def send_message(
 
         # ── 对话中切换模型 / 知识库 ──
         # 请求显式传值 → 本次生效并持久化到会话（后续轮次沿用）；不传 → 沿用会话已存配置
-        if request.llm_config_id is not None:
-            conv_llm_config_id = request.llm_config_id
-        if request.knowledge_ids is not None or request.knowledge_id is not None:
+        if payload.llm_config_id is not None:
+            conv_llm_config_id = payload.llm_config_id
+        if payload.knowledge_ids is not None or payload.knowledge_id is not None:
             conv_knowledge_ids = _resolve_knowledge_ids(
-                request.knowledge_ids, request.knowledge_id)
+                payload.knowledge_ids, payload.knowledge_id)
             conv_knowledge_id = conv_knowledge_ids[0] if conv_knowledge_ids else None
-        if (request.llm_config_id is not None
-                or request.knowledge_ids is not None
-                or request.knowledge_id is not None):
+        if (payload.llm_config_id is not None
+                or payload.knowledge_ids is not None
+                or payload.knowledge_id is not None):
             with session_scope() as db_upd:
                 db_upd.query(Conversation).filter(
                     Conversation.id == conversation_id
@@ -566,8 +577,8 @@ def send_message(
         llm_client = _build_llm_client(user_id, conv_llm_config_id)
 
         # 链路追踪：前置步骤（鉴权/模型/知识库）
-        from app.timezone import now_beijing as _nb
         from app.permissions import is_schema_visible as _is_visible
+        from app.timezone import now_beijing as _nb
         schema_visible = _is_visible(user, schema_name)
         pre_log = [{
             "step": "AUTH_SCHEMA_CHECK", "timestamp": _nb().strftime("%Y-%m-%d %H:%M:%S"),
@@ -604,7 +615,7 @@ def send_message(
         # 跟进消息
         result = session.process_followup_message(
             conversation_messages=history,
-            new_user_content=request.content,
+            new_user_content=payload.content,
             schema_csv=schema_csv,
             first_tables=first_tables,
             db_type=conv_db_type,
@@ -627,7 +638,7 @@ def send_message(
             user_msg = ConversationMessage(
                 conversation_id=conversation_id,
                 role="user",
-                content=request.content
+                content=payload.content
             )
             db.add(user_msg)
 
@@ -656,7 +667,7 @@ def send_message(
             db.commit()
         # 保存 LLM 调用记录（遥测库）+ 回填消息关联
         call_id = _record_telemetry(
-            user_id, llm_client, request.content,
+            user_id, llm_client, payload.content,
             conditions=f"conversation={conversation_id}, followup",
             result=result, conversation_id=conversation_id,
             config_id=conv_llm_config_id)
@@ -693,7 +704,7 @@ def send_message(
             "user_message": {
                 "id": user_msg_id,
                 "role": "user",
-                "content": request.content
+                "content": payload.content
             },
             "assistant_message": {
                 "id": assistant_msg_id,
@@ -719,7 +730,9 @@ def send_message(
 
 
 @router.get("")
+@limiter.limit(LIMIT_READ)
 def list_conversations(
+    request: Request,
     user: CurrentUser,
     limit: int = Query(20, ge=1, le=200),
     offset: int = Query(0, ge=0),
@@ -741,7 +754,6 @@ def list_conversations(
     # schema id → name 映射（一次查询）
     schema_names = schema_crud.name_map()
     # 各对话消息数（一次 GROUP BY 聚合，避免 N+1 count）
-    from crud.conversation import message_crud
     from sqlalchemy import func
     with session_scope() as db:
         conv_ids = [c.id for c in conversations]
@@ -761,10 +773,12 @@ def list_conversations(
             message_count=msg_counts.get(conv.id, 0)
         ))
 
-    return {"items": result, "total": total}
+    return ok({"items": result, "total": total})
 @router.get("/{conversation_id}/messages")
+@limiter.limit(LIMIT_READ)
 def get_messages(
     conversation_id: int,
+    request: Request,
     user: CurrentUser
 ):
     """获取对话消息历史"""
@@ -798,8 +812,10 @@ def get_messages(
             for msg in messages
         ]
 @router.delete("/{conversation_id}")
+@limiter.limit(LIMIT_WRITE)
 def delete_conversation(
     conversation_id: int,
+    request: Request,
     user: CurrentUser
 ):
     """删除对话"""
@@ -822,7 +838,7 @@ def delete_conversation(
         db.delete(conversation)
         db.commit()
     
-        return {"success": True, "message": "对话已删除"}
+        return ok_msg("对话已删除")
 # ── Internal helpers ──────────────────────────────────────────────
 
 def _rebuild_schema_csv(schema_name: Optional[str] = None) -> str:

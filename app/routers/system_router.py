@@ -9,13 +9,15 @@ import subprocess
 import sys
 from typing import List, Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
 from app.auth import AdminUser, CurrentUser
+from app.limiter import LIMIT_HEAVY, LIMIT_READ, LIMIT_WRITE, limiter
 from app.logger import logger
-from models.system import SystemSetting
+from app.response import ErrorCode, fail, ok_msg
 from crud.base import session_scope
+from models.system import SystemSetting
 
 router = APIRouter()
 
@@ -102,7 +104,8 @@ class SiteBrandingResponse(BaseModel):
 # ── Embedding endpoints ──────────────────────────────────────────
 
 @router.get("/embedding-status", response_model=EmbeddingStatusResponse)
-def get_embedding_status(user: CurrentUser):
+@limiter.limit(LIMIT_READ)
+def get_embedding_status(request: Request, user: CurrentUser):
     """获取 embedding 模型下载状态"""
     found = _find_embedding_path()
     downloaded = found is not None
@@ -120,7 +123,8 @@ def get_embedding_status(user: CurrentUser):
 
 
 @router.post("/download-embedding")
-def download_embedding(user: AdminUser):
+@limiter.limit(LIMIT_HEAVY)
+def download_embedding(request: Request, user: AdminUser):
     """触发下载 embedding 模型（后台异步）"""
     try:
         project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -132,16 +136,17 @@ def download_embedding(user: AdminUser):
             subprocess.Popen([sys.executable, script_path],
                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         logger.info("触发 embedding 模型下载")
-        return {"success": True, "message": "下载已启动，请等待完成后刷新页面"}
+        return ok_msg("下载已启动，请等待完成后刷新页面")
     except Exception as e:
         logger.error(f"启动下载失败: {e}")
-        return {"success": False, "message": f"启动下载失败: {str(e)}"}
+        return fail(ErrorCode.INTERNAL, f"启动下载失败: {str(e)}")
 
 
 # ── Settings endpoints ───────────────────────────────────────────
 
 @router.get("/site-branding", response_model=SiteBrandingResponse)
-def get_site_branding():
+@limiter.limit(LIMIT_READ)
+def get_site_branding(request: Request):
     """站点品牌配置（公开接口：登录页等未登录场景也需读取）"""
     return SiteBrandingResponse(
         logo=_get_setting('SITE_LOGO') or '/static/img/logo.svg',
@@ -150,7 +155,8 @@ def get_site_branding():
 
 
 @router.get("/settings", response_model=List[SystemSettingItem])
-def get_settings(user: AdminUser):
+@limiter.limit(LIMIT_READ)
+def get_settings(request: Request, user: AdminUser):
     """获取所有系统配置（密钥类 value 脱敏；仅管理员）"""
     with session_scope() as db:
         rows = db.query(SystemSetting).all()
@@ -165,7 +171,8 @@ def get_settings(user: AdminUser):
 
 
 @router.put("/settings")
-def update_setting(req: UpdateSettingRequest, user: AdminUser):
+@limiter.limit(LIMIT_WRITE)
+def update_setting(request: Request, req: UpdateSettingRequest, user: AdminUser):
     """更新系统配置（仅 auth/vector 分类可改；仅管理员）"""
     # 仅允许编辑标记为 is_editable 的配置项（排除 security / runtime）
     try:
@@ -179,4 +186,4 @@ def update_setting(req: UpdateSettingRequest, user: AdminUser):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     logger.info(f"系统配置已更新: {req.key}")
-    return {"success": True, "message": f"{req.key} 已更新"}
+    return ok_msg(f"{req.key} 已更新")

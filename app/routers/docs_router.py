@@ -1,15 +1,17 @@
 """API 文档路由 — 本地 Swagger UI、ReDoc 与 OpenAPI 安全方案。"""
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
 from fastapi.openapi.utils import get_openapi
 
+from app.limiter import LIMIT_READ, limiter
 
 router = APIRouter()
 _SWAGGER_ASSET_PREFIX = '/static/vendor/swagger-ui'
 
 
 @router.get("/docs", include_in_schema=False)
-async def docs_page():
+@limiter.limit(LIMIT_READ)
+async def docs_page(request: Request):
     return get_swagger_ui_html(
         openapi_url="/openapi.json",
         title="QueryForge API 文档",
@@ -20,7 +22,8 @@ async def docs_page():
 
 
 @router.get("/redoc", include_in_schema=False)
-async def redoc_page():
+@limiter.limit(LIMIT_READ)
+async def redoc_page(request: Request):
     return get_redoc_html(
         openapi_url="/openapi.json",
         title="QueryForge API 文档",

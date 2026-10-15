@@ -10,20 +10,22 @@ import threading
 from datetime import datetime
 from typing import List, Optional
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel, ConfigDict, Field, computed_field
 
 from app.auth import AdminUser
-from app.logger import logger, log_audit
+from app.crypto import decrypt_secret, encrypt_secret, mask_api_key
+from app.limiter import LIMIT_HEAVY, LIMIT_READ, LIMIT_TEST, LIMIT_WRITE, limiter
+from app.logger import log_audit, logger
+from app.response import ErrorCode, fail, ok, ok_msg
 from app.timezone import now_beijing
-from app.crypto import encrypt_secret, decrypt_secret, mask_api_key
-from services.sync_connectors import get_connector
-from models.datasource import DataSource
-from models.sync import SyncJobConfig
 from crud.base import session_scope
 from crud.datasource import datasource_crud
-from crud.schema import schema_crud, table_crud, column_crud
-from crud.sync import sync_job_crud, sync_run_crud, change_crud, get_sync_stats
+from crud.schema import column_crud, schema_crud, table_crud
+from crud.sync import change_crud, get_sync_stats, sync_job_crud, sync_run_crud
+from models.datasource import DataSource
+from models.sync import SyncJobConfig
+from services.sync_connectors import get_connector
 
 router = APIRouter()
 
@@ -192,17 +194,19 @@ class SyncChangeOut(BaseModel):
 # ═══════════════════════════════════════════════════════════════════
 
 @router.get("/datasources")
-def list_datasources(user: AdminUser):
+@limiter.limit(LIMIT_READ)
+def list_datasources(request: Request, user: AdminUser):
     """列出所有数据源（密码脱敏）"""
     # (权限由 AdminUser 依赖统一校验)
     with session_scope() as db:
         rows = db.query(DataSource).order_by(DataSource.created_at.desc()).all()
-        return {
+        return ok({
             "items": [DataSourceOut.model_validate(r) for r in rows],
             "total": len(rows),
-        }
+        })
 @router.post("/datasources")
-def create_datasource(req: DataSourceCreate, user: AdminUser):
+@limiter.limit(LIMIT_WRITE)
+def create_datasource(request: Request, req: DataSourceCreate, user: AdminUser):
     """创建数据源（密码加密存储）"""
     # (权限由 AdminUser 依赖统一校验)
     with session_scope() as db:
@@ -232,7 +236,8 @@ def create_datasource(req: DataSourceCreate, user: AdminUser):
         log_audit(user, "create_datasource", f"name={name}, type={req.db_type}")
         return DataSourceOut.model_validate(ds)
 @router.put("/datasources/{ds_id}")
-def update_datasource(ds_id: int, req: DataSourceUpdate, user: AdminUser):
+@limiter.limit(LIMIT_WRITE)
+def update_datasource(request: Request, ds_id: int, req: DataSourceUpdate, user: AdminUser):
     """更新数据源"""
     # (权限由 AdminUser 依赖统一校验)
     with session_scope() as db:
@@ -273,7 +278,8 @@ def update_datasource(ds_id: int, req: DataSourceUpdate, user: AdminUser):
         db.commit()
         return DataSourceOut.model_validate(ds)
 @router.delete("/datasources/{ds_id}")
-def delete_datasource(ds_id: int, user: AdminUser):
+@limiter.limit(LIMIT_WRITE)
+def delete_datasource(request: Request, ds_id: int, user: AdminUser):
     """删除数据源（级联清理同步任务/执行历史/变更记录；关联库解除绑定、保留元数据）"""
     # (权限由 AdminUser 依赖统一校验)
     ds = datasource_crud.get_by_id(ds_id)
@@ -282,10 +288,10 @@ def delete_datasource(ds_id: int, user: AdminUser):
     job_count = datasource_crud.delete_cascade(ds_id)
     log_audit(user, "delete_datasource",
               f"id={ds_id} jobs_cleaned={job_count}")
-    return {"success": True,
-            "message": f"数据源已删除，已清理 {job_count} 个关联同步任务及历史记录"}
+    return ok_msg(f"数据源已删除，已清理 {job_count} 个关联同步任务及历史记录")
 @router.post("/datasources/{ds_id}/test")
-def test_datasource(ds_id: int, user: AdminUser):
+@limiter.limit(LIMIT_TEST)
+def test_datasource(request: Request, ds_id: int, user: AdminUser):
     """测试数据源连接"""
     # (权限由 AdminUser 依赖统一校验)
     with session_scope() as db:
@@ -298,22 +304,26 @@ def test_datasource(ds_id: int, user: AdminUser):
             ds.db_type,
             host=ds.host, port=ds.port, database=ds.database,
             username=ds.username, password=password,
+            extra_params=ds.extra_params,
         )
-        ok, msg = connector.test_connection()
+        connected, msg = connector.test_connection()
         connector.close()
-    
+
         ds.last_tested_at = now_beijing()
-        ds.status = 'active' if ok else 'error'
-        ds.last_error = '' if ok else msg[:500]
+        ds.status = 'active' if connected else 'error'
+        ds.last_error = '' if connected else msg[:500]
         db.commit()
-    
-        return {"success": ok, "message": msg}
+
+        if connected:
+            return ok_msg(msg)
+        return fail(ErrorCode.BAD_REQUEST, msg)
 # ═══════════════════════════════════════════════════════════════════
 # 同步任务管理
 # ═══════════════════════════════════════════════════════════════════
 
 @router.get("/jobs")
-def list_jobs(user: AdminUser):
+@limiter.limit(LIMIT_READ)
+def list_jobs(request: Request, user: AdminUser):
     """列出所有同步任务（含数据源名称与数据库名）"""
     # (权限由 AdminUser 依赖统一校验)
     rows = sync_job_crud.list_with_datasource()
@@ -323,9 +333,10 @@ def list_jobs(user: AdminUser):
         out.datasource_name = ds_name
         out.database = ds_database
         items.append(out)
-    return {"items": items, "total": len(items)}
+    return ok({"items": items, "total": len(items)})
 @router.post("/jobs")
-def create_job(req: SyncJobCreate, user: AdminUser):
+@limiter.limit(LIMIT_WRITE)
+def create_job(request: Request, req: SyncJobCreate, user: AdminUser):
     """创建同步任务 — 目标数据库名一律取数据源「数据库名」，不接受前端自定义。"""
     # (权限由 AdminUser 依赖统一校验)
     ds = datasource_crud.get_by_id(req.datasource_id)
@@ -357,7 +368,8 @@ def create_job(req: SyncJobCreate, user: AdminUser):
     out.database = ds.database
     return out
 @router.put("/jobs/{job_id}")
-def update_job(job_id: int, req: SyncJobUpdate, user: AdminUser):
+@limiter.limit(LIMIT_WRITE)
+def update_job(request: Request, job_id: int, req: SyncJobUpdate, user: AdminUser):
     """更新同步任务 — 目标数据库名恒等于数据源数据库名，不支持修改。"""
     # (权限由 AdminUser 依赖统一校验)
     job = sync_job_crud.get_by_id(job_id)
@@ -397,16 +409,17 @@ def update_job(job_id: int, req: SyncJobUpdate, user: AdminUser):
     out.database = ds.database if ds else ''
     return out
 @router.post("/history/clear")
-def clear_sync_history(user: AdminUser):
+@limiter.limit(LIMIT_WRITE)
+def clear_sync_history(request: Request, user: AdminUser):
     """清空全部同步执行历史与变更记录（仅管理员，不可恢复）"""
     # (权限由 AdminUser 依赖统一校验)
     runs, changes = change_crud.clear_history()
     log_audit(user, "clear_sync_history", f"runs={runs} changes={changes}")
     logger.info(f"管理员 {user['username']} 清空同步历史: runs={runs} changes={changes}")
-    return {"success": True,
-            "message": f"已清除 {runs} 条同步历史、{changes} 条变更记录"}
+    return ok_msg(f"已清除 {runs} 条同步历史、{changes} 条变更记录")
 @router.delete("/jobs/{job_id}")
-def delete_job(job_id: int, user: AdminUser):
+@limiter.limit(LIMIT_WRITE)
+def delete_job(request: Request, job_id: int, user: AdminUser):
     """删除同步任务（连同执行历史与变更记录）"""
     # (权限由 AdminUser 依赖统一校验)
     job = sync_job_crud.get_by_id(job_id)
@@ -414,9 +427,10 @@ def delete_job(job_id: int, user: AdminUser):
         raise HTTPException(404, "同步任务不存在")
     sync_job_crud.delete_cascade(job_id)
     log_audit(user, "delete_sync_job", f"job_id={job_id}")
-    return {"success": True, "message": "同步任务已删除"}
+    return ok_msg("同步任务已删除")
 @router.post("/jobs/{job_id}/run")
-def trigger_sync(job_id: int, user: AdminUser):
+@limiter.limit(LIMIT_HEAVY)
+def trigger_sync(request: Request, job_id: int, user: AdminUser):
     """手动触发同步（后台执行）"""
     # (权限由 AdminUser 依赖统一校验)
     with session_scope() as db:
@@ -429,11 +443,13 @@ def trigger_sync(job_id: int, user: AdminUser):
             raise HTTPException(404, "关联数据源不存在")
 
         # 并发防护：30 分钟内有处于 running 状态的执行记录时拒绝重复触发
+        # （执行记录已拆至日志库，需单独会话查询）
         from models.sync import SyncRunLog
-        active_run = db.query(SyncRunLog).filter(
-            SyncRunLog.job_id == job_id,
-            SyncRunLog.status == 'running',
-        ).order_by(SyncRunLog.started_at.desc()).first()
+        with session_scope(logs=True) as ldb:
+            active_run = ldb.query(SyncRunLog).filter(
+                SyncRunLog.job_id == job_id,
+                SyncRunLog.status == 'running',
+            ).order_by(SyncRunLog.started_at.desc()).first()
         if active_run and active_run.started_at:
             from app.timezone import now_beijing as _now
             if (_now() - active_run.started_at).total_seconds() < 30 * 60:
@@ -463,13 +479,15 @@ def trigger_sync(job_id: int, user: AdminUser):
         thread.start()
     
         log_audit(user, "trigger_sync", f"job_id={job_id}")
-        return {"success": True, "message": "同步任务已触发，正在后台执行"}
+        return ok_msg("同步任务已触发，正在后台执行")
 # ═══════════════════════════════════════════════════════════════════
 # 同步历史
 # ═══════════════════════════════════════════════════════════════════
 
 @router.get("/runs")
+@limiter.limit(LIMIT_READ)
 def list_runs(
+    request: Request,
     user: AdminUser,
     job_id: Optional[int] = None,
     limit: int = Query(50, le=200),
@@ -490,9 +508,10 @@ def list_runs(
         # changes_pending 覆盖为实时值；changes_auto 为运行时的自动应用数，不再变化
         out.changes_pending = pending_map.get(r.id, 0)
         items.append(out)
-    return {"items": items, "total": total}
+    return ok({"items": items, "total": total})
 @router.get("/runs/{run_id}")
-def get_run_detail(run_id: int, user: AdminUser):
+@limiter.limit(LIMIT_READ)
+def get_run_detail(request: Request, run_id: int, user: AdminUser):
     """同步执行详情（含变更列表）"""
     # (权限由 AdminUser 依赖统一校验)
     run = sync_run_crud.get_by_id(run_id)
@@ -513,7 +532,9 @@ def get_run_detail(run_id: int, user: AdminUser):
 # ═══════════════════════════════════════════════════════════════════
 
 @router.get("/changes")
+@limiter.limit(LIMIT_READ)
 def list_changes(
+    request: Request,
     user: AdminUser,
     job_id: Optional[int] = None,
     approval_status: Optional[str] = None,
@@ -524,12 +545,13 @@ def list_changes(
     """变更记录列表"""
     # (权限由 AdminUser 依赖统一校验)
     rows, total = change_crud.list_paged(job_id, approval_status, change_type, limit, offset)
-    return {
+    return ok({
         "items": [SyncChangeOut.model_validate(c) for c in rows],
         "total": total,
-    }
+    })
 @router.post("/changes/{change_id}/approve")
-def approve_change(change_id: int, user: AdminUser):
+@limiter.limit(LIMIT_WRITE)
+def approve_change(request: Request, change_id: int, user: AdminUser):
     """审批通过变更（执行删除操作）"""
     # (权限由 AdminUser 依赖统一校验)
     ch = change_crud.get_by_id(change_id)
@@ -560,9 +582,10 @@ def approve_change(change_id: int, user: AdminUser):
 
     log_audit(user, "approve_change",
               f"id={change_id}, {ch.change_type} {ch.object_name}")
-    return {"success": True, "message": f"变更已审批通过: {ch.object_name}"}
+    return ok_msg(f"变更已审批通过: {ch.object_name}")
 @router.post("/changes/{change_id}/reject")
-def reject_change(change_id: int, user: AdminUser):
+@limiter.limit(LIMIT_WRITE)
+def reject_change(request: Request, change_id: int, user: AdminUser):
     """拒绝变更（保留元数据）"""
     # (权限由 AdminUser 依赖统一校验)
     ch = change_crud.get_by_id(change_id)
@@ -577,9 +600,10 @@ def reject_change(change_id: int, user: AdminUser):
                        approved_at=now_beijing())
 
     log_audit(user, "reject_change", f"id={change_id}, {ch.object_name}")
-    return {"success": True, "message": f"变更已拒绝: {ch.object_name}"}
+    return ok_msg(f"变更已拒绝: {ch.object_name}")
 @router.get("/stats")
-def sync_stats(user: AdminUser):
+@limiter.limit(LIMIT_READ)
+def sync_stats(request: Request, user: AdminUser):
     """同步统计概览"""
     # (权限由 AdminUser 依赖统一校验)
     return get_sync_stats()

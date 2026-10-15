@@ -8,21 +8,29 @@ import io
 from datetime import datetime
 from typing import List, Optional
 
-from fastapi import APIRouter, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict
 
 from app.auth import AdminUser, CurrentUser
-from app.logger import logger, log_audit
-from app.permissions import get_visible_schema_ids, get_table_grants_by_schema, is_schema_visible
-from services.vector_service import auto_build_vector_index, mark_index_stale  # 从服务层导入（消除路由层职责过重）
-from models.schema import DbSchema, DbColumn
-from models.datasource import DataSource
-from services.schema_parsers import (
-    parse_json_schema, parse_schema_csv, DDLParseError, SUPPORTED_DB_TYPES,
-)
-from services import schema_service
+from app.limiter import LIMIT_HEAVY, LIMIT_READ, LIMIT_WRITE, limiter
+from app.logger import log_audit, logger
+from app.permissions import get_table_grants_by_schema, get_visible_schema_ids, is_schema_visible
+from app.response import ok, ok_msg
 from crud.base import session_scope
+from models.datasource import DataSource
+from models.schema import DbColumn, DbSchema
+from services import schema_service
+from services.schema_parsers import (
+    SUPPORTED_DB_TYPES,
+    DDLParseError,
+    parse_json_schema,
+    parse_schema_csv,
+)
+from services.vector_service import (  # 从服务层导入（消除路由层职责过重）
+    auto_build_vector_index,
+    mark_index_stale,
+)
 
 router = APIRouter()
 
@@ -192,23 +200,25 @@ def _ingest_and_respond(parsed_results, user, db_type, source, fallback_schema,
 # ═══════════════════════════════════════════════════════════════════
 
 @router.post("/parse-csv", response_model=SchemaListResponse)
+@limiter.limit(LIMIT_WRITE)
 def parse_csv_text(
-        request: CSVParseRequest,
+        request: Request,
+        payload: CSVParseRequest,
         user: AdminUser
 ):
     """解析规范 CSV 文本（仅管理员；数据库类型必填）"""
     # (权限由 AdminUser 依赖统一校验)
-    _validate_db_type(request.db_type)
-    log_audit(user, "parse_schema_csv", f"schema_name={request.schema_name} db_type={request.db_type}")
+    _validate_db_type(payload.db_type)
+    log_audit(user, "parse_schema_csv", f"schema_name={payload.schema_name} db_type={payload.db_type}")
     try:
         parsed_results = parse_schema_csv(
-            request.csv_text, user['user_id'], request.schema_name)
+            payload.csv_text, user['user_id'], payload.schema_name)
 
         if not parsed_results:
             raise HTTPException(status_code=400, detail="无法解析 CSV，请检查表头与内容格式")
 
-        return _ingest_and_respond(parsed_results, user, request.db_type, 'csv',
-                                   request.schema_name, datasource_id=request.datasource_id)
+        return _ingest_and_respond(parsed_results, user, payload.db_type, 'csv',
+                                   payload.schema_name, datasource_id=payload.datasource_id)
     except DDLParseError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except HTTPException:
@@ -219,22 +229,24 @@ def parse_csv_text(
 
 
 @router.post("/parse-json", response_model=SchemaListResponse)
+@limiter.limit(LIMIT_WRITE)
 def parse_json_text(
-        request: JSONParseRequest,
+        request: Request,
+        payload: JSONParseRequest,
         user: AdminUser
 ):
     """解析 JSON 格式的 Schema（仅管理员）"""
     # (权限由 AdminUser 依赖统一校验)
-    _validate_db_type(request.db_type)
+    _validate_db_type(payload.db_type)
     try:
-        parsed_results = parse_json_schema(request.json_text, user['user_id'], request.schema_name)
+        parsed_results = parse_json_schema(payload.json_text, user['user_id'], payload.schema_name)
 
         if not parsed_results:
             raise HTTPException(status_code=400, detail="无法解析 JSON，请检查格式")
 
-        return _ingest_and_respond(parsed_results, user, request.db_type, 'json',
-                                   request.schema_name, extra_fk_line=True,
-                                   datasource_id=request.datasource_id)
+        return _ingest_and_respond(parsed_results, user, payload.db_type, 'json',
+                                   payload.schema_name, extra_fk_line=True,
+                                   datasource_id=payload.datasource_id)
     except DDLParseError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except HTTPException:
@@ -245,7 +257,9 @@ def parse_json_text(
 
 
 @router.post("/upload", response_model=SchemaListResponse)
+@limiter.limit(LIMIT_HEAVY)
 async def upload_schema_file(
+        request: Request,
         user: AdminUser,
         file: UploadFile = File(...),
         schema_name: str = Form("default"),
@@ -293,7 +307,9 @@ async def upload_schema_file(
 # ═══════════════════════════════════════════════════════════════════
 
 @router.get("/list", response_model=SchemaListResponse)
+@limiter.limit(LIMIT_READ)
 def get_schema_list(
+        request: Request,
         user: CurrentUser,
         schema_name: Optional[str] = None,
         table_name: Optional[str] = None,
@@ -321,7 +337,8 @@ def get_schema_list(
 
 
 @router.get("/stats")
-def get_schema_stats(user: CurrentUser):
+@limiter.limit(LIMIT_READ)
+def get_schema_stats(request: Request, user: CurrentUser):
     """获取用户 Schema 统计数据"""
     try:
         with session_scope() as db:
@@ -334,7 +351,8 @@ def get_schema_stats(user: CurrentUser):
 
 
 @router.get("/check", response_model=SchemaCheckResponse)
-def check_schema(user: CurrentUser):
+@limiter.limit(LIMIT_READ)
+def check_schema(request: Request, user: CurrentUser):
     """检查用户是否有 Schema 数据"""
     try:
         with session_scope() as db:
@@ -352,7 +370,9 @@ def check_schema(user: CurrentUser):
 
 
 @router.get("/export")
+@limiter.limit(LIMIT_HEAVY)
 def export_schema(
+        request: Request,
         user: CurrentUser,
         schema_name: Optional[str] = None,
         table_name: Optional[str] = None,
@@ -401,7 +421,8 @@ def export_schema(
 
 
 @router.get("/schemas")
-def get_schemas(user: CurrentUser):
+@limiter.limit(LIMIT_READ)
+def get_schemas(request: Request, user: CurrentUser):
     """获取用户可见的 schema 列表（含 db_type 映射与数据源分组，供级联选择）"""
     try:
         with session_scope() as db:
@@ -434,7 +455,9 @@ def get_schemas(user: CurrentUser):
 
 
 @router.get("/tables")
+@limiter.limit(LIMIT_READ)
 def get_tables(
+        request: Request,
         user: CurrentUser,
         schema_name: Optional[str] = None,
 ):
@@ -458,7 +481,8 @@ def get_tables(
 
 
 @router.get("/supported-db-types")
-def get_supported_db_types():
+@limiter.limit(LIMIT_READ)
+def get_supported_db_types(request: Request):
     """获取支持的数据库类型列表"""
     return {
         "db_types": SUPPORTED_DB_TYPES,
@@ -482,7 +506,9 @@ def get_supported_db_types():
 # ═══════════════════════════════════════════════════════════════════
 
 @router.delete("/schema/{schema_name}")
+@limiter.limit(LIMIT_WRITE)
 def delete_schema(
+        request: Request,
         schema_name: str,
         user: AdminUser
 ):
@@ -491,14 +517,16 @@ def delete_schema(
     try:
         with session_scope() as db:
             count = schema_service.delete_schema_by_name(db, schema_name)
-            return {"success": True, "message": f"已删除 schema '{schema_name}' 的 {count} 条记录"}
+            return ok_msg(f"已删除 schema '{schema_name}' 的 {count} 条记录")
     except Exception as e:
         logger.error(f"删除 schema 失败：{e}")
         raise HTTPException(status_code=500, detail=f"删除失败：{str(e)}")
 
 
 @router.delete("/table")
+@limiter.limit(LIMIT_WRITE)
 def delete_table(
+        request: Request,
         schema_name: str,
         table_name: str,
         user: AdminUser
@@ -508,14 +536,16 @@ def delete_table(
     try:
         with session_scope() as db:
             count = schema_service.delete_table(db, schema_name, table_name)
-            return {"success": True, "message": f"已删除表 '{table_name}' 的 {count} 条记录"}
+            return ok_msg(f"已删除表 '{table_name}' 的 {count} 条记录")
     except Exception as e:
         logger.error(f"删除表失败：{e}")
         raise HTTPException(status_code=500, detail=f"删除失败：{str(e)}")
 
 
 @router.delete("/{schema_id}")
+@limiter.limit(LIMIT_WRITE)
 def delete_schema_item(
+        request: Request,
         schema_id: int,
         user: AdminUser
 ):
@@ -525,7 +555,7 @@ def delete_schema_item(
         with session_scope() as db:
             if not schema_service.delete_column_by_id(db, schema_id):
                 raise HTTPException(status_code=404, detail="Schema 项不存在")
-            return {"success": True, "message": "删除成功"}
+            return ok_msg("删除成功")
     except HTTPException:
         raise
     except Exception as e:
@@ -534,18 +564,20 @@ def delete_schema_item(
 
 
 @router.put("/{schema_id}/sample-values")
+@limiter.limit(LIMIT_WRITE)
 def update_sample_values(
         schema_id: int,
-        request: UpdateSampleValuesRequest,
+        payload: UpdateSampleValuesRequest,
+        request: Request,
         user: AdminUser
 ):
     """更新字段的示例值（仅管理员）"""
     # (权限由 AdminUser 依赖统一校验)
     try:
         with session_scope() as db:
-            if not schema_service.update_sample_values(db, schema_id, request.sample_values):
+            if not schema_service.update_sample_values(db, schema_id, payload.sample_values):
                 raise HTTPException(status_code=404, detail="Schema 项不存在")
-            return {"success": True, "message": "更新成功"}
+            return ok_msg("更新成功")
     except HTTPException:
         raise
     except Exception as e:
@@ -554,9 +586,11 @@ def update_sample_values(
 
 
 @router.put("/column/{column_id}")
+@limiter.limit(LIMIT_WRITE)
 def update_column_meta(
         column_id: int,
-        request: UpdateColumnMetaRequest,
+        payload: UpdateColumnMetaRequest,
+        request: Request,
         user: AdminUser
 ):
     """更新字段的维度/度量标记与描述（仅管理员）"""
@@ -565,12 +599,12 @@ def update_column_meta(
         with session_scope() as db:
             if not schema_service.update_column_metadata(
                 db, column_id,
-                is_dimension=request.is_dimension,
-                is_measure=request.is_measure,
-                description=request.description,
+                is_dimension=payload.is_dimension,
+                is_measure=payload.is_measure,
+                description=payload.description,
             ):
                 raise HTTPException(status_code=404, detail="字段不存在")
-            return {"success": True, "message": "更新成功"}
+            return ok_msg("更新成功")
     except HTTPException:
         raise
     except Exception as e:
@@ -582,8 +616,7 @@ def update_column_meta(
 # 表关系维护
 # ═══════════════════════════════════════════════════════════════════
 
-from models.schema import DbTableRelation
-from crud.schema import relation_crud, table_crud, column_crud, schema_crud
+from crud.schema import column_crud, relation_crud, schema_crud, table_crud
 
 ALLOWED_JOIN_TYPES = {'INNER JOIN', 'LEFT JOIN', 'RIGHT JOIN', 'FULL JOIN'}
 ALLOWED_RELATION_TYPES = {'1:1', '1:N', 'N:1', 'N:N'}
@@ -660,7 +693,8 @@ def _validate_relation_payload(left_schema, right_schema, left_table, left_colum
 
 
 @router.get("/relations")
-def list_relations(user: CurrentUser, schema_name: Optional[str] = None):
+@limiter.limit(LIMIT_READ)
+def list_relations(request: Request, user: CurrentUser, schema_name: Optional[str] = None):
     """表关系列表（按用户可见 schema 过滤；可再按库名筛选，左右任一侧命中即匹配）"""
     try:
         visible = get_visible_schema_ids(user)
@@ -679,7 +713,7 @@ def list_relations(user: CurrentUser, schema_name: Optional[str] = None):
             out.left_schema_name = name_map.get(r.left_schema_id, '')
             out.right_schema_name = name_map.get(r.right_schema_id, '')
             items.append(out)
-        return {"items": items, "total": len(items)}
+        return ok({"items": items, "total": len(items)})
     except HTTPException:
         raise
     except Exception as e:
@@ -688,7 +722,8 @@ def list_relations(user: CurrentUser, schema_name: Optional[str] = None):
 
 
 @router.post("/relations")
-def create_relation(req: RelationCreateRequest, user: AdminUser):
+@limiter.limit(LIMIT_WRITE)
+def create_relation(request: Request, req: RelationCreateRequest, user: AdminUser):
     """新建表关系（仅管理员；表/字段须真实存在，支持跨库）"""
     log_audit(user, "create_table_relation",
               f"{req.left_schema_name}.{req.left_table}.{req.left_column}"
@@ -731,7 +766,8 @@ def create_relation(req: RelationCreateRequest, user: AdminUser):
 
 
 @router.put("/relations/{relation_id}")
-def update_relation(relation_id: int, req: RelationUpdateRequest, user: AdminUser):
+@limiter.limit(LIMIT_WRITE)
+def update_relation(request: Request, relation_id: int, req: RelationUpdateRequest, user: AdminUser):
     """更新表关系（仅管理员；支持跨库，可改两侧库）"""
     log_audit(user, "update_table_relation", f"id={relation_id}")
     try:
@@ -776,13 +812,14 @@ def update_relation(relation_id: int, req: RelationUpdateRequest, user: AdminUse
 
 
 @router.delete("/relations/{relation_id}")
-def delete_relation(relation_id: int, user: AdminUser):
+@limiter.limit(LIMIT_WRITE)
+def delete_relation(request: Request, relation_id: int, user: AdminUser):
     """删除表关系（仅管理员）"""
     log_audit(user, "delete_table_relation", f"id={relation_id}")
     try:
         if not relation_crud.delete(relation_id):
             raise HTTPException(404, "表关系不存在")
-        return {"success": True, "message": "表关系已删除"}
+        return ok_msg("表关系已删除")
     except HTTPException:
         raise
     except Exception as e:
@@ -791,7 +828,8 @@ def delete_relation(relation_id: int, user: AdminUser):
 
 
 @router.get("/table-columns")
-def get_table_columns(user: CurrentUser, schema_name: str, table_name: str):
+@limiter.limit(LIMIT_READ)
+def get_table_columns(request: Request, user: CurrentUser, schema_name: str, table_name: str):
     """获取指定表的字段列表（表关系维护下拉用，含权限校验）"""
     try:
         if not is_schema_visible(user, schema_name):
@@ -819,24 +857,25 @@ def get_table_columns(user: CurrentUser, schema_name: str, table_name: str):
 # ═══════════════════════════════════════════════════════════════════
 
 @router.post("/build-vector-index")
+@limiter.limit(LIMIT_HEAVY)
 def build_vector_index(
-    request: BuildIndexRequest,
+    request: Request,
+    payload: BuildIndexRequest,
     user: AdminUser
 ):
-    """构建向量索引（仅管理员）"""
+    """构建向量索引（仅管理员，重接口：全库重建耗时以分钟计）
+
+    注意：body 参数命名为 payload，request 名留给 slowapi 定位 Request。
+    """
     # (权限由 AdminUser 依赖统一校验)
     _check_embedding_ready()
     try:
         from core.ret_index_meta import build_vector_index as do_build
 
-        result = do_build(request.schema_name)
-        message = "向量索引重建成功" if request.rebuild else "向量索引构建成功"
+        result = do_build(payload.schema_name)
+        message = "向量索引重建成功" if payload.rebuild else "向量索引构建成功"
 
-        return {
-            "success": True,
-            "message": message,
-            "result": result
-        }
+        return ok({'result': result}, message)
 
     except Exception as e:
         logger.error(f"构建向量索引失败：{e}")
@@ -844,7 +883,9 @@ def build_vector_index(
 
 
 @router.get("/vector-index-info", response_model=IndexInfoResponse)
+@limiter.limit(LIMIT_READ)
 def get_vector_index_info(
+    request: Request,
     user: CurrentUser,
     schema_name: Optional[str] = None,
 ):
@@ -868,7 +909,8 @@ def get_vector_index_info(
 
 
 @router.get("/vector-index-list")
-def list_vector_indexes(user: AdminUser):
+@limiter.limit(LIMIT_READ)
+def list_vector_indexes(request: Request, user: AdminUser):
     """列出向量索引元数据（仅管理员）
 
     对话为全库模式，统一维护 'default' 全库索引一行；历史按库索引行

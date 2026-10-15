@@ -6,13 +6,14 @@
 API 契约：前端通过 /api/knowledge 访问；字段召回增强端点 /api/knowledge/recall。
 """
 import json
-from typing import Optional, List, Dict, Any
+from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel, field_validator
 
 from app.auth import CurrentUser
-from app.logger import logger, log_audit
+from app.limiter import LIMIT_HEAVY, LIMIT_READ, LIMIT_WRITE, limiter
+from app.logger import log_audit, logger
 from app.permissions import get_visible_knowledge_ids, is_admin
 from crud.base import session_scope
 from crud.knowledge import knowledge_crud
@@ -157,7 +158,9 @@ def get_knowledge_safe(user_id: int, knowledge_id: int = None) -> dict:
             'content': item.content or ''
         }
 @router.get("", response_model=KnowledgeListResponse)
+@limiter.limit(LIMIT_READ)
 def list_knowledge(
+    request: Request,
     user: CurrentUser,
     limit: int = Query(20, ge=1, le=100),
     offset: int = Query(0, ge=0),
@@ -168,7 +171,9 @@ def list_knowledge(
 
 
 @router.post("", response_model=KnowledgeResponse)
+@limiter.limit(LIMIT_WRITE)
 def create_knowledge(
+    request: Request,
     data: KnowledgeRequest,
     user: CurrentUser
 ):
@@ -191,7 +196,9 @@ def create_knowledge(
 
 
 @router.get("/{knowledge_id}", response_model=KnowledgeResponse)
+@limiter.limit(LIMIT_READ)
 def get_knowledge(
+    request: Request,
     knowledge_id: int,
     user: CurrentUser
 ):
@@ -214,7 +221,9 @@ def get_knowledge(
 
 
 @router.put("/{knowledge_id}", response_model=KnowledgeResponse)
+@limiter.limit(LIMIT_WRITE)
 def update_knowledge(
+    request: Request,
     knowledge_id: int,
     data: KnowledgeRequest,
     user: CurrentUser
@@ -253,7 +262,9 @@ def update_knowledge(
 
 
 @router.delete("/{knowledge_id}")
+@limiter.limit(LIMIT_WRITE)
 def delete_knowledge(
+    request: Request,
     knowledge_id: int,
     user: CurrentUser
 ):
@@ -276,7 +287,9 @@ def delete_knowledge(
 
 
 @router.post("/recall", response_model=KnowledgeRecallResponse)
+@limiter.limit(LIMIT_HEAVY)
 def recall_knowledge_endpoint(
+    request: Request,
     body: KnowledgeRecallRequest,
     user: CurrentUser
 ):

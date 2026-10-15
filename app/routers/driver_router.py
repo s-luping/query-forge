@@ -10,11 +10,13 @@ import subprocess
 import sys
 from typing import List
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
 from app.auth import AdminUser
-from app.logger import logger, log_audit
+from app.limiter import LIMIT_HEAVY, LIMIT_READ, limiter
+from app.logger import log_audit, logger
+from app.response import ErrorCode, fail, ok_msg
 
 router = APIRouter()
 
@@ -79,7 +81,8 @@ class InstallRequest(BaseModel):
 
 
 @router.get("/list", response_model=DriverListResponse)
-def list_drivers(user: AdminUser):
+@limiter.limit(LIMIT_READ)
+def list_drivers(request: Request, user: AdminUser):
     """列出支持的数据库驱动及安装状态"""
     items = []
     for d in DRIVER_CATALOG:
@@ -93,7 +96,8 @@ def list_drivers(user: AdminUser):
 
 
 @router.post("/install")
-def install_driver(req: InstallRequest, user: AdminUser):
+@limiter.limit(LIMIT_HEAVY)
+def install_driver(request: Request, req: InstallRequest, user: AdminUser):
     """一键安装数据库驱动（pip 安装到当前服务解释器）"""
     package = req.package.strip()
     if not package:
@@ -118,11 +122,10 @@ def install_driver(req: InstallRequest, user: AdminUser):
                   f"package={package} python={sys.executable} code={proc.returncode}")
         if proc.returncode == 0:
             logger.info(f"驱动安装成功: {package}")
-            return {"success": True, "message": f"驱动 {package} 安装成功",
-                    "output": tail}
+            return ok_msg(f"驱动 {package} 安装成功", output=tail)
         logger.error(f"驱动安装失败: {package}\n{output[-800:]}")
-        return {"success": False, "message": f"驱动 {package} 安装失败（详见输出）",
-                "output": tail}
+        return fail(ErrorCode.INTERNAL, f"驱动 {package} 安装失败（详见输出）",
+                    {'output': tail})
     except subprocess.TimeoutExpired:
         raise HTTPException(status_code=500,
                             detail=f"安装超时（300秒），请稍后重试: {package}")

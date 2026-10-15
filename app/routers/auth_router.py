@@ -1,13 +1,16 @@
 import re
-from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from app.auth import (authenticate_user, create_access_token, hash_password,
-                      _get_token_expire_minutes)
+from app.auth import (
+    _get_token_expire_minutes,
+    authenticate_user,
+    create_access_token,
+    hash_password,
+)
 from app.config import COOKIE_SECURE
 from app.limiter import limiter
 from app.logger import logger
@@ -44,13 +47,16 @@ class RegisterRequest(BaseModel):
     email: Optional[str] = None
 
 
-@limiter.limit("2/minute")
+# 注意：①装饰器顺序 @router.post 必须在 @limiter.limit 外层，否则限流静默失效；
+# ②slowapi 按参数名查找 Request（kwargs['request'] 须为 Starlette Request），
+#   body 参数不能占用 request 这个名字
 @router.post("/login")
-def login(request: LoginRequest):
+@limiter.limit("2/minute")
+def login(request: Request, payload: LoginRequest):
     """登录"""
     try:
-        username = request.username
-        password = request.password
+        username = payload.username
+        password = payload.password
 
         user = authenticate_user(username, password)
         if user is None:
@@ -88,20 +94,20 @@ def login(request: LoginRequest):
         raise HTTPException(status_code=500, detail=f"登录失败: {str(e)}")
 
 
-@limiter.limit("2/minute")
 @router.post("/register")
-def register(request: RegisterRequest):
+@limiter.limit("2/minute")
+def register(request: Request, payload: RegisterRequest):
     """注册（受 ALLOW_REGISTER 系统设置控制；企业内部可关闭，改由管理员创建账号）"""
     try:
         # 注册开关：管理员可在 系统设置 中关闭自助注册
         allow = system_setting_crud.get_one(key='ALLOW_REGISTER')
         if allow is None or str(allow.value).lower() not in ('1', 'true', 'yes'):
-            logger.warning(f"注册被管理员关闭: username={request.username}")
+            logger.warning(f"注册被管理员关闭: username={payload.username}")
             raise HTTPException(status_code=403, detail="系统已关闭自助注册，请联系管理员开通账号")
 
-        username = request.username
-        password = request.password
-        email = request.email
+        username = payload.username
+        password = payload.password
+        email = payload.email
 
         if len(username) < 3:
             raise HTTPException(status_code=400, detail="用户名至少需要3个字符")

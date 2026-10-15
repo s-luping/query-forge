@@ -1,4 +1,4 @@
-"""应用中间件：安全响应头、访问日志、页面访问守卫和 CORS。"""
+"""应用中间件：安全响应头、访问日志（含 traceId/慢接口）、页面访问守卫和 CORS。"""
 import time
 
 from fastapi import FastAPI, Request
@@ -6,8 +6,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from app.auth import resolve_token_user
-from app.config import CORS_ORIGINS, FRAME_ANCESTORS
+from app.config import CORS_ORIGINS, FRAME_ANCESTORS, SLOW_REQUEST_MS
 from app.logger import logger
+from app.response import get_request_id, new_request_id, set_request_id
 
 _TEMPLATE_ADMIN_PREFIXES = (
     '/static/template/system/',
@@ -54,6 +55,8 @@ async def access_log(request: Request, call_next):
     if any(request.url.path.startswith(path)
            for path in ('/static', '/favicon.ico', '/__reload__')):
         return await call_next(request)
+    # traceId：贯穿访问日志 / 慢SQL日志 / 错误响应体 / X-Request-ID 响应头
+    set_request_id(new_request_id())
     started = time.time()
     token = request.cookies.get('token') or request.headers.get(
         'Authorization', '').replace('Bearer ', '')
@@ -62,8 +65,18 @@ async def access_log(request: Request, call_next):
     duration = (time.time() - started) * 1000
     identity = (f"user_id={user['user_id']} username={user['username']}"
                 if user else 'anonymous')
-    logger.info(f'[{request.method}] {request.url.path} - {response.status_code} - '
-                f'{duration:.2f}ms - {identity}')
+    rid = get_request_id()
+    log_line = (f'[{rid}] [{request.method}] {request.url.path} - '
+                f'{response.status_code} - {duration:.2f}ms - {identity}')
+    if duration >= SLOW_REQUEST_MS:
+        # 慢接口观测（纲领 §4.1）：独立 WARNING 便于检索
+        logger.warning(f'[SLOW] {log_line}')
+    else:
+        logger.info(log_line)
+    try:
+        response.headers['X-Request-ID'] = rid
+    except Exception:
+        pass
     return response
 
 
