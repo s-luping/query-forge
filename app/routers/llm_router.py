@@ -316,9 +316,13 @@ def update_config(request: Request, config_id: int, payload: LLMConfigUpdate, us
             config = _get_editable_config(db, config_id, user)
             if not config:
                 raise HTTPException(status_code=404, detail="配置不存在或无权修改")
+            # 注意：必须读 payload 而非 request — Starlette Request 自带 base_url 属性
+            # （URL 对象），误读会把请求地址写进库导致 sqlite3.InterfaceError
             for attr in ['model', 'base_url', 'max_tokens', 'temperature', 'timeout', 'description']:
-                val = getattr(request, attr, None)
+                val = getattr(payload, attr, None)
                 if val is not None:
+                    if attr == 'base_url':
+                        val = str(val)   # 防御：杜绝 URL 等非 str 对象写入 String 列
                     setattr(config, attr, val)
             # api_key 单独处理：非空才覆盖并加密
             if payload.api_key is not None and payload.api_key != '':
