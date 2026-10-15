@@ -11,7 +11,6 @@ import time
 from app.logger import logger
 from app.timezone import now_beijing
 
-
 SETTING_META = {
     'SECRET_KEY': ('security', 0),
     'ACCESS_TOKEN_EXPIRE_MINUTES': ('auth', 1),
@@ -27,8 +26,8 @@ SETTING_META = {
 def _seed_system_settings():
     """初始化系统配置表 — 从 config 初始值写入 system_settings"""
     import app.config as config
-    from models.system import SystemSetting
     from db.engine import SessionLocal
+    from models.system import SystemSetting
     db = SessionLocal()
     try:
         for key, (category, editable) in SETTING_META.items():
@@ -50,9 +49,9 @@ def _seed_system_settings():
 
 def _seed_roles():
     """初始化角色 — 管理员 / 普通用户，并为已有用户分配角色"""
+    from db.engine import SessionLocal
     from models.role import Role, UserRole
     from models.user import User
-    from db.engine import SessionLocal
     db = SessionLocal()
     try:
         admin_role = db.query(Role).filter(Role.code == 'admin').first()
@@ -82,9 +81,9 @@ def _seed_roles():
 
 def create_default_admin():
     """创建默认管理员用户（仅首次）"""
-    from models.user import User
     from app.auth import hash_password
     from db.engine import SessionLocal
+    from models.user import User
     db = SessionLocal()
     try:
         admin = db.query(User).filter(User.username == 'admin').first()
@@ -99,10 +98,10 @@ def create_default_admin():
             db.commit()
             logger.info("默认管理员用户创建成功: admin")
             print(f"\n{'='*60}")
-            print(f"  默认管理员账号已创建")
-            print(f"  用户名: admin")
+            print("  默认管理员账号已创建")
+            print("  用户名: admin")
             print(f"  密码:   {pwd}")
-            print(f"  请登录后立即修改密码！")
+            print("  请登录后立即修改密码！")
             print(f"{'='*60}\n")
         else:
             logger.debug("管理员用户已存在")

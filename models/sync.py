@@ -2,20 +2,36 @@
 """元数据同步模型 — 同步任务 + 执行历史 + 变更记录
 
 架构层次：
-    DataSource (外部数据库连接配置，见 models/datasource.py)
-        └── SyncJobConfig (同步任务：数据源 → 目标 schema)
-                └── SyncRunLog (每次执行的历史记录)
-                        └── SchemaChangeLog (检测到的变更明细)
+    DataSource (外部数据库连接配置，见 models/datasource.py，主库)
+        └── SyncJobConfig (同步任务：数据源 → 目标 schema，主库)
+                └── SyncRunLog (每次执行的历史记录，日志库)
+                        └── SchemaChangeLog (检测到的变更明细，日志库)
 
 变更审批流程：
     - 新增表/字段 → auto_applied（自动应用 + 自动分类敏感等级）
     - 修改字段类型 → auto_applied（自动更新 + 记录变更）
     - 删除表/字段 → pending（需管理员审批后才执行删除）
     - 管理员拒绝删除 → ignored（保留元数据，标记源库已移除）
+
+库归属说明：SyncRunLog / SchemaChangeLog 为追加型高频写日志，已拆至
+日志库（logs.db，LogsBase）。跨库引用（job_id → sync_job_configs.id、
+datasource_id → data_sources.id）降级为普通索引列，删除同步任务/数据源
+时由 crud 层显式级联清理；run_log_id → sync_run_logs.id 为库内引用，
+保留外键约束。
 """
-from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime, ForeignKey, UniqueConstraint
-from models.base import MainBase
+from sqlalchemy import (
+    Boolean,
+    Column,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+)
+
 from app.timezone import now_beijing
+from models.base import LogsBase, MainBase
 
 
 class SyncJobConfig(MainBase):
@@ -38,11 +54,11 @@ class SyncJobConfig(MainBase):
     updated_at = Column(DateTime, default=now_beijing, onupdate=now_beijing, comment='更新时间（北京时间）')
 
 
-class SyncRunLog(MainBase):
-    """同步执行历史 — 每次同步运行的完整记录"""
+class SyncRunLog(LogsBase):
+    """同步执行历史 — 每次同步运行的完整记录（日志库）"""
     __tablename__ = 'sync_run_logs'
     id = Column(Integer, primary_key=True, autoincrement=True, comment='主键')
-    job_id = Column(Integer, ForeignKey('sync_job_configs.id'), nullable=False, index=True, comment='同步任务ID')
+    job_id = Column(Integer, nullable=False, index=True, comment='同步任务ID(跨库引用sync_job_configs.id,应用层级联清理)')
     triggered_by = Column(String(50), default='scheduler', comment='触发者: scheduler/manual/<username>')
     started_at = Column(DateTime, default=now_beijing, comment='开始时间（北京时间）')
     finished_at = Column(DateTime, comment='结束时间')
@@ -59,13 +75,13 @@ class SyncRunLog(MainBase):
     summary = Column(Text, default='', comment='摘要(JSON): 变更详情')
 
 
-class SchemaChangeLog(MainBase):
-    """Schema 变更记录 — 检测到的每次变更明细"""
+class SchemaChangeLog(LogsBase):
+    """Schema 变更记录 — 检测到的每次变更明细（日志库）"""
     __tablename__ = 'schema_change_logs'
     id = Column(Integer, primary_key=True, autoincrement=True, comment='主键')
-    run_log_id = Column(Integer, ForeignKey('sync_run_logs.id'), nullable=False, index=True, comment='同步执行ID')
-    job_id = Column(Integer, ForeignKey('sync_job_configs.id'), nullable=False, index=True, comment='同步任务ID')
-    datasource_id = Column(Integer, ForeignKey('data_sources.id'), nullable=False, index=True, comment='数据源ID')
+    run_log_id = Column(Integer, ForeignKey('sync_run_logs.id'), nullable=False, index=True, comment='同步执行ID(库内引用)')
+    job_id = Column(Integer, nullable=False, index=True, comment='同步任务ID(跨库引用sync_job_configs.id,应用层级联清理)')
+    datasource_id = Column(Integer, nullable=False, index=True, comment='数据源ID(跨库引用data_sources.id,应用层级联清理)')
     target_schema_name = Column(String(100), nullable=False, comment='目标 schema 名')
     change_type = Column(String(20), nullable=False, index=True, comment='变更类型: add/modify/remove')
     object_type = Column(String(20), nullable=False, comment='对象类型: table/column')

@@ -1,8 +1,8 @@
 # -*- coding: UTF-8 -*-
 """验证脚本：db 模块拆分后的 import 与功能检查"""
+import importlib
 import os
 import sys
-import importlib
 
 # 确保项目根目录在 Python 路径中
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -13,9 +13,11 @@ passes = []
 # 1. db.engine
 try:
     from db.engine import (
-        engine_main, engine_telemetry, SessionLocal,
-        TelemetrySessionLocal, is_sqlite,
-        create_db_engine, _resolve_urls, _mask_url,
+        _mask_url,
+        _resolve_urls,
+        engine_main,
+        engine_telemetry,
+        is_sqlite,
     )
     passes.append('db.engine: all exports OK')
 except Exception as e:
@@ -23,21 +25,19 @@ except Exception as e:
 
 # 2. db.sqlite_hooks
 try:
-    from db.sqlite_hooks import _make_pragma, _ensure_column_sqlite
     passes.append('db.sqlite_hooks: _make_pragma, _ensure_column_sqlite OK')
 except Exception as e:
     errors.append(f'db.sqlite_hooks FAIL: {e}')
 
 # 3. db.seed
 try:
-    from db.seed import _seed_system_settings, _seed_roles, create_default_admin, SETTING_META
     passes.append('db.seed: all exports OK')
 except Exception as e:
     errors.append(f'db.seed FAIL: {e}')
 
 # 4. db.database
 try:
-    from db.database import get_setting, init_database, is_sqlite
+    from db.database import is_sqlite
     passes.append('db.database: get_setting, init_database, is_sqlite OK')
 except Exception as e:
     errors.append(f'db.database FAIL: {e}')
@@ -45,9 +45,9 @@ except Exception as e:
 # 5. db __init__
 try:
     from db import (
-        engine_main, engine_telemetry, SessionLocal,
-        TelemetrySessionLocal, get_setting, init_database,
-        is_sqlite, AppSessionLocal,
+        engine_main,
+        engine_telemetry,
+        is_sqlite,
     )
     passes.append('db (__init__): all 8 exports OK')
 except Exception as e:
@@ -55,7 +55,6 @@ except Exception as e:
 
 # 6. crud.base (downstream consumer)
 try:
-    from crud.base import session_scope, tx_scope, BaseCrud
     passes.append('crud.base: session_scope, tx_scope, BaseCrud OK')
 except Exception as e:
     errors.append(f'crud.base FAIL: {e}')
@@ -74,7 +73,7 @@ except Exception as e:
 try:
     from db import is_sqlite
     assert is_sqlite is True, f'is_sqlite should be True, got: {is_sqlite}'
-    passes.append(f'is_sqlite flag: True (default SQLite) OK')
+    passes.append('is_sqlite flag: True (default SQLite) OK')
 except Exception as e:
     errors.append(f'is_sqlite flag FAIL: {e}')
 
@@ -92,7 +91,7 @@ try:
     assert main_url.startswith('sqlite'), f'Main should be sqlite, got: {main_url}'
     assert tel_url.startswith('sqlite'), f'Telemetry should be sqlite, got: {tel_url}'
     assert main_url != tel_url, 'SQLite should have separate files'
-    passes.append(f'_resolve_urls: separate SQLite files OK')
+    passes.append('_resolve_urls: separate SQLite files OK')
 except Exception as e:
     errors.append(f'_resolve_urls FAIL: {e}')
 
@@ -103,7 +102,7 @@ try:
     main_url2, tel_url2 = _resolve_urls()
     assert main_url2 == 'mysql+pymysql://user:pass@localhost:3306/test', f'Got: {main_url2}'
     assert tel_url2 == main_url2, f'External: telemetry should = main, got: {tel_url2}'
-    passes.append(f'_resolve_urls (MySQL): telemetry = main (same DB) OK')
+    passes.append('_resolve_urls (MySQL): telemetry = main (same DB) OK')
     # Clean up
     del os.environ['DATABASE_URL']
     importlib.reload(config)

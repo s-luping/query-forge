@@ -2,7 +2,6 @@
 """验证直接修改 config.py 切换数据库（不使用 .env 文件）"""
 import os
 import sys
-import importlib
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, PROJECT_ROOT)
@@ -14,12 +13,12 @@ def test_default_sqlite():
     config.DATABASE_URL = ''
     config.TELEMETRY_DATABASE_URL = ''
 
-    from db.engine import _resolve_urls, _is_sqlite_url
+    from db.engine import _resolve_urls
     main_url, tel_url = _resolve_urls()
     assert main_url.startswith('sqlite')
     assert tel_url.startswith('sqlite')
     assert main_url != tel_url, 'SQLite should have separate files'
-    print(f'  PASS: SQLite default, main != telemetry (separate files)')
+    print('  PASS: SQLite default, main != telemetry (separate files)')
 
 
 def test_mysql():
@@ -28,7 +27,7 @@ def test_mysql():
     config.DATABASE_URL = 'mysql+pymysql://testuser:testpass@testhost:3306/testdb?charset=utf8mb4'
     config.TELEMETRY_DATABASE_URL = ''
 
-    from db.engine import _resolve_urls, _is_sqlite_url, _mask_url
+    from db.engine import _is_sqlite_url, _mask_url, _resolve_urls
     assert not _is_sqlite_url(config.DATABASE_URL)
     main_url, tel_url = _resolve_urls()
     assert main_url == config.DATABASE_URL
@@ -49,7 +48,7 @@ def test_postgresql():
     main_url, tel_url = _resolve_urls()
     assert main_url == config.DATABASE_URL
     assert tel_url == main_url
-    print(f'  PASS: PostgreSQL, telemetry=main')
+    print('  PASS: PostgreSQL, telemetry=main')
 
 
 def test_sqlite_explicit():
@@ -58,12 +57,12 @@ def test_sqlite_explicit():
     config.DATABASE_URL = 'sqlite:///db/test_explicit.db'
     config.TELEMETRY_DATABASE_URL = ''
 
-    from db.engine import _resolve_urls, _is_sqlite_url
+    from db.engine import _is_sqlite_url, _resolve_urls
     assert _is_sqlite_url(config.DATABASE_URL)
     main_url, tel_url = _resolve_urls()
     assert 'test_explicit' in main_url
     assert tel_url != main_url, 'SQLite: telemetry should be separate'
-    print(f'  PASS: explicit SQLite, telemetry=separate file')
+    print('  PASS: explicit SQLite, telemetry=separate file')
 
 
 def test_separate_telemetry():
@@ -77,7 +76,7 @@ def test_separate_telemetry():
     assert 'main_db' in main_url
     assert 'telemetry_db' in tel_url
     assert main_url != tel_url
-    print(f'  PASS: separate main+telemetry URLs')
+    print('  PASS: separate main+telemetry URLs')
 
 
 def test_back_to_default():
@@ -90,7 +89,7 @@ def test_back_to_default():
     main_url, _ = _resolve_urls()
     assert main_url.startswith('sqlite')
     assert 'queryforge.db' in main_url
-    print(f'  PASS: back to default SQLite')
+    print('  PASS: back to default SQLite')
 
 
 if __name__ == '__main__':

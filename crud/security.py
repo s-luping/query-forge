@@ -11,6 +11,7 @@ from models.security import QueryAuditLog
 
 class AuditCrud(BaseCrud):
     model = QueryAuditLog
+    default_db = 'logs'   # 查询审计日志已拆至日志库（logs.db）
 
     def list_by_user(self, user_id: int, limit: int = 100) -> list:
         return self.list(user_id=user_id, order_by='created_at', desc=True)[:limit]
