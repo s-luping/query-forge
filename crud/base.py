@@ -10,10 +10,18 @@
 用法：
     from crud.base import session_scope, BaseCrud
     with session_scope() as db:          # 单会话多步操作
-        row = db.query(User).first()
+        row = db.query(User).filter(...)
 
     from crud.user import user_crud
     u = user_crud.get_by_id(1)            # 单步 CRUD，内部自管会话
+
+会话语义（expire_on_commit=False，见 db/engine.py）：
+    - commit 不再过期属性，实例脱离会话（close 后）仍可安全读属性；
+      逃出 with 块的 ORM 对象无需强制 expunge（expunge 仍是推荐写法，
+      语义为"显式声明快照离开"）
+    - 例外：同会话内用 query.update/delete(synchronize_session=False) bulk
+      改过的行，其已加载的 ORM 实例不会同步——之后再读这些行必须重新 query，
+      或改用 synchronize_session='fetch'
 
 库选择（三库分离）：
     session_scope()                → 主库（默认）

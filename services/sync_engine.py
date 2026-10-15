@@ -85,6 +85,10 @@ class SyncEngine:
                 stored_schema, stored_tables, stored_cols_map = self._get_stored_metadata(db)
                 if stored_schema is None:
                     stored_schema = self._create_target_schema(db)
+                # 会话关闭（close 使实例脱离）+ 内部 commit（属性过期）后，
+                # 再访问 stored_schema.name 会触发 DetachedInstanceError，
+                # 因此必须在会话存活期间取出标量值
+                schema_name = stored_schema.name
 
                 # 5. Diff
                 changes = diff_metadata(source_tables, stored_tables, stored_cols_map)
@@ -124,7 +128,7 @@ class SyncEngine:
                 db.commit()
 
             # 10. 触发索引重建
-            self._trigger_index_rebuild(stored_schema.name)
+            self._trigger_index_rebuild(schema_name)
 
             logger.info(f"同步完成: {run_log.summary}")
             return run_log

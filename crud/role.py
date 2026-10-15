@@ -176,7 +176,11 @@ class RolePermissionCrud(BaseCrud):
             q = db.query(RolePermission).filter(RolePermission.role_id.in_(role_ids))
             if resource_type:
                 q = q.filter(RolePermission.resource_type == resource_type)
-            return q.all()
+            rows = q.all()
+            # expunge 后再返回，避免会话外访问过期属性触发 DetachedInstanceError
+            for r in rows:
+                db.expunge(r)
+            return rows
 
 
 role_crud = RoleCrud()

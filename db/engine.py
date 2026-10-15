@@ -122,13 +122,18 @@ is_sqlite = _is_sqlite_url(_main_url)
 _telemetry_same_as_main = (_telemetry_url == _main_url)
 _logs_same_as_main = (_logs_url == _main_url)
 
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine_main)
+# expire_on_commit=False：本项目惯例是"加载 → 脱离会话 → 会话外使用"（BaseCrud
+# 全系 expunge 返回、后台线程拿 detached 对象）。commit 后保留内存态可根除
+# DetachedInstanceError 一类隐患。约束：同会话内 bulk update(synchronize_session=False)
+# 改过的行，之后再读须重新 query（commit 不会再触发重查）。
+SessionLocal = sessionmaker(autocommit=False, autoflush=False,
+                            expire_on_commit=False, bind=engine_main)
 TelemetrySessionLocal = sessionmaker(
-    autocommit=False, autoflush=False,
+    autocommit=False, autoflush=False, expire_on_commit=False,
     bind=engine_telemetry if not _telemetry_same_as_main else engine_main,
 )
 LogsSessionLocal = sessionmaker(
-    autocommit=False, autoflush=False,
+    autocommit=False, autoflush=False, expire_on_commit=False,
     bind=engine_logs if not _logs_same_as_main else engine_main,
 )
 
