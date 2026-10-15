@@ -13,7 +13,7 @@ from crud.base import session_scope
 from models.schema import DbColumn, DbSchema, DbTable
 from models.security import QueryAuditLog
 
-router = APIRouter(tags=['audit'])
+router = APIRouter()
 
 
 class AuditLogItem(BaseModel):
