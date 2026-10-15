@@ -1,0 +1,32 @@
+# QueryForge 工程化配置 — lint / format / test 统一入口
+# 开发纲领 §2：提交前必须过 lint / type / test
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+exclude = [
+    ".venv",
+    "static/vendor",
+    "models/embeddings",
+    "__pycache__",
+]
+
+[tool.ruff.lint]
+# 起步守卫集：E9 语法错误、F pyflakes、W605 无效转义、I 导入排序。
+# 后续按需收紧（如加 B/S/C90），保持 CI 全绿再渐进。
+select = ["E9", "F", "W605", "I"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["app", "core", "crud", "db", "models", "scheduler", "services"]
+
+[tool.ruff.lint.per-file-ignores]
+# __init__.py 的 F401 多为有意再导出（公共能力下沉入口），不清理
+"**/__init__.py" = ["F401"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-q"
+filterwarnings = [
+    "ignore::DeprecationWarning",
+]
