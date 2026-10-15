@@ -27,10 +27,7 @@ from services.schema_parsers import (
     parse_json_schema,
     parse_schema_csv,
 )
-from services.vector_service import (  # 从服务层导入（消除路由层职责过重）
-    auto_build_vector_index,
-    mark_index_stale,
-)
+from services.vector_service import mark_index_stale  # 从服务层导入（消除路由层职责过重）
 
 router = APIRouter()
 
@@ -143,9 +140,8 @@ def _check_embedding_ready():
         )
 
 
-# 向量索引构建逻辑已下沉到 services/vector/service.py
+# 向量索引构建逻辑已下沉到 services/vector_service.py
 # 此处保留兼容别名（如有外部引用）
-_auto_build_vector_index = auto_build_vector_index
 _mark_index_stale = mark_index_stale
 
 
@@ -183,17 +179,12 @@ def _ingest_and_respond(parsed_results, user, db_type, source, fallback_schema,
                 message += f"，外键 {fk_count} 条"
     
         items = _items_in_schemas(db, schema_names, fallback_schema)
-    
-        index_messages = []
-        for schema_name in schema_names:
-            schema_field_count = schema_service.field_count(schema_name)
-            index_message = _auto_build_vector_index(schema_name, schema_field_count)
-            if index_message:
-                index_messages.append(index_message)
-    
-        if index_messages:
-            message += "。" + "；".join(index_messages)
-    
+
+        # 不再自动构建：只标记全库索引过期，由定时任务「向量索引重建」按需执行
+        if schema_names:
+            mark_index_stale('default')
+            message += "。向量索引已标记过期，将由定时任务自动重建"
+
         return SchemaListResponse(items=items, total=len(items), message=message)
 # ═══════════════════════════════════════════════════════════════════
 # 解析与导入端点

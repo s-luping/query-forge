@@ -367,11 +367,11 @@ class SyncEngine:
             ldb.commit()
 
     def _trigger_index_rebuild(self, schema_name: str):
-        """同步后标记向量索引过期（懒重建，不立即全量构建）
+        """同步后标记向量索引过期（不再自动构建，由定时任务重建）
 
         对话为全库模式（统一 fields 索引），同步任一库都影响全库索引。
-        策略：只标记 stale，下次对话召回时检测到 stale 再后台重建（原子写，
-        重建期间旧索引继续服务），避免每次同步都触发耗时全量重建。
+        策略：只标记 stale，定时任务「向量索引重建」检测到 stale 后按需
+        构建（原子写，重建期间旧索引继续服务），避免构建与用户使用冲突。
         """
         try:
             from services.vector_service import mark_index_stale

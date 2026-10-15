@@ -83,11 +83,12 @@ class SchemaRetriever:
     # ---------- 向量索引 ----------
 
     def try_load_vector_store(self, schema_name: Optional[str] = None) -> bool:
-        """尝试加载（必要时构建）向量索引；字段数低于阈值或失败时返回 False
+        """尝试加载向量索引（不再自动构建）；字段数低于阈值或失败时返回 False
 
         全库统一索引：始终加载无前缀 fields 索引（schema_name 仅记录用途）。
-        - 索引状态为 stale（同步后标记）时，用旧索引继续服务 + 后台懒重建，
-          不阻塞当前请求（重建不影响用户使用）。
+        - 索引状态为 stale（导入/同步后标记）时，用旧索引继续服务，
+          重建统一由定时任务「向量索引重建」执行，避免与用户使用冲突。
+        - 无索引文件时降级 DB 关键词召回，等待定时任务首次构建。
         """
         try:
             threshold = get_vector_config('VECTOR_INDEX_THRESHOLD')
@@ -97,40 +98,30 @@ class SchemaRetriever:
             store = SchemaVectorStore()
             if store.load(None):
                 self.vector_store, self.vector_loaded = store, True
-                # stale 检查：后台重建，不阻塞本次召回
-                self._maybe_rebuild_stale()
+                self._log_stale_status()
                 return True
 
-            # 无索引文件：前台构建（首问会慢，属预期）
-            schemas = [self._row_to_dict(r) for r in self.get_field_rows(None)]
-            if schemas:
-                store.build_from_schemas(schemas, None)
-                self.vector_store, self.vector_loaded = store, True
-                return True
+            # 无索引文件：不再前台构建，等待定时任务构建（期间降级 DB 召回）
+            logger.info("[SchemaRetriever] 向量索引尚未构建，本次召回降级 DB 查询，等待定时任务构建")
             return False
         except Exception as e:
             self.vector_error = str(e)
             logger.warning(f"[SchemaRetriever] 向量索引加载失败，降级DB查询: {e}")
             return False
 
-    def _maybe_rebuild_stale(self):
-        """索引状态为 stale 时后台懒重建（不阻塞当前请求）。
+    def _log_stale_status(self):
+        """索引状态为 stale 时仅记录日志（重建统一由定时任务执行）。
 
-        重建期间旧索引文件保持完整（原子写），本次召回继续用旧索引，
-        新索引就绪后自动替换。auto_build_vector_index 内部自带构建锁，
-        并发触发时后到者直接跳过。
+        旧索引文件保持完整（原子写），本次召回继续用旧索引服务，
+        定时任务「向量索引重建」检测到 stale 后按需构建替换。
         """
         try:
             from core.ret_index_meta import get_index_meta
             meta = get_index_meta('default')
-            if meta is None or meta.get('status') != 'stale':
-                return
-            from services.vector_service import auto_build_vector_index
-            result = auto_build_vector_index('default', meta.get('field_count', 0))
-            if result:
-                logger.info("[SchemaRetriever] stale 索引后台重建已触发")
+            if meta and meta.get('status') == 'stale':
+                logger.info("[SchemaRetriever] 向量索引为 stale，等待定时任务重建（本次召回使用旧索引）")
         except Exception as e:
-            logger.warning(f"[SchemaRetriever] stale 懒重建触发失败: {e}")
+            logger.warning(f"[SchemaRetriever] stale 状态检查失败: {e}")
 
     def search_vector(self, keywords: List[str],
                       query: Optional[str] = None,
