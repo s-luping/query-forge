@@ -13,8 +13,8 @@ from sqlalchemy import func
 from crud.base import BaseCrud, session_scope
 from models.datasource import DataSource
 from models.knowledge import KnowledgeItem
-from models.role import Role, UserRole, RolePermission
-from models.schema import DbSchema, DbTable, DbColumn
+from models.role import Role, RolePermission, UserRole
+from models.schema import DbColumn, DbSchema, DbTable
 from models.sync import SyncJobConfig
 from models.user import User
 

@@ -10,8 +10,8 @@ import hashlib
 from typing import Optional
 
 from app.logger import logger
-from models.llm import LLMCall, LLMPrompt
 from crud.base import session_scope
+from models.llm import LLMCall, LLMPrompt
 
 
 def get_or_create_prompt(content: Optional[str]) -> Optional[int]:

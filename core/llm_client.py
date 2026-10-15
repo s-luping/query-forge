@@ -7,7 +7,6 @@ LLM客户端 - 通用大模型API调用
 """
 import ipaddress
 import json
-import re
 import time
 from typing import Optional
 from urllib.parse import urlparse
@@ -17,7 +16,6 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
 from app.logger import llm_logger
-
 
 # ── SSRF 防护 ──────────────────────────────────────────────
 

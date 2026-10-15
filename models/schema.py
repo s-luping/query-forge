@@ -5,10 +5,19 @@
 - 列表/统计直接查三层，无需 GROUP BY
 - 表级操作（改表注释、删表）= 一行操作
 """
-from datetime import datetime
-from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, ForeignKey, UniqueConstraint
-from models.base import MainBase
+from sqlalchemy import (
+    Boolean,
+    Column,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+)
+
 from app.timezone import now_beijing
+from models.base import MainBase
 
 
 class DbSchema(MainBase):

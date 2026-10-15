@@ -83,7 +83,7 @@ class KnowledgeCrud(BaseCrud):
             return []
 
         with session_scope() as db:
-            from sqlalchemy import or_, and_
+            from sqlalchemy import or_
             q = db.query(KnowledgeItem).filter(KnowledgeItem.is_active == 1)
 
             # 作用域下推（relation 类型豁免）

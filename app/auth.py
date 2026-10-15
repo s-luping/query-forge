@@ -1,16 +1,16 @@
-from datetime import datetime, timedelta
-from typing import Annotated, Dict, Any, Optional
+from datetime import timedelta
+from typing import Annotated, Any, Dict, Optional
 
 import jwt
 from fastapi import Depends, HTTPException, Request
 
+from app.config import ACCESS_TOKEN_EXPIRE_MINUTES, SECRET_KEY
 from app.logger import logger
-from app.config import SECRET_KEY, ACCESS_TOKEN_EXPIRE_MINUTES
 from app.timezone import now_beijing_aware
-from crud.base import session_scope, tx_scope
+from crud.base import session_scope
 from db import get_setting
-from models.user import User
 from models.role import Role, UserRole
+from models.user import User
 
 ALGORITHM = 'HS256'
 
@@ -164,7 +164,7 @@ async def get_current_user(request: Request):
 
     user = resolve_token_user(token)
     if user is None:
-        logger.warning(f"无效/失效的token")
+        logger.warning("无效/失效的token")
         raise HTTPException(status_code=401, detail="无效的token或登录已失效，请重新登录")
     logger.debug(f"用户认证成功: {user['username']}")
     return user

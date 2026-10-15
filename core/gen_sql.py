@@ -1,5 +1,5 @@
 import re
-from typing import List, Optional, Tuple, Dict
+from typing import Dict, List, Optional, Tuple
 
 
 class SqlGenerator:

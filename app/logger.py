@@ -13,8 +13,9 @@ import logging
 import os
 import traceback
 from datetime import datetime
-from app.timezone import BEIJING_TZ
 from logging.handlers import RotatingFileHandler, TimedRotatingFileHandler
+
+from app.timezone import BEIJING_TZ
 
 LOG_DIR = "logs"
 os.makedirs(LOG_DIR, exist_ok=True)

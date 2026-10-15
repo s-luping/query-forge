@@ -11,10 +11,10 @@
 - payload: 结构化内容 JSON 字符串，按 knowledge_type 解释，平台只透传 + 内建类型渲染。
 - scope_schema_id: 作用域（限定的 schema id；NULL=全局）。relation 类型忽略此限制（关系天然跨库）。
 """
-from datetime import datetime
-from sqlalchemy import Column, Integer, String, DateTime, Text
-from models.base import MainBase
+from sqlalchemy import Column, DateTime, Integer, String, Text
+
 from app.timezone import now_beijing
+from models.base import MainBase
 
 
 class KnowledgeItem(MainBase):

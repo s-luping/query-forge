@@ -5,9 +5,10 @@ gateway_result 兼容两种形态：
   - SqlGatewayResult 对象（pipeline 传入）
   - to_dict() 产物 dict（chat 传入）
 """
+from typing import Optional
+
 from app.logger import logger
 from crud.base import session_scope
-from typing import Optional
 
 
 def write_query_audit_log(user_id: int, user: dict, query: str,

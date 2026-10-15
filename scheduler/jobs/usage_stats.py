@@ -6,7 +6,7 @@
 """
 from datetime import date, datetime, timedelta
 
-from sqlalchemy import func, case
+from sqlalchemy import case, func
 
 from app.logger import logger
 from app.timezone import now_beijing

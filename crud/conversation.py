@@ -40,7 +40,6 @@ class ConversationCrud(BaseCrud):
         Returns:
             (conversations, total)
         """
-        from sqlalchemy import func
         with session_scope() as db:
             q = db.query(Conversation)
             if not is_admin:

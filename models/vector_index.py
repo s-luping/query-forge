@@ -3,10 +3,10 @@
 注：仍以 schema_name 字符串为键（索引文件名也使用 schema 前缀），
 与 db_schemas.id 的强关联留作后续演进。
 """
-from datetime import datetime
-from sqlalchemy import Column, Integer, String, Text, DateTime
-from models.base import MainBase
+from sqlalchemy import Column, DateTime, Integer, String, Text
+
 from app.timezone import now_beijing
+from models.base import MainBase
 
 
 class VectorIndexMeta(MainBase):
