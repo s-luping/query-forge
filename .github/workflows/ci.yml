@@ -1,0 +1,30 @@
+# CI — 开发纲领 §2 / §6.3：lint + 反模式守卫 + 测试
+name: ci
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      # CI 只装轻量子集（torch 等重依赖不进 CI，见 requirements-ci.txt）
+      - name: Install CI deps
+        run: pip install -r requirements-ci.txt
+
+      - name: Ruff lint
+        run: ruff check .
+
+      - name: CI guard (反模式 + 资产登记校验)
+        run: python scripts/ci_guard.py
+
+      - name: Pytest
+        run: python -m pytest
