@@ -37,7 +37,8 @@ def write_query_audit_log(user_id: int, user: dict, query: str,
             tables = columns = block_reason = ''
             hit_sensitive = was_blocked = False
 
-        with session_scope() as db:
+        # QueryAuditLog 挂 LogsBase（三库分离），必须写日志库
+        with session_scope(logs=True) as db:
             log = QueryAuditLog(
                 user_id=user_id,
                 username=str(user.get('username', '')),
@@ -71,7 +72,8 @@ def update_pipeline_log(log_id: Optional[int], pipeline_log: str):
         return
     try:
         from models.security import QueryAuditLog
-        with session_scope() as db:
+        # QueryAuditLog 在日志库（三库分离），回写也必须走日志库
+        with session_scope(logs=True) as db:
             db.query(QueryAuditLog).filter(QueryAuditLog.id == log_id).update(
                 {QueryAuditLog.pipeline_log: pipeline_log})
             db.commit()
