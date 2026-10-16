@@ -199,11 +199,24 @@ class SchemaRetriever:
             logger.warning(f"[SchemaRetriever] 构建搜索掩码失败，放行全量: {e}")
             return None
 
+    def list_schema_tables(self, schema_name: str) -> List[str]:
+        """权限约束下的库内表名列表（库级 + 表级权限裁剪）"""
+        with session_scope() as db:
+            tables = schema_service.list_tables(
+                db, schema_name=schema_name,
+                visible_schema_ids=get_visible_schema_ids(self.user),
+                table_grants_by_schema=get_table_grants_by_schema(self.user))
+            return [t[0] for t in tables]
+
     def recall_fields(self, keywords: List[str],
                       schema_name: Optional[str] = None,
                       query: Optional[str] = None) -> List[Dict]:
         """字段召回统一入口：向量优先（懒加载）+ DB 关键词兜底合并。
 
+        - 小库直通：指定库且表数不超过 SMALL_SCHEMA_TABLE_LIMIT 时跳过召回，
+          每表返回一个 full_scope 标记的占位字段，整库进入上下文。
+          十几张表的库全量 CSV 仅千余 token，字段召回 TopK 截断反而会丢核心表
+          （如 formula_1 的 drivers/races 未召回导致两模型一致误拦截）。
         - 向量索引可能是历史构建（缺库/权限范围不一致），仅靠向量会漏召回
           未建索引库的表 → 用 DB 关键词召回做并集兜底，保证覆盖所有可见库。
         - 两条路径返回字段均以 DB 权限集合过滤/归一化（schema_name/column_name）。
@@ -211,6 +224,17 @@ class SchemaRetriever:
         - query: 原始用户问题，用于向量编码（语义完整度高于关键词拼接）。
         - 全库索引下用权限掩码避免 top-K 名额被无权限字段挤占。
         """
+        if schema_name:
+            try:
+                all_tables = self.list_schema_tables(schema_name)
+                if 0 < len(all_tables) <= get_vector_config('SMALL_SCHEMA_TABLE_LIMIT'):
+                    return [{'schema_name': schema_name, 'table_name': t,
+                             'column_name': '', 'recall_source': 'full',
+                             'full_scope': True}
+                            for t in all_tables]
+            except Exception as e:
+                logger.warning(f"[SchemaRetriever] 小库直通判定失败，走常规召回: {e}")
+
         if not self.vector_loaded and self.vector_error is None:
             self.try_load_vector_store(schema_name)
 
@@ -284,10 +308,15 @@ class SchemaRetriever:
         此前累积路径把首轮表混入后按 MAX_TABLES 随机裁剪（无命中数时排序不稳定），
         导致首轮 15 张表被挤到 10 张。
         """
-        max_tables = get_vector_config('MAX_TABLES')
         # 保持输入顺序（追问轮传 merged_order 保序列表；同名列去重/白名单裁剪依赖稳定表序）
         table_names = list(dict.fromkeys(
             f.get('table_name') for f in recalled_fields if f.get('table_name')))
+
+        # 小库直通：召回带 full_scope 标记时整库注入，不受 MAX_TABLES 裁剪
+        full_scope = any(f.get('full_scope') for f in recalled_fields)
+        max_tables = get_vector_config('MAX_TABLES')
+        if full_scope:
+            max_tables = max(max_tables, len(table_names))
 
         if len(table_names) > max_tables:
             # 权重裁剪：向量召回字段(recall_source=vector)所在表优先保留，
@@ -334,6 +363,7 @@ class SchemaRetriever:
             'tables': table_names,
             'all_fields': all_fields,
             'schema_name': schema_name,
+            'full_scope': full_scope,
         }
 
     # ---------- 知识条目单独召回（概念级检索，第三支柱） ----------

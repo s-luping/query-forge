@@ -20,6 +20,7 @@ SETTING_META = {
     'VECTOR_INDEX_THRESHOLD': ('vector', 1),
     'FIELD_RECALL_TOP_K': ('vector', 1),
     'MAX_TABLES': ('vector', 1),
+    'SMALL_SCHEMA_TABLE_LIMIT': ('vector', 1),
 }
 
 

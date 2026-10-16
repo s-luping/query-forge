@@ -413,7 +413,10 @@ class ChatSession:
                 if t not in merged_order:
                     merged_order.append(t)
             try:
-                recalled = [{'table_name': t} for t in merged_order]
+                # 小库直通：本轮召回命中整库标记时，合并表集合同样整库注入
+                full_scope = bool(aggregation and aggregation.get('full_scope'))
+                recalled = [{'table_name': t, **({'full_scope': True} if full_scope else {})}
+                            for t in merged_order]
                 # keep_first：历史 SQL 用过的表完整保留，超限只裁剪新增召回表
                 merged_aggregation = self.retriever.aggregate_tables(
                     recalled, schema_name, keep_first=keep_first)
@@ -433,8 +436,12 @@ class ChatSession:
                     if t and c and (t, c) not in _recall_seen:
                         _recall_seen.add((t, c))
                         recall_cols.append((t, c))
-                field_whitelist = required_cols | self._trim_recall_cols(
-                    merged_aggregation, required_cols, recall_cols)
+                if full_scope:
+                    # 小库直通：整库注入，不做字段级裁剪
+                    field_whitelist = None
+                else:
+                    field_whitelist = required_cols | self._trim_recall_cols(
+                        merged_aggregation, required_cols, recall_cols)
                 schema_csv_used = SchemaRetriever.build_schema_csv(
                     merged_aggregation, field_whitelist or None)
                 relation_tables = merged_aggregation.get('tables', [])

@@ -67,6 +67,7 @@ EMBEDDING_MODEL_PATH = ''                   # embedding 模型路径，runtime �
 VECTOR_INDEX_THRESHOLD = '50'               # 向量索引构建阈值，vector 分类可改
 FIELD_RECALL_TOP_K = '20'                   # 字段召回数量，vector 分类可改
 MAX_TABLES = '10'                           # 单次查询最大表数，vector 分类可改
+SMALL_SCHEMA_TABLE_LIMIT = '20'             # 小库直通阈值：库内表数不超过该值时整库注入，vector 分类可改
 
 # ── 安全配置 ───────────────────────────────────────────────
 # JWT 签名密钥：留空则首次初始化数据库时自动生成随机字符串并持久化到系统设置表

@@ -24,9 +24,10 @@ VECTOR_INDEX_DIR = os.path.join(PROJECT_ROOT, 'db', 'vectors')
 
 # 默认向量参数（数据库无配置时使用）
 _DEFAULT_VECTOR_CONFIG = {
-    'VECTOR_INDEX_THRESHOLD': 50,
-    'FIELD_RECALL_TOP_K': 20,
-    'MAX_TABLES': 10,
+    'VECTOR_INDEX_THRESHOLD': 1000,
+    'FIELD_RECALL_TOP_K': 50,
+    'MAX_TABLES': 20,
+    'SMALL_SCHEMA_TABLE_LIMIT': 20,
 }
 
 
