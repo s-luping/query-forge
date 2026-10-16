@@ -158,7 +158,7 @@ def _items_in_schemas(db, schema_names: List[str], fallback_schema: str) -> List
 
 def _ingest_and_respond(parsed_results, user, db_type, source, fallback_schema,
                         extra_fk_line=False, datasource_id=None) -> SchemaListResponse:
-    """解析结果入库 + 触发自动索引 + 组装响应（/parse-csv /parse-json /upload 共用）"""
+    """解析结果入库 + 标记索引过期 + 组装响应（/parse-csv /parse-json /upload 共用）"""
     with session_scope() as db:
         if datasource_id is not None:
             ds = db.query(DataSource).filter(DataSource.id == datasource_id).first()

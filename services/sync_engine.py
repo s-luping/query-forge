@@ -127,8 +127,9 @@ class SyncEngine:
                 db.merge(self.job)
                 db.commit()
 
-            # 10. 触发索引重建
-            self._trigger_index_rebuild(schema_name)
+            # 10. 有实际变更才标记索引过期（0 变更的空跑不触发重建）
+            if changes:
+                self._trigger_index_rebuild(schema_name)
 
             logger.info(f"同步完成: {run_log.summary}")
             return run_log
