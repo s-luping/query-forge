@@ -45,6 +45,7 @@ class LLMConfig(MainBase):
     is_default = Column(Boolean, default=False, comment='是否默认')
     is_active = Column(Boolean, default=True, comment='是否启用')
     is_public = Column(Boolean, default=False, comment='是否公开(所有用户可见)')
+    status = Column(String(20), default='normal', comment='配置状态: normal=正常, arrears=欠费(调用时厂商返回余额不足自动标记, 续费后手动改回)')
     description = Column(Text, comment='备注')
     created_at = Column(DateTime, default=now_beijing, comment='创建时间（北京时间）')
     updated_at = Column(DateTime, default=now_beijing, onupdate=now_beijing, comment='更新时间（北京时间）')

@@ -107,6 +107,7 @@
                 max_tokens: parseInt(document.getElementById('maxTokens').value) || 8192,
                 temperature: parseFloat(document.getElementById('temperature').value) || 0.0,
                 thinking_mode: document.getElementById('thinkingMode').value || 'auto',
+                status: document.getElementById('configStatus').value || 'normal',
                 timeout: parseInt(document.getElementById('timeout').value) || 300,
                 is_default: document.getElementById('isDefault').checked,
                 is_public: document.getElementById('isPublic').checked,
@@ -178,6 +179,7 @@
                                 ${item.is_public ? '<span class="status-badge bg-info text-white ms-2">公共</span>' : '<span class="status-badge bg-light text-dark ms-2">私有</span>'}
                                 ${item.is_default ? '<span class="status-badge bg-success text-white ms-2">默认</span>' : ''}
                                 ${!item.is_active ? '<span class="status-badge bg-secondary text-white ms-2">已禁用</span>' : ''}
+                                ${item.status === 'arrears' ? '<span class="status-badge bg-danger text-white ms-2">欠费</span>' : ''}
                             </div>
                             <small class="text-muted">
                                 API Key: ${escapeHtml(item.api_key_masked)}
@@ -228,6 +230,7 @@
                 document.getElementById('maxTokens').value = config.max_tokens ?? 8192;
                 document.getElementById('temperature').value = config.temperature ?? 0.0;
                 document.getElementById('thinkingMode').value = config.thinking_mode || 'auto';
+                document.getElementById('configStatus').value = config.status || 'normal';
                 document.getElementById('timeout').value = config.timeout || 300;
                 document.getElementById('isDefault').checked = config.is_default;
                 document.getElementById('isPublic').checked = config.is_public || false;
@@ -282,6 +285,7 @@
             document.getElementById('maxTokens').value = 8192;
             document.getElementById('temperature').value = 0.0;
             document.getElementById('thinkingMode').value = 'auto';
+            document.getElementById('configStatus').value = 'normal';
             document.getElementById('timeout').value = 300;
             document.getElementById('description').value = '';
             document.getElementById('isDefault').checked = false;

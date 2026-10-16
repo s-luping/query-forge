@@ -20,6 +20,7 @@ from app.logger import logger
 from app.response import ok, ok_msg
 from app.timezone import now_beijing
 from core import LLMClient
+from core.llm_client import LLMArrearsError
 from core.gen_chat import ChatSession
 from core.gen_sql import SqlGenerator
 from crud.base import session_scope
@@ -175,6 +176,26 @@ def _get_user_llm_config(user_id: int, config_id: Optional[int] = None) -> Optio
                 'timeout': config.timeout if config.timeout is not None else 300
             }
         return None
+
+
+def _mark_llm_config_arrears(config_id: Optional[int]) -> None:
+    """LLM 厂商返回余额不足/配额暂停时，把该配置状态标记为欠费。
+
+    仅更新 status 一个字段（其余字段与状态不动）；恢复由用户续费后手动改回。
+    """
+    if not config_id:
+        return
+    try:
+        from models.llm import LLMConfig
+        with session_scope() as db:
+            db.query(LLMConfig).filter(LLMConfig.id == config_id).update({
+                'status': 'arrears', 'updated_at': now_beijing()})
+            db.commit()
+        logger.warning(f"LLM 配置 {config_id} 厂商返回余额不足，已标记为欠费(arrears)")
+    except Exception as e:
+        logger.warning(f"标记 LLM 配置欠费状态失败: {e}")
+
+
 def _build_llm_client(user_id: int, llm_config_id: Optional[int] = None) -> LLMClient:
     """构建 LLM 客户端"""
     llm_config = _get_user_llm_config(user_id, llm_config_id)
@@ -190,6 +211,8 @@ def _build_llm_client(user_id: int, llm_config_id: Optional[int] = None) -> LLMC
             temperature=llm_config['temperature'],
             thinking_mode=llm_config.get('thinking_mode', 'auto')
         )
+        # 记录实际使用的配置 ID，供欠费错误回写状态（默认配置回退后仍可定位）
+        llm_client.config_id = llm_config['id']
     else:
         llm_client = LLMClient()
 
@@ -528,6 +551,12 @@ def create_conversation(
 
     except HTTPException:
         raise
+    except LLMArrearsError as e:
+        # 厂商返回余额不足/配额暂停：标记配置状态为欠费（仅此字段，其余不动）
+        _mark_llm_config_arrears(getattr(llm_client, 'config_id', None))
+        logger.error(f"创建对话失败(模型欠费): {e}")
+        raise HTTPException(status_code=502,
+                            detail="模型欠费/余额不足，已标记该 LLM 配置为欠费状态，续费后请在模型管理页恢复")
     except Exception as e:
         logger.error(f"创建对话失败: {e}")
         raise HTTPException(status_code=500, detail=f"创建对话失败: {str(e)}")
@@ -773,6 +802,12 @@ def send_message(
 
     except HTTPException:
         raise
+    except LLMArrearsError as e:
+        # 厂商返回余额不足/配额暂停：标记配置状态为欠费（仅此字段，其余不动）
+        _mark_llm_config_arrears(getattr(llm_client, 'config_id', None))
+        logger.error(f"发送消息失败(模型欠费): {e}")
+        raise HTTPException(status_code=502,
+                            detail="模型欠费/余额不足，已标记该 LLM 配置为欠费状态，续费后请在模型管理页恢复")
     except Exception as e:
         logger.error(f"发送消息失败: {e}")
         raise HTTPException(status_code=500, detail=f"发送消息失败: {str(e)}")
