@@ -171,6 +171,7 @@ def _get_user_llm_config(user_id: int, config_id: Optional[int] = None) -> Optio
                 # 注意不能用 or 回退：temperature=0.0 是合法值（falsy 会被 0.7 覆盖）
                 'max_tokens': config.max_tokens if config.max_tokens is not None else 8000,
                 'temperature': config.temperature if config.temperature is not None else 0.0,
+                'thinking_mode': config.thinking_mode or 'auto',
                 'timeout': config.timeout if config.timeout is not None else 300
             }
         return None
@@ -186,7 +187,8 @@ def _build_llm_client(user_id: int, llm_config_id: Optional[int] = None) -> LLMC
             base_url=llm_config.get('base_url'),
             max_tokens=llm_config['max_tokens'],
             timeout=llm_config['timeout'],
-            temperature=llm_config['temperature']
+            temperature=llm_config['temperature'],
+            thinking_mode=llm_config.get('thinking_mode', 'auto')
         )
     else:
         llm_client = LLMClient()

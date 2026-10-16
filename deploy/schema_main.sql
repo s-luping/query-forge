@@ -174,6 +174,7 @@ CREATE TABLE llm_configs (
 	base_url VARCHAR(500), 
 	max_tokens INTEGER, 
 	temperature FLOAT, 
+	thinking_mode VARCHAR(20), 
 	timeout INTEGER, 
 	is_default BOOLEAN, 
 	is_active BOOLEAN, 
