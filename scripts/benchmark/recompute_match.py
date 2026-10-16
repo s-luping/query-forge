@@ -4,13 +4,13 @@
 可重复执行（幂等），用于修正客户端比对 bug 或服务端执行缓存差异。
 """
 import json
+import sys
 
 import pymysql
 
 MYSQL = dict(host="127.0.0.1", port=3306, user="root", password="REDACTED",
              charset="utf8mb4", autocommit=True)
-SRC = r"D:\qf_bench\qf_results.json"
-
+SRC = sys.argv[1] if len(sys.argv) > 1 else r"D:\qf_bench\qf_results_turbo.json"
 
 def norm_cell(v):
     if v is None:

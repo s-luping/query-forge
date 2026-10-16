@@ -41,16 +41,22 @@
 
 | 档位 | 数据集 | 题量 | 用途 |
 |---|---|---|---|
-| **A. 中文基准（主）** | Falcon 全量 500+ 题 | 500+ | 每次优化必跑，中文场景核心指标 |
-| | DuSQL dev 子集 | 抽样 100 题 | 中文多表跨域 |
+| **A. 中文基准（主）** | Falcon dev 全量 | 309 题（16 个库，官方公开 dev.json） | 每次优化必跑，中文场景核心指标 |
+| | DuSQL dev 子集 | 抽样 100 题 | 中文多表跨域（待接入） |
 | **B. 英文学术基准（辅）** | Spider 1.0 dev | 抽样 100 题 | 跨域通用能力，结果可对标公开榜 |
-| | BIRD dev | 抽样 50 题 | 真实数据鲁棒性 |
+| | BIRD dev | 抽样 50 题 | 真实数据鲁棒性（待接入） |
 
-选型原则：
+Falcon 实况（2026-10-16 落地）：
 
-1. **Falcon 题量适中、难度分层、中文**，最贴合 QueryForge 主场景，作为每次优化的回归基准；
-2. Spider 1.0 / BIRD 各抽子集，避免全量跑 LLM 的成本（全量 dev 跑一轮 doubao-pro 级别模型需数小时），抽样按题号等距取，**抽样规则固定写死**，保证前后对比用的是同一批题；
-3. WikiSQL（太简单）、Spider 2.0（方言不匹配）、专项集（Archer/ESQ-Bench 等）列入观察项，不做常规回归。
+- 数据源 `eosphoros-ai/Falcon`（蚂蚁 DB-GPT 团队，分支 main），`dev_data/dev.json` 公开可下载 **309 题**（README 宣称 500 题，其余未随 dev 公开）；难度分层标签在 dev.json 中未随附；
+- 16 个 SQLite 库（db_id 4~28，Kaggle 来源）已全部导入本地 MySQL，命名 `falcon_dev_<db_id>`；题目自带官方标准答案（列式 JSON，MaxCompute 引擎产出）与 `is_order` 排序标记（43 题需保序比对）；
+- 比对方式：生成 SQL 的执行结果 vs 官方标准答案（DB-GPT Benchmark 同款），数值按 2 位小数容差、多重集合/保序两种模式；48 个答案集超 100 行（服务端 `max_rows=100` 截断），无序题计入 `row_limit` 桶不计正确，有序题按前 100 行比对；
+- 模型：**llm_config_id=5（doubao-seed-2-1-turbo）**。原计划 id=4（pro）在首跑即触发火山方舟用量上限（SetLimitExceeded，模型服务暂停），后若恢复可再跑一轮 pro 基线；
+- 工具链（项目 `benchmark/` 目录）：
+  - `falcon_import.py`：SQLite→MySQL 建库导入（`--import`）+ 生成题目文件（`--questions` → `questions_falcon.jsonl`）；
+  - `setup_sync.py`：一键创建 16 个数据源→同步任务→触发同步→重建全量向量索引；
+  - `run_eval.py`：批量评测（登录→逐题调 API→比对→JSONL 断点续跑→汇总报告），支持 `--workers` 并发、`--limit` 抽样、`--report-only` 随时汇总；
+  - 结果目录 `benchmark/results/`，基线文件 `falcon.c5.baseline_v0.jsonl` + 同名 `.report.md`。
 
 ## 3. 基准与 QueryForge 的对接方式
 
@@ -85,9 +91,15 @@ flowchart LR
 
 已知问题（纳入回归关注）：多轮追问的同步响应 message 为空（以持久化消息为准）；召回 TopK 可能遗漏中间关联表（S1 案例根因）。
 
-### 4.2 正式基线（待建立）
+### 4.2 正式基线（Baseline v0）
 
-第一次按本方案跑通 Falcon 500+ 题后，将结果固化为 **Baseline v0**（记录日期、模型 config、指标全量快照），后续所有优化对比均以 Baseline v0 及其后的最新基线为参照。
+- **题集**：Falcon dev 全量 309 题（`benchmark/questions_falcon.jsonl`）
+- **模型**：llm_config_id=5（doubao-seed-2-1-turbo-260628）
+- **启动时间**：2026-10-16 00:57，批量评测后台执行（3 并发，约 1 题/分钟，预计 5 小时量级跑完）
+- **结果文件**：`benchmark/results/falcon.c5.baseline_v0.jsonl`（逐题明细，断点续跑）+ `falcon.c5.baseline_v0.report.md`（汇总）
+- **随时查看进度**：`.venv\Scripts\python.exe benchmark\run_eval.py --questions benchmark\questions_falcon.jsonl --llm-config-id 5 --out benchmark\results\falcon.c5.baseline_v0.jsonl --report-only`
+
+后续所有优化对比均以 Baseline v0 及其后的最新基线为参照。
 
 ## 5. 优化对比流程
 

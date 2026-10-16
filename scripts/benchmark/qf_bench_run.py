@@ -13,11 +13,11 @@ import requests
 
 BASE = "http://localhost:8888"
 USER, PWD = "admin", "REDACTED"
-LLM_CONFIG_ID = 4  # doubao-seed-2-1-pro-260628
+LLM_CONFIG_ID = 5  # doubao-seed-2-1-turbo-260628（id=4 pro 配额已耗尽被暂停）
 DBS = [("bird_superhero", "superhero"), ("bird_formula_1", "formula_1"),
        ("bird_financial", "financial")]
 SEL = r"D:\qf_bench\selected_questions.json"
-OUT = r"D:\qf_bench\qf_results.json"
+OUT = r"D:\qf_bench\qf_results_turbo.json"
 TOKEN = None
 SESSION = requests.Session()  # token 经 HttpOnly cookie 下发，用 session 自动携带
 TIMEOUT = 600
@@ -28,6 +28,10 @@ def api(method, path, **kw):
     for attempt in range(6):
         try:
             r = SESSION.request(method, BASE + path, timeout=TIMEOUT, **kw)
+            if r.status_code == 401:  # 服务重启后 JWT 失效 -> 重新登录
+                print(f"{method} {path} got 401, re-login", flush=True)
+                login()
+                continue
             r.raise_for_status()
             return r.json()
         except requests.ConnectionError as e:  # 服务 reload/重启窗口
