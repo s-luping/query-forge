@@ -155,7 +155,7 @@ def run_test():
             rec["missing_info"] = msg.get("missing_info")
             qr = msg.get("query_result") or {}
             rec["exec_error"] = qr.get("error")
-            rec["llm_info"] = resp.get("llm_info")
+            rec["llm_info"] = msg.get("llm_info")
             rows = qr.get("rows") or []
             gen_norm = sorted(tuple(norm_cell(c) for c in r) for r in rows)
             gold_norm = sorted(tuple(norm_cell(c) for c in r) for r in q["gold_result"])
