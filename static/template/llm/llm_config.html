@@ -121,6 +121,15 @@
                     </div>
 
                     <div class="mb-3">
+                        <label class="form-label">状态</label>
+                        <select class="form-select" id="configStatus">
+                            <option value="normal" selected>正常</option>
+                            <option value="arrears">欠费</option>
+                        </select>
+                        <small class="text-muted">调用时厂商返回余额不足/配额暂停会自动标记为欠费；续费后请手动改回正常</small>
+                    </div>
+
+                    <div class="mb-3">
                         <label class="form-label">备注</label>
                         <textarea class="form-control" id="description" rows="2"
                                   placeholder="可选备注信息"></textarea>

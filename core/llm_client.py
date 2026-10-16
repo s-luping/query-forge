@@ -86,6 +86,26 @@ def _get_session() -> requests.Session:
     return _session
 
 
+# ── 欠费/配额类错误识别 ──────────────────────────────────────
+
+# 厂商余额不足/配额暂停类错误关键词（火山 SetLimitExceeded、OpenAI
+# insufficient_quota、one-api 余额不足等，不区分大小写匹配响应体）
+_ARREARS_MARKERS = (
+    'setlimitexceeded', 'arrearage', 'insufficient_quota',
+    'insufficient balance', 'usage limit', '欠费', '余额不足',
+)
+
+
+class LLMArrearsError(ValueError):
+    """LLM 厂商返回余额不足/配额暂停类错误 — 上层据此把配置状态标记为欠费"""
+
+
+def _is_arrears_response(text: str) -> bool:
+    """判断厂商错误响应体是否属于余额不足/配额暂停类"""
+    low = (text or '').lower()
+    return any(m in low for m in _ARREARS_MARKERS)
+
+
 class LLMClient:
     """通用大模型客户端"""
 
@@ -351,6 +371,8 @@ class LLMClient:
         if response.status_code != 200:
             error_msg = f"API返回错误状态码: {response.status_code}, {response.text}"
             llm_logger.error(f"【API错误】{error_msg}")
+            if _is_arrears_response(response.text):
+                raise LLMArrearsError(error_msg)
             raise ValueError(error_msg)
 
         result = response.json()
@@ -435,6 +457,8 @@ class LLMClient:
         if response.status_code != 200:
             error_msg = f"API返回错误状态码: {response.status_code}, {response.text}"
             llm_logger.error(f"【多轮对话API错误】{error_msg}")
+            if _is_arrears_response(response.text):
+                raise LLMArrearsError(error_msg)
             raise ValueError(error_msg)
 
         result = response.json()

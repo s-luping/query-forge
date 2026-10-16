@@ -179,6 +179,7 @@ CREATE TABLE llm_configs (
 	is_default BOOLEAN, 
 	is_active BOOLEAN, 
 	is_public BOOLEAN, 
+	status VARCHAR(20), 
 	description TEXT, 
 	created_at DATETIME, 
 	updated_at DATETIME, 

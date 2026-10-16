@@ -111,6 +111,10 @@ def init_database():
         _ensure_column_sqlite(
             config.MAIN_DB_PATH, 'llm_configs', 'thinking_mode', "VARCHAR(20) DEFAULT 'auto'"
         )
+        # LLM 配置状态（normal=正常 / arrears=欠费，余额不足自动标记；存量库增量迁移）
+        _ensure_column_sqlite(
+            config.MAIN_DB_PATH, 'llm_configs', 'status', "VARCHAR(20) DEFAULT 'normal'"
+        )
         # 高频过滤字段的普通索引（存量库补建；新库由 create_all 一并创建）
         from db.sqlite_hooks import (
             _ensure_indexes_sqlite,

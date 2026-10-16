@@ -268,6 +268,7 @@ def delete_llm_log(request: Request, log_id: int, user: CurrentUser):
 # ═══════════════════════════════════════════════════════════════════
 
 _THINKING_MODES = ('auto', 'enabled', 'disabled')
+_STATUS_VALUES = ('normal', 'arrears')
 
 
 class LLMConfigCreate(BaseModel):
@@ -285,6 +286,7 @@ class LLMConfigUpdate(BaseModel):
     timeout: Optional[int] = None
     is_default: Optional[bool] = None; is_active: Optional[bool] = None
     is_public: Optional[bool] = None; description: Optional[str] = None
+    status: Optional[str] = None   # normal=正常 / arrears=欠费（续费后手动恢复用）
 
 
 class LLMConfigItem(BaseModel):
@@ -292,6 +294,7 @@ class LLMConfigItem(BaseModel):
     base_url: Optional[str]; max_tokens: int; temperature: float; timeout: int
     thinking_mode: str = 'auto'
     is_default: bool; is_active: bool; is_public: bool
+    status: str = 'normal'
     description: Optional[str]; created_at: Optional[datetime]; updated_at: Optional[datetime]
 
     class Config:
@@ -334,7 +337,8 @@ def get_configs(request: Request, user: CurrentUser):
                 temperature=c.temperature if c.temperature is not None else 0.0,
                 timeout=c.timeout or 300, thinking_mode=c.thinking_mode or 'auto',
                 is_default=c.is_default, is_active=c.is_active,
-                is_public=c.is_public or False, description=c.description,
+                is_public=c.is_public or False, status=c.status or 'normal',
+                description=c.description,
                 created_at=c.created_at, updated_at=c.updated_at
             ) for c in configs]
             return LLMConfigListResponse(items=items, total=len(items))
@@ -388,10 +392,12 @@ def update_config(request: Request, config_id: int, payload: LLMConfigUpdate, us
                 raise HTTPException(status_code=404, detail="配置不存在或无权修改")
             if payload.thinking_mode is not None and payload.thinking_mode not in _THINKING_MODES:
                 raise HTTPException(status_code=400, detail="thinking_mode 仅支持 auto/enabled/disabled")
+            if payload.status is not None and payload.status not in _STATUS_VALUES:
+                raise HTTPException(status_code=400, detail="status 仅支持 normal/arrears")
             # 注意：必须读 payload 而非 request — Starlette Request 自带 base_url 属性
             # （URL 对象），误读会把请求地址写进库导致 sqlite3.InterfaceError
             for attr in ['model', 'base_url', 'max_tokens', 'temperature', 'thinking_mode',
-                         'timeout', 'description']:
+                         'timeout', 'description', 'status']:
                 val = getattr(payload, attr, None)
                 if val is not None:
                     if attr == 'base_url':
