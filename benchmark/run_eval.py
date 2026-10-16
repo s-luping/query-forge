@@ -9,7 +9,7 @@
 （列式 JSON 转行集，数值按 2 位小数容差），多答案题命中任一即正确。
 
 用法（项目 venv，cwd=项目根）：
-    .venv\\Scripts\\python.exe benchmark\\run_eval.py --questions benchmark\\questions_falcon.jsonl
+    .venv\\Scripts\\python.exe benchmark\\run_eval.py --questions benchmark\\questions\\questions_falcon.jsonl
     # 断点续跑：同一 --out 再次执行即自动跳过已完成题目
     # 只汇总不跑：--report-only
 """

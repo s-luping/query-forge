@@ -10,7 +10,7 @@ import pymysql
 
 MYSQL = dict(host="127.0.0.1", port=3306, user="root", password="REDACTED",
              charset="utf8mb4", autocommit=True)
-SRC = sys.argv[1] if len(sys.argv) > 1 else r"D:\qf_bench\qf_results_turbo.json"
+SRC = sys.argv[1] if len(sys.argv) > 1 else r"D:\projects\query-forge\benchmark\results\bird_eval_turbo.json"
 
 def norm_cell(v):
     if v is None:

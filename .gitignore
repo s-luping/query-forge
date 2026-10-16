@@ -75,7 +75,11 @@ id_rsa.pub
 *.jsonl
 
 # ---------- 基准测试运行产物 ----------
-benchmark/results/
+# 结果目录整体排除，仅 .report.md 汇总报告入库（先 /* 才能反选目录内文件）
+benchmark/results/*
+!benchmark/results/*.report.md
+benchmark/data/
+benchmark/questions/
 
 # ---------- 系统垃圾 ----------
 .DS_Store
