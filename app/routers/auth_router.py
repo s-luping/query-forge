@@ -12,7 +12,7 @@ from app.auth import (
     hash_password,
 )
 from app.config import COOKIE_SECURE
-from app.limiter import limiter
+from app.limiter import LIMIT_AUTH, limiter
 from app.logger import logger
 from app.timezone import now_beijing
 from crud.base import session_scope
@@ -51,7 +51,7 @@ class RegisterRequest(BaseModel):
 # ②slowapi 按参数名查找 Request（kwargs['request'] 须为 Starlette Request），
 #   body 参数不能占用 request 这个名字
 @router.post("/login")
-@limiter.limit("2/minute")
+@limiter.limit(LIMIT_AUTH)
 def login(request: Request, payload: LoginRequest):
     """登录"""
     try:
@@ -95,7 +95,7 @@ def login(request: Request, payload: LoginRequest):
 
 
 @router.post("/register")
-@limiter.limit("2/minute")
+@limiter.limit(LIMIT_AUTH)
 def register(request: Request, payload: RegisterRequest):
     """注册（受 ALLOW_REGISTER 系统设置控制；企业内部可关闭，改由管理员创建账号）"""
     try:

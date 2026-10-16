@@ -11,6 +11,8 @@ key 优先取登录用户（同一账号跨 IP 共享额度），未登录回退
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
+import os
+
 from app.auth import resolve_token_user
 
 
@@ -31,12 +33,16 @@ limiter = Limiter(key_func=_rate_limit_key)
 
 
 # ── 限流档位（集中定义，避免各处魔法字符串；纲领 §3.2/§4.1）──────
-# 数据接口按"单用户/单IP 每分钟"计，额度按资源代价分级：
-LIMIT_AUTH = '2/minute'          # 登录/注册：防暴力破解
-LIMIT_HEAVY = '10/minute'        # 重接口：生成 SQL 执行、向量索引重建、导出
-LIMIT_WRITE = '30/minute'        # 写接口：导入/删除/更新/同步触发
-LIMIT_READ = '120/minute'        # 读接口：列表/详情/统计（防脚本批量刷）
-LIMIT_TEST = '6/minute'          # 外部连接测试：每次都会真实建连，额度最低
+# 数据接口按"单用户/单IP 每分钟"计，额度按资源代价分级；
+# 可用环境变量 QF_LIMIT_* 覆盖（测试/压测环境放宽用，默认值即线上档位）：
+def _limit(env: str, default: str) -> str:
+    return os.getenv(env, default) or default
+
+LIMIT_AUTH = _limit('QF_LIMIT_AUTH', '2/minute')            # 登录/注册：防暴力破解
+LIMIT_HEAVY = _limit('QF_LIMIT_HEAVY', '10/minute')         # 重接口：生成 SQL 执行、向量索引重建、导出
+LIMIT_WRITE = _limit('QF_LIMIT_WRITE', '30/minute')         # 写接口：导入/删除/更新/同步触发
+LIMIT_READ = _limit('QF_LIMIT_READ', '120/minute')          # 读接口：列表/详情/统计（防脚本批量刷）
+LIMIT_TEST = _limit('QF_LIMIT_TEST', '6/minute')            # 外部连接测试：每次都会真实建连，额度最低
 
 __all__ = ['limiter', 'LIMIT_AUTH', 'LIMIT_HEAVY', 'LIMIT_WRITE',
            'LIMIT_READ', 'LIMIT_TEST']
