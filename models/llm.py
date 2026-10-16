@@ -40,6 +40,7 @@ class LLMConfig(MainBase):
     base_url = Column(String(500), comment='API地址')
     max_tokens = Column(Integer, default=8000, comment='最大Token数')
     temperature = Column(Float, default=0.2, comment='生成随机性')
+    thinking_mode = Column(String(20), default='auto', comment='思考模式: auto=跟随模型默认, enabled=强制思考, disabled=关闭思考')
     timeout = Column(Integer, default=300, comment='请求超时(秒)')
     is_default = Column(Boolean, default=False, comment='是否默认')
     is_active = Column(Boolean, default=True, comment='是否启用')

@@ -107,6 +107,10 @@ def init_database():
         _ensure_column_sqlite(
             config.TELEMETRY_DB_PATH, 'llm_calls', 'reasoning_tokens', 'INTEGER'
         )
+        # LLM 配置思考模式开关（存量 SQLite 库增量迁移；新库由 create_all 建全量表）
+        _ensure_column_sqlite(
+            config.MAIN_DB_PATH, 'llm_configs', 'thinking_mode', "VARCHAR(20) DEFAULT 'auto'"
+        )
         # 高频过滤字段的普通索引（存量库补建；新库由 create_all 一并创建）
         from db.sqlite_hooks import (
             _ensure_indexes_sqlite,

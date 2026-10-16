@@ -106,6 +106,7 @@
                 base_url: baseUrl || null,
                 max_tokens: parseInt(document.getElementById('maxTokens').value) || 8192,
                 temperature: parseFloat(document.getElementById('temperature').value) || 0.0,
+                thinking_mode: document.getElementById('thinkingMode').value || 'auto',
                 timeout: parseInt(document.getElementById('timeout').value) || 300,
                 is_default: document.getElementById('isDefault').checked,
                 is_public: document.getElementById('isPublic').checked,
@@ -182,6 +183,7 @@
                                 API Key: ${escapeHtml(item.api_key_masked)}
                                 ${item.base_url ? `<br>API地址: ${escapeHtml(item.base_url)}` : ''}
                                 <br>Max Tokens: ${item.max_tokens} | Temperature: ${item.temperature} | Timeout: ${item.timeout}s
+                                ${item.thinking_mode && item.thinking_mode !== 'auto' ? ` | 思考: ${item.thinking_mode === 'enabled' ? '开' : '关'}` : ''}
                             </small>
                             ${item.description ? `<div class="mt-1"><small>${escapeHtml(item.description)}</small></div>` : ''}
                         </div>
@@ -225,6 +227,7 @@
                 }
                 document.getElementById('maxTokens').value = config.max_tokens ?? 8192;
                 document.getElementById('temperature').value = config.temperature ?? 0.0;
+                document.getElementById('thinkingMode').value = config.thinking_mode || 'auto';
                 document.getElementById('timeout').value = config.timeout || 300;
                 document.getElementById('isDefault').checked = config.is_default;
                 document.getElementById('isPublic').checked = config.is_public || false;
@@ -278,6 +281,7 @@
             document.getElementById('baseUrl').value = '';
             document.getElementById('maxTokens').value = 8192;
             document.getElementById('temperature').value = 0.0;
+            document.getElementById('thinkingMode').value = 'auto';
             document.getElementById('timeout').value = 300;
             document.getElementById('description').value = '';
             document.getElementById('isDefault').checked = false;

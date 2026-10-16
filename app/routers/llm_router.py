@@ -209,9 +209,13 @@ def delete_llm_log(request: Request, log_id: int, user: CurrentUser):
 # LLM 模型配置（主库，api_key 加密存储）
 # ═══════════════════════════════════════════════════════════════════
 
+_THINKING_MODES = ('auto', 'enabled', 'disabled')
+
+
 class LLMConfigCreate(BaseModel):
     provider: str; model: str; api_key: str; base_url: str
     max_tokens: Optional[int] = 8192; temperature: Optional[float] = 0.0
+    thinking_mode: Optional[str] = 'auto'
     timeout: Optional[int] = 300; is_default: bool = False
     is_public: bool = False; description: Optional[str] = None
 
@@ -219,7 +223,8 @@ class LLMConfigCreate(BaseModel):
 class LLMConfigUpdate(BaseModel):
     model: Optional[str] = None; api_key: Optional[str] = None
     base_url: Optional[str] = None; max_tokens: Optional[int] = None
-    temperature: Optional[float] = None; timeout: Optional[int] = None
+    temperature: Optional[float] = None; thinking_mode: Optional[str] = None
+    timeout: Optional[int] = None
     is_default: Optional[bool] = None; is_active: Optional[bool] = None
     is_public: Optional[bool] = None; description: Optional[str] = None
 
@@ -227,6 +232,7 @@ class LLMConfigUpdate(BaseModel):
 class LLMConfigItem(BaseModel):
     id: int; user_id: int; provider: str; model: str; api_key_masked: str
     base_url: Optional[str]; max_tokens: int; temperature: float; timeout: int
+    thinking_mode: str = 'auto'
     is_default: bool; is_active: bool; is_public: bool
     description: Optional[str]; created_at: Optional[datetime]; updated_at: Optional[datetime]
 
@@ -268,7 +274,8 @@ def get_configs(request: Request, user: CurrentUser):
                 api_key_masked=mask_api_key(decrypt_secret(c.api_key)), base_url=c.base_url,
                 max_tokens=c.max_tokens if c.max_tokens is not None else 8192,
                 temperature=c.temperature if c.temperature is not None else 0.0,
-                timeout=c.timeout or 300, is_default=c.is_default, is_active=c.is_active,
+                timeout=c.timeout or 300, thinking_mode=c.thinking_mode or 'auto',
+                is_default=c.is_default, is_active=c.is_active,
                 is_public=c.is_public or False, description=c.description,
                 created_at=c.created_at, updated_at=c.updated_at
             ) for c in configs]
@@ -286,6 +293,8 @@ def create_config(request: Request, payload: LLMConfigCreate, user: CurrentUser)
         with session_scope() as db:
             if payload.is_public and not _is_admin(user):
                 raise HTTPException(status_code=403, detail="仅管理员可创建公共配置")
+            if payload.thinking_mode not in _THINKING_MODES:
+                raise HTTPException(status_code=400, detail="thinking_mode 仅支持 auto/enabled/disabled")
             if db.query(LLMConfig).filter(LLMConfig.user_id == user_id,
                     LLMConfig.provider == payload.provider, LLMConfig.model == payload.model).first():
                 raise HTTPException(status_code=400, detail="该供应商+模型已存在配置")
@@ -297,6 +306,7 @@ def create_config(request: Request, payload: LLMConfigCreate, user: CurrentUser)
                 user_id=user_id, provider=payload.provider, model=payload.model,
                 api_key=encrypt_secret(payload.api_key), base_url=payload.base_url,
                 max_tokens=payload.max_tokens, temperature=payload.temperature,
+                thinking_mode=payload.thinking_mode or 'auto',
                 timeout=payload.timeout, is_default=payload.is_default,
                 is_public=payload.is_public and _is_admin(user), description=payload.description)
             db.add(config)
@@ -318,9 +328,12 @@ def update_config(request: Request, config_id: int, payload: LLMConfigUpdate, us
             config = _get_editable_config(db, config_id, user)
             if not config:
                 raise HTTPException(status_code=404, detail="配置不存在或无权修改")
+            if payload.thinking_mode is not None and payload.thinking_mode not in _THINKING_MODES:
+                raise HTTPException(status_code=400, detail="thinking_mode 仅支持 auto/enabled/disabled")
             # 注意：必须读 payload 而非 request — Starlette Request 自带 base_url 属性
             # （URL 对象），误读会把请求地址写进库导致 sqlite3.InterfaceError
-            for attr in ['model', 'base_url', 'max_tokens', 'temperature', 'timeout', 'description']:
+            for attr in ['model', 'base_url', 'max_tokens', 'temperature', 'thinking_mode',
+                         'timeout', 'description']:
                 val = getattr(payload, attr, None)
                 if val is not None:
                     if attr == 'base_url':
@@ -427,6 +440,7 @@ def get_default_config(request: Request, user: CurrentUser):
                 "base_url": config.base_url,
                 "max_tokens": config.max_tokens if config.max_tokens is not None else 8192,
                 "temperature": config.temperature if config.temperature is not None else 0.0,
+                "thinking_mode": config.thinking_mode or 'auto',
                 "timeout": config.timeout or 300}}
     except Exception as e:
         logger.error(f"获取默认配置失败: {e}")

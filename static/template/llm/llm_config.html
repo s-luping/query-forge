@@ -111,6 +111,16 @@
                     </div>
 
                     <div class="mb-3">
+                        <label class="form-label">思考模式</label>
+                        <select class="form-select" id="thinkingMode">
+                            <option value="auto" selected>跟随模型默认</option>
+                            <option value="enabled">强制开启思考</option>
+                            <option value="disabled">关闭思考</option>
+                        </select>
+                        <small class="text-muted">思考模型的思考Token计入输出上限，开启后建议同步调大 Max Tokens</small>
+                    </div>
+
+                    <div class="mb-3">
                         <label class="form-label">备注</label>
                         <textarea class="form-control" id="description" rows="2"
                                   placeholder="可选备注信息"></textarea>

@@ -91,7 +91,8 @@ class LLMClient:
 
     def __init__(self, provider: str = '', api_key: str = "", model: str = "",
                  base_url: Optional[str] = None,
-                 max_tokens: int = 8000, timeout: int = 300, temperature: float = 0.7):
+                 max_tokens: int = 8000, timeout: int = 300, temperature: float = 0.7,
+                 thinking_mode: str = 'auto'):
         """
         初始化客户端
         :param provider: 模型供应商名称（自由输入，如 OpenAI、DeepSeek 等）
@@ -101,6 +102,7 @@ class LLMClient:
         :param max_tokens: 最大生成token数
         :param timeout: 请求超时时间（秒）
         :param temperature: 生成随机性 (0-2)
+        :param thinking_mode: 思考模式 auto=跟随模型默认 / enabled=强制思考 / disabled=关闭思考
         """
         self.provider = provider or ''
         self.provider_name = provider or ''
@@ -110,6 +112,20 @@ class LLMClient:
         self.max_tokens = max_tokens
         self.timeout = timeout
         self.temperature = temperature
+        self.thinking_mode = thinking_mode or 'auto'
+
+    def _thinking_payload(self) -> Optional[dict]:
+        """思考模式开关 payload — auto 时不发送该字段（跟随模型默认行为）。
+
+        火山方舟（doubao-seed）/ 智谱 GLM 等 OpenAI 兼容网关统一使用
+        thinking: {"type": "enabled"|"disabled"}；不识别该字段的网关
+        仅在用户显式选择时才会收到，默认请求与旧行为完全一致。
+        """
+        if self.thinking_mode == 'enabled':
+            return {"type": "enabled"}
+        if self.thinking_mode == 'disabled':
+            return {"type": "disabled"}
+        return None
 
     def _endpoint_url(self) -> str:
         """补全聊天补全端点 — base_url 填根地址（如 https://open.bigmodel.cn/api/paas/v4/）
@@ -312,6 +328,9 @@ class LLMClient:
             "temperature": self.temperature,
             "max_tokens": self.max_tokens
         }
+        thinking = self._thinking_payload()
+        if thinking:
+            payload["thinking"] = thinking
 
         start_time = time.time()
 
@@ -389,6 +408,9 @@ class LLMClient:
             "temperature": temperature if temperature is not None else self.temperature,
             "max_tokens": max_tokens if max_tokens is not None else self.max_tokens
         }
+        thinking = self._thinking_payload()
+        if thinking:
+            payload["thinking"] = thinking
 
         start_time = time.time()
 
