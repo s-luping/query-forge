@@ -155,6 +155,7 @@ def run_test():
             rec["missing_info"] = msg.get("missing_info")
             qr = msg.get("query_result") or {}
             rec["exec_error"] = qr.get("error")
+            rec["llm_info"] = resp.get("llm_info")
             rows = qr.get("rows") or []
             gen_norm = sorted(tuple(norm_cell(c) for c in r) for r in rows)
             gold_norm = sorted(tuple(norm_cell(c) for c in r) for r in q["gold_result"])
@@ -168,8 +169,9 @@ def run_test():
         with open(OUT, "w", encoding="utf-8") as f:
             json.dump(results, f, ensure_ascii=False, indent=1)
         ok = rec["match"]
-        print(f"-> match={ok} elapsed={rec['elapsed_s']}s "
-              f"gen_sql={str(rec.get('gen_sql'))[:120]}", flush=True)
+        print(f"-> match={ok} elapsed={rec['elapsed_s']}s", flush=True)
+        if rec.get("gen_sql"):
+            print("SQL:", rec["gen_sql"], flush=True)
     n_ok = sum(1 for r in results if r["match"])
     print(f"\n总计: {n_ok}/{len(results)}")
 

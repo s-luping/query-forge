@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="zh"><head><meta charset="utf-8">
+<title>BIRD 基准 NL2SQL 测试报告</title>
+<style>
+body{font-family:"Microsoft YaHei",sans-serif;max-width:1240px;margin:24px auto;padding:0 16px;color:#222}
+h1{font-size:22px} h2{font-size:18px;margin-top:28px}
+.sum{display:flex;gap:16px;margin:16px 0}
+.card{background:#f6f8fa;border-radius:8px;padding:14px 20px;text-align:center;flex:1}
+.card b{font-size:26px;display:block}
+table{border-collapse:collapse;width:100%;font-size:13px;margin-top:8px}
+td,th{border:1px solid #d0d7de;padding:6px 8px;text-align:left;vertical-align:top}
+th{background:#f6f8fa}
+.q{max-width:340px;word-break:break-all;font-family:Consolas,monospace;font-size:12px}
+.ok{color:#1a7f37;font-weight:bold} .no{color:#cf222e;font-weight:bold}
+.nb{color:#9a6700;font-weight:bold} .er{color:#8250df;font-weight:bold}
+</style></head><body>
+<h1>QueryForge NL2SQL — BIRD 基准测试报告（nvidia glm-5.3-flash (id=7)）</h1>
+<p><b>数据集:</b> BIRD dev（2024-06-27 官方发布，阿里云 OSS 直下，1534 题/11 库）·
+<b>测试库:</b> superhero(10 表) / formula_1(13 表) / financial(8 表)，SQLite→MySQL 8.0 迁移，
+保留主键/外键，官方 database_description 列说明写入 MySQL COMMENT ·
+<b>选题:</b> 24 题（各库 simple×3 / moderate×3 / challenging×2，gold SQL 可在 MySQL 执行）·
+<b>评测:</b> 执行准确率（生成 SQL 与 gold SQL 在 MySQL 上执行结果多重集比对，浮点 4 位舍入）</p>
+<div class="sum">
+ <div class="card"><b>12/24 (50%)</b>执行准确率(有效题)</div>
+ <div class="card"><b>4</b>拦截(信息不足)</div>
+ <div class="card"><b>20</b>SQL 成功执行</div>
+ <div class="card"><b>55s</b>平均耗时/题</div>
+</div>
+<p><b>主模型:</b> nvidia glm-5.3-flash (id=7)（NVIDIA NIM 免费额度，base_url=integrate.api.nvidia.com/v1，OpenAI 兼容协议）。
+历史对照: doubao-seed-2-1-turbo (id=5) 在同题集上 7/19 通过
+（37%），对照结果取自历史评测存档，未重跑。</p>
+<h2>分库结果（nvidia glm-5.3-flash (id=7)）</h2><table><tr><th>数据库</th><th>通过/总题</th></tr><tr><td>bird_superhero</td><td>0/0</td></tr><tr><td>bird_formula_1</td><td>0/0</td></tr><tr><td>bird_financial</td><td>0/0</td></tr></table>
+<h2>分难度结果（nvidia glm-5.3-flash (id=7)）</h2><table><tr><th>难度</th><th>通过/总题</th></tr><tr><td>simple</td><td>6/9</td></tr><tr><td>moderate</td><td>5/9</td></tr><tr><td>challenging</td><td>1/6</td></tr></table>
+<h2>明细（nvidia glm-5.3-flash (id=7)，末列为 doubao-seed-2-1-turbo (id=5) 对照）</h2>
+<table><tr><th>#</th><th>库</th><th>难度</th><th>问题</th><th>QF 生成 SQL</th>
+<th>行数(gold/gen)</th><th>结论</th><th>说明</th><th>对照</th><th>耗时</th></tr>
+
+<tr>
+ <td>1</td><td>financial</td><td>challenging</td>
+ <td class="q">List out the account numbers of female clients who are oldest and has lowest average salary, calculate the gap between this lowest average salary with the highest average salary?</td>
+ <td class="q">SELECT dp.account_id, (SELECT MAX(A11) FROM district) - dt.A11 AS gap
+FROM disp dp
+INNER JOIN client c ON dp.client_id = c.client_id
+INNER JOIN district dt ON c.district_id = dt.district_id
+WHERE c.gender = &#x27;F&#x27;
+  AND c.birth_date = (SELECT MIN(birth_date) FROM client WHERE gender = &#x27;F&#x27;)
+  AND dt.A11 = (SELECT MIN(A11) FROM district)</td>
+ <td>1 / 0</td>
+ <td><span class="no">不通过</span></td><td class="q">执行成功但结果不一致</td>
+ <td>不通过</td><td>148.7s</td>
+</tr>
+<tr>
+ <td>2</td><td>financial</td><td>challenging</td>
+ <td class="q">How often does account number 3 request an account statement to be released? What was the aim of debiting 3539 in total?</td>
+ <td class="q">SELECT a.frequency, o.k_symbol
+FROM account a
+JOIN `order` o ON a.account_id = o.account_id
+WHERE a.account_id = 3
+  AND o.amount = 3539;</td>
+ <td>1 / 1</td>
+ <td><span class="ok">通过</span></td><td class="q"></td>
+ <td>不通过</td><td>106.5s</td>
+</tr>
+<tr>
+ <td>3</td><td>financial</td><td>moderate</td>
+ <td class="q">What is the average amount of loan which are still on running contract with statement issuance after each transaction?</td>
+ <td class="q">SELECT AVG(l.amount) 
+FROM loan AS l 
+JOIN account AS a ON l.account_id = a.account_id 
+WHERE l.status IN (&#x27;C&#x27;, &#x27;D&#x27;) 
+  AND a.frequency = &#x27;POPLATEK PO OBRATU&#x27;;</td>
+ <td>1 / 1</td>
+ <td><span class="ok">通过</span></td><td class="q"></td>
+ <td>拦截</td><td>149.0s</td>
+</tr>
+<tr>
+ <td>4</td><td>financial</td><td>moderate</td>
+ <td class="q">How many accounts who choose issuance after transaction are staying in East Bohemia region?</td>
+ <td class="q">SELECT COUNT(DISTINCT a.account_id)
+FROM account a
+JOIN district d ON a.district_id = d.district_id
+WHERE a.frequency = &#x27;POPLATEK PO OBRATU&#x27;
+  AND d.A3 = &#x27;East Bohemia&#x27;;</td>
+ <td>1 / 1</td>
+ <td><span class="ok">通过</span></td><td class="q"></td>
+ <td>不通过</td><td>80.6s</td>
+</tr>
+<tr>
+ <td>5</td><td>financial</td><td>moderate</td>
+ <td class="q">How much is the average amount in credit card made by account holders in a month, in year 2021?</td>
+ <td class="q">SELECT AVG(amount) FROM trans WHERE operation = &#x27;VYBER KARTOU&#x27; AND date LIKE &#x27;21%&#x27;</td>
+ <td>1 / 1</td>
+ <td><span class="no">不通过</span></td><td class="q">执行成功但结果不一致</td>
+ <td>不通过</td><td>53.1s</td>
+</tr>
+<tr>
+ <td>6</td><td>financial</td><td>simple</td>
+ <td class="q">What is the district Id of the account that placed the order with the id 33333?</td>
+ <td class="q">SELECT T1.district_id FROM account AS T1 JOIN `order` AS T2 ON T1.account_id = T2.account_id WHERE T2.order_id = 33333</td>
+ <td>1 / 1</td>
+ <td><span class="ok">通过</span></td><td class="q"></td>
+ <td>通过</td><td>14.0s</td>
+</tr>
+<tr>
+ <td>7</td><td>financial</td><td>simple</td>
+ <td class="q">What is the gender of the oldest client who opened his/her account in the highest average salary branch?</td>
+ <td class="q">SELECT c.gender
+FROM client c
+JOIN disp d ON c.client_id = d.client_id
+JOIN account a ON d.account_id = a.account_id
+JOIN district dt ON a.district_id = dt.district_id
+WHERE dt.A11 = (SELECT MAX(A11) FROM district)
+ORDER BY c.birth_date ASC
+LIMIT 1;</td>
+ <td>1 / 1</td>
+ <td><span class="no">不通过</span></td><td class="q">执行成功但结果不一致</td>
+ <td>通过</td><td>106.6s</td>
+</tr>
+<tr>
+ <td>8</td><td>financial</td><td>simple</td>
+ <td class="q">For the female client who was born in 1976/1/29, which district did she opened her account?</td>
+ <td class="q">SELECT district.A2
+FROM client
+JOIN disp ON client.client_id = disp.client_id
+JOIN account ON disp.account_id = account.account_id
+JOIN district ON account.district_id = district.district_id
+WHERE client.gender = &#x27;F&#x27;
+  AND client.birth_date = &#x27;1976-01-29&#x27;
+  AND disp.type = &#x27;OWNER&#x27;;</td>
+ <td>1 / 1</td>
+ <td><span class="ok">通过</span></td><td class="q"></td>
+ <td>拦截</td><td>50.7s</td>
+</tr>
+<tr>
+ <td>9</td><td>formula_1</td><td>challenging</td>
+ <td class="q">Paul di Resta was in the No. 853 race, what percent faster did he finish in the 853rd race than the next race for the fastest lap speed?</td>
+ <td class="q">-</td>
+ <td>1 / 0</td>
+ <td><span class="nb">拦截</span></td><td class="q">信息不足: [&amp;quot;drivers 表（含 driverId、forename、surname 字段），用于将车手姓名 &amp;#x27;Paul di Resta&amp;#x27; 映射为 driverId&amp;quot;]</td>
+ <td>拦截</td><td>38.0s</td>
+</tr>
+<tr>
+ <td>10</td><td>formula_1</td><td>challenging</td>
+ <td class="q">What is the constructor reference name of the champion in the 2009 Singapore Grand Prix? Please give its website.</td>
+ <td class="q">-</td>
+ <td>1 / 0</td>
+ <td><span class="nb">拦截</span></td><td class="q">信息不足: [&amp;quot;races表（应包含raceId、year、name等字段），用于按name=&amp;#x27;Singapore Grand Prix&amp;#x27;和year=2009定位具体比赛的raceId&amp;quot;]</td>
+ <td>拦截</td><td>15.2s</td>
+</tr>
+<tr>
+ <td>11</td><td>formula_1</td><td>moderate</td>
+ <td class="q">How many drivers from the UN participated in the 2008 Australian Grand Prix?</td>
+ <td class="q">-</td>
+ <td>1 / 0</td>
+ <td><span class="nb">拦截</span></td><td class="q">信息不足: [&amp;quot;&amp;#x27;UN&amp;#x27; 指代的具体国籍（drivers.nationality 的有效取值，如 UK/United Kingdom、USA/United States 等）&amp;quot;]</td>
+ <td>不通过</td><td>74.7s</td>
+</tr>
+<tr>
+ <td>12</td><td>formula_1</td><td>moderate</td>
+ <td class="q">What is the average score of Lewis Hamilton among all the Turkish Grand Prix?</td>
+ <td class="q">-</td>
+ <td>1 / 0</td>
+ <td><span class="nb">拦截</span></td><td class="q">信息不足: [&amp;quot;drivers 表结构（需含 driverId、forename、surname 等字段，用于匹配 &amp;#x27;Lewis Hamilton&amp;#x27;）&amp;quot;, &amp;quot;races 表结构（需含 raceId、name、year 等字段，用于匹配 &amp;#x27;Turkish Grand Prix&amp;#x27;）&amp;quot;]</td>
+ <td>拦截</td><td>48.8s</td>
+</tr>
+<tr>
+ <td>13</td><td>formula_1</td><td>moderate</td>
+ <td class="q">For all the drivers who finished the game in race No. 872, who is the youngest?</td>
+ <td class="q">SELECT d.forename, d.surname, d.dob
+FROM results r
+JOIN drivers d ON r.driverId = d.driverId
+WHERE r.raceId = 872
+  AND r.time IS NOT NULL
+ORDER BY d.dob DESC
+LIMIT 1;</td>
+ <td>1 / 1</td>
+ <td><span class="no">不通过</span></td><td class="q">执行成功但结果不一致</td>
+ <td>不通过</td><td>24.0s</td>
+</tr>
+<tr>
+ <td>14</td><td>formula_1</td><td>simple</td>
+ <td class="q">Which driver created the fastest lap speed in a Formula_1 race? Please give both his forename and surname.</td>
+ <td class="q">SELECT d.forename, d.surname
+FROM results r
+JOIN drivers d ON r.driverId = d.driverId
+WHERE r.fastestLapSpeed IS NOT NULL AND r.fastestLapSpeed != &#x27;&#x27;
+ORDER BY CAST(r.fastestLapSpeed AS DECIMAL(10, 3)) DESC
+LIMIT 1;</td>
+ <td>1 / 1</td>
+ <td><span class="no">不通过</span></td><td class="q">执行成功但结果不一致</td>
+ <td>不通过</td><td>24.3s</td>
+</tr>
+<tr>
+ <td>15</td><td>formula_1</td><td>simple</td>
+ <td class="q">For the race happened on 2015/11/29, how many drivers finished the game?</td>
+ <td class="q">SELECT COUNT(DISTINCT T2.driverId)
+FROM races AS T1
+JOIN results AS T2 ON T1.raceId = T2.raceId
+WHERE T1.date = &#x27;2015-11-29&#x27;
+  AND T2.milliseconds IS NOT NULL;</td>
+ <td>1 / 1</td>
+ <td><span class="ok">通过</span></td><td class="q"></td>
+ <td>通过</td><td>15.5s</td>
+</tr>
+<tr>
+ <td>16</td><td>formula_1</td><td>simple</td>
+ <td class="q">Show me the season page of year when the race No. 901 took place.</td>
+ <td class="q">SELECT seasons.url FROM races JOIN seasons ON races.year = seasons.year WHERE races.raceId = 901</td>
+ <td>1 / 1</td>
+ <td><span class="ok">通过</span></td><td class="q"></td>
+ <td>不通过</td><td>55.7s</td>
+</tr>
+<tr>
+ <td>17</td><td>superhero</td><td>challenging</td>
+ <td class="q">Which publisher created more superheroes: DC or Marvel Comics? Find the difference in the number of superheroes.</td>
+ <td class="q">SELECT
+    SUM(CASE WHEN p.publisher_name = &#x27;DC Comics&#x27; THEN 1 ELSE 0 END) AS dc_comics_count,
+    SUM(CASE WHEN p.publisher_name = &#x27;Marvel Comics&#x27; THEN 1 ELSE 0 END) AS marvel_comics_count,
+    ABS(
+        SUM(CASE WHEN p.publisher_name = &#x27;DC Comics&#x27; THEN 1 ELSE 0 END) -
+        SUM(CASE WHEN p.publisher_name = &#x27;Marvel Comics&#x27; THEN 1 ELSE 0 END)
+    ) AS difference
+FROM superhero s
+JOIN publisher p ON s.publisher_id = p.id
+WHERE p.publisher_name IN (&#x27;DC Comics&#x27;, &#x27;Marvel Comics&#x27;);</td>
+ <td>1 / 1</td>
+ <td><span class="no">不通过</span></td><td class="q">执行成功但结果不一致</td>
+ <td>不通过</td><td>43.4s</td>
+</tr>
+<tr>
+ <td>18</td><td>superhero</td><td>challenging</td>
+ <td class="q">Between DC and Marvel Comics, which publisher has published more superheroes? Find the difference in the number of superheroes they have published.</td>
+ <td class="q">SELECT
+    SUM(CASE WHEN p.publisher_name = &#x27;DC Comics&#x27; THEN 1 ELSE 0 END) AS dc_superhero_count,
+    SUM(CASE WHEN p.publisher_name = &#x27;Marvel Comics&#x27; THEN 1 ELSE 0 END) AS marvel_superhero_count,
+    ABS(SUM(CASE WHEN p.publisher_name = &#x27;DC Comics&#x27; THEN 1 ELSE 0 END) - SUM(CASE WHEN p.publisher_name = &#x27;Marvel Comics&#x27; THEN 1 ELSE 0 END)) AS difference
+FROM superhero s
+JOIN publisher p ON s.publisher_id = p.id
+WHERE p.publisher_name IN (&#x27;DC Comics&#x27;, &#x27;Marvel Comics&#x27;);</td>
+ <td>1 / 1</td>
+ <td><span class="no">不通过</span></td><td class="q">执行成功但结果不一致</td>
+ <td>不通过</td><td>99.3s</td>
+</tr>
+<tr>
+ <td>19</td><td>superhero</td><td>moderate</td>
+ <td class="q">How many heroes have the highest attribute value in strength?</td>
+ <td class="q">SELECT COUNT(T1.hero_id) FROM hero_attribute AS T1 JOIN attribute AS T2 ON T1.attribute_id = T2.id WHERE T2.attribute_name = &#x27;Strength&#x27; AND T1.attribute_value = (SELECT MAX(T3.attribute_value) FROM hero_attribute AS T3 JOIN attribute AS T4 ON T3.attribute_id = T4.id WHERE T4.attribute_name = &#x27;Strength&#x27;)</td>
+ <td>1 / 1</td>
+ <td><span class="ok">通过</span></td><td class="q"></td>
+ <td>通过</td><td>31.1s</td>
+</tr>
+<tr>
+ <td>20</td><td>superhero</td><td>moderate</td>
+ <td class="q">Calculate the difference between Emil Blonsky&#x27;s weight and Charles Chandler&#x27;s weight.</td>
+ <td class="q">SELECT (SELECT weight_kg FROM superhero WHERE full_name = &#x27;Emil Blonsky&#x27;) - (SELECT weight_kg FROM superhero WHERE full_name = &#x27;Charles Chandler&#x27;) AS weight_difference;</td>
+ <td>1 / 1</td>
+ <td><span class="ok">通过</span></td><td class="q"></td>
+ <td>通过</td><td>37.2s</td>
+</tr>
+<tr>
+ <td>21</td><td>superhero</td><td>moderate</td>
+ <td class="q">Which publisher published the slowest superhero?</td>
+ <td class="q">SELECT p.publisher_name
+FROM superhero s
+JOIN hero_attribute ha ON s.id = ha.hero_id
+JOIN attribute a ON ha.attribute_id = a.id
+JOIN publisher p ON s.publisher_id = p.id
+WHERE a.attribute_name = &#x27;Speed&#x27;
+ORDER BY ha.attribute_value ASC
+LIMIT 1;</td>
+ <td>1 / 1</td>
+ <td><span class="ok">通过</span></td><td class="q"></td>
+ <td>不通过</td><td>17.8s</td>
+</tr>
+<tr>
+ <td>22</td><td>superhero</td><td>simple</td>
+ <td class="q">How many superheroes have a neutral alignment?</td>
+ <td class="q">SELECT COUNT(*) AS superhero_count
+FROM superhero
+JOIN alignment ON superhero.alignment_id = alignment.id
+WHERE alignment.alignment = &#x27;Neutral&#x27;;</td>
+ <td>1 / 1</td>
+ <td><span class="ok">通过</span></td><td class="q"></td>
+ <td>通过</td><td>31.4s</td>
+</tr>
+<tr>
+ <td>23</td><td>superhero</td><td>simple</td>
+ <td class="q">How many superheroes didn&#x27;t have any publisher?</td>
+ <td class="q">SELECT COUNT(*) FROM superhero WHERE publisher_id IS NULL;</td>
+ <td>1 / 1</td>
+ <td><span class="no">不通过</span></td><td class="q">执行成功但结果不一致</td>
+ <td>不通过</td><td>8.4s</td>
+</tr>
+<tr>
+ <td>24</td><td>superhero</td><td>simple</td>
+ <td class="q">How many superheroes did DC Comics publish?</td>
+ <td class="q">SELECT COUNT(*) AS superhero_count
+FROM superhero
+JOIN publisher ON superhero.publisher_id = publisher.id
+WHERE publisher.publisher_name = &#x27;DC Comics&#x27;;</td>
+ <td>1 / 1</td>
+ <td><span class="ok">通过</span></td><td class="q"></td>
+ <td>通过</td><td>38.6s</td>
+</tr>
+</table>
+</body></html>

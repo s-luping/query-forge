@@ -1,12 +1,22 @@
 # -*- coding: utf-8 -*-
-"""读取 qf_results_turbo.json（主）/ qf_results.json（pro 对照），生成 BIRD 基准测试 HTML 报告。"""
+"""生成 BIRD 基准测试 HTML 报告。
+
+用法:
+  python make_report.py <主模型结果.json> "<主模型标签>" [输出.html]
+对照固定使用历史 bird_eval_turbo.json（doubao-seed-2-1-turbo）结果，不重跑。
+"""
 import json
+import sys
 import html
 from collections import Counter
 
-TURBO = r"D:\projects\query-forge\benchmark\results\bird_eval_turbo.json"
-PRO = r"D:\projects\query-forge\benchmark\results\bird_eval_pro.json"
-OUT = r"d:\projects\query-forge\docs\BIRD基准NL2SQL测试报告.html"
+RESULTS = r"D:\projects\query-forge\benchmark\results"
+COMP = RESULTS + r"\bird_eval_turbo.json"
+COMP_LABEL = "doubao-seed-2-1-turbo (id=5)"
+
+MAIN = sys.argv[1] if len(sys.argv) > 1 else RESULTS + r"\bird_eval_nvidia_glm53.json"
+MAIN_LABEL = sys.argv[2] if len(sys.argv) > 2 else "nvidia glm-5.3-flash (id=7)"
+OUT = sys.argv[3] if len(sys.argv) > 3 else r"d:\projects\query-forge\docs\BIRD基准NL2SQL测试报告.html"
 
 
 def load_dedup(path):
@@ -29,15 +39,16 @@ def stats(rs):
     )
 
 
-turbo = load_dedup(TURBO)
-pro = load_dedup(PRO)
-st, sp = stats(turbo), stats(pro)
+main = load_dedup(MAIN)
+comp = load_dedup(COMP)
+st, sc = stats(main), stats(comp)
+comp_by_qid = {r["question_id"]: r for r in comp}
 
-by_db = Counter(r["db_id"] for r in turbo)
-by_diff = Counter(r["difficulty"] for r in turbo)
-ok_by_db = Counter(r["db_id"] for r in turbo if r["match"])
-ok_by_diff = Counter(r["difficulty"] for r in turbo if r["match"])
-executed = sum(1 for r in turbo if not r.get("error") and not r.get("need_more_info"))
+by_db = Counter(r["db_id"] for r in main)
+by_diff = Counter(r["difficulty"] for r in main)
+ok_by_db = Counter(r["db_id"] for r in main if r["match"])
+ok_by_diff = Counter(r["difficulty"] for r in main if r["match"])
+executed = sum(1 for r in main if not r.get("error") and not r.get("need_more_info"))
 
 
 def esc_html(s):
@@ -45,7 +56,7 @@ def esc_html(s):
 
 
 rows_html = []
-for i, r in enumerate(sorted(turbo, key=lambda x: (x["db_id"], x["difficulty"]))):
+for i, r in enumerate(sorted(main, key=lambda x: (x["db_id"], x["difficulty"]))):
     if r.get("error"):
         badge = '<span class="er">请求异常</span>'
         note = "异常: " + esc_html(r.get("error"))
@@ -58,13 +69,16 @@ for i, r in enumerate(sorted(turbo, key=lambda x: (x["db_id"], x["difficulty"]))
     else:
         badge = '<span class="no">不通过</span>'
         note = "执行成功但结果不一致" if not r.get("exec_error") else "执行错误: " + esc_html(r.get("exec_error"))
+    c = comp_by_qid.get(r["question_id"])
+    comp_txt = "-" if not c else ("通过" if c["match"] else ("拦截" if c.get("need_more_info") else "不通过"))
     rows_html.append(f"""
 <tr>
  <td>{i+1}</td><td>{esc_html(r['db_id'])}</td><td>{esc_html(r['difficulty'])}</td>
  <td class="q">{esc_html(r['question'])}</td>
  <td class="q">{esc_html(r.get('gen_sql')) or '-'}</td>
  <td>{r.get('gold_rows_count')} / {r.get('gen_rows_count', '-')}</td>
- <td>{badge}</td><td class="q">{esc_html(note)}</td><td>{r['elapsed_s']}s</td>
+ <td>{badge}</td><td class="q">{esc_html(note)}</td>
+ <td>{comp_txt}</td><td>{r['elapsed_s']}s</td>
 </tr>""")
 
 db_rows = "".join(
@@ -75,7 +89,7 @@ diff_rows = "".join(
     for d in ["simple", "moderate", "challenging"])
 
 acc = f"{st['ok']}/{st['valid']}"
-pct = st["ok"] / max(st["valid"], 1) * 100
+pct = st["ok"] / max(st['valid'], 1) * 100
 
 doc = f"""<!DOCTYPE html>
 <html lang="zh"><head><meta charset="utf-8">
@@ -93,7 +107,7 @@ th{{background:#f6f8fa}}
 .ok{{color:#1a7f37;font-weight:bold}} .no{{color:#cf222e;font-weight:bold}}
 .nb{{color:#9a6700;font-weight:bold}} .er{{color:#8250df;font-weight:bold}}
 </style></head><body>
-<h1>QueryForge NL2SQL — BIRD 基准测试报告</h1>
+<h1>QueryForge NL2SQL — BIRD 基准测试报告（{esc_html(MAIN_LABEL)}）</h1>
 <p><b>数据集:</b> BIRD dev（2024-06-27 官方发布，阿里云 OSS 直下，1534 题/11 库）·
 <b>测试库:</b> superhero(10 表) / formula_1(13 表) / financial(8 表)，SQLite→MySQL 8.0 迁移，
 保留主键/外键，官方 database_description 列说明写入 MySQL COMMENT ·
@@ -105,29 +119,16 @@ th{{background:#f6f8fa}}
  <div class="card"><b>{executed}</b>SQL 成功执行</div>
  <div class="card"><b>{st['avg_t']:.0f}s</b>平均耗时/题</div>
 </div>
-<p><b>主模型:</b> doubao-seed-2-1-turbo-260628 (id=5)。
-对照: doubao-seed-2-1-pro-260628 (id=4) 在 17 道有效题上 {sp['ok']}/{sp['valid']} 通过
-（{sp['ok']/max(sp['valid'],1)*100:.0f}%），pro 于测试中途方舟配额耗尽服务暂停，未完成全量。
-turbo 轮在最后 4 题同样触发配额上限（SetLimitExceeded），如需补全需在火山方舟控制台提额。</p>
-<h2>分库结果（turbo）</h2><table><tr><th>数据库</th><th>通过/总题</th></tr>{db_rows}</table>
-<h2>分难度结果（turbo）</h2><table><tr><th>难度</th><th>通过/总题</th></tr>{diff_rows}</table>
-<h2>明细（turbo）</h2>
+<p><b>主模型:</b> {esc_html(MAIN_LABEL)}（NVIDIA NIM 免费额度，base_url=integrate.api.nvidia.com/v1，OpenAI 兼容协议）。
+历史对照: {esc_html(COMP_LABEL)} 在同题集上 {sc['ok']}/{sc['valid']} 通过
+（{sc['ok']/max(sc['valid'],1)*100:.0f}%），对照结果取自历史评测存档，未重跑。</p>
+<h2>分库结果（{esc_html(MAIN_LABEL)}）</h2><table><tr><th>数据库</th><th>通过/总题</th></tr>{db_rows}</table>
+<h2>分难度结果（{esc_html(MAIN_LABEL)}）</h2><table><tr><th>难度</th><th>通过/总题</th></tr>{diff_rows}</table>
+<h2>明细（{esc_html(MAIN_LABEL)}，末列为 {esc_html(COMP_LABEL)} 对照）</h2>
 <table><tr><th>#</th><th>库</th><th>难度</th><th>问题</th><th>QF 生成 SQL</th>
-<th>行数(gold/gen)</th><th>结论</th><th>说明</th><th>耗时</th></tr>
+<th>行数(gold/gen)</th><th>结论</th><th>说明</th><th>对照</th><th>耗时</th></tr>
 {''.join(rows_html)}
 </table>
-<h2>过程发现的问题</h2>
-<ul>
-<li><b>已修复缺陷:</b> 创建对话接口在响应序列化阶段引用了 <code>request.schema_name</code>（应为
-<code>payload.schema_name</code>），导致每轮首轮生成在全部成功后仍返回 500，前端拿不到 SQL 与结果。
-已修复 app/routers/conversation_router.py 并经本轮验证。</li>
-<li><b>已知问题 1:</b> 同步任务 run 状态恒为 failed——元数据同步实际成功（表/列全部入库），
-但收尾阶段抛 <code>DbSchema not bound to Session</code>，建议排查 services/sync_engine.py 会话管理。</li>
-<li><b>已知问题 2:</b> 信息不足拦截（5 题）集中在 need_more_info 分支，其中 formula_1 challenging
-3 题全部拦截，复杂多表链路的字段召回有提升空间。</li>
-<li><b>已知问题 3:</b> 火山方舟账号 doubao 系列模型配额耗尽（pro 与 turbo 先后被暂停），
-影响长基准测试连续性。</li>
-</ul>
 </body></html>"""
 
 with open(OUT, "w", encoding="utf-8") as f:
