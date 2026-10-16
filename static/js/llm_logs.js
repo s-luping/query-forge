@@ -17,10 +17,31 @@
             detailTrigger = null;
         });
 
+        // ---- 筛选条件：list 与 stats 共用同一组参数，统计卡片跟随筛选联动 ----
+        const FILTER_IDS = ['dateFilter', 'statusFilter', 'providerFilter',
+            'modelFilter', 'durationFilter', 'tokenFilter'];
+
+        function buildFilterParams() {
+            const p = new URLSearchParams();
+            const days = document.getElementById('dateFilter').value;
+            const status = document.getElementById('statusFilter').value;
+            const provider = document.getElementById('providerFilter').value;
+            const model = document.getElementById('modelFilter').value;
+            const duration = document.getElementById('durationFilter').value;
+            const tokens = document.getElementById('tokenFilter').value;
+            if (days) p.set('days', days);
+            if (status) p.set('status', status);
+            if (provider) p.set('provider', provider);
+            if (model) p.set('model', model);
+            if (duration) p.set('min_duration_ms', duration);
+            if (tokens) p.set('min_tokens', tokens);
+            return p.toString();
+        }
+
         async function loadStats() {
             // 后端按角色自动限定范围：管理员看全部，普通用户看自己的统计
             try {
-                const response = await apiRequest('/api/llm/stats');
+                const response = await apiRequest('/api/llm/stats?' + buildFilterParams());
                 const data = await response.json();
 
                 document.getElementById('totalCalls').textContent = data.total_calls;
@@ -35,17 +56,46 @@
             }
         }
 
+        async function loadFilterOptions() {
+            // 供应商/模型下拉可选项：取当前可见范围内的去重值
+            try {
+                const response = await apiRequest('/api/llm/filter-options');
+                const data = await response.json();
+                const fill = (id, values) => {
+                    const sel = document.getElementById(id);
+                    const current = sel.value;
+                    for (const v of values) {
+                        const opt = document.createElement('option');
+                        opt.value = v;
+                        opt.textContent = v;
+                        sel.appendChild(opt);
+                    }
+                    if (values.includes(current)) sel.value = current;
+                };
+                fill('providerFilter', data.providers || []);
+                fill('modelFilter', data.models || []);
+            } catch (e) {
+                console.error('加载筛选可选项失败:', e);
+            }
+        }
+
+        function onFilterChange() {
+            currentPage = 1;
+            loadLogs();
+            loadStats();
+        }
+
         // 请求令牌：快速点击分页 / 切换筛选时，丢弃过期响应，避免旧数据覆盖新数据
         let loadToken = 0;
 
         async function loadLogs() {
             const token = ++loadToken;
-            const status = document.getElementById('statusFilter').value;
             const offset = (currentPage - 1) * pageSize;
 
             try {
                 let url = `/api/llm/list?limit=${pageSize}&offset=${offset}`;
-                if (status) url += `&status=${status}`;
+                const filterParams = buildFilterParams();
+                if (filterParams) url += `&${filterParams}`;
 
                 const response = await apiRequest(url);
                 const data = await response.json();
@@ -357,6 +407,20 @@
         // 必须无条件挂载 QF.onReady（否则角色未加载时 isAdmin()=false 会误删管理员功能）。
         function initPage() {
             if (window.QF.isAdmin()) loadStats();
+            loadFilterOptions();
             loadLogs();
+
+            // 筛选控件变更：回到第 1 页并联动刷新列表 + 统计卡片
+            for (const id of FILTER_IDS) {
+                document.getElementById(id).addEventListener('change', onFilterChange);
+            }
+            document.getElementById('resetFilters').addEventListener('click', function () {
+                let changed = false;
+                for (const id of FILTER_IDS) {
+                    const el = document.getElementById(id);
+                    if (el.value) { el.value = ''; changed = true; }
+                }
+                if (changed) onFilterChange();
+            });
         }
         window.QF.onReady = initPage;
