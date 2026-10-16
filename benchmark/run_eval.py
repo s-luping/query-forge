@@ -9,10 +9,12 @@
 （列式 JSON 转行集，数值按 2 位小数容差），多答案题命中任一即正确。
 
 用法（项目 venv，cwd=项目根）：
-    .venv\\Scripts\\python.exe benchmark\\run_eval.py --questions benchmark\\questions\\questions_falcon.jsonl
-    # 断点续跑：同一 --out 再次执行即自动跳过已完成题目
-    # 只汇总不跑：--report-only
-"""
+        .venv\\Scripts\\python.exe benchmark\\run_eval.py --questions benchmark\\questions\\questions_falcon.jsonl
+        # 断点续跑：同一 --out 再次执行即自动跳过已完成题目
+        # 只汇总不跑：--report-only
+        # 离线重标注：--relabel-quota 把历史 HTTPError:500 记录改为 model_quota_paused
+        # 续费后重跑被标记题：--retry-status model_quota_paused,rate_limited
+    """
 import argparse
 import json
 import os
@@ -56,6 +58,17 @@ def rate_gate():
                 return
             wait = RATE_WINDOW - (now - _rate_ts[0]) + 0.5
         time.sleep(max(wait, 1.0))
+
+
+# 模型配额类错误关键词（火山方舟 SetLimitExceeded / 未开通 / 欠费 / 通用 quota）
+QUOTA_MARKERS = ("setlimitexceeded", "modelnotopen", "arrearage",
+                 "usage limit", "quota", "欠费", "余额不足")
+
+
+def classify_quota_error(resp_text):
+    """判断响应体是否属于模型过期/配额不足类错误。"""
+    low = (resp_text or "").lower()
+    return any(m in low for m in QUOTA_MARKERS)
 
 
 def login(session):
@@ -216,6 +229,17 @@ def eval_one(session, item, llm_config_id, http_timeout):
         rec["status"] = "timeout"
         rec["note"] = f"客户端超时({http_timeout}s)"
         return rec
+    except requests.HTTPError as e:
+        body = ""
+        if e.response is not None:
+            body = e.response.text or ""
+        if classify_quota_error(body):
+            rec["status"] = "model_quota_paused"
+            rec["note"] = "模型过期/配额不足: " + body[:180]
+        else:
+            rec["status"] = "error"
+            rec["note"] = f"{type(e).__name__}: {e}"[:200]
+        return rec
     except Exception as e:
         rec["note"] = f"{type(e).__name__}: {e}"[:200]
         return rec
@@ -240,6 +264,45 @@ def summarize(records):
     }
 
 
+def load_records(out_path):
+    """读取结果 JSONL，同 qid 保留最后一条（支持 --retry-status 覆盖旧记录）。"""
+    by_qid = {}
+    order = []
+    with open(out_path, encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            r = json.loads(line)
+            if r.get("qid") not in by_qid:
+                order.append(r.get("qid"))
+            by_qid[r.get("qid")] = r
+    return [by_qid[q] for q in order]
+
+
+def relabel_quota(out_path):
+    """离线重标注：历史 status=error 且 note 含 HTTPError:500 的记录改为
+    model_quota_paused（依据服务端日志证据：该批次 500 均为 SetLimitExceeded）。"""
+    recs = []
+    n = 0
+    with open(out_path, encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            r = json.loads(line)
+            note = r.get("note") or ""
+            if r.get("status") == "error" and "HTTPError" in note and "500" in note:
+                r["status"] = "model_quota_paused"
+                r["note"] = "模型过期/配额不足(离线标注): " + note[:160]
+                n += 1
+            recs.append(r)
+    with open(out_path, "w", encoding="utf-8") as f:
+        for r in recs:
+            f.write(json.dumps(r, ensure_ascii=False) + "\n")
+    log(f"离线重标注 {n}/{len(recs)} 条 → model_quota_paused")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--questions", required=True, help="题目 JSONL 路径")
@@ -249,6 +312,10 @@ def main():
     ap.add_argument("--limit", type=int, default=0, help="只跑前 N 题（0=全量）")
     ap.add_argument("--http-timeout", type=int, default=600)
     ap.add_argument("--report-only", action="store_true")
+    ap.add_argument("--relabel-quota", action="store_true",
+                    help="只离线重标注：把历史 HTTPError:500 记录改为 model_quota_paused")
+    ap.add_argument("--retry-status", default="",
+                    help="逗号分隔状态列表，这些状态的已完成记录视为待重跑（如 model_quota_paused,rate_limited）")
     args = ap.parse_args()
 
     name = os.path.splitext(os.path.basename(args.questions))[0]
@@ -256,14 +323,21 @@ def main():
     out_path = args.out or f"benchmark/results/{name}.c{args.llm_config_id}.jsonl"
     report_path = out_path.rsplit(".", 1)[0] + ".report.md"
 
-    done_qids = set()
+    if args.relabel_quota:
+        relabel_quota(out_path)
+        args.report_only = True
+
+    retry_statuses = {s.strip() for s in args.retry_status.split(",") if s.strip()}
+
+    done_status = {}
     if os.path.exists(out_path):
         with open(out_path, encoding="utf-8") as f:
             for line in f:
                 line = line.strip()
                 if line:
                     try:
-                        done_qids.add(json.loads(line)["qid"])
+                        r = json.loads(line)
+                        done_status[r["qid"]] = r.get("status")
                     except Exception:
                         pass
 
@@ -271,8 +345,10 @@ def main():
         items = [json.loads(l) for l in f if l.strip()]
     if args.limit:
         items = items[:args.limit]
-    todo = [it for it in items if it["qid"] not in done_qids]
-    log(f"题目 {len(items)}，已完成 {len(done_qids)}，待跑 {len(todo)} → {out_path}")
+    todo = [it for it in items
+            if it["qid"] not in done_status or done_status[it["qid"]] in retry_statuses]
+    log(f"题目 {len(items)}，已完成 {len(done_status)}，待跑 {len(todo)} → {out_path}"
+        + (f"（重试状态: {','.join(retry_statuses)}）" if retry_statuses else ""))
 
     if not args.report_only:
         session = requests.Session()
@@ -296,11 +372,7 @@ def main():
                     log(f"({n}/{len(todo)}) {rec['qid']} [{rec['status']}] "
                         f"ex={rec.get('ex')} {rec.get('note','')[:80]}")
 
-    records = []
-    with open(out_path, encoding="utf-8") as f:
-        for line in f:
-            if line.strip():
-                records.append(json.loads(line))
+    records = load_records(out_path)
     summary = summarize(records)
     log("汇总: " + json.dumps(summary, ensure_ascii=False))
     with open(report_path, "w", encoding="utf-8") as f:
@@ -310,6 +382,9 @@ def main():
         f.write(f"- 题数: {summary['total']}  EX: {summary['EX']}"
                 f" ({summary['EX_correct']}/{summary['total']})\n")
         f.write(f"- 状态分桶: {json.dumps(summary['status_buckets'], ensure_ascii=False)}\n")
+        n_paused = summary["status_buckets"].get("model_quota_paused", 0)
+        if n_paused:
+            f.write(f"- ⚠ 模型过期/配额不足 {n_paused} 题（待续费后用 --retry-status model_quota_paused 重跑）\n")
         f.write(f"- 平均耗时: {summary['avg_latency_s']}s"
                 f"  Token: {json.dumps(summary['tokens_total'])}\n\n")
         f.write("| qid | schema | status | EX | note |\n|---|---|---|---|---|\n")
