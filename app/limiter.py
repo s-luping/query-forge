@@ -14,6 +14,7 @@ from slowapi.util import get_remote_address
 import os
 
 from app.auth import resolve_token_user
+from app.config import DEBUG
 
 
 def _rate_limit_key(request):
@@ -35,7 +36,10 @@ limiter = Limiter(key_func=_rate_limit_key)
 # ── 限流档位（集中定义，避免各处魔法字符串；纲领 §3.2/§4.1）──────
 # 数据接口按"单用户/单IP 每分钟"计，额度按资源代价分级；
 # 可用环境变量 QF_LIMIT_* 覆盖（测试/压测环境放宽用，默认值即线上档位）：
+# DEBUG=True（本地开发）时默认不限流，显式设置 QF_LIMIT_* 仍可单独收紧。
 def _limit(env: str, default: str) -> str:
+    if DEBUG and not os.getenv(env):
+        return '1000000/minute'
     return os.getenv(env, default) or default
 
 LIMIT_AUTH = _limit('QF_LIMIT_AUTH', '2/minute')            # 登录/注册：防暴力破解
