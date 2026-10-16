@@ -3,9 +3,10 @@
 
 用法:
   python qf_bench_run.py setup     # 建数据源 -> 测试连接 -> 建同步任务 -> 执行 -> 重建向量索引
-  python qf_bench_run.py test      # 对 selected_questions.json 逐题调 QF NL2SQL 并对比标准答案
+  python qf_bench_run.py test      # 对 questions/bird_selected_questions.json 逐题调 QF NL2SQL 并对比标准答案
 """
 import json
+import os
 import sys
 import time
 
@@ -16,8 +17,8 @@ USER, PWD = "admin", "REDACTED"
 LLM_CONFIG_ID = 5  # doubao-seed-2-1-turbo-260628（id=4 pro 配额已耗尽被暂停）
 DBS = [("bird_superhero", "superhero"), ("bird_formula_1", "formula_1"),
        ("bird_financial", "financial")]
-SEL = r"D:\qf_bench\selected_questions.json"
-OUT = r"D:\qf_bench\qf_results_turbo.json"
+SEL = os.path.join(os.path.dirname(os.path.abspath(__file__)), "questions", "bird_selected_questions.json")
+OUT = r"D:\projects\query-forge\benchmark\results\bird_eval_turbo.json"
 TOKEN = None
 SESSION = requests.Session()  # token 经 HttpOnly cookie 下发，用 session 自动携带
 TIMEOUT = 600
@@ -174,4 +175,8 @@ def run_test():
 
 
 if __name__ == "__main__":
+    if len(sys.argv) > 2:
+        LLM_CONFIG_ID = int(sys.argv[2])
+    if len(sys.argv) > 3:
+        OUT = sys.argv[3]
     {"setup": setup, "test": run_test}[sys.argv[1]]()

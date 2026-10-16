@@ -4,10 +4,10 @@
 两个功能：
 1. --import：把 Falcon dev_data 的 16 个 SQLite 库导入本地 MySQL，
    每个源库一个 schema：falcon_dev_<db_id>（可重复执行，先 DROP 再建）；
-2. --questions：生成 benchmark/questions_falcon.jsonl 题目文件
+2. --questions：生成 benchmark/questions/questions_falcon.jsonl 题目文件
    （qid/question/schema/is_order/answers，answers 已转为行集）。
 
-数据源目录结构（--src，默认 D:\\projects\\_falcon_data\\dev_data）：
+数据源目录结构（--src，默认 benchmark/data/falcon，脚本所在目录同级）：
     dev.json / tables.json / dev_databases/<db_id>/<db_id>.sqlite
 
 用法（项目 venv）：
@@ -21,7 +21,7 @@ import sys
 
 import pymysql
 
-DEFAULT_SRC = r"D:\projects\_falcon_data"
+DEFAULT_SRC = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "falcon")
 MYSQL_CONF = dict(
     host=os.environ.get("QF_MYSQL_HOST", "127.0.0.1"),
     port=int(os.environ.get("QF_MYSQL_PORT", "3306")),
@@ -158,7 +158,7 @@ def main():
     ap.add_argument("--src", default=DEFAULT_SRC)
     ap.add_argument("--import", dest="do_import", action="store_true")
     ap.add_argument("--questions", dest="do_questions", action="store_true")
-    ap.add_argument("--out", default=os.path.join("benchmark", "questions_falcon.jsonl"))
+    ap.add_argument("--out", default=os.path.join("benchmark", "questions", "questions_falcon.jsonl"))
     args = ap.parse_args()
     if not (args.do_import or args.do_questions):
         print("无操作：指定 --import 和/或 --questions")

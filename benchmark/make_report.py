@@ -4,8 +4,8 @@ import json
 import html
 from collections import Counter
 
-TURBO = r"D:\qf_bench\qf_results_turbo.json"
-PRO = r"D:\qf_bench\qf_results.json"
+TURBO = r"D:\projects\query-forge\benchmark\results\bird_eval_turbo.json"
+PRO = r"D:\projects\query-forge\benchmark\results\bird_eval_pro.json"
 OUT = r"d:\projects\query-forge\docs\BIRD基准NL2SQL测试报告.html"
 
 

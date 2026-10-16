@@ -34,7 +34,7 @@ def log(msg):
 
 
 def falcon_schemas():
-    dev_path = os.path.join(os.path.dirname(__file__), "questions_falcon.jsonl")
+    dev_path = os.path.join(os.path.dirname(__file__), "questions", "questions_falcon.jsonl")
     schemas = set()
     with open(dev_path, encoding="utf-8") as f:
         for line in f:
