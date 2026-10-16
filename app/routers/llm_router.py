@@ -7,7 +7,7 @@
 模型配置：
 - api_key 列存 Fernet 密文（app/security/crypto.py），读取时解密。
 """
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List, Optional
 
 from fastapi import APIRouter, HTTPException, Query, Request
@@ -32,6 +32,33 @@ config_router = APIRouter()
 
 def _is_admin(user: dict) -> bool:
     return user.get('role') == 'admin'
+
+
+def _apply_log_filters(query, user_id: int, is_admin: bool,
+                       status: Optional[str] = None, provider: Optional[str] = None,
+                       model: Optional[str] = None, days: Optional[int] = None,
+                       min_duration_ms: Optional[float] = None,
+                       min_tokens: Optional[int] = None):
+    """调用记录筛选条件（/list 与 /stats 共用）。days: 1=今天 7=近一周 30=近30天"""
+    if not is_admin:
+        query = query.filter(LLMCall.user_id == user_id)
+    if status:
+        query = query.filter(LLMCall.status == status)
+    if provider:
+        query = query.filter(LLMCall.provider == provider)
+    if model:
+        query = query.filter(LLMCall.model == model)
+    if days:
+        if days == 1:
+            start = datetime.combine(datetime.now().date(), datetime.min.time())
+        else:
+            start = datetime.now() - timedelta(days=days)
+        query = query.filter(LLMCall.created_at >= start)
+    if min_duration_ms is not None:
+        query = query.filter(LLMCall.duration_ms >= min_duration_ms)
+    if min_tokens is not None:
+        query = query.filter(LLMCall.total_tokens >= min_tokens)
+    return query
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -104,17 +131,20 @@ def _call_to_item(call: LLMCall, prompt_content: Optional[str]) -> LLMLogItem:
 @limiter.limit(LIMIT_READ)
 def get_llm_logs(request: Request, user: CurrentUser,
                  limit: int = Query(20, ge=1, le=100), offset: int = Query(0, ge=0),
-                 status: Optional[str] = None):
-    """获取LLM调用记录列表（管理员看全部，用户看自己）"""
-    user_id = user['user_id']; is_admin = user.get('role') == 'admin'
+                 status: Optional[str] = None, provider: Optional[str] = None,
+                 model: Optional[str] = None,
+                 days: Optional[int] = Query(None, ge=1, le=365),
+                 min_duration_ms: Optional[float] = Query(None, ge=0),
+                 min_tokens: Optional[int] = Query(None, ge=0)):
+    """获取LLM调用记录列表（管理员看全部，用户看自己），支持状态/供应商/模型/日期/耗时/Token筛选"""
     try:
         with session_scope(telemetry=True) as db:
             query = db.query(LLMCall, LLMPrompt.content).outerjoin(
                 LLMPrompt, LLMCall.prompt_id == LLMPrompt.id)
-            if not is_admin:
-                query = query.filter(LLMCall.user_id == user_id)
-            if status:
-                query = query.filter(LLMCall.status == status)
+            query = _apply_log_filters(query, user['user_id'], _is_admin(user),
+                                       status=status, provider=provider, model=model,
+                                       days=days, min_duration_ms=min_duration_ms,
+                                       min_tokens=min_tokens)
             total = query.count()
             rows = query.order_by(LLMCall.created_at.desc()).offset(offset).limit(limit).all()
             items = [_call_to_item(c, p) for c, p in rows]
@@ -126,28 +156,38 @@ def get_llm_logs(request: Request, user: CurrentUser,
 
 @log_router.get("/stats", response_model=LLMLogStats)
 @limiter.limit(LIMIT_READ)
-def get_llm_stats(request: Request, user: CurrentUser):
-    """获取LLM调用统计（管理员看全部，用户看自己）"""
-    user_id = user['user_id']; is_admin = user.get('role') == 'admin'
+def get_llm_stats(request: Request, user: CurrentUser,
+                  status: Optional[str] = None, provider: Optional[str] = None,
+                  model: Optional[str] = None,
+                  days: Optional[int] = Query(None, ge=1, le=365),
+                  min_duration_ms: Optional[float] = Query(None, ge=0),
+                  min_tokens: Optional[int] = Query(None, ge=0)):
+    """获取LLM调用统计（管理员看全部，用户看自己），筛选条件与 /list 一致"""
     try:
         with session_scope(telemetry=True) as db:
             from sqlalchemy import func
 
             base = db.query(LLMCall)
-            if not is_admin:
-                base = base.filter(LLMCall.user_id == user_id)
+            base = _apply_log_filters(base, user['user_id'], _is_admin(user),
+                                      status=status, provider=provider, model=model,
+                                      days=days, min_duration_ms=min_duration_ms,
+                                      min_tokens=min_tokens)
             total_calls = base.count()
 
             succ = db.query(LLMCall)
-            if not is_admin:
-                succ = succ.filter(LLMCall.user_id == user_id)
-            success_calls = succ.filter(LLMCall.status == 'success').count()
+            succ = _apply_log_filters(succ, user['user_id'], _is_admin(user),
+                                      status='success', provider=provider, model=model,
+                                      days=days, min_duration_ms=min_duration_ms,
+                                      min_tokens=min_tokens)
+            success_calls = succ.count()
 
             sq = db.query(func.sum(LLMCall.total_tokens), func.sum(LLMCall.prompt_tokens),
                           func.sum(LLMCall.completion_tokens), func.avg(LLMCall.duration_ms),
                           func.sum(LLMCall.cost))
-            if not is_admin:
-                sq = sq.filter(LLMCall.user_id == user_id)
+            sq = _apply_log_filters(sq, user['user_id'], _is_admin(user),
+                                    status=status, provider=provider, model=model,
+                                    days=days, min_duration_ms=min_duration_ms,
+                                    min_tokens=min_tokens)
             st = sq.first()
             return LLMLogStats(
                 total_calls=total_calls, total_tokens=st[0] or 0,
@@ -158,6 +198,24 @@ def get_llm_stats(request: Request, user: CurrentUser):
     except Exception as e:
         logger.error(f"获取LLM统计失败: {e}")
         raise HTTPException(status_code=500, detail=f"获取统计失败: {str(e)}")
+
+
+@log_router.get("/filter-options")
+@limiter.limit(LIMIT_READ)
+def get_filter_options(request: Request, user: CurrentUser):
+    """筛选下拉框可选项：当前可见范围内的去重供应商/模型列表"""
+    try:
+        with session_scope(telemetry=True) as db:
+            base = db.query(LLMCall)
+            if not _is_admin(user):
+                base = base.filter(LLMCall.user_id == user['user_id'])
+            rows = base.with_entities(LLMCall.provider, LLMCall.model).distinct().all()
+            providers = sorted({r[0] for r in rows if r[0]})
+            models = sorted({r[1] for r in rows if r[1]})
+            return {'providers': providers, 'models': models}
+    except Exception as e:
+        logger.error(f"获取筛选可选项失败: {e}")
+        raise HTTPException(status_code=500, detail=f"获取筛选项失败: {str(e)}")
 
 
 @log_router.get("/{log_id}", response_model=LLMLogItem)
