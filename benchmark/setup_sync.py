@@ -56,12 +56,16 @@ def main():
     # 现有数据源
     r = s.get(f"{BASE_URL}/api/sync/datasources", timeout=30)
     r.raise_for_status()
-    existing = {d["name"]: d["id"] for d in r.json()}
+    ds_items = r.json()
+    ds_items = ds_items.get("items", []) if isinstance(ds_items, dict) else ds_items
+    existing = {d["name"]: d["id"] for d in ds_items}
 
     # 现有任务
     r = s.get(f"{BASE_URL}/api/sync/jobs", timeout=30)
     r.raise_for_status()
-    jobs_by_ds = {j["datasource_id"]: j["id"] for j in r.json()}
+    job_items = r.json()
+    job_items = job_items.get("items", []) if isinstance(job_items, dict) else job_items
+    jobs_by_ds = {j["datasource_id"]: j["id"] for j in job_items}
 
     for schema in schemas:
         ds_id = existing.get(schema)
