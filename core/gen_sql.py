@@ -60,7 +60,9 @@ class SqlGenerator:
         ]
 
         if knowledge_content:
-            prompt_parts.append(f"【领域知识】\n{knowledge_content.strip()}")
+            kb = knowledge_content.strip()
+            # 调用方已带段标题（【全局规则】/【领域知识】…）时原样注入，否则补默认标题
+            prompt_parts.append(kb if kb.startswith('【') else f"【领域知识】\n{kb}")
         if relations_text:
             prompt_parts.append(
                 "【表关系（已人工确认的 JOIN 条件）】\n" + relations_text.strip()
@@ -120,7 +122,9 @@ class SqlGenerator:
                     history_section += f"助手: {sql or content}\n"
             prompt_parts.append(f"【对话历史】\n{history_section}")
         if knowledge_content:
-            prompt_parts.append(f"【领域知识】\n{knowledge_content.strip()}")
+            kb = knowledge_content.strip()
+            # 调用方已带段标题（【全局规则】/【领域知识】…）时原样注入，否则补默认标题
+            prompt_parts.append(kb if kb.startswith('【') else f"【领域知识】\n{kb}")
         if relations_text:
             prompt_parts.append(
                 "【表关系（已人工确认的 JOIN 条件）】\n" + relations_text.strip())

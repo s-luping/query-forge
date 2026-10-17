@@ -199,6 +199,11 @@ function renderMessage(msg) {
             }
         }
 
+        // 权限提示（后端网关改写：行级过滤注入/敏感字段仅聚合返回）
+        if (msg.permission_note) {
+            html += `<div class="msg-perm-note">🛡 ${escapeHtml(msg.permission_note)}</div>`;
+        }
+
         // 查询结果表格（query_result: {columns, rows, row_count, error, duration_ms}）
         // 会话内只显示前 N 行，完整结果在弹窗中分页查看
         if (msg.query_result) {
@@ -210,6 +215,10 @@ function renderMessage(msg) {
                 const total = qr.row_count != null ? qr.row_count : (qr.rows || []).length;
                 const preview = (qr.rows || []).slice(0, PREVIEW_ROWS);
                 html += `<div style="margin-top:8px;font-size:12px;color:#6c757d;">查询结果：共 ${total} 行${qr.duration_ms != null ? ` · ${qr.duration_ms}ms` : ''}</div>`;
+                if (total === 0 && !msg.permission_note) {
+                    // 历史消息可能无后端归因提示，前端兜底提示空结果可能原因
+                    html += `<div class="msg-perm-note" style="margin-top:4px;">ℹ️ 返回 0 行：可能筛选条件过严或数据本身为空；如涉及数据权限过滤，请联系管理员确认</div>`;
+                }
                 html += `<div style="overflow-x:auto;margin-top:4px;"><table class="table table-sm table-bordered mb-0" style="font-size:12px;"><thead><tr>${qr.columns.map(c => `<th>${escapeHtml(c)}</th>`).join('')}</tr></thead><tbody>`;
                 html += preview.map(r => `<tr>${r.map(v => `<td>${escapeHtml(v ?? '')}</td>`).join('')}</tr>`).join('');
                 html += `</tbody></table></div>`;
@@ -306,7 +315,8 @@ async function sendMsg() {
             error_message: data.assistant_message.error_message,
             columns: data.assistant_message.columns,
             query_result: data.assistant_message.query_result,
-            llm_info: data.assistant_message.llm_info
+            llm_info: data.assistant_message.llm_info,
+            permission_note: data.assistant_message.permission_note
         });
 
         loadConvList(); // refresh sidebar
@@ -435,7 +445,8 @@ async function createConv() {
             error_message: data.message.error_message,
             columns: data.message.columns,
             query_result: data.message.query_result,
-            llm_info: data.message.llm_info
+            llm_info: data.message.llm_info,
+            permission_note: data.message.permission_note
         });
 
         loadConvList();
@@ -501,8 +512,10 @@ function renderKbOptions() {
     });
     box.innerHTML = list.map(it => {
         const checked = _kbChecked.has(String(it.id)) ? ' checked' : '';
+        const badge = it.is_pinned ? '<span class="badge bg-warning text-dark">常驻</span> '
+            : (it.visibility === 'global' ? '<span class="badge bg-dark">全局</span> ' : '');
         return `<div class="chat-kb-option">
-            <label><input type="checkbox" value="${it.id}" data-name="${escapeAttr(it.title || '(无标题)')}"${checked}>${escapeHtml(it.title || '(无标题)')}</label>
+            <label><input type="checkbox" value="${it.id}" data-name="${escapeAttr(it.title || '(无标题)')}"${checked}>${badge}${escapeHtml(it.title || '(无标题)')}</label>
         </div>`;
     }).join('');
     document.getElementById('chatKbEmpty').style.display =
@@ -584,17 +597,48 @@ async function loadKnowledge() {
             id: k.id,
             title: k.title || '(无标题)',
             aliases: Array.isArray(k.aliases) ? k.aliases : [],
-            content: k.content || ''
+            content: k.content || '',
+            visibility: k.visibility || 'personal',
+            is_pinned: !!k.is_pinned
         }));
+        await loadDefaultKb();
         renderKbOptions();
     } catch (e) { console.error('加载知识库失败:', e); }
 }
 
-// ── Utils ──────────────────────────────────────────────────
-// escapeHtml / e 由 app_common.js 提供
-function escapeAttr(text) {
-    return text.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+// 用户默认勾选（新对话自动带上；显式清空前一直生效）
+let _kbDefaultIds = [];
+
+async function loadDefaultKb() {
+    try {
+        const resp = await apiRequest('/api/user/preferences/default-knowledge');
+        if (!resp.ok) return;
+        const data = await resp.json();
+        _kbDefaultIds = (data.knowledge_ids || []).map(String);
+        // 无会话记忆时以用户默认勾选为初始状态
+        if (!_kbChecked.size && _kbDefaultIds.length) {
+            _kbChecked = new Set(_kbDefaultIds.filter(id =>
+                _kbItems.some(it => String(it.id) === id)));
+        }
+    } catch (e) { /* 默认勾选加载失败按空处理 */ }
 }
+
+async function saveDefaultKb() {
+    try {
+        const resp = await apiRequest('/api/user/preferences/default-knowledge', {
+            method: 'PUT',
+            body: JSON.stringify({ knowledge_ids: getSelectedKbIds().map(id => parseInt(id)) })
+        });
+        if (!resp.ok) throw new Error((await resp.json()).detail || '保存失败');
+        _kbDefaultIds = getSelectedKbIds();
+        QF.toast(_kbDefaultIds.length ? '已保存为默认勾选（新对话自动带上）' : '已清空默认勾选', 'success');
+    } catch (e) {
+        QF.toast('保存默认勾选失败: ' + e.message, 'danger');
+    }
+}
+
+// ── Utils ──────────────────────────────────────────────────
+// escapeHtml / e / escapeAttr 均由 app_common.js 提供
 
 function copySql(btn, sql) {
     navigator.clipboard.writeText(sql).then(() => {

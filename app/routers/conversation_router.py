@@ -23,6 +23,7 @@ from core import LLMClient
 from core.llm_client import LLMArrearsError
 from core.gen_chat import ChatSession
 from core.gen_sql import SqlGenerator
+from core.ret_retriever import SchemaRetriever
 from crud.base import session_scope
 from crud.conversation import conversation_crud
 from crud.schema import schema_crud
@@ -74,10 +75,54 @@ class MessageItem(BaseModel):
     columns: Optional[list]
     query_result: Optional[dict] = None
     llm_info: Optional[dict] = None
+    permission_note: Optional[str] = None
     created_at: str
 
 
 # ── Helpers ───────────────────────────────────────────────────────
+
+def _permission_note(result: dict, query_result: Optional[dict] = None) -> Optional[str]:
+    """从网关结果 + 执行结果提取用户可见的结果归因提示。
+
+    覆盖三类静默行为，避免用户对结果产生误解：
+    - 行级过滤注入（was_modified）：结果行数被悄悄裁剪，需明示过滤了哪些表
+    - 敏感字段参与聚合（hit_sensitive）：FILTER 字段仅以聚合值返回，不暴露明细
+    - 空结果归因：SQL 执行成功但 0 行时，结合权限过滤情况告知可能原因
+      （此前用户只看到"共 0 行"，无法区分数据为空、条件过严还是权限过滤所致）
+    拦截类提示已由 error_message 承载，此处不重复。
+    """
+    gw = result.get('gateway')
+    parts = []
+    if gw:
+        if gw.get('was_modified'):
+            tables = []
+            for m in (gw.get('modifications') or []):
+                # 格式：'注入行级过滤: {table} → {filter_expr}'
+                try:
+                    name = m.split(':', 1)[1].split('→')[0].strip()
+                    if name:
+                        tables.append(name)
+                except (IndexError, AttributeError):
+                    continue
+            if tables:
+                parts.append(f"已按数据权限过滤 {len(tables)} 张表（{'、'.join(dict.fromkeys(tables))}），结果为过滤后数据")
+            else:
+                parts.append('已按数据权限过滤查询结果')
+        if gw.get('hit_sensitive') and gw.get('is_allowed', True):
+            parts.append('结果涉及敏感字段，仅返回聚合统计值')
+
+    # 空结果归因：执行成功但 0 行 → 结合权限过滤情况给出可能原因
+    if (query_result and not query_result.get('error')
+            and query_result.get('row_count') == 0):
+        filtered = bool(gw and gw.get('was_modified'))
+        if filtered:
+            parts.append('查询返回 0 行：数据权限行级过滤后无匹配数据'
+                         '（也可能数据本身为空或筛选条件过严）；'
+                         '如预期应有数据，请联系管理员确认行级权限范围')
+        else:
+            parts.append('查询返回 0 行：未匹配到数据，可能筛选条件过严或数据本身为空')
+    return '；'.join(parts) if parts else None
+
 
 def _infer_visible_db_type(user: dict) -> Optional[str]:
     """全库模式：从用户可见的库中推断 db_type（取首个有类型的库）
@@ -176,6 +221,40 @@ def _get_user_llm_config(user_id: int, config_id: Optional[int] = None) -> Optio
                 'timeout': config.timeout if config.timeout is not None else 300
             }
         return None
+
+
+# LLM/网络错误分类关键词（小写匹配）→ 用户可读的失败原因
+_LLM_ERROR_PATTERNS = [
+    (('timeout', 'timed out', '读超时', '连接超时'), 504,
+     '模型响应超时，请稍后重试或更换模型（思考类模型对复杂问题可能超过配置的超时时间）'),
+    (('invalid api key', 'unauthorized', '401', 'authentication'), 502,
+     '模型 API 密钥无效或未授权，请在模型管理页检查 API Key 配置'),
+    (('429', 'too many requests', 'rate limit', '限流', '访问量过大'), 502,
+     '模型服务限流/访问量过大，请稍后重试或更换其他模型'),
+    (('api密钥未配置', '未配置', 'api密钥'), 400,
+     '未配置模型 API 密钥，请先在模型管理页完成配置'),
+    (('ssrf', '内网地址', 'scheme 不合法', 'llm api 地址'), 400,
+     '模型 API 地址配置不合法，请在模型管理页检查 base_url'),
+    (('no such column', 'no such table', 'unknown column', 'doesn\'t exist'), 500,
+     '查询引用了不存在的表/字段：可能是模型生成了错误字段名，重试或补充更明确的描述'),
+]
+
+
+def _classify_llm_failure(e: Exception, context: str) -> HTTPException:
+    """把生成链路的异常归类为用户可读的失败原因。
+
+    此前统一 500「xx失败: {原始异常}」，用户无法区分是模型问题、网络问题、
+    配置问题还是权限/拦截问题。按关键词归到 4 类（超时/认证/限流/配置），
+    其余保持 500 但提示排查方向。完整异常始终记入日志。
+    """
+    logger.error(f"{context}: {e}", exc_info=True)
+    msg = str(e) or e.__class__.__name__.lower()
+    low = msg.lower()
+    for keywords, status, friendly in _LLM_ERROR_PATTERNS:
+        if any(k in low for k in keywords):
+            return HTTPException(status_code=status, detail=friendly)
+    return HTTPException(status_code=500,
+                         detail=f"{context}: {msg[:300]}")
 
 
 def _mark_llm_config_arrears(config_id: Optional[int]) -> None:
@@ -318,6 +397,64 @@ def _get_knowledge_safe(user_id: int, knowledge_id: Optional[int] = None,
         return ""
 
 
+# 全局常驻注入预算（字符）：单条 2000 / 总量 6000，超出截断并记 WARNING
+_GLOBAL_RULE_ITEM_BUDGET = 2000
+_GLOBAL_RULE_TOTAL_BUDGET = 6000
+
+
+def _get_global_rules_content() -> tuple:
+    """全局常驻知识内容（管理员 pin 的 global 条目，人人遵守）。
+
+    Returns:
+        (text, pinned_count)：text 为拼好的多段内容（不含【全局规则】标题），
+        空字符串表示无常驻条目。
+    """
+    try:
+        from crud.knowledge import knowledge_crud
+        items = knowledge_crud.list_global_pinned()
+        if not items:
+            return "", 0
+        parts, total = [], 0
+        for it in items:
+            d = knowledge_crud.to_dict(it)
+            content = (d.get('content') or '').strip()
+            if not content:
+                continue
+            if len(content) > _GLOBAL_RULE_ITEM_BUDGET:
+                content = content[:_GLOBAL_RULE_ITEM_BUDGET] + '…(截断)'
+            # 首条保底；后续条目超总量预算即止
+            if parts and total + len(content) > _GLOBAL_RULE_TOTAL_BUDGET:
+                logger.warning(
+                    f"全局常驻知识超预算 {total + len(content)}>"
+                    f"{_GLOBAL_RULE_TOTAL_BUDGET}，仅注入前 {len(parts)} 条")
+                break
+            title = d.get('title') or f"知识#{d['id']}"
+            parts.append(f"◆ {title}\n{content}")
+            total += len(content)
+        return "\n\n".join(parts), len(parts)
+    except Exception as e:
+        logger.warning(f"加载全局常驻知识失败（忽略）: {e}")
+        return "", 0
+
+
+def _get_user_default_knowledge_ids(user_id: int) -> List[int]:
+    """用户默认勾选的知识库条目（新对话未显式选择时自动带上）"""
+    try:
+        from models.preference import UserPreference
+        with session_scope() as db:
+            row = db.query(UserPreference).filter(
+                UserPreference.user_id == user_id,
+                UserPreference.pref_key == 'default_knowledge_ids').first()
+            # 会话内取标量，避免脱离实例后访问属性（DetachedInstanceError）
+            raw = row.pref_value if row else None
+        if raw:
+            from crud.knowledge import _parse_json
+            return [int(i) for i in (_parse_json(raw, []) or []) if i]
+    except Exception:
+        pass
+    return []
+
+
 def _record_telemetry(user_id: int, llm_client: LLMClient, question: str,
                       conditions: str, result: dict, conversation_id: Optional[int],
                       config_id: Optional[int], purpose: str = 'chat_sql') -> Optional[int]:
@@ -403,10 +540,22 @@ def create_conversation(
 
     try:
         llm_client = _build_llm_client(user_id, payload.llm_config_id)
-        # 知识库支持多选（knowledge_ids 优先，兼容旧版 knowledge_id）
+        # 知识库支持多选（knowledge_ids 优先，兼容旧版 knowledge_id）；
+        # 未显式选择时回退用户默认勾选（显式传 [] 表示强制不带）
         knowledge_ids = _resolve_knowledge_ids(payload.knowledge_ids, payload.knowledge_id)
-        knowledge_content = _get_knowledge_safe(
-            user_id, knowledge_ids=knowledge_ids)
+        used_default_kb = False
+        if not knowledge_ids and payload.knowledge_ids is None and payload.knowledge_id is None:
+            knowledge_ids = _get_user_default_knowledge_ids(user_id)
+            used_default_kb = bool(knowledge_ids)
+        selected_content = _get_knowledge_safe(user_id, knowledge_ids=knowledge_ids)
+        # 全局常驻知识（管理员 pin，人人遵守）+ 用户勾选知识，各自带段标题注入
+        global_text, pinned_n = _get_global_rules_content()
+        kb_sections = []
+        if global_text:
+            kb_sections.append(f"【全局规则（管理员发布，人人遵守）】\n{global_text}")
+        if selected_content:
+            kb_sections.append(f"【领域知识（用户勾选）】\n{selected_content}")
+        knowledge_content = "\n\n".join(kb_sections)
 
         pre_log.append({
             "step": "LLM_CONFIG_LOAD", "timestamp": _nb().strftime("%Y-%m-%d %H:%M:%S"),
@@ -417,7 +566,9 @@ def create_conversation(
         pre_log.append({
             "step": "KNOWLEDGE_LOAD", "timestamp": _nb().strftime("%Y-%m-%d %H:%M:%S"),
             "data": {"knowledge_ids": knowledge_ids,
-                     "user_selected": bool(knowledge_ids),
+                     "user_selected": bool(payload.knowledge_ids or payload.knowledge_id),
+                     "used_default_kb": used_default_kb,
+                     "global_pinned": pinned_n,
                      "note": "用户显式选择的知识库；链路第 8 步为自动概念召回(与勾选无关)" if not knowledge_ids else "",
                      "loaded": bool(knowledge_content),
                      "content_length": len(knowledge_content)},
@@ -485,7 +636,8 @@ def create_conversation(
                 is_valid=result['is_valid'],
                 error_message=result.get('error_message'),
                 columns=columns_json,
-                result_data=json.dumps(query_result, ensure_ascii=False) if query_result else None
+                result_data=json.dumps(query_result, ensure_ascii=False) if query_result else None,
+                permission_note=_permission_note(result, query_result)
             )
             db.add(assistant_msg)
             db.flush()
@@ -546,6 +698,7 @@ def create_conversation(
                 "need_more_info": result.get('need_more_info', False),
                 "missing_info": result.get('missing_info'),
                 "suggestion": result.get('suggestion'),
+                "permission_note": _permission_note(result, query_result),
             }
         }
 
@@ -558,8 +711,7 @@ def create_conversation(
         raise HTTPException(status_code=502,
                             detail="模型欠费/余额不足，已标记该 LLM 配置为欠费状态，续费后请在模型管理页恢复")
     except Exception as e:
-        logger.error(f"创建对话失败: {e}")
-        raise HTTPException(status_code=500, detail=f"创建对话失败: {str(e)}")
+        raise _classify_llm_failure(e, f"创建对话失败")
 
 
 @router.post("/{conversation_id}/messages")
@@ -641,8 +793,9 @@ def send_message(
                 f"对话 {conversation_id} 配置切换: "
                 f"llm_config_id={conv_llm_config_id}, knowledge_ids={conv_knowledge_ids}")
 
-        # 从三层模型重建 schema CSV（fallback 全量，用于未记录首轮表集合的旧对话）
-        schema_csv = _rebuild_schema_csv(schema_name)
+        # 从三层模型重建 schema CSV（fallback 全量，用于未记录首轮表集合的旧对话；
+        # 权限裁剪在 SchemaRetriever.get_field_rows 内完成）
+        schema_csv = SchemaRetriever(user=user).build_full_schema_csv(schema_name)
         # 首轮召回表集合（新对话已记录；旧对话为空则追问轮沿用全量 schema_csv）
         first_tables: list = []
         if conv_schema_tables:
@@ -670,13 +823,22 @@ def send_message(
                      "model": getattr(llm_client, 'model', '') or 'default',
                      "config_id": conv_llm_config_id},
         })
-        # 跟进消息的知识内容需在日志步骤前加载（避免引用未赋值变量）
-        knowledge_content = _get_knowledge_safe(
+        # 跟进消息的知识内容需在日志步骤前加载（避免引用未赋值变量）；
+        # 全局常驻知识（管理员 pin）每次追问都注入
+        selected_content = _get_knowledge_safe(
             user_id, knowledge_ids=conv_knowledge_ids)
+        global_text, pinned_n = _get_global_rules_content()
+        kb_sections = []
+        if global_text:
+            kb_sections.append(f"【全局规则（管理员发布，人人遵守）】\n{global_text}")
+        if selected_content:
+            kb_sections.append(f"【领域知识（用户勾选）】\n{selected_content}")
+        knowledge_content = "\n\n".join(kb_sections)
         pre_log.append({
             "step": "KNOWLEDGE_LOAD", "timestamp": _nb().strftime("%Y-%m-%d %H:%M:%S"),
             "data": {"knowledge_ids": conv_knowledge_ids,
                      "user_selected": bool(conv_knowledge_ids),
+                     "global_pinned": pinned_n,
                      "note": "用户显式选择的知识库；链路第 8 步为自动概念召回(与勾选无关)" if not conv_knowledge_ids else "",
                      "loaded": bool(knowledge_content),
                      "content_length": len(knowledge_content)},
@@ -728,7 +890,8 @@ def send_message(
                 is_valid=result['is_valid'],
                 error_message=result.get('error_message'),
                 columns=columns_json,
-                result_data=json.dumps(query_result, ensure_ascii=False) if query_result else None
+                result_data=json.dumps(query_result, ensure_ascii=False) if query_result else None,
+                permission_note=_permission_note(result, query_result)
             )
             db.add(assistant_msg)
             db.flush()
@@ -797,6 +960,7 @@ def send_message(
                 "need_more_info": result.get('need_more_info', False),
                 "missing_info": result.get('missing_info'),
                 "suggestion": result.get('suggestion'),
+                "permission_note": _permission_note(result, query_result),
             }
         }
 
@@ -809,8 +973,7 @@ def send_message(
         raise HTTPException(status_code=502,
                             detail="模型欠费/余额不足，已标记该 LLM 配置为欠费状态，续费后请在模型管理页恢复")
     except Exception as e:
-        logger.error(f"发送消息失败: {e}")
-        raise HTTPException(status_code=500, detail=f"发送消息失败: {str(e)}")
+        raise _classify_llm_failure(e, f"发送消息失败")
 
 
 @router.get("")
@@ -896,6 +1059,7 @@ def get_messages(
                 columns=_safe_parse_columns(msg.columns),
                 query_result=_safe_parse_result(msg.result_data),
                 llm_info=call_map.get(msg.llm_call_id) if msg.role == 'assistant' else None,
+                permission_note=msg.permission_note,
                 created_at=msg.created_at.isoformat() if msg.created_at else ""
             )
             for msg in messages
@@ -929,34 +1093,5 @@ def delete_conversation(
     
         return ok_msg("对话已删除")
 # ── Internal helpers ──────────────────────────────────────────────
-
-def _rebuild_schema_csv(schema_name: Optional[str] = None) -> str:
-    """从三层模型重建 schema CSV 字符串（字段召回上下文）
-
-    schema_name=None（全库模式）时表名带库前缀（库名.表名），跨库消歧；
-    指定库时保持纯表名（兼容旧行为）。
-    """
-    rows = schema_service.iter_field_rows(schema_name=schema_name)
-
-    if not rows:
-        return "表名,字段名,字段类型,字段描述,主键,外键"
-
-    # 按表分组（iter_field_rows 已按表连续返回，仍做稳定分组）
-    cross_schema = schema_name is None and len({r.schema_name for r in rows}) > 1
-    tables = {}
-    for f in rows:
-        tables.setdefault(f.table_name, []).append(f)
-
-    lines = ["表名,字段名,字段类型,字段描述,主键,外键"]
-    for table_name, fields in tables.items():
-        for f in fields:
-            label = f"{f.schema_name}.{table_name}" if cross_schema else table_name
-            lines.append(
-                f"{label},{f.column_name or ''},"
-                f"{f.column_type or ''},"
-                f"{f.column_description or ''},"
-                f"{f.column_key or ''},"
-                f"{f.foreign_key or ''}"
-            )
-
-    return '\n'.join(lines)
+# （schema CSV 全量重建已下沉 SchemaRetriever.build_full_schema_csv——
+#   权限裁剪属于召回层职责，路由层不再自行拼权限原语）

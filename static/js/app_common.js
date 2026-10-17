@@ -18,6 +18,16 @@
     // 兼容历史命名（chat/llm_config/llm_logs 曾各自定义 escapeHtml）
     window.escapeHtml = window.e;
 
+    // JS 字符串上下文转义——用于「HTML 属性内内联 JS 的单引号字符串」插值，
+    // 如 onclick="fn('${escapeAttr(title)}')"。注意：e()/escapeHtml() 不转义
+    // 引号，绝不能用于此场景（属性值会被 HTML 解析器实体解码后交给 JS 引擎）。
+    window.escapeAttr = function (text) {
+        return String(text == null ? '' : text)
+            .replace(/\\/g, '\\\\')
+            .replace(/'/g, "\\'")
+            .replace(/"/g, '&quot;');
+    };
+
     // 时间格式化（合并 llm_logs.formatTime / security_manage.fmtTime / sync_manage.fmt）
     window.QF.fmtTime = function (s, fallback) {
         if (s == null || s === '') return fallback === undefined ? '-' : fallback;

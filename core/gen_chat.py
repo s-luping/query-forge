@@ -222,31 +222,10 @@ class ChatSession:
             "missing_info": (judge or {}).get('missing_info', []),
             "suggestion": (judge or {}).get('suggestion', '')})
         if judge and not judge.get('can_generate', True):
-            duration_ms = int((now_beijing() - start_time).total_seconds() * 1000)
-            jt = judge.get('_judge_tokens') or {}
-            audit_log_id = write_query_audit_log(
-                self.user_id, self.user, query, '', '',
-                gateway_result=None, duration_ms=duration_ms,
-                pipeline_log=json.dumps(pipeline_log, ensure_ascii=False, default=str))
-            return {
-                "sql": '', "is_valid": False,
-                "error_message": judge.get('suggestion') or '信息不足，请补充后重试',
-                "columns": None, "schema_csv": schema_csv,
-                "tables": aggregation.get('tables', []), "keywords": keywords,
-                "messages": messages, "duration_ms": duration_ms,
-                "raw_response": '', "gateway": None, "pipeline_log": pipeline_log,
-                "need_more_info": True,
-                "missing_info": judge.get('missing_info', []),
-                "suggestion": judge.get('suggestion', ''),
-                "judge_reason": judge.get('reason', ''),
-                "audit_log_id": audit_log_id,
-                "tokens": {
-                    "prompt_tokens": jt.get('prompt_tokens', 0),
-                    "completion_tokens": jt.get('completion_tokens', 0),
-                    "reasoning_tokens": jt.get('reasoning_tokens', 0),
-                    "total_tokens": jt.get('total_tokens', 0),
-                },
-            }
+            return self._need_more_info_result(
+                judge, query, messages, pipeline_log, start_time, aggregation,
+                schema_csv=schema_csv, tables=aggregation.get('tables', []),
+                keywords=keywords)
 
         # Step 5: 调用 LLM
         llm_result = self.llm_client.chat(messages)
@@ -521,33 +500,9 @@ class ChatSession:
             "missing_info": (judge or {}).get('missing_info', []),
             "suggestion": (judge or {}).get('suggestion', '')})
         if judge and not judge.get('can_generate', True):
-            duration_ms = int((now_beijing() - start_time).total_seconds() * 1000)
-            jt = judge.get('_judge_tokens') or {}
-            try:
-                audit_log_id = write_query_audit_log(
-                    self.user_id, self.user, new_user_content, '', '',
-                    gateway_result=None, duration_ms=duration_ms,
-                    pipeline_log=json.dumps(pipeline_log, ensure_ascii=False, default=str))
-            except Exception:
-                logger.warning("跟进判断不足审计日志写入失败（不影响主流程）")
-                audit_log_id = None
-            return {
-                "sql": '', "is_valid": False,
-                "error_message": judge.get('suggestion') or '信息不足，请补充后重试',
-                "columns": None, "messages": messages, "duration_ms": duration_ms,
-                "raw_response": '', "gateway": None, "pipeline_log": pipeline_log,
-                "need_more_info": True,
-                "missing_info": judge.get('missing_info', []),
-                "suggestion": judge.get('suggestion', ''),
-                "judge_reason": judge.get('reason', ''),
-                "audit_log_id": audit_log_id,
-                "tokens": {
-                    "prompt_tokens": jt.get('prompt_tokens', 0),
-                    "completion_tokens": jt.get('completion_tokens', 0),
-                    "reasoning_tokens": jt.get('reasoning_tokens', 0),
-                    "total_tokens": jt.get('total_tokens', 0),
-                },
-            }
+            return self._need_more_info_result(
+                judge, new_user_content, messages, pipeline_log, start_time,
+                aggregation)
 
         # Step 5: 调用 LLM
         llm_result = self.llm_client.chat(messages)
@@ -603,6 +558,101 @@ class ChatSession:
         }
 
     # ---------- 内部方法 ----------
+
+    def _need_more_info_result(self, judge: dict, query_text: str,
+                               messages: list, pipeline_log: list,
+                               start_time, aggregation: Optional[dict],
+                               schema_csv: Optional[str] = None,
+                               tables: Optional[List[str]] = None,
+                               keywords: Optional[List[str]] = None) -> dict:
+        """判断步拦截（need_more_info）结果构造 — 首轮/追问共用
+
+        含权限归因提示（权限裁剪可能是"信息不足"的真实原因）与审计落库
+        （失败不阻断主流程）。
+        """
+        import json
+        duration_ms = int((now_beijing() - start_time).total_seconds() * 1000)
+        perm_hint = self._permission_context_hint(aggregation)
+        judge_msg = judge.get('suggestion') or '信息不足，请补充后重试'
+        if perm_hint:
+            judge_msg = f"{judge_msg}（{perm_hint}）"
+        try:
+            audit_log_id = write_query_audit_log(
+                self.user_id, self.user, query_text, '', '',
+                gateway_result=None, duration_ms=duration_ms,
+                pipeline_log=json.dumps(pipeline_log, ensure_ascii=False, default=str))
+        except Exception:
+            logger.warning("判断不足审计日志写入失败（不影响主流程）")
+            audit_log_id = None
+        jt = judge.get('_judge_tokens') or {}
+        result = {
+            "sql": '', "is_valid": False,
+            "error_message": judge_msg,
+            "columns": None,
+            "messages": messages, "duration_ms": duration_ms,
+            "raw_response": '', "gateway": None, "pipeline_log": pipeline_log,
+            "need_more_info": True,
+            "missing_info": judge.get('missing_info', []),
+            "suggestion": judge.get('suggestion', ''),
+            "judge_reason": judge.get('reason', ''),
+            "audit_log_id": audit_log_id,
+            "tokens": {
+                "prompt_tokens": jt.get('prompt_tokens', 0),
+                "completion_tokens": jt.get('completion_tokens', 0),
+                "reasoning_tokens": jt.get('reasoning_tokens', 0),
+                "total_tokens": jt.get('total_tokens', 0),
+            },
+        }
+        if schema_csv is not None:
+            result["schema_csv"] = schema_csv
+        if tables is not None:
+            result["tables"] = tables
+        if keywords is not None:
+            result["keywords"] = keywords
+        return result
+
+    def _permission_context_hint(self, aggregation: Optional[dict]) -> str:
+        """生成用户可见的权限归因提示（用于「信息不足」场景）。
+
+        背景：召回阶段按库/表/字段三级权限静默裁剪，LLM 只能看到用户有权限的
+        表结构——当问题涉及的表/字段无权限时，判断步会报「信息不足」，但用户
+        无法区分是表述不清还是权限不够。此提示把权限因素显式告知用户。
+
+        Returns:
+            空字符串 = 权限与信息不足无关（正常表述类问题），不追加提示。
+        """
+        try:
+            from app.permissions import (
+                get_column_access_map,
+                get_visible_schema_ids,
+                is_admin,
+            )
+            visible = get_visible_schema_ids(self.user)
+            if visible == []:
+                return ('当前账号未被授予任何数据访问权限（库/表授权为空），'
+                        '请联系管理员配置角色授权后再试')
+            tables = (aggregation.get('tables') or []) if aggregation else []
+            if not tables:
+                if visible is not None:
+                    return ('未在您有权限的数据库中检索到与问题相关的表/字段：'
+                            '可能是问题涉及的表无访问权限，或该库元数据尚未同步，'
+                            '请联系管理员确认权限与数据同步状态')
+                return ''
+            if is_admin(self.user):
+                return ''
+            # 字段级 NONE 比例：受限字段已从上下文剔除，可能正是"缺信息"的来源
+            col_map = get_column_access_map(
+                self.user,
+                schema_name=aggregation.get('schema_name') if aggregation else None,
+                table_names=tables or None)
+            if col_map:
+                none_n = sum(1 for v in col_map.values() if v == 'NONE')
+                if none_n:
+                    return (f'注意：当前范围内有 {none_n} 个字段因权限受限'
+                            f'未纳入本次分析，可能与信息不足有关')
+        except Exception:
+            pass
+        return ''
 
     def _log_permission_stats(self, pipeline_log: list, aggregation: dict,
                               schema_name: Optional[str]):
@@ -665,8 +715,10 @@ class ChatSession:
                 sql = gw_result.sql
             return sql, is_valid, error_msg, gw_result.to_dict()
         except Exception as e:
-            logger.warning(f"[ChatSession] 网关处理失败: {e}")
-            return sql, is_valid, error_msg, None
+            # 安全边界 fail-closed：网关异常（解析失败/权限查询故障等）时拦截本次查询，
+            # 而非放行未校验的 SQL（此前 fail-open 会让该请求跳过全部权限校验）
+            logger.warning(f"[ChatSession] 网关处理失败，已拦截: {e}")
+            return sql, False, '权限网关处理异常，本次查询已拦截，请重试或联系管理员', None
 
     def _build_system_prompt(self, schema_csv: str, db_type: str,
                              knowledge_content: str = "",
@@ -688,7 +740,9 @@ class ChatSession:
 7. 禁止SELECT *，必须显式列出查询字段(防敏感泄露)"""
 
         if knowledge_content:
-            prompt += f"\n\n【领域知识】\n{knowledge_content}"
+            kb = knowledge_content.strip()
+            # 调用方已带段标题（【全局规则】/【领域知识】…）时原样注入，否则补默认标题
+            prompt += f"\n\n{kb}" if kb.startswith('【') else f"\n\n【领域知识】\n{kb}"
 
         if relations_text:
             prompt += ("\n\n【表关系（已人工确认的 JOIN 条件）】\n" + relations_text.strip()

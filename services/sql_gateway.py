@@ -82,6 +82,7 @@ class SqlGateway:
         # 无前缀 SQL 兜底（跨库模式）：(table, col) → (col_id, sensitive)，同表多库取第一个匹配
         self._col_lookup_flat: Dict[Tuple[str, str], Tuple[int, str]] = {}
         self._table_schema: Dict[Tuple[str, str], int] = {}  # {(db, table): schema_id}
+        self._table_schema_flat: Dict[str, int] = {}  # {table: schema_id} 无前缀 SQL 兜底
         self._table_grants_by_name: Dict[int, set] = {}  # {schema_id: {table_name,...}} 表级白名单(表名)
 
     def process(self, sql: str, schema_name: Optional[str] = None,
@@ -92,22 +93,30 @@ class SqlGateway:
 
         # 不再为 admin 整体跳过校验：admin 同样受角色 DENY（schema/table/column）约束，
         # 路由层 is_schema_visible 已先行拦截被拒库，这里做 SQL 级兜底（表/字段级）。
-        # 仅保留解析表/字段用于审计信息。
+        tree = None
         try:
             tree = sqlglot.parse_one(sql, dialect=_DIALECT_MAP.get(db_type, 'sqlite'))
             result.tables = self._extract_tables(tree)
             result.columns = self._extract_columns_with_context(tree)
         except Exception:
-            pass
+            tree = None
 
         dialect = _DIALECT_MAP.get(db_type, 'sqlite')
 
-        # 1. 解析 SQL
-        try:
-            tree = sqlglot.parse_one(sql, dialect=dialect)
-        except Exception as e:
-            result.is_allowed = False
-            result.block_reason = f'SQL 解析失败: {e}'
+        # 1. 解析 SQL（复用首次解析结果，避免重复 parse）
+        if tree is None:
+            try:
+                tree = sqlglot.parse_one(sql, dialect=dialect)
+            except Exception as e:
+                result.is_allowed = False
+                result.block_reason = f'SQL 解析失败: {e}'
+                return result
+
+        # 1.5 根类型断言：仅放行 SELECT/UNION（含 CTE），拦截 SELECT INTO、
+        # 写语句、EXPLAIN 之外的命令语句——此前网关自身不做根类型断言，
+        # 写拦截完全依赖校验/执行层的关键字黑名单
+        blocked = self._assert_read_only(tree, result)
+        if blocked:
             return result
 
         # 2. 提取表名
@@ -144,6 +153,30 @@ class SqlGateway:
             result.sql = sql
 
         return result
+
+    # 写操作 AST 节点（根类型断言 + 全树扫描，出现即拦截）
+    _WRITE_NODE_NAMES = ('Insert', 'Update', 'Delete', 'Merge', 'Create',
+                         'Drop', 'Alter', 'Truncate', 'Grant', 'Command', 'Into')
+
+    def _assert_read_only(self, tree: exp.Expression, result: SqlGatewayResult) -> bool:
+        """断言语句只读：根必须是 SELECT/UNION，且全树无写操作节点。
+
+        覆盖 SELECT INTO（sqlglot 解析为 Select 内嵌 Into 节点）、CTE 体内藏写
+        语句、多语句片段等——返回 True 表示被拦截。
+        """
+        root = tree
+        while isinstance(root, exp.Subquery):
+            root = root.unnest()
+        if not isinstance(root, (exp.Select, exp.Union)):
+            result.is_allowed = False
+            result.block_reason = '仅允许 SELECT 查询语句'
+            return True
+        for node in root.walk():
+            if node.__class__.__name__ in self._WRITE_NODE_NAMES:
+                result.is_allowed = False
+                result.block_reason = '仅允许 SELECT 查询，检测到写操作'
+                return True
+        return False
 
     def _extract_tables(self, tree: exp.Expression) -> List[str]:
         """提取 SQL 中引用的所有表名（跨库场景返回 库名.表名 或 表名）"""
@@ -226,6 +259,9 @@ class SqlGateway:
                 tq = tq.filter(DbTable.name.in_(pure_names))
             for db_name, name, sid in tq.all():
                 self._table_schema[(db_name or '', name)] = sid
+                # 无前缀 SQL 兜底：LLM 漏带库前缀时（会被路由层兜底到唯一可见库）
+                # 表级白名单仍需生效——同表名多库取第一个匹配（按 schema id 排序确定性）
+                self._table_schema_flat.setdefault(name, sid)
 
             # 表级白名单 {schema_id: {table_name,...}}（表名形式便于 SQL 表名校验）
             grants = get_table_grants_by_schema(self.user)
@@ -244,6 +280,9 @@ class SqlGateway:
             if not tname:
                 continue
             sid = self._table_schema.get((db_name, tname))
+            if sid is None:
+                # 无库前缀（或前缀库名不在元数据中）→ 平铺兜底，防止白名单被漏前缀 SQL 绕过
+                sid = self._table_schema_flat.get(tname)
             if sid is None:
                 continue  # 未知表（不存在）→ 交由数据库报错
             allowed = self._table_grants_by_name.get(sid)
@@ -366,7 +405,12 @@ class SqlGateway:
         if not self._row_scopes:
             return tree
 
-        tables_in_sql = set(self._extract_tables(tree))
+        # 跨库模式生成的 SQL 表名带库前缀（库名.表名），而行级规则 key 是纯表名——
+        # 两侧都归一化为纯表名再匹配，否则前缀 SQL 永远匹配不上导致过滤静默失效
+        tables_in_sql = {
+            t.split('.', 1)[1] if '.' in t else t
+            for t in self._extract_tables(tree)
+        }
 
         for table_name, filter_expr in self._row_scopes.items():
             if table_name in tables_in_sql:

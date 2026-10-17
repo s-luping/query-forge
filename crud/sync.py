@@ -77,12 +77,14 @@ class SyncRunCrud(BaseCrud):
         return self.count(status='success')
 
     def list_paged(self, job_id: Optional[int], limit: int,
-                   offset: int) -> Tuple[List[SyncRunLog], int]:
+                   offset: int, status: Optional[str] = None) -> Tuple[List[SyncRunLog], int]:
         """分页列表 + 总数；批量取 job schema 名映射避免 N+1"""
         with session_scope(logs=True) as db:
             q = db.query(SyncRunLog)
             if job_id:
                 q = q.filter(SyncRunLog.job_id == job_id)
+            if status:
+                q = q.filter(SyncRunLog.status == status)
             total = q.count()
             rows = q.order_by(SyncRunLog.started_at.desc()).limit(limit).offset(offset).all()
             for r in rows:

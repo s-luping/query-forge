@@ -175,8 +175,10 @@ def _hashable(v: Any) -> Any:
     if isinstance(v, (str, int, float, bool, bytes, type(None))):
         return v
     if isinstance(v, (list, tuple, set, frozenset)):
+        # set/frozenset 迭代序不稳定 → 先排序，保证同一集合生成稳定缓存键
+        items = sorted(v, key=lambda x: str(x)) if isinstance(v, (set, frozenset)) else list(v)
         out = []
-        for i in v:
+        for i in items:
             h = _hashable(i)
             if h is _UNHASHABLE:
                 return _UNHASHABLE
