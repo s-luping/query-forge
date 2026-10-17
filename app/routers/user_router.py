@@ -5,6 +5,7 @@
 - 管理员：用户管理（列表/创建/分配角色/启用禁用/重置密码/删除）
   角色分配走 /api/permission/users/{user_id}/roles（见 permission_router.py）
 """
+import json
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Request
@@ -101,6 +102,78 @@ async def get_user_profile(request: Request, current_user: CurrentUser):
             "register_date": user.register_date,
             "last_login": user.last_login
         }
+
+
+# ═══════════════════════════════════════════════════════════════════
+# 用户偏好（key-value，如默认勾选的知识库条目）
+# ═══════════════════════════════════════════════════════════════════
+
+class DefaultKnowledgeRequest(BaseModel):
+    knowledge_ids: list  # 知识条目 id 数组（可空 = 清空默认勾选）
+
+
+@router.get("/preferences/default-knowledge")
+@limiter.limit(LIMIT_READ)
+def get_default_knowledge(request: Request, current_user: CurrentUser):
+    """获取用户默认勾选的知识库条目 id 列表（新对话自动带上）"""
+    from models.preference import UserPreference
+    with session_scope() as db:
+        row = db.query(UserPreference).filter(
+            UserPreference.user_id == current_user['user_id'],
+            UserPreference.pref_key == 'default_knowledge_ids').first()
+        if row:
+            from crud.knowledge import _parse_json
+            return {'knowledge_ids': _parse_json(row.pref_value, [])}
+    return {'knowledge_ids': []}
+
+
+@router.put("/preferences/default-knowledge")
+@limiter.limit(LIMIT_WRITE)
+def set_default_knowledge(request: Request, body: DefaultKnowledgeRequest,
+                          current_user: CurrentUser):
+    """设置用户默认勾选的知识库条目（多选；校验条目存在且对用户可见）"""
+    from models.preference import UserPreference
+    ids = [int(i) for i in (body.knowledge_ids or []) if i]
+    if ids:
+        with session_scope() as db:
+            from sqlalchemy import or_
+            from models.knowledge import KnowledgeItem
+            from app.permissions import get_visible_knowledge_ids
+            q = db.query(KnowledgeItem).filter(
+                KnowledgeItem.id.in_(ids), KnowledgeItem.is_active == 1)
+            visible = get_visible_knowledge_ids(current_user)
+            if visible is not None:
+                # 非管理员：全局条目人人可勾选；个人条目需在授权清单内
+                conds = [KnowledgeItem.visibility == 'global']
+                if visible:
+                    conds.append(KnowledgeItem.id.in_(visible))
+                q = q.filter(or_(*conds))
+            found = {row.id for row in q.all()}
+        invalid = [i for i in ids if i not in found]
+        if invalid:
+            raise HTTPException(status_code=400,
+                                detail=f"知识条目不存在或不可见: {invalid}")
+    try:
+        with session_scope() as db:
+            row = db.query(UserPreference).filter(
+                UserPreference.user_id == current_user['user_id'],
+                UserPreference.pref_key == 'default_knowledge_ids').first()
+            if row:
+                row.pref_value = json.dumps(ids, ensure_ascii=False)
+            else:
+                db.add(UserPreference(
+                    user_id=current_user['user_id'],
+                    pref_key='default_knowledge_ids',
+                    pref_value=json.dumps(ids, ensure_ascii=False)))
+        log_audit(current_user, "set_default_knowledge", f"ids={ids}")
+        return {'knowledge_ids': ids}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"设置默认知识库失败: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # ═══════════════════════════════════════════════════════════════════
 # 管理员用户管理（AdminUser 依赖：未登录 401 / 非管理员 403）
 # ═══════════════════════════════════════════════════════════════════

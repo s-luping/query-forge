@@ -14,6 +14,7 @@ CREATE TABLE conversation_messages (
 	error_message TEXT, 
 	columns TEXT, 
 	result_data TEXT, 
+	permission_note TEXT, 
 	llm_call_id INTEGER, 
 	created_at DATETIME, 
 	PRIMARY KEY (id), 
@@ -156,6 +157,8 @@ CREATE TABLE knowledge_items (
 	aliases TEXT, 
 	payload TEXT, 
 	scope_schema_id INTEGER, 
+	visibility VARCHAR(20), 
+	is_pinned INTEGER, 
 	is_active INTEGER, 
 	created_at DATETIME, 
 	updated_at DATETIME, 
@@ -163,6 +166,19 @@ CREATE TABLE knowledge_items (
 );
 CREATE INDEX ix_knowledge_items_scope_schema_id ON knowledge_items (scope_schema_id);
 CREATE INDEX ix_knowledge_items_user_id ON knowledge_items (user_id);
+
+-- ── knowledge_versions ──
+CREATE TABLE knowledge_versions (
+	id INTEGER NOT NULL, 
+	item_id INTEGER NOT NULL, 
+	version_no INTEGER NOT NULL, 
+	action VARCHAR(20) NOT NULL, 
+	snapshot TEXT NOT NULL, 
+	operator_id INTEGER, 
+	created_at DATETIME, 
+	PRIMARY KEY (id)
+);
+CREATE INDEX ix_knowledge_versions_item_id ON knowledge_versions (item_id);
 
 -- ── llm_configs ──
 CREATE TABLE llm_configs (
@@ -298,6 +314,15 @@ CREATE TABLE system_settings (
 	PRIMARY KEY (id)
 );
 CREATE UNIQUE INDEX ix_system_settings_key ON system_settings ("key");
+
+-- ── user_preferences ──
+CREATE TABLE user_preferences (
+	user_id INTEGER NOT NULL, 
+	pref_key VARCHAR(50) NOT NULL, 
+	pref_value TEXT, 
+	updated_at DATETIME, 
+	PRIMARY KEY (user_id, pref_key)
+);
 
 -- ── user_roles ──
 CREATE TABLE user_roles (

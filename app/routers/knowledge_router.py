@@ -26,14 +26,18 @@ router = APIRouter()
 # 内置知识类型（平台不解释具体值，仅做下拉/渲染路由）
 KNOWLEDGE_TYPES = [
     'note',            # 普通笔记 / 自由文本
-    'terminology',     # 术语别名
-    'calculation',     # 计算规则
-    'relation',        # 表关系
-    'value_domain',    # 取值域
-    'convention',      # 约定
+    'terminology',     # 术语别名（L1 业务术语）
+    'calculation',     # 计算规则（L2 字段口径）
+    'relation',        # 表关系（L4 关联链路）
+    'value_domain',    # 取值域（L2 字段口径）
+    'convention',      # 约定（L5 输出规范）
     'entity_map',      # 实体映射
-    'sample_qa',       # 样例问答
+    'sample_qa',       # 样例问答（L6 错题 few-shot）
+    'quality',         # 数据质量/清洗陷阱（L3，如 $ 前缀、TRIM、CAST 清洗模板）
 ]
+
+# 全局常驻条目上限（与 crud.knowledge.MAX_PINNED_GLOBAL 一致）
+MAX_PINNED_GLOBAL = 20
 
 
 class KnowledgeRequest(BaseModel):
@@ -48,6 +52,8 @@ class KnowledgeRequest(BaseModel):
     aliases: Optional[List[str]] = None
     payload: Optional[Dict[str, Any]] = None
     scope_schema_id: Optional[int] = None
+    visibility: Optional[str] = None   # global=管理员全局发布 / personal=个人（默认）
+    is_pinned: Optional[int] = None    # 常驻上下文开关（仅 global 可置 1）
 
     @field_validator('title')
     @classmethod
@@ -70,6 +76,13 @@ class KnowledgeRequest(BaseModel):
             raise ValueError(f'不支持的知识类型: {v}')
         return v
 
+    @field_validator('visibility')
+    @classmethod
+    def validate_visibility(cls, v):
+        if v is not None and v not in ('global', 'personal'):
+            raise ValueError(f'不支持的可见范围: {v}')
+        return v
+
 
 class KnowledgeResponse(BaseModel):
     """知识库条目响应"""
@@ -81,6 +94,8 @@ class KnowledgeResponse(BaseModel):
     aliases: List[str] = []
     payload: Dict[str, Any] = {}
     scope_schema_id: Optional[int] = None
+    visibility: str = 'personal'
+    is_pinned: int = 0
     is_active: int
     created_at: Optional[str]
     updated_at: Optional[str]
@@ -112,15 +127,50 @@ def _to_dict(item: KnowledgeItem) -> dict:
     return knowledge_crud.to_dict(item)
 
 
-def get_all_knowledge(user: dict, limit: int = 20, offset: int = 0) -> tuple:
-    """获取知识库条目（按用户权限过滤）"""
+def get_all_knowledge(user: dict, limit: int = 20, offset: int = 0,
+                      visibility_filter: Optional[str] = None,
+                      keyword: Optional[str] = None,
+                      type_filter: Optional[str] = None,
+                      status_filter: Optional[str] = None,
+                      pinned_filter: Optional[str] = None) -> tuple:
+    """获取知识库条目（全局条目人人可见；个人条目按用户权限过滤）
+
+    status_filter: enabled=仅启用 / disabled=仅禁用 / None=全部
+    type_filter: knowledge_type 精确匹配
+    pinned_filter: pinned=仅常驻
+    """
     with session_scope() as db:
-        query = db.query(KnowledgeItem).filter(KnowledgeItem.is_active == 1)
+        from sqlalchemy import or_
+        query = db.query(KnowledgeItem)
+        if status_filter == 'enabled':
+            query = query.filter(KnowledgeItem.is_active == 1)
+        elif status_filter == 'disabled':
+            query = query.filter(KnowledgeItem.is_active == 0)
+        if type_filter:
+            if type_filter == 'note':
+                # 历史数据 knowledge_type 可能为 NULL，序列化时归一为 note，筛选需同时匹配
+                query = query.filter(or_(
+                    KnowledgeItem.knowledge_type == 'note',
+                    KnowledgeItem.knowledge_type.is_(None)))
+            else:
+                query = query.filter(KnowledgeItem.knowledge_type == type_filter)
+        if pinned_filter == 'pinned':
+            query = query.filter(KnowledgeItem.is_pinned == 1)
+        if visibility_filter:
+            query = query.filter(KnowledgeItem.visibility == visibility_filter)
+        if keyword:
+            kw = f"%{keyword.strip()}%"
+            query = query.filter(or_(
+                KnowledgeItem.title.ilike(kw),
+                KnowledgeItem.content.ilike(kw),
+            ))
         visible_ids = get_visible_knowledge_ids(user)
-        if visible_ids is not None:
-            if not visible_ids:
-                return [], 0
-            query = query.filter(KnowledgeItem.id.in_(visible_ids))
+        if visible_ids is not None and not is_admin(user):
+            # 全局条目人人可见；个人条目仅授权清单内的可见
+            conds = [KnowledgeItem.visibility == 'global']
+            if visible_ids:
+                conds.append(KnowledgeItem.id.in_(visible_ids))
+            query = query.filter(or_(*conds))
         total = query.count()
         items = query.order_by(KnowledgeItem.updated_at.desc()).limit(limit).offset(offset).all()
         # 必须在会话关闭前 expunge，否则 session.close() 会过期属性，
@@ -131,7 +181,7 @@ def get_all_knowledge(user: dict, limit: int = 20, offset: int = 0) -> tuple:
 
 
 def get_knowledge_safe(user_id: int, knowledge_id: int = None) -> dict:
-    """安全获取知识条目（含用户授权校验，防越权读取）"""
+    """安全获取知识条目（含用户授权校验，防越权读取；全局条目人人可读）"""
     if not knowledge_id:
         return {}
     if not isinstance(knowledge_id, int) or knowledge_id <= 0:
@@ -143,20 +193,66 @@ def get_knowledge_safe(user_id: int, knowledge_id: int = None) -> dict:
         ).first()
         if not item:
             return {}
-        from models.role import Role, UserRole
-        usr = db.query(User).filter(User.id == user_id).first()
-        roles = [row[0] for row in db.query(Role.code).join(
-            UserRole, UserRole.role_id == Role.id).filter(UserRole.user_id == user_id).all()]
-        if not (usr and is_admin({'user_id': user_id, 'role': usr.role, 'roles': roles})):
-            visible_ids = get_visible_knowledge_ids({
-                'user_id': user_id, 'role': usr.role if usr else 'user', 'roles': roles})
-            if visible_ids is not None and knowledge_id not in visible_ids:
-                return {}
+        if (item.visibility or 'personal') != 'global':
+            from models.role import Role, UserRole
+            usr = db.query(User).filter(User.id == user_id).first()
+            roles = [row[0] for row in db.query(Role.code).join(
+                UserRole, UserRole.role_id == Role.id).filter(UserRole.user_id == user_id).all()]
+            if not (usr and is_admin({'user_id': user_id, 'role': usr.role, 'roles': roles})):
+                visible_ids = get_visible_knowledge_ids({
+                    'user_id': user_id, 'role': usr.role if usr else 'user', 'roles': roles})
+                if visible_ids is not None and knowledge_id not in visible_ids:
+                    return {}
         return {
             'id': item.id,
             'title': item.title,
             'content': item.content or ''
         }
+
+
+def _validate_visibility_fields(user: dict, data: KnowledgeRequest,
+                                current_item: Optional[KnowledgeItem] = None) -> dict:
+    """校验 visibility/is_pinned 字段（仅管理员可全局发布/常驻），返回可写入字段"""
+    provided = data.model_fields_set
+    fields = {}
+    if 'visibility' in provided and data.visibility is not None:
+        if data.visibility == 'global' and not is_admin(user):
+            raise HTTPException(status_code=403, detail="仅管理员可发布全局知识")
+        fields['visibility'] = data.visibility
+    if 'is_pinned' in provided and data.is_pinned is not None:
+        pinned = 1 if data.is_pinned else 0
+        target_vis = fields.get('visibility') or (
+            (current_item.visibility or 'personal') if current_item else 'personal')
+        if pinned and target_vis != 'global':
+            raise HTTPException(status_code=400, detail="仅全局知识可设置常驻上下文")
+        if pinned:
+            from crud.knowledge import MAX_PINNED_GLOBAL
+            current_id = current_item.id if current_item else None
+            n = knowledge_crud.count_global_pinned()
+            if current_item and current_item.is_pinned:
+                n -= 1  # 自身已 pin，改内容不占新名额
+            if n >= MAX_PINNED_GLOBAL:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"全局常驻条目已达上限 {MAX_PINNED_GLOBAL}，请先取消部分常驻")
+        fields['is_pinned'] = pinned
+    return fields
+
+
+@router.get("/global", response_model=KnowledgeListResponse)
+@limiter.limit(LIMIT_READ)
+def list_global_knowledge(
+    request: Request,
+    user: CurrentUser,
+    limit: int = Query(100, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+):
+    """全局发布且启用的知识条目（人人可见；对话页展示全局规则用）"""
+    all_items = knowledge_crud.list_global_active()
+    items = all_items[offset:offset + limit]
+    return {'items': [_to_dict(i) for i in items], 'total': len(all_items)}
+
+
 @router.get("", response_model=KnowledgeListResponse)
 @limiter.limit(LIMIT_READ)
 def list_knowledge(
@@ -164,9 +260,20 @@ def list_knowledge(
     user: CurrentUser,
     limit: int = Query(20, ge=1, le=100),
     offset: int = Query(0, ge=0),
+    visibility: Optional[str] = Query(None, description="按可见范围过滤：global/personal"),
+    keyword: Optional[str] = Query(None, max_length=100, description="按标题/内容模糊搜索"),
+    knowledge_type: Optional[str] = Query(None, max_length=30, description="按知识类型过滤"),
+    status: Optional[str] = Query(None, description="按状态过滤：enabled/disabled，留空=全部"),
+    pinned: Optional[str] = Query(None, description="pinned=仅常驻条目"),
 ):
-    """获取知识库列表"""
-    items, total = get_all_knowledge(user, limit, offset)
+    """获取知识库列表（visibility 仅管理员可用作过滤，普通用户忽略）"""
+    vf = visibility if (visibility in ('global', 'personal') and is_admin(user)) else None
+    st = status if status in ('enabled', 'disabled') else None
+    items, total = get_all_knowledge(user, limit, offset, visibility_filter=vf,
+                                     keyword=(keyword or '').strip() or None,
+                                     type_filter=(knowledge_type or '').strip() or None,
+                                     status_filter=st,
+                                     pinned_filter=('pinned' if pinned == 'pinned' else None))
     return {'items': [_to_dict(item) for item in items], 'total': total}
 
 
@@ -179,6 +286,7 @@ def create_knowledge(
 ):
     """创建知识条目"""
     try:
+        vis_fields = _validate_visibility_fields(user, data)
         item = knowledge_crud.create(
             user_id=user['user_id'],
             title=data.title,
@@ -187,9 +295,17 @@ def create_knowledge(
             aliases=json.dumps(data.aliases or [], ensure_ascii=False),
             payload=json.dumps(data.payload or {}, ensure_ascii=False),
             scope_schema_id=data.scope_schema_id,
+            visibility=vis_fields.get('visibility', 'personal'),
+            is_pinned=vis_fields.get('is_pinned', 0),
         )
-        log_audit(user, "create_knowledge", f"title={data.title} type={data.knowledge_type}")
+        knowledge_crud.record_version(item.id, 'create', user['user_id'])
+        log_audit(user, "create_knowledge",
+                  f"title={data.title} type={data.knowledge_type} "
+                  f"visibility={vis_fields.get('visibility', 'personal')} "
+                  f"pinned={vis_fields.get('is_pinned', 0)}")
         return _to_dict(item)
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"创建知识失败: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -250,8 +366,10 @@ def update_knowledge(
             update_fields['payload'] = json.dumps(data.payload or {}, ensure_ascii=False)
         if 'scope_schema_id' in provided:
             update_fields['scope_schema_id'] = data.scope_schema_id
+        update_fields.update(_validate_visibility_fields(user, data, item))
 
         knowledge_crud.update(knowledge_id, **update_fields)
+        knowledge_crud.record_version(knowledge_id, 'update', user['user_id'])
         log_audit(user, "update_knowledge", f"id={knowledge_id}")
         return _to_dict(knowledge_crud.get_by_id(knowledge_id))
     except HTTPException:
@@ -268,7 +386,7 @@ def delete_knowledge(
     knowledge_id: int,
     user: CurrentUser
 ):
-    """删除知识（软删除，所有者或管理员）"""
+    """删除知识（软删除 + 版本快照，所有者或管理员；可从版本历史恢复）"""
     try:
         item = knowledge_crud.get_by_id(knowledge_id)
         if not item:
@@ -277,12 +395,82 @@ def delete_knowledge(
             raise HTTPException(status_code=403, detail="只能删除自己创建的知识")
 
         knowledge_crud.update(knowledge_id, is_active=0)
+        knowledge_crud.record_version(knowledge_id, 'delete', user['user_id'])
         log_audit(user, "delete_knowledge", f"id={knowledge_id}")
-        return {"message": "知识已删除"}
+        return {"message": "知识已删除（可在版本历史中恢复）"}
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"删除知识失败: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class RestoreRequest(BaseModel):
+    version_no: int
+
+
+@router.get("/{knowledge_id}/versions")
+@limiter.limit(LIMIT_READ)
+def list_knowledge_versions(
+    request: Request,
+    knowledge_id: int,
+    user: CurrentUser
+):
+    """知识条目版本历史（含快照；属主或管理员）"""
+    item = knowledge_crud.get_by_id(knowledge_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="知识不存在")
+    if not is_admin(user) and item.user_id != user['user_id']:
+        raise HTTPException(status_code=403, detail="只能查看自己创建的知识的版本")
+    return {'items': knowledge_crud.list_versions(knowledge_id)}
+
+
+@router.post("/{knowledge_id}/restore", response_model=KnowledgeResponse)
+@limiter.limit(LIMIT_WRITE)
+def restore_knowledge_version(
+    request: Request,
+    knowledge_id: int,
+    body: RestoreRequest,
+    user: CurrentUser
+):
+    """恢复知识条目到指定版本（属主或管理员；删除态条目恢复后重新启用）"""
+    try:
+        item = knowledge_crud.get_by_id(knowledge_id)  # get_by_id 含删除态行，删除后仍可恢复
+        if not item:
+            raise HTTPException(status_code=404, detail="知识不存在")
+        if not is_admin(user) and item.user_id != user['user_id']:
+            raise HTTPException(status_code=403, detail="只能恢复自己创建的知识")
+
+        snap = knowledge_crud.get_version_snapshot(knowledge_id, body.version_no)
+        if not snap:
+            raise HTTPException(status_code=404, detail=f"版本 {body.version_no} 不存在")
+
+        restore_fields = {
+            'title': snap.get('title'),
+            'content': snap.get('content'),
+            'knowledge_type': snap.get('knowledge_type') or 'note',
+            'aliases': snap.get('aliases'),
+            'payload': snap.get('payload'),
+            'scope_schema_id': snap.get('scope_schema_id'),
+            'visibility': snap.get('visibility') or 'personal',
+            'is_pinned': snap.get('is_pinned') or 0,
+            'is_active': 1,  # 恢复即重新启用
+        }
+        # 全局发布/常驻与创建/更新同权：非管理员不得借历史快照绕过
+        # 「仅管理员可发布全局知识」校验与全局常驻上限（旧快照可能带 global/pinned）
+        if not is_admin(user):
+            if restore_fields['visibility'] == 'global':
+                restore_fields['visibility'] = 'personal'
+            if restore_fields['is_pinned']:
+                restore_fields['is_pinned'] = 0
+        knowledge_crud.update(knowledge_id, **restore_fields)
+        knowledge_crud.record_version(knowledge_id, 'restore', user['user_id'])
+        log_audit(user, "restore_knowledge", f"id={knowledge_id} version={body.version_no}")
+        return _to_dict(knowledge_crud.get_by_id(knowledge_id))
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"恢复知识版本失败: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

@@ -103,6 +103,18 @@ def init_database():
         _ensure_column_sqlite(
             config.MAIN_DB_PATH, 'conversations', 'knowledge_ids', 'TEXT'
         )
+        # 对话消息权限提示（网关行级过滤注入/敏感字段聚合，用户可见；存量库增量迁移）
+        _ensure_column_sqlite(
+            config.MAIN_DB_PATH, 'conversation_messages', 'permission_note', 'TEXT'
+        )
+        # 知识库全局发布与常驻上下文（存量条目统一置 personal，行为不变；管理员按需重新发布）
+        _ensure_column_sqlite(
+            config.MAIN_DB_PATH, 'knowledge_items', 'visibility',
+            "VARCHAR(20) DEFAULT 'personal'"
+        )
+        _ensure_column_sqlite(
+            config.MAIN_DB_PATH, 'knowledge_items', 'is_pinned', 'INTEGER DEFAULT 0'
+        )
         # 存量遥测库补列：深度思考模型的输出 Token 明细
         _ensure_column_sqlite(
             config.TELEMETRY_DB_PATH, 'llm_calls', 'reasoning_tokens', 'INTEGER'
