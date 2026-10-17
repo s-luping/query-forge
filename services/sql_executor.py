@@ -167,20 +167,38 @@ def _get_cached_engine(ds: dict, db_type: str) -> Engine:
         return engine
 
 
+def _max_rows_config() -> int:
+    """查询结果行数上限：读系统设置 SQL_MAX_ROWS，缺省 2000。
+
+    前端气泡预览 10 行、结果弹窗 50 行/页分页，渲染成本与总行数无关；
+    2000 行 JSON 约 0.5~1MB，传输与存储均可接受（基准评测覆盖 99%+ 题目）。
+    """
+    try:
+        from db import get_setting
+        v = str(get_setting('SQL_MAX_ROWS', '') or '').strip()
+        if v.isdigit() and int(v) > 0:
+            return int(v)
+    except Exception:
+        pass
+    return 2000
+
+
 def execute_sql(sql: str, schema_name: Optional[str] = None,
-                db_type: str = 'sqlite', max_rows: int = 100) -> dict:
+                db_type: str = 'sqlite', max_rows: Optional[int] = None) -> dict:
     """执行 SQL 查询，返回 {columns, rows, row_count, duration_ms, error}。
 
     Args:
         sql: 生成的 SQL（必须非空且为 SELECT）
         schema_name: 目标库名（用于定位数据源连接）
         db_type: 数据库类型（无数据源关联时的兜底）
-        max_rows: 最多返回行数（防止大结果集撑爆内存）
+        max_rows: 最多返回行数（防大结果集撑爆内存）；None 时读系统设置 SQL_MAX_ROWS（默认 2000）
 
     Raises:
         SqlExecutionError: 校验失败 / 连接失败 / 查询失败
     """
     _validate_select_only(sql)
+    if max_rows is None:
+        max_rows = _max_rows_config()
     start = time.time()
 
     # 跨库模式（schema_name=None）：从 SQL 表前缀解析目标库，路由到对应数据源
