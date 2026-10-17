@@ -35,6 +35,7 @@ RATE_MAX_CALLS = 8
 RATE_WINDOW = 60.0
 
 NUM_TOL = 0.011  # 标准答案按 2 位小数舍入，浮点比较容差
+MAX_ROWS = 2000  # 服务端 SQL_MAX_ROWS（系统设置，与 sql_executor 保持一致）
 
 _print_lock = threading.Lock()
 _rate_lock = threading.Lock()
@@ -141,8 +142,67 @@ def _rows_equal_tol(pred_rows, gold_rows):
     return True
 
 
+def _ci(norm_rows):
+    """大小写不敏感视图：字符串单元格转小写（用于回退比对层）。"""
+    return [tuple((c[0], c[1].lower()) if c[0] == "str" else c for c in row)
+            for row in norm_rows]
+
+
+def _multiset_ok(pred, gold, ci=False):
+    if ci:
+        pred, gold = _ci(pred), _ci(gold)
+    return len(pred) == len(gold) and Counter(pred) == Counter(gold)
+
+
+def _permute(pred, idx_seq):
+    return [tuple(pred[i] for i in idx_seq) for pred in pred]
+
+
+def _unordered_match(pred, gold):
+    """无序题分层比对，返回 (ex, note)。
+
+    第 1 层：多重集（行序无关，列位置对齐）；
+    第 2 层：字符串大小写不敏感多重集；
+    第 3 层：列排列/多余列剔除（gold 列数的列子集排列），应对
+             SELECT 多输出列、列顺序不同导致的错位（如 qid0）。
+    """
+    if _multiset_ok(pred, gold):
+        return 1, "multiset"
+    if _multiset_ok(pred, gold, ci=True):
+        return 1, "multiset_ci"
+    gcols = len(gold[0])
+    pcols = len(pred[0])
+    import itertools
+    if pcols == gcols:
+        idx_seqs = list(itertools.permutations(range(pcols)))
+    elif pcols > gcols:
+        idx_seqs = list(itertools.permutations(range(pcols), gcols))
+    else:
+        return 0, "value_mismatch"
+    # 候选排列过多（>5040）时放弃列排列层，避免组合爆炸
+    if len(idx_seqs) > 5040:
+        return 0, "value_mismatch"
+    # 排列去重（重复列时排列数会重复）
+    seen = set()
+    for seq in idx_seqs:
+        if seq in seen:
+            continue
+        seen.add(seq)
+        pp = _permute(pred, seq)
+        if _multiset_ok(pp, gold):
+            return 1, "multiset_perm"
+        if _multiset_ok(pp, gold, ci=True):
+            return 1, "multiset_perm_ci"
+    return 0, "value_mismatch"
+
+
 def compare_result(pred_rows, gold_rows, ordered):
-    """返回 (ex, note)。gold_rows 为官方标准答案行集之一。"""
+    """返回 (ex, note)。gold_rows 为官方标准答案行集之一。
+
+    ordered：is_order=1 的题逐位置比较（含前缀截断）；
+    无序题做分层多重集比较：忽略行序 → 忽略字符串大小写 →
+    忽略列顺序/多余输出列（评测口径：忽略列名与行序，要求排序除外）。
+    """
     if pred_rows is None or gold_rows is None:
         return 0, "missing_rows"
     if not gold_rows and not pred_rows:
@@ -150,18 +210,26 @@ def compare_result(pred_rows, gold_rows, ordered):
     if not gold_rows or not pred_rows:
         return 0, "empty_mismatch"
     col_count = len(gold_rows[0])
-    pred = _norm_rows(pred_rows, col_count, tol=True)
-    gold = _norm_rows(gold_rows, col_count, tol=True)
     if ordered:
+        # 有序题沿用原口径：pred 截断到 gold 列宽后逐位置比较
+        pred = _norm_rows(pred_rows, col_count, tol=True)
+        gold = _norm_rows(gold_rows, col_count, tol=True)
         ok = _rows_equal_tol(pred[:len(gold)], gold) and len(pred) >= len(gold)
-    else:
-        ok = len(pred) == len(gold) and _rows_equal_tol(pred, gold)
-    return (1, "ordered" if ordered else "multiset") if ok else (0, "value_mismatch")
+        return (1, "ordered") if ok else (0, "value_mismatch")
+    # 无序题保留 pred 全部列（多余列交给列排列层处理）
+    pred_width = max(len(r) for r in pred_rows)
+    pred = _norm_rows(pred_rows, pred_width, tol=True)
+    gold = _norm_rows(gold_rows, col_count, tol=True)
+    return _unordered_match(pred, gold)
 
 
 # ---------------- 单题评测 ----------------
 
-def eval_one(session, item, llm_config_id, http_timeout):
+# 触发备用模型切换的状态（超时/限流/配额暂停/服务端 500）
+FALLBACK_STATUSES = {"timeout", "rate_limited", "model_quota_paused", "error"}
+
+
+def eval_one_once(session, item, llm_config_id, http_timeout):
     qid = item["qid"]
     t0 = time.time()
     rec = {"qid": qid, "schema": item["schema"], "question": item["question"],
@@ -205,13 +273,13 @@ def eval_one(session, item, llm_config_id, http_timeout):
 
         answers = item.get("answers") or []
         max_rows_ans = max((len(a) for a in answers), default=0)
-        if max_rows_ans > 100:
-            rec["note"] = f"标准答案 {max_rows_ans} 行超服务端 max_rows=100 截断"
+        if max_rows_ans > MAX_ROWS:
+            rec["note"] = f"标准答案 {max_rows_ans} 行超服务端 max_rows={MAX_ROWS} 截断"
             if not item.get("is_order"):
                 rec["status"] = "row_limit"
                 return rec
-            answers = [a[:100] for a in answers]
-            pred_rows = pred_rows[:100]
+            answers = [a[:MAX_ROWS] for a in answers]
+            pred_rows = pred_rows[:MAX_ROWS]
 
         best_note = "value_mismatch"
         for ans in answers:
@@ -243,6 +311,23 @@ def eval_one(session, item, llm_config_id, http_timeout):
     except Exception as e:
         rec["note"] = f"{type(e).__name__}: {e}"[:200]
         return rec
+
+
+def eval_one(session, item, llm_config_id, http_timeout, fallback_ids=()):
+    """单题评测，主配置命中超时/限流/配额/500 时依次用备用配置重试。"""
+    rec = eval_one_once(session, item, llm_config_id, http_timeout)
+    rec["llm_config_id"] = llm_config_id
+    if rec["status"] in FALLBACK_STATUSES and fallback_ids:
+        for fid in fallback_ids:
+            if fid == llm_config_id:
+                continue
+            log(f"qid {item['qid']} [{rec['status']}] → 切换 llm_config_id={fid} 重试")
+            rec = eval_one_once(session, item, fid, http_timeout)
+            rec["llm_config_id"] = fid
+            rec["fallback_from"] = llm_config_id
+            if rec["status"] not in FALLBACK_STATUSES:
+                break
+    return rec
 
 
 # ---------------- 汇总 ----------------
@@ -307,9 +392,12 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--questions", required=True, help="题目 JSONL 路径")
     ap.add_argument("--llm-config-id", type=int, default=4)
+    ap.add_argument("--fallback-llm-ids", default="",
+                    help="逗号分隔备用 llm_config_id，主配置超时/限流/配额/500 时依次切换重试（如 8,6）")
     ap.add_argument("--out", default=None, help="结果 JSONL 路径（默认 results/<题集名>.<config>.jsonl）")
     ap.add_argument("--workers", type=int, default=3)
     ap.add_argument("--limit", type=int, default=0, help="只跑前 N 题（0=全量）")
+    ap.add_argument("--offset", type=int, default=0, help="跳过前 N 题后再取 limit（用于分段跑）")
     ap.add_argument("--http-timeout", type=int, default=600)
     ap.add_argument("--report-only", action="store_true")
     ap.add_argument("--relabel-quota", action="store_true",
@@ -343,6 +431,8 @@ def main():
 
     with open(args.questions, encoding="utf-8") as f:
         items = [json.loads(l) for l in f if l.strip()]
+    if args.offset:
+        items = items[args.offset:]
     if args.limit:
         items = items[:args.limit]
     todo = [it for it in items
@@ -361,8 +451,9 @@ def main():
                     fout.flush()
 
             with ThreadPoolExecutor(max_workers=args.workers) as pool:
+                fids = tuple(int(x) for x in args.fallback_llm_ids.split(",") if x.strip())
                 futs = {pool.submit(eval_one, session, it,
-                                    args.llm_config_id, args.http_timeout): it
+                                    args.llm_config_id, args.http_timeout, fids): it
                         for it in todo}
                 n = 0
                 for fut in as_completed(futs):
