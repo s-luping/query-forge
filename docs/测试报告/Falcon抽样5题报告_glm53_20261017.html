@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Falcon dev 抽样测试报告（glm-5.3-flash）</title>
+<style>
+  :root {
+    --bg: #f6f8fa; --card: #ffffff; --border: #e1e4e8;
+    --text: #24292f; --muted: #57606a;
+    --ok: #1a7f37; --ok-bg: #dafbe1;
+    --bad: #cf222e; --bad-bg: #ffebe9;
+    --warn: #9a6700; --warn-bg: #fff8c5;
+    --accent: #0969da;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: "Segoe UI", "Microsoft YaHei", sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; }
+  .wrap { max-width: 960px; margin: 0 auto; padding: 32px 20px 64px; }
+  h1 { font-size: 26px; margin: 0 0 4px; }
+  .sub { color: var(--muted); font-size: 14px; margin-bottom: 24px; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 24px; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
+  .card .k { font-size: 12px; color: var(--muted); }
+  .card .v { font-size: 22px; font-weight: 700; }
+  .card .v.ok { color: var(--ok); }
+  h2 { font-size: 18px; border-bottom: 1px solid var(--border); padding-bottom: 6px; margin-top: 32px; }
+  table { width: 100%; border-collapse: collapse; background: var(--card); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; font-size: 14px; }
+  th, td { padding: 8px 12px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; }
+  th { background: #f0f3f6; font-weight: 600; }
+  tr:last-child td { border-bottom: none; }
+  .badge { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 12px; font-weight: 600; }
+  .b-ok { color: var(--ok); background: var(--ok-bg); }
+  .b-bad { color: var(--bad); background: var(--bad-bg); }
+  .b-warn { color: var(--warn); background: var(--warn-bg); }
+  .note { color: var(--muted); font-size: 13px; }
+  ul { padding-left: 22px; }
+  li { margin: 6px 0; }
+  code { background: #eff1f3; border-radius: 4px; padding: 1px 5px; font-size: 13px; }
+  .callout { background: var(--warn-bg); border: 1px solid #d4a72c66; border-radius: 8px; padding: 12px 16px; margin: 16px 0; font-size: 14px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Falcon dev 抽样测试报告（glm-5.3-flash）</h1>
+  <div class="sub">QueryForge NL2SQL 基准 · questions_falcon 前 5 题 · 2026-10-17</div>
+
+  <div class="cards">
+    <div class="card"><div class="k">题数</div><div class="v">5</div></div>
+    <div class="card"><div class="k">EX（执行准确率）</div><div class="v ok">3/5 = 0.60</div></div>
+    <div class="card"><div class="k">平均耗时</div><div class="v">61.5s</div></div>
+    <div class="card"><div class="k">Token（入/出）</div><div class="v" style="font-size:16px">2,194 / 6,893</div></div>
+  </div>
+
+  <div class="callout">背景：豆包 pro(4)/turbo(5) 火山方舟配额暂停（已自动标记欠费），本批改用 <b>glm-5.3-flash（id=7，NVIDIA）</b>；此前豆包单题 50~120s，本批 37.8~92.0s。</div>
+
+  <h2>逐题结果</h2>
+  <table>
+    <tr><th>qid</th><th>schema</th><th>题目</th><th>状态</th><th>EX</th><th>说明</th></tr>
+    <tr><td>0</td><td>falcon_dev_14</td><td>Commercial 区域库存量前十的产品</td><td><span class="badge b-bad">形态失败</span></td><td>0</td><td class="note">数值与行序全对，仅多输出 Product_ID 首列致列错位</td></tr>
+    <tr><td>1</td><td>falcon_dev_20</td><td>各城市活跃司机平均行程次数与平均评分</td><td><span class="badge b-bad">口径失败</span></td><td>0</td><td class="note">行程 Rating 双重平均（4.23~4.27）vs gold 司机档案 average_rating（4.46~4.68），真实语义失败</td></tr>
+    <tr><td>2</td><td>falcon_dev_16</td><td>每科前三名学生的平均分</td><td><span class="badge b-ok">通过</span></td><td>1</td><td class="note">比对器修复后转对（10 行数值全对）</td></tr>
+    <tr><td>4</td><td>falcon_dev_20</td><td>服务年限高于城市平均的活跃驾驶员</td><td><span class="badge b-ok">通过</span></td><td>1</td><td class="note">18 名驾驶员 ID 集合与答案完全一致</td></tr>
+    <tr><td>3</td><td>falcon_dev_16</td><td>各科平均分高于总平均 + 教师&gt;40 岁</td><td><span class="badge b-ok">通过</span></td><td>1</td><td class="note">三表 JOIN + HAVING 子查询，完全正确</td></tr>
+  </table>
+
+  <h2>失败归因</h2>
+  <ul>
+    <li><b>qid 0 — 形态类</b>：产品与库存数值、行序<b>完全正确</b>（Deck Of Cards 44 / Etch A Sketch 13 / Lego Bricks 11 / Kids Makeup Kit 5），但生成 SQL 多输出 <code>Product_ID</code> 列且位于首列，导致列错位判错。属【结果形态】类失败，非语义错误。</li>
+    <li><b>qid 1 — 口径类</b>：平均行程次数在容差内一致；<b>平均评分口径不同</b>——生成 SQL 对行程级 <code>Rating</code> 先按司机平均再按城市平均（双重平均），标准答案取司机档案 <code>average_rating</code> 字段直接城市平均。</li>
+  </ul>
+
+  <h2>比对器修复（顺手修正）</h2>
+  <p><code>run_eval.py compare_result</code> 的无序题分支原为<b>逐位置</b>比较（与注释 multiset 不符）：行序不同即判错，导致 qid2 数值完全一致、仅行序不同也被误判。已改为<b>多重集比较</b>（与 BIRD recompute_match 口径一致，Counter 逐行元组计数）。离线重算同批 5 题：qid2、qid4 由 wrong_answer 转 ok（名义 EX 1/5 → 3/5）。</p>
+  <p class="note">注：qid0/qid4 均属"数值对但输出列不齐"，与 BIRD 优化落地的【结果形态】约束方向一致，可作为下一轮 gen_sql 提示词回归项。</p>
+
+  <h2>失败模式小结（n=5）</h2>
+  <table>
+    <tr><th>模式</th><th>题数</th><th>说明</th></tr>
+    <tr><td><span class="badge b-ok">通过</span></td><td>3</td><td>qid2 / qid3 / qid4</td></tr>
+    <tr><td><span class="badge b-warn">形态（多输出列）</span></td><td>1</td><td>qid0，数值全对</td></tr>
+    <tr><td><span class="badge b-bad">口径（聚合字段选择）</span></td><td>1</td><td>qid1，评分口径真实错误</td></tr>
+  </table>
+</div>
+</body>
+</html>

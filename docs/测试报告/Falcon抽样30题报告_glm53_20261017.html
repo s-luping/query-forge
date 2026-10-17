@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Falcon dev 抽样30题测试报告（glm-5.3-flash，qid 5-34）</title>
+<style>
+  :root {
+    --bg: #f6f8fa; --card: #ffffff; --border: #e1e4e8;
+    --text: #24292f; --muted: #57606a;
+    --ok: #1a7f37; --ok-bg: #dafbe1;
+    --bad: #cf222e; --bad-bg: #ffebe9;
+    --warn: #9a6700; --warn-bg: #fff8c5;
+    --info: #0969da; --info-bg: #ddf4ff;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: "Segoe UI", "Microsoft YaHei", sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 32px 20px 64px; }
+  h1 { font-size: 26px; margin: 0 0 4px; }
+  .sub { color: var(--muted); font-size: 14px; margin-bottom: 24px; }
+  h2 { font-size: 18px; border-bottom: 1px solid var(--border); padding-bottom: 6px; margin-top: 32px; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 24px; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
+  .card .k { font-size: 12px; color: var(--muted); }
+  .card .v { font-size: 22px; font-weight: 700; }
+  .card .v.ok { color: var(--ok); }
+  table { width: 100%; border-collapse: collapse; background: var(--card); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; font-size: 13.5px; }
+  th, td { padding: 7px 10px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; }
+  th { background: #f0f3f6; font-weight: 600; white-space: nowrap; }
+  tr:last-child td { border-bottom: none; }
+  .badge { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+  .b-ok { color: var(--ok); background: var(--ok-bg); }
+  .b-bad { color: var(--bad); background: var(--bad-bg); }
+  .b-warn { color: var(--warn); background: var(--warn-bg); }
+  .b-info { color: var(--info); background: var(--info-bg); }
+  .note { color: var(--muted); font-size: 13px; }
+  ul { padding-left: 22px; }
+  li { margin: 6px 0; }
+  code { background: #eff1f3; border-radius: 4px; padding: 1px 5px; font-size: 13px; }
+  .callout { background: var(--info-bg); border: 1px solid #54aeff66; border-radius: 8px; padding: 12px 16px; margin: 16px 0; font-size: 14px; }
+  .warnbox { background: var(--warn-bg); border: 1px solid #d4a72c66; border-radius: 8px; padding: 12px 16px; margin: 16px 0; font-size: 14px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Falcon dev 抽样30题测试报告（glm-5.3-flash）</h1>
+  <div class="sub">QueryForge NL2SQL 基准 · questions_falcon qid 5-34 · llm_config_id=7（NVIDIA z-ai/glm-5.3-flash）· 2026-10-17</div>
+
+  <div class="cards">
+    <div class="card"><div class="k">题数</div><div class="v">30</div></div>
+    <div class="card"><div class="k">EX（执行准确率）</div><div class="v">5/30 = 16.7%</div></div>
+    <div class="card"><div class="k">平均耗时</div><div class="v">72.2s</div></div>
+    <div class="card"><div class="k">Token（入/出）</div><div class="v" style="font-size:16px">14,452 / 39,365</div></div>
+    <div class="card"><div class="k">累计 35 题 EX</div><div class="v ok" style="font-size:18px">8/35 = 22.9%</div></div>
+  </div>
+
+  <div class="callout">状态分桶：<span class="badge b-ok">通过 5</span> <span class="badge b-bad">值/口径错误 20</span> <span class="badge b-warn">row_limit 3</span> <span class="badge b-bad">幻觉列 exec_error 1</span> <span class="badge b-warn">形态 1</span>。本批 EX 明显低于前 5 题（3/5），主因：题目更复杂（多表/窗口/占比/中位数类）+ 3 题 row_limit 无法比对 + 1 题幻觉列。</div>
+
+  <h2>失败模式分布（25 题未通过）</h2>
+  <table>
+    <tr><th>模式</th><th>题数</th><th>qid</th><th>说明</th></tr>
+    <tr><td><span class="badge b-ok">通过</span></td><td>5</td><td>11 / 17 / 31 / 32 / 33</td><td>多为单/双表聚合过滤题</td></tr>
+    <tr><td><span class="badge b-warn">row_limit（非模型问题）</span></td><td>3</td><td>5 / 12 / 22</td><td>标准答案超 100 行，服务端 max_rows=100 截断无法比对（全量 309 题中此类共 48 题）</td></tr>
+    <tr><td><span class="badge b-bad">0 行 · 过滤/关联口径</span></td><td>5</td><td>9 / 15 / 16 / 24 / 26</td><td>WHERE 值口径（日期、地名、类别映射）或关联链路错误，查询结果为空</td></tr>
+    <tr><td><span class="badge b-bad">行数不符 · 部分重叠</span></td><td>6</td><td>6 / 18 / 19 / 21 / 27 / 30</td><td>HAVING 边界/去重/关联遗漏：如 qid6 重叠 45/65、qid30 重叠 6/10、qid18 多判 1 个"欧洲"国家、qid19 边界 8 vs 1</td></tr>
+    <tr><td><span class="badge b-bad">值差异 · 聚合/分组</span></td><td>4</td><td>7 / 8 / 23 / 34</td><td>分组值错位（qid7/8）；<b>NULL 聚合 2 题</b>（qid23/34 过滤后无匹配行返回 None，未按口径返回 0/空集）</td></tr>
+    <tr><td><span class="badge b-bad">列数不符 + 值差异</span></td><td>5</td><td>10 / 13 / 14 / 20 / 28</td><td>形态与值双重失败：多列/少列且截取后仍不一致（qid20 为少列）</td></tr>
+    <tr><td><span class="badge b-bad">幻觉列 exec_error</span></td><td>1</td><td>29</td><td>引用不存在的列 <code>install_num</code>（字段召回未覆盖 → LLM 编造列名）</td></tr>
+    <tr><td><span class="badge b-warn">形态（截取后一致）</span></td><td>1</td><td>25</td><td>多列输出，按 gold 列数截取后行集一致，纯形态问题</td></tr>
+  </table>
+
+  <h2>逐题结果</h2>
+  <table>
+    <tr><th>qid</th><th>schema</th><th>题目</th><th>状态</th><th>耗时</th><th>归因</th></tr>
+    <tr><td>5</td><td>falcon_dev_28</td><td>信用卡支付成功率低于均值州·失败客户邮箱</td><td><span class="badge b-warn">row_limit</span></td><td>54s</td><td class="note">标准答案 821 行超 100 截断</td></tr>
+    <tr><td>6</td><td>falcon_dev_4</td><td>纸质账单客户逾期超行业平均·逾期次数</td><td><span class="badge b-bad">行数不符</span></td><td>127s</td><td class="note">pred 63 vs gold 65，重叠 45/65（HAVING/去重口径）</td></tr>
+    <tr><td>7</td><td>falcon_dev_8</td><td>每类别价格最高的付费应用</td><td><span class="badge b-bad">值差异</span></td><td>89s</td><td class="note">类别-应用映射不同（并列最值 tie-breaking）</td></tr>
+    <tr><td>8</td><td>falcon_dev_8</td><td>免费应用各内容评级的总数</td><td><span class="badge b-bad">值差异</span></td><td>16s</td><td class="note">分组值错位（Unrated 2 vs Everyone 6855）</td></tr>
+    <tr><td>9</td><td>falcon_dev_14</td><td>销售额超 50 美元的类别及占比</td><td><span class="badge b-bad">0 行</span></td><td>30s</td><td class="note">过滤/聚合口径错误，结果为空</td></tr>
+    <tr><td>10</td><td>falcon_dev_8</td><td>游戏类下载量前三 APP 及平均价格</td><td><span class="badge b-bad">列数+值</span></td><td>177s</td><td class="note">4 列 vs 3 列且截取后仍不一致</td></tr>
+    <tr><td>11</td><td>falcon_dev_8</td><td>教育类评分前五 APP 及平均安装数</td><td><span class="badge b-ok">通过</span></td><td>69s</td><td class="note">multiset 一致</td></tr>
+    <tr><td>12</td><td>falcon_dev_24</td><td>订单总额高于分群均值的客户</td><td><span class="badge b-warn">row_limit</span></td><td>73s</td><td class="note">标准答案超 100 行</td></tr>
+    <tr><td>13</td><td>falcon_dev_17</td><td>订单额超城市均值的客户</td><td><span class="badge b-bad">列数+值</span></td><td>132s</td><td class="note">4 列 vs 3 列且截取后仍不一致</td></tr>
+    <tr><td>14</td><td>falcon_dev_21</td><td>各类订单最多产品·均销额超 200 的类别</td><td><span class="badge b-bad">列数+值</span></td><td>30s</td><td class="note">4 列 vs 3 列且截取后仍不一致</td></tr>
+    <tr><td>15</td><td>falcon_dev_14</td><td>类别×城市销售额超类别均值</td><td><span class="badge b-bad">0 行</span></td><td>47s</td><td class="note">查询结果为空</td></tr>
+    <tr><td>16</td><td>falcon_dev_28</td><td>承运商平均配送时长及效率排名</td><td><span class="badge b-bad">0 行</span></td><td>25s</td><td class="note">查询结果为空（状态值/关联口径）</td></tr>
+    <tr><td>17</td><td>falcon_dev_4</td><td>争议账单处理周期超 35 天的国家</td><td><span class="badge b-ok">通过</span></td><td>28s</td><td class="note">multiset 一致</td></tr>
+    <tr><td>18</td><td>falcon_dev_19</td><td>欧洲男性预期寿命&gt;75 国家的酒消费</td><td><span class="badge b-bad">行数不符</span></td><td>86s</td><td class="note">25 vs 24 行（"欧洲"国家判定多 1 个，且 5 列 vs 4 列）</td></tr>
+    <tr><td>19</td><td>falcon_dev_14</td><td>2008 年前开业且玩具均价&lt;14.99 美元的城市</td><td><span class="badge b-bad">行数不符</span></td><td>61s</td><td class="note">8 vs 1 行（边界口径：平均售价过滤差异）</td></tr>
+    <tr><td>20</td><td>falcon_dev_14</td><td>2018 年 Mexicali 各店铺玩具销售额排名</td><td><span class="badge b-bad">列数+值</span></td><td>48s</td><td class="note">2 列 vs 3 列（少输出列）且值不一致</td></tr>
+    <tr><td>21</td><td>falcon_dev_14</td><td>每店销量≤10 件的产品及累计销量</td><td><span class="badge b-bad">行数不符</span></td><td>84s</td><td class="note">13 vs 20 行（累计销量聚合口径）</td></tr>
+    <tr><td>22</td><td>falcon_dev_28</td><td>游戏键盘客户消费总额及占比</td><td><span class="badge b-warn">row_limit</span></td><td>97s</td><td class="note">标准答案超 100 行</td></tr>
+    <tr><td>23</td><td>falcon_dev_14</td><td>商业区玩具销售额占全部区域比例</td><td><span class="badge b-bad">NULL 聚合</span></td><td>37s</td><td class="note">返回 None vs gold 0.12（过滤无匹配未返回 0/空集）</td></tr>
+    <tr><td>24</td><td>falcon_dev_15</td><td>钻石客户 2016-12 交易 ID 及均值</td><td><span class="badge b-bad">0 行</span></td><td>148s</td><td class="note">查询结果为空（客户分群/日期口径）</td></tr>
+    <tr><td>25</td><td>falcon_dev_26</td><td>2015 赛季主队预期进球前十比赛</td><td><span class="badge b-warn">形态</span></td><td>71s</td><td class="note">多列输出，截取后行集一致，纯形态</td></tr>
+    <tr><td>26</td><td>falcon_dev_20</td><td>评分&gt;4.5 驾驶员 2024-11 接单最多者</td><td><span class="badge b-bad">0 行</span></td><td>28s</td><td class="note">查询结果为空（月份边界/评分口径）</td></tr>
+    <tr><td>27</td><td>falcon_dev_20</td><td>LA/SF 活跃司机里程&gt;100km 且评分&gt;4.0</td><td><span class="badge b-bad">行数不符</span></td><td>56s</td><td class="note">13 vs 22 行，重叠 12/22（总距离求和口径）</td></tr>
+    <tr><td>28</td><td>falcon_dev_4</td><td>特定争议状态客户均逾期天数与发票占比</td><td><span class="badge b-bad">列数+值</span></td><td>317s</td><td class="note">4 列 vs 3 列且截取后仍不一致；思考耗时最长 317s</td></tr>
+    <tr><td>29</td><td>falcon_dev_8</td><td>安装量超类别中位数千倍的应用</td><td><span class="badge b-bad">幻觉列</span></td><td>74s</td><td class="note">Unknown column 'install_num'（编造列名）</td></tr>
+    <tr><td>30</td><td>falcon_dev_16</td><td>成绩高于全校均值的每师学生数排名</td><td><span class="badge b-bad">行数不符</span></td><td>53s</td><td class="note">6 vs 10 行，重叠 6/10（关联遗漏部分老师）</td></tr>
+    <tr><td>31</td><td>falcon_dev_17</td><td>运费占比&gt;15% 的商品及类别</td><td><span class="badge b-ok">通过</span></td><td>30s</td><td class="note">multiset 一致</td></tr>
+    <tr><td>32</td><td>falcon_dev_18</td><td>月均收入&gt;3000 且游客&gt;1000 万的国家</td><td><span class="badge b-ok">通过</span></td><td>28s</td><td class="note">multiset 一致</td></tr>
+    <tr><td>33</td><td>falcon_dev_18</td><td>生活成本指数&gt;100 且旅游占 GDP&gt;1%</td><td><span class="badge b-ok">通过</span></td><td>29s</td><td class="note">multiset 一致</td></tr>
+    <tr><td>34</td><td>falcon_dev_21</td><td>卡萨布兰卡客户购买工具类总金额</td><td><span class="badge b-bad">NULL 聚合</span></td><td>23s</td><td class="note">返回 None vs gold 1628.71（地名/类别映射无匹配）</td></tr>
+  </table>
+
+  <h2>关键洞察</h2>
+  <ul>
+    <li><b>通过题画像</b>：单/双表 + 明确数值阈值的过滤聚合题（qid11/17/31/32/33）全部通过；失败集中在<b>多跳关联、占比/排名/中位数、复杂口径</b>题。</li>
+    <li><b>NULL 聚合 2 题</b>（qid23/34）：过滤条件无匹配行时 SUM 返回 NULL，与 gold 的"返回 0/比例值"口径不符——提示词可补充"无匹配行时聚合按 0/空集处理"。</li>
+    <li><b>幻觉列 1 题</b>（qid29）：字段召回未覆盖时 LLM 编造 <code>install_num</code>——可通过数据指南（Schema 数据指南功能）补字段说明缓解。</li>
+    <li><b>形态类占比低但复合失败多</b>：纯形态仅 1 题（qid25），"列数不符且值也错" 5 题——上一批（前 5 题）的形态问题在本批退居次要，<b>过滤值口径与关联链路</b>成为主要失败源。</li>
+    <li><b>row_limit 3 题为已知限制</b>（48/309 题属此类），非模型能力问题，建议后续对超 100 行答案集单独分桶统计。</li>
+    <li><b>耗时波动大</b>：22.9~316.6s（qid28 思考 317s），思考模型对复杂题自动延长思考；若做全量基线建议 http-timeout ≥ 600s 已足够。</li>
+  </ul>
+
+  <h2>与前 5 题合并累计</h2>
+  <table>
+    <tr><th>批次</th><th>题数</th><th>EX</th><th>说明</th></tr>
+    <tr><td>qid 0-4（前 5 题）</td><td>5</td><td>3/5 = 60%</td><td class="note">1 形态 + 1 口径失败</td></tr>
+    <tr><td>qid 5-34（本批 30 题）</td><td>30</td><td>5/30 = 16.7%</td><td class="note">题目复杂度显著上升</td></tr>
+    <tr><td><b>合计</b></td><td><b>35</b></td><td><b>8/35 = 22.9%</b></td><td class="note">名义 EX；剔除 row_limit 3 题后有效题 EX 为 8/32 = 25%</td></tr>
+  </table>
+  <p class="note">结果明细 JSONL：benchmark/results/falcon.c7.q5_34_20261017.jsonl（qid0-4 见 falcon.c7.smoke5_20261017.jsonl）。比对口径：多重集 + 2 位小数容差；is_order=1 保序。</p>
+</div>
+</body>
+</html>
