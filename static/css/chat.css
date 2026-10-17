@@ -210,6 +210,18 @@ body {
     color: #dc3545;
 }
 
+/* 权限提示：网关行级过滤注入/敏感字段聚合（非错误，弱化展示） */
+.msg-perm-note {
+    margin-top: 6px;
+    font-size: 12px;
+    color: #856404;
+    background: #fff3cd;
+    border: 1px solid #ffe69c;
+    border-radius: 6px;
+    padding: 4px 10px;
+    display: inline-block;
+}
+
 /* 助手消息元信息行：模型 · 耗时 · Token */
 .msg-llm-meta {
     margin-top: 8px;

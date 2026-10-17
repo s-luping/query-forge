@@ -40,5 +40,6 @@ class ConversationMessage(MainBase):
     error_message = Column(Text, nullable=True, comment='错误信息')
     columns = Column(Text, nullable=True, comment='结果列名(JSON数组)')
     result_data = Column(Text, nullable=True, comment='查询结果持久化(JSON: {columns,rows,row_count,error})')
+    permission_note = Column(Text, nullable=True, comment='权限提示(网关改写：行级过滤注入/敏感字段聚合，用户可见)')
     llm_call_id = Column(Integer, nullable=True, index=True, comment='关联的LLM调用ID(→llm_calls，跨库逻辑引用)')
     created_at = Column(DateTime, default=now_beijing, comment='创建时间（北京时间）')

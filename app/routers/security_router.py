@@ -46,11 +46,22 @@ class SensitiveLevelUpdate(BaseModel):
 @router.get('/logs', response_model=AuditLogListResponse)
 @limiter.limit(LIMIT_READ)
 def list_audit_logs(request: Request, user: AdminUser, limit: int = Query(50, le=200),
-                    offset: int = Query(0), blocked_only: bool = Query(False)):
+                    offset: int = Query(0), blocked_only: bool = Query(False),
+                    status: Optional[str] = Query(None, pattern='^(blocked|passed)$'),
+                    username: Optional[str] = Query(None),
+                    search: Optional[str] = Query(None)):
     with session_scope(logs=True) as db:
         query = db.query(QueryAuditLog)
         if blocked_only:
             query = query.filter(QueryAuditLog.was_blocked == True)
+        if status == 'blocked':
+            query = query.filter(QueryAuditLog.was_blocked == True)
+        elif status == 'passed':
+            query = query.filter(QueryAuditLog.was_blocked == False)
+        if username:
+            query = query.filter(QueryAuditLog.username.like(f'%{username}%'))
+        if search:
+            query = query.filter(QueryAuditLog.query.like(f'%{search}%'))
         total = query.count()
         rows = query.order_by(QueryAuditLog.created_at.desc()).limit(limit).offset(offset).all()
         return AuditLogListResponse(items=[AuditLogItem(

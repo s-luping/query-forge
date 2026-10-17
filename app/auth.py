@@ -113,6 +113,33 @@ def create_access_token(data: dict, expires_delta=None):
     return encoded_jwt
 
 
+_NO_USER = object()   # request.state 匿名标记（区分「未解析」与「已解析为匿名」）
+
+
+def _extract_token(request: Request) -> Optional[str]:
+    """从请求提取 token：Bearer 头优先，其次 HttpOnly cookie"""
+    auth_header = request.headers.get('Authorization', '')
+    if auth_header.startswith('Bearer '):
+        return auth_header[7:]
+    return request.cookies.get('token')
+
+
+def resolve_request_user(request: Request) -> Optional[dict]:
+    """请求级用户解析 + request.state 缓存（同请求内多消费方复用一次解析结果）
+
+    同一请求内 access_log / page_auth_guard / 限流 key / 路由依赖会各自解析
+    token（JWT 解码 + 用户/角色 2 次 DB 查询），此前每请求重复 3~4 次；
+    缓存到 request.state 后全请求仅解析 1 次，跨请求不受影响（每次请求重新解析）。
+    """
+    cached = getattr(request.state, 'qf_user', None)
+    if cached is not None:
+        return None if cached is _NO_USER else cached
+    token = _extract_token(request)
+    user = resolve_token_user(token) if token else None
+    request.state.qf_user = user if user is not None else _NO_USER
+    return user
+
+
 def resolve_token_user(token: Optional[str]) -> Optional[dict]:
     """解析 token → 当前用户字典；token 缺失/无效/过期/用户禁用/密码已变更 → None。
 
@@ -151,19 +178,12 @@ def resolve_token_user(token: Optional[str]) -> Optional[dict]:
 
 
 async def get_current_user(request: Request):
-    """从请求中获取当前用户（Bearer 头优先，其次 HttpOnly cookie）"""
-    auth_header = request.headers.get('Authorization', '')
-    if auth_header.startswith('Bearer '):
-        token = auth_header[7:]
-    else:
-        token = request.cookies.get('token')
-
-    if not token:
-        logger.warning("请求缺少认证token")
-        raise HTTPException(status_code=401, detail="未登录，请先登录")
-
-    user = resolve_token_user(token)
+    """从请求中获取当前用户（请求级缓存，见 resolve_request_user）"""
+    user = resolve_request_user(request)
     if user is None:
+        if not _extract_token(request):
+            logger.warning("请求缺少认证token")
+            raise HTTPException(status_code=401, detail="未登录，请先登录")
         logger.warning("无效/失效的token")
         raise HTTPException(status_code=401, detail="无效的token或登录已失效，请重新登录")
     logger.debug(f"用户认证成功: {user['username']}")

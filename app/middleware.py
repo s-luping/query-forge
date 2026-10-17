@@ -5,7 +5,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from app.auth import resolve_token_user
+from app.auth import resolve_request_user
 from app.config import CORS_ORIGINS, FRAME_ANCESTORS, SLOW_REQUEST_MS
 from app.logger import logger
 from app.response import get_request_id, new_request_id, set_request_id
@@ -58,9 +58,8 @@ async def access_log(request: Request, call_next):
     # traceId：贯穿访问日志 / 慢SQL日志 / 错误响应体 / X-Request-ID 响应头
     set_request_id(new_request_id())
     started = time.time()
-    token = request.cookies.get('token') or request.headers.get(
-        'Authorization', '').replace('Bearer ', '')
-    user = resolve_token_user(token) if token else None
+    # 请求级缓存解析（结果供 page_auth_guard / 限流 key / 路由依赖复用）
+    user = resolve_request_user(request)
     response = await call_next(request)
     duration = (time.time() - started) * 1000
     identity = (f"user_id={user['user_id']} username={user['username']}"
@@ -87,9 +86,7 @@ async def page_auth_guard(request: Request, call_next):
                path in _DOCS_PATHS)
     if not is_page:
         return await call_next(request)
-    token = request.cookies.get('token') or request.headers.get(
-        'Authorization', '').replace('Bearer ', '')
-    user = resolve_token_user(token)
+    user = resolve_request_user(request)
     if path == '/':
         return await call_next(request) if user else RedirectResponse('/login', status_code=302)
     if not user:

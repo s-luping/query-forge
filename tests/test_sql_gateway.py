@@ -52,3 +52,34 @@ def test_result_to_dict():
     r = SqlGatewayResult()
     d = r.to_dict()
     assert d['is_allowed'] is True and d['sql'] == ''
+
+
+# ── 根类型断言（只读校验，防 SELECT INTO / 写语句） ────────────────
+
+def test_select_into_blocked(gateway):
+    """SELECT INTO 可建表写数据（PG/MySQL SELECT ... INTO），必须拦截"""
+    result = gateway.process('SELECT name INTO newtable FROM users', schema_name='test')
+    assert not result.is_allowed
+    assert '写操作' in result.block_reason
+
+
+def test_write_statement_blocked(gateway):
+    result = gateway.process('DELETE FROM users', schema_name='test')
+    assert not result.is_allowed
+
+
+def test_cte_allowed(gateway):
+    result = gateway.process('WITH c AS (SELECT id FROM users) SELECT id FROM c',
+                             schema_name='test')
+    assert result.is_allowed
+
+
+def test_union_allowed(gateway):
+    result = gateway.process('SELECT id FROM users UNION SELECT id FROM roles',
+                             schema_name='test')
+    assert result.is_allowed
+
+
+def test_non_select_root_blocked(gateway):
+    result = gateway.process('EXPLAIN SELECT * FROM users', schema_name='test')
+    assert not result.is_allowed

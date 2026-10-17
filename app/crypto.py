@@ -30,15 +30,11 @@ def _get_fernet():
 
 
 def encrypt_secret(plain: str) -> str:
-    """加密明文。加密失败（如依赖缺失）时退回明文并告警，不阻断业务。"""
+    """加密明文。加密失败直接抛错拒绝保存——绝不静默回退明文落库
+    （API Key / 数据源密码明文进 DB 属敏感信息泄漏，宁可让保存操作失败）。"""
     if not plain:
         return plain
-    try:
-        return _PREFIX + _get_fernet().encrypt(plain.encode('utf-8')).decode('utf-8')
-    except Exception as e:
-        from app.logger import logger
-        logger.warning(f"api_key 加密失败（将以明文存储）: {e}")
-        return plain
+    return _PREFIX + _get_fernet().encrypt(plain.encode('utf-8')).decode('utf-8')
 
 
 def decrypt_secret(stored: str) -> str:

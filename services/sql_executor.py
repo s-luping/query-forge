@@ -9,6 +9,7 @@
 
 安全边界：只读执行，任何非 SELECT 语句（INSERT/UPDATE/DELETE/DDL）直接拒绝。
 """
+import re
 import threading
 import time
 from typing import List, Optional
@@ -78,6 +79,42 @@ _SQLGLOT_DIALECT = {
     'sqlite': 'sqlite', 'mysql': 'mysql', 'postgresql': 'postgres',
     'postgres': 'postgres', 'oracle': 'oracle', 'sqlserver': 'tsql', 'mssql': 'tsql',
 }
+
+# 写操作 AST 节点类型（出现即拒绝）
+_WRITE_NODES = ('Insert', 'Update', 'Delete', 'Merge', 'Create', 'Drop',
+                'Alter', 'Truncate', 'Grant', 'Command')
+
+
+def _has_write_node(sql: str, db_type: str) -> bool:
+    """AST 判定 SQL 是否含写操作节点（解析失败返回 False，交由关键字兜底）"""
+    try:
+        import sqlglot
+        tree = sqlglot.parse_one(sql, dialect=_SQLGLOT_DIALECT.get(db_type or '', 'sqlite'))
+        return any(node.__class__.__name__ in _WRITE_NODES for node in tree.walk())
+    except Exception:
+        return False
+
+
+def _validate_select_only(sql: str, db_type: str = '') -> None:
+    """校验 SQL 非空且仅允许 SELECT"""
+    if not sql or not sql.strip():
+        raise SqlExecutionError("SQL 为空，无法执行")
+    stripped = sql.strip()
+    # 只允许以 SELECT / WITH（CTE 最终也必须是 SELECT）开头
+    head = stripped[:6].upper()
+    if head.startswith('WITH') or head.startswith('SELECT'):
+        # AST 判定写操作（覆盖换行/括号邻接等子串匹配绕过），失败回退关键字粗检
+        if _has_write_node(stripped, db_type):
+            raise SqlExecutionError("仅允许 SELECT 查询，检测到写操作")
+        upper = stripped.upper()
+        for kw in ('INSERT', 'UPDATE', 'DELETE', 'DROP', 'ALTER', 'CREATE',
+                   'TRUNCATE', 'GRANT', 'MERGE'):
+            if head.startswith('WITH'):
+                if re.search(rf'\b{kw}\b', upper):
+                    raise SqlExecutionError(
+                        f"仅允许 SELECT 查询，检测到写操作关键字: {kw}")
+    else:
+        raise SqlExecutionError("仅允许 SELECT 查询语句")
 
 
 def _extract_sql_schema_names(sql: str, db_type: str = '') -> List[str]:
@@ -196,7 +233,7 @@ def execute_sql(sql: str, schema_name: Optional[str] = None,
     Raises:
         SqlExecutionError: 校验失败 / 连接失败 / 查询失败
     """
-    _validate_select_only(sql)
+    _validate_select_only(sql, db_type)
     if max_rows is None:
         max_rows = _max_rows_config()
     start = time.time()

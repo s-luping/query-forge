@@ -490,12 +490,13 @@ def list_runs(
     request: Request,
     user: AdminUser,
     job_id: Optional[int] = None,
+    status: Optional[str] = Query(None, pattern='^(running|success|failed)$'),
     limit: int = Query(50, le=200),
     offset: int = 0,
 ):
     """同步执行历史"""
     # (权限由 AdminUser 依赖统一校验)
-    rows, total = sync_run_crud.list_paged(job_id, limit, offset)
+    rows, total = sync_run_crud.list_paged(job_id, limit, offset, status=status)
     # 批量取任务目标库名（避免 N+1 查询）
     run_job_ids = {r.job_id for r in rows if r.job_id}
     job_schema_map = sync_run_crud.schema_map_for_runs(list(run_job_ids))

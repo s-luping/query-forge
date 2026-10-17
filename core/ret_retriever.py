@@ -389,7 +389,20 @@ class SchemaRetriever:
         if not kw_set:
             return {'items': [], 'prompt_text': '', 'related_tables': []}
 
-        items = knowledge_crud.search_matched_items(kw_set, scope_schema_id=scope_schema_id, limit=12)
+        # 可见性：global 条目人人可召回；personal 仅属主/被授权者
+        # （get_visible_knowledge_ids 对管理员/通配授权返回 None = 不限制）
+        owner_user_id = self.user_id
+        visible_ids = None
+        try:
+            from app.permissions import get_visible_knowledge_ids
+            ids = get_visible_knowledge_ids(self.user) if self.user else None
+            visible_ids = set(ids) if ids is not None else None
+        except Exception:
+            pass
+
+        items = knowledge_crud.search_matched_items(
+            kw_set, scope_schema_id=scope_schema_id, limit=12,
+            owner_user_id=owner_user_id, visible_ids=visible_ids)
         if exclude_contents:
             items = [d for d in items
                      if (d.get('content') or '').strip() not in exclude_contents]
@@ -480,6 +493,35 @@ class SchemaRetriever:
             return ''
 
     # ---------- CSV ----------
+
+    def build_full_schema_csv(self, schema_name: Optional[str] = None) -> str:
+        """全量重建 schema CSV（追问轮 fallback：旧对话未存首轮表集合时用）
+
+        权限裁剪（库级 + 表级 + 字段级）统一走 get_field_rows——路由层不再
+        自行拼权限原语，避免遗漏某级裁剪造成数据泄漏（2026-10-17 修过一次）。
+        """
+        rows = self.get_field_rows(schema_name)
+        if not rows:
+            return "表名,字段名,字段类型,字段描述,主键,外键"
+
+        # 按表分组（同表字段聚合；get_field_rows 未按表连续返回时仍稳定分组）
+        cross_schema = schema_name is None and len({r.schema_name for r in rows}) > 1
+        tables = {}
+        for f in rows:
+            tables.setdefault(f.table_name, []).append(f)
+
+        lines = ["表名,字段名,字段类型,字段描述,主键,外键"]
+        for table_name, fields in tables.items():
+            for f in fields:
+                label = f"{f.schema_name}.{table_name}" if cross_schema else table_name
+                lines.append(
+                    f"{label},{f.column_name or ''},"
+                    f"{f.column_type or ''},"
+                    f"{f.column_description or ''},"
+                    f"{f.column_key or ''},"
+                    f"{f.foreign_key or ''}"
+                )
+        return '\n'.join(lines)
 
     @staticmethod
     def build_schema_csv(aggregation: Dict,

@@ -13,16 +13,14 @@ from slowapi.util import get_remote_address
 
 import os
 
-from app.auth import resolve_token_user
+from app.auth import resolve_request_user
 from app.config import DEBUG
 
 
 def _rate_limit_key(request):
-    """登录用户按 user_id 限流，未登录按 IP"""
+    """登录用户按 user_id 限流，未登录按 IP（用户解析走请求级缓存，不重复查库）"""
     try:
-        token = request.cookies.get('token') or request.headers.get(
-            'Authorization', '').replace('Bearer ', '')
-        user = resolve_token_user(token) if token else None
+        user = resolve_request_user(request)
         if user:
             return f'u{user["user_id"]}'
     except Exception:
