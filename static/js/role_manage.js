@@ -210,4 +210,11 @@ async function submitCreateRole() {
 
 function esc(v) { return String(v || '').replace(/[&<>"']/g, x => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[x])); }
 
+/* 授权分区页签切换 */
+document.querySelectorAll('[data-tab]').forEach(button => button.addEventListener('click', () => {
+    document.querySelectorAll('[data-tab]').forEach(item => item.classList.remove('active'));
+    button.classList.add('active');
+    ['ds', 'schema', 'table', 'knowledge'].forEach(tab => document.getElementById('tab-' + tab).hidden = tab !== button.dataset.tab);
+}));
+
 load();

@@ -56,12 +56,20 @@ async function loadSettings() {
         })).join('');
 
         // 向量索引参数
-        const vecKeys = ['VECTOR_INDEX_THRESHOLD', 'FIELD_RECALL_TOP_K', 'MAX_TABLES'];
+        const vecKeys = ['VECTOR_INDEX_THRESHOLD', 'FIELD_RECALL_TOP_K', 'MAX_TABLES', 'SMALL_SCHEMA_TABLE_LIMIT'];
         const vecItems = items.filter(s => vecKeys.includes(s.key));
         document.getElementById('vectorConfig').innerHTML = vecItems.map(s => renderSettingRow(s, {
             'VECTOR_INDEX_THRESHOLD': { desc: '字段数达到此值自动构建索引', width: '80px' },
             'FIELD_RECALL_TOP_K': { desc: '向量检索时召回的最大字段数', width: '80px' },
-            'MAX_TABLES': { desc: '按表聚合时包含的最大表数', width: '80px' }
+            'MAX_TABLES': { desc: '按表聚合时包含的最大表数', width: '80px' },
+            'SMALL_SCHEMA_TABLE_LIMIT': { desc: '库内表数不超过此值时整库注入 Schema', width: '80px' }
+        })).join('');
+
+        // 查询参数
+        const queryKeys = ['SQL_MAX_ROWS'];
+        const queryItems = items.filter(s => queryKeys.includes(s.key));
+        document.getElementById('queryConfig').innerHTML = queryItems.map(s => renderSettingRow(s, {
+            'SQL_MAX_ROWS': { desc: '查询结果最大返回行数', width: '100px' }
         })).join('');
 
         // 站点品牌（Logo / 站点名）

@@ -23,9 +23,27 @@
         </div></div>
     </section>
     <section id="tab-logs" hidden>
-        <div class="card"><div class="card-header d-flex justify-content-between"><span>查询审计日志</span><button class="btn btn-sm btn-outline-secondary" onclick="loadLogs()">刷新</button></div>
-            <div class="card-body p-0"><table class="table table-sm mb-0"><thead><tr><th>时间</th><th>用户</th><th>问题</th><th>生成 SQL</th><th>状态</th><th>链路</th></tr></thead><tbody id="logs"></tbody></table></div>
+        <div class="card"><div class="card-header d-flex justify-content-between align-items-center">
+            <span>查询审计日志</span>
+            <div class="d-flex gap-2 align-items-center">
+                <select id="logStatusFilter" class="form-select form-select-sm" style="width:110px;" onchange="logsCur=1; loadLogs()">
+                    <option value="">全部状态</option>
+                    <option value="blocked">已拦截</option>
+                    <option value="passed">通过</option>
+                </select>
+                <input type="text" id="logUserFilter" class="form-control form-control-sm" style="width:120px;" placeholder="用户名..." oninput="logFilterDebounce()">
+                <input type="text" id="logSearch" class="form-control form-control-sm" style="width:200px;" placeholder="搜索问题关键词..." oninput="logFilterDebounce()">
+            </div>
         </div>
+            <div class="card-body p-0"><table class="table table-sm mb-0"><thead><tr><th>时间</th><th>用户</th><th>问题</th><th>生成 SQL</th><th>状态</th><th>链路</th></tr></thead><tbody id="logs"></tbody></table></div>
+        <div class="card-footer d-flex justify-content-between align-items-center py-2">
+            <span class="text-muted" style="font-size:12px;" id="logsCount"></span>
+            <div class="d-flex gap-2 align-items-center">
+                <button class="btn btn-sm btn-outline-secondary" onclick="logsPage(-1)" id="logsPrev">‹ 上一页</button>
+                <span style="font-size:13px;" id="logsPageInfo">1 / 1</span>
+                <button class="btn btn-sm btn-outline-secondary" onclick="logsPage(1)" id="logsNext">下一页 ›</button>
+            </div>
+        </div></div>
     </section>
     <section id="tab-sensitive" hidden>
         <div class="card"><div class="card-header d-flex justify-content-between align-items-center">

@@ -2,14 +2,22 @@
 .rm-page { max-width: 1100px; }
 .rm-title { font-size: 16px; font-weight: 600; color: #1e293b; }
 
-/* 分区卡片：左侧彩色竖条标识 */
-.rm-card { position: relative; }
-.rm-card .card-header { display: flex; align-items: center; gap: 8px; padding-left: 16px; }
-.rm-card .card-header::before { content: ''; width: 4px; height: 16px; border-radius: 2px; background: var(--rm-accent, #2563eb); }
-.rm-card.is-ds { --rm-accent: #2563eb; }
-.rm-card.is-schema { --rm-accent: #7c3aed; }
-.rm-card.is-table { --rm-accent: #059669; }
-.rm-card.is-knowledge { --rm-accent: #d97706; }
+/* 分区卡片：页签导航 + 各分区主题色 */
+.rm-card { position: relative; padding: 0; }
+.rm-tabs-wrap { border-bottom: 1px solid #e8edf3; padding: 4px 12px 0; }
+.rm-tabs { gap: 2px; }
+.rm-tabs .nav-link { color: #64748b; font-size: 13px; border: none; border-bottom: 2px solid transparent; border-radius: 0; padding: 9px 12px; background: transparent; }
+.rm-tabs .nav-link:hover { color: #334155; }
+.rm-tabs .nav-link.active { font-weight: 600; background: transparent; }
+.rm-pane { --rm-accent: #2563eb; }
+.rm-pane.is-ds { --rm-accent: #2563eb; }
+.rm-pane.is-schema { --rm-accent: #7c3aed; }
+.rm-pane.is-table { --rm-accent: #059669; }
+.rm-pane.is-knowledge { --rm-accent: #d97706; }
+.rm-tabs .nav-item:nth-child(1) .nav-link.active { color: #2563eb; border-bottom-color: #2563eb; }
+.rm-tabs .nav-item:nth-child(2) .nav-link.active { color: #7c3aed; border-bottom-color: #7c3aed; }
+.rm-tabs .nav-item:nth-child(3) .nav-link.active { color: #059669; border-bottom-color: #059669; }
+.rm-tabs .nav-item:nth-child(4) .nav-link.active { color: #d97706; border-bottom-color: #d97706; }
 .rm-hint { color: #94a3b8; font-size: 12px; margin: 0 0 12px; }
 
 /* 资源行 */
