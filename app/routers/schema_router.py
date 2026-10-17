@@ -862,8 +862,16 @@ def build_vector_index(
     _check_embedding_ready()
     try:
         from core.ret_index_meta import build_vector_index as do_build
+        from scheduler.jobs.vector_index import vector_build_lock
 
-        result = do_build(payload.schema_name)
+        # 非阻塞拿锁：已有构建（手动或定时）在进行时直接拒绝，避免并发全量构建
+        if not vector_build_lock.acquire(blocking=False):
+            return ok({'result': None}, '已有构建任务在进行中，请稍后再试')
+
+        try:
+            result = do_build(payload.schema_name)
+        finally:
+            vector_build_lock.release()
         message = "向量索引重建成功" if payload.rebuild else "向量索引构建成功"
 
         return ok({'result': result}, message)
