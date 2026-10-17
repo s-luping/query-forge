@@ -21,6 +21,7 @@ SETTING_META = {
     'FIELD_RECALL_TOP_K': ('vector', 1),
     'MAX_TABLES': ('vector', 1),
     'SMALL_SCHEMA_TABLE_LIMIT': ('vector', 1),
+    'SQL_MAX_ROWS': ('query', 1),
 }
 
 
