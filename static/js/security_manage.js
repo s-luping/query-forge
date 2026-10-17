@@ -7,9 +7,34 @@ async function loadStats() {
     const logs = await get('/api/audit/logs?blocked_only=true&limit=10');
     document.getElementById('recent').innerHTML = logs.items.map(item => `<tr><td>${esc(item.created_at)}</td><td>${esc(item.username)}</td><td>${esc(item.query)}</td><td>${esc(item.block_reason)}</td></tr>`).join('') || '<tr><td colspan="4" class="text-center text-muted">暂无记录</td></tr>';
 }
+const LOGS_PS = 20;
+let logsCur = 1, logsTotal = 0, logFilterTimer = null;
+function logFilterDebounce() { clearTimeout(logFilterTimer); logFilterTimer = setTimeout(() => { logsCur = 1; loadLogs(); }, 400); }
 async function loadLogs() {
-    const data = await get('/api/audit/logs?limit=100');
+    const offset = (logsCur - 1) * LOGS_PS;
+    const params = new URLSearchParams({ limit: LOGS_PS, offset });
+    const status = document.getElementById('logStatusFilter')?.value || '';
+    const username = document.getElementById('logUserFilter')?.value.trim() || '';
+    const search = document.getElementById('logSearch')?.value.trim() || '';
+    if (status) params.set('status', status);
+    if (username) params.set('username', username);
+    if (search) params.set('search', search);
+    const data = await get('/api/audit/logs?' + params.toString());
+    logsTotal = data.total || 0;
+    const maxPage = Math.max(1, Math.ceil(logsTotal / LOGS_PS));
+    if (logsCur > maxPage) { logsCur = maxPage; return loadLogs(); }
+    _logsCache = data.items;
     document.getElementById('logs').innerHTML = data.items.map(item => `<tr><td>${esc(item.created_at)}</td><td>${esc(item.username)}</td><td class="query-cell" title="${esc(item.query)}">${esc(item.query)}</td><td class="sql-cell" title="${esc(item.generated_sql)}">${esc(item.generated_sql)}</td><td>${item.was_blocked ? '已拦截' : '通过'}</td><td>${item.pipeline_log ? `<button class="btn btn-sm btn-outline-primary" onclick="showPipeline(${item.id})">查看</button>` : '<span class="text-muted">-</span>'}</td></tr>`).join('') || '<tr><td colspan="6" class="text-center text-muted">暂无记录</td></tr>';
+    document.getElementById('logsCount').textContent = `共 ${logsTotal} 条`;
+    document.getElementById('logsPageInfo').textContent = `${logsCur} / ${maxPage}`;
+    document.getElementById('logsPrev').disabled = logsCur <= 1;
+    document.getElementById('logsNext').disabled = logsCur >= maxPage;
+}
+function logsPage(delta) {
+    const next = logsCur + delta;
+    if (next < 1) return;
+    logsCur = next;
+    loadLogs();
 }
 // 链路追踪查看：从日志列表定位并解析 pipeline_log JSON
 let _logsCache = [];

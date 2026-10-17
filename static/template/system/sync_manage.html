@@ -87,7 +87,17 @@
         <div class="card">
             <div class="card-header d-flex justify-content-between align-items-center">
                 <span>同步任务</span>
-                <button class="btn btn-sm btn-primary" onclick="showJobModal()"><i class="fas fa-plus"></i> 新增任务</button>
+                <div class="d-flex align-items-center gap-2">
+                    <select class="form-select form-select-sm" id="jobDsFilter" style="width:160px;" onchange="renderJobs()">
+                        <option value="">全部数据源</option>
+                    </select>
+                    <select class="form-select form-select-sm" id="jobEnabledFilter" style="width:110px;" onchange="renderJobs()">
+                        <option value="">全部状态</option>
+                        <option value="1">启用</option>
+                        <option value="0">禁用</option>
+                    </select>
+                    <button class="btn btn-sm btn-primary" onclick="showJobModal()"><i class="fas fa-plus"></i> 新增任务</button>
+                </div>
             </div>
             <div class="card-body p-0">
                 <table class="table table-hover table-sm mb-0">
@@ -104,6 +114,15 @@
             <div class="card-header d-flex justify-content-between align-items-center">
                 <span>同步执行历史</span>
                 <div class="d-flex align-items-center gap-2">
+                    <select class="form-select form-select-sm" id="runJobFilter" style="width:180px;" onchange="runsPage=1; loadRuns()">
+                        <option value="">全部任务</option>
+                    </select>
+                    <select class="form-select form-select-sm" id="runStatusFilter" style="width:110px;" onchange="runsPage=1; loadRuns()">
+                        <option value="">全部状态</option>
+                        <option value="success">成功</option>
+                        <option value="failed">失败</option>
+                        <option value="running">运行中</option>
+                    </select>
                     <button class="btn btn-sm btn-outline-danger" onclick="clearSyncHistory()" data-admin-only title="清空全部同步历史与变更记录"><i class="fas fa-trash-alt"></i> 清空历史</button>
                     <button class="btn btn-sm btn-outline-secondary" onclick="loadRuns()"><i class="fas fa-sync"></i> 刷新</button>
                 </div>
@@ -124,14 +143,24 @@
             <div class="card-header d-flex justify-content-between align-items-center">
                 <span>变更记录</span>
                 <div class="d-flex align-items-center gap-2">
-                    <button class="btn btn-sm btn-outline-danger" onclick="clearSyncHistory()" data-admin-only title="清空全部同步历史与变更记录"><i class="fas fa-trash-alt"></i> 清空历史</button>
-                    <select class="form-select form-select-sm" id="chgFilter" style="width:160px;" onchange="loadChanges()">
+                    <select class="form-select form-select-sm" id="chgJobFilter" style="width:180px;" onchange="changesPage=1; loadChanges()">
+                        <option value="">全部任务</option>
+                    </select>
+                    <select class="form-select form-select-sm" id="chgTypeFilter" style="width:110px;" onchange="changesPage=1; loadChanges()">
+                        <option value="">全部类型</option>
+                        <option value="add">新增</option>
+                        <option value="modify">修改</option>
+                        <option value="remove">删除</option>
+                    </select>
+                    <select class="form-select form-select-sm" id="chgFilter" style="width:140px;" onchange="changesPage=1; loadChanges()">
                         <option value="">全部状态</option>
                         <option value="auto_applied">自动应用</option>
                         <option value="pending">待审批</option>
                         <option value="approved">已通过</option>
                         <option value="rejected">已拒绝</option>
+                        <option value="ignored">已忽略</option>
                     </select>
+                    <button class="btn btn-sm btn-outline-danger" onclick="clearSyncHistory()" data-admin-only title="清空全部同步历史与变更记录"><i class="fas fa-trash-alt"></i> 清空历史</button>
                     <button class="btn btn-sm btn-outline-secondary" onclick="loadChanges()"><i class="fas fa-sync"></i></button>
                 </div>
             </div>

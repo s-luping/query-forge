@@ -25,7 +25,7 @@
         </div>
             <div class="card-body p-0">
                 <div class="px-3 py-2 small text-muted" style="background:#f8f9fa;border-bottom:1px solid #eee;">
-                    对话为全库模式，统一维护一份全库向量索引（覆盖全部可见数据库）。同步完成或结构变更后标记"待更新"，下次查询时自动后台重建，不影响使用。
+                    对话为全库模式，统一维护一份全库向量索引（覆盖全部可见数据库）。同步完成或结构变更后标记"待更新"，由定时任务「向量索引重建」自动重建；也可手动点击"重建"。构建期间旧索引继续服务，不影响使用。
                 </div>
                 <div class="table-responsive">
                     <table class="table table-hover table-sm mb-0">
@@ -88,8 +88,7 @@ async function loadList() {
                 <td><small>${r.built_at ? new Date(r.built_at).toLocaleString() : '-'}</small></td>
                 <td><small class="text-danger">${e(r.error_message || '-')}</small></td>
                 <td>
-                    <button class="btn btn-outline-primary btn-sm" onclick="rebuild('${e(r.schema_name)}')"
-                            ${r.status === 'building' ? 'disabled' : ''}>
+                    <button class="btn btn-outline-primary btn-sm" onclick="rebuild('${e(r.schema_name)}')">
                         <i class="fas fa-redo"></i> 重建
                     </button>
                 </td>

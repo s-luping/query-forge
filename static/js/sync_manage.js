@@ -29,8 +29,8 @@ function switchTab(tab) {
     if (tab === 'overview') loadOverview();
     else if (tab === 'datasources') loadDatasources();
     else if (tab === 'jobs') loadJobs();
-    else if (tab === 'runs') loadRuns();
-    else if (tab === 'changes') loadChanges();
+    else if (tab === 'runs') { ensureJobFilterOptions(); loadRuns(); }
+    else if (tab === 'changes') { ensureJobFilterOptions(); loadChanges(); }
 }
 
 function navTab(tab) {
@@ -166,14 +166,56 @@ async function deleteDs(id) {
 }
 
 // ── 同步任务 ─────────────────────────────────────────────────
+function fillJobFilterOptions() {
+    const opts = '<option value="">全部任务</option>' + jobList.map(j =>
+        `<option value="${j.id}">${e(j.datasource_name || '-')} / ${e(j.database || '-')}</option>`).join('');
+    for (const id of ['runJobFilter', 'chgJobFilter']) {
+        const sel = document.getElementById(id);
+        if (sel) { const cur = sel.value; sel.innerHTML = opts; sel.value = cur; }
+    }
+    const dsSel = document.getElementById('jobDsFilter');
+    if (dsSel) {
+        const cur = dsSel.value;
+        const dsMap = new Map();
+        jobList.forEach(j => { if (!dsMap.has(j.datasource_id)) dsMap.set(j.datasource_id, j.datasource_name || '-'); });
+        dsSel.innerHTML = '<option value="">全部数据源</option>' +
+            [...dsMap].map(([id, name]) => `<option value="${id}">${e(name)}</option>`).join('');
+        dsSel.value = cur;
+    }
+}
+
+// 同步历史/变更记录页签的「任务」筛选项；jobList 尚未加载时补拉一次
+async function ensureJobFilterOptions() {
+    if (!jobList.length) {
+        try {
+            const resp = await apiRequest('/api/sync/jobs');
+            const data = await resp.json();
+            jobList = data.items || [];
+        } catch (e) { console.error(e); return; }
+    }
+    fillJobFilterOptions();
+}
+
 async function loadJobs() {
     try {
         const resp = await apiRequest('/api/sync/jobs');
         const data = await resp.json();
         jobList = data.items || [];
-        const tbody = document.getElementById('jobTable');
-        if (!jobList.length) { tbody.innerHTML = '<tr><td colspan="8" class="empty-state">暂无同步任务</td></tr>'; return; }
-        tbody.innerHTML = jobList.map(j => `<tr>
+        fillJobFilterOptions();
+        renderJobs();
+    } catch (e) { console.error(e); }
+}
+
+// 任务列表为配置数据（量小），筛选走客户端过滤
+function renderJobs() {
+    const tbody = document.getElementById('jobTable');
+    const dsF = document.getElementById('jobDsFilter')?.value || '';
+    const enF = document.getElementById('jobEnabledFilter')?.value || '';
+    let items = jobList;
+    if (dsF) items = items.filter(j => String(j.datasource_id) === dsF);
+    if (enF !== '') items = items.filter(j => String(j.is_enabled ? 1 : 0) === enF);
+    if (!items.length) { tbody.innerHTML = '<tr><td colspan="8" class="empty-state">暂无同步任务</td></tr>'; return; }
+    tbody.innerHTML = items.map(j => `<tr>
             <td>${j.datasource_name || '-'}</td>
             <td>${e(j.database || '-')}</td>
             <td>${j.schedule_type === 'interval' ? '每' + j.schedule_value + '分钟' : j.schedule_type}</td>
@@ -190,7 +232,6 @@ async function loadJobs() {
                 <button class="btn btn-sm btn-outline-danger" onclick="deleteJob(${j.id})" title="删除"><i class="fas fa-trash"></i></button>
             </td>
         </tr>`).join('');
-    } catch (e) { console.error(e); }
 }
 
 async function showJobModal(id) {
@@ -354,7 +395,12 @@ function runSchemaName(r) {
 async function loadRuns() {
     try {
         const offset = (runsPage - 1) * RUNS_PS;
-        const resp = await apiRequest(`/api/sync/runs?limit=${RUNS_PS}&offset=${offset}`);
+        let qs = `?limit=${RUNS_PS}&offset=${offset}`;
+        const jobF = document.getElementById('runJobFilter')?.value || '';
+        const stF = document.getElementById('runStatusFilter')?.value || '';
+        if (jobF) qs += `&job_id=${jobF}`;
+        if (stF) qs += `&status=${stF}`;
+        const resp = await apiRequest('/api/sync/runs' + qs);
         const data = await resp.json();
         const tbody = document.getElementById('runsTable');
         const items = data.items || [];
@@ -407,9 +453,13 @@ async function showRunDetail(runId) {
 // ── 变更记录 ─────────────────────────────────────────────────
 async function loadChanges() {
     const filter = document.getElementById('chgFilter')?.value || '';
+    const typeF = document.getElementById('chgTypeFilter')?.value || '';
+    const jobF = document.getElementById('chgJobFilter')?.value || '';
     const offset = (changesPage - 1) * CHANGES_PS;
     let qs = `?limit=${CHANGES_PS}&offset=${offset}`;
     if (filter) qs += `&approval_status=${filter}`;
+    if (typeF) qs += `&change_type=${typeF}`;
+    if (jobF) qs += `&job_id=${jobF}`;
     try {
         const resp = await apiRequest('/api/sync/changes' + qs);
         const data = await resp.json();

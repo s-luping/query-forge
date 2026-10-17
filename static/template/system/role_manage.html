@@ -35,39 +35,36 @@
         </div>
     </div>
 
-    <div class="card rm-card is-ds">
-        <div class="card-header">数据源授权</div>
-        <div class="card-body">
-            <p class="rm-hint">允许某数据源 = 该数据源下全部库表可见；勾选「全部数据源」= 一键全量授权</p>
-            <div id="dsArea"></div>
+    <div class="card rm-card">
+        <div class="rm-tabs-wrap">
+            <ul class="nav rm-tabs">
+                <li class="nav-item"><button class="nav-link active" data-tab="ds">数据源授权</button></li>
+                <li class="nav-item"><button class="nav-link" data-tab="schema">数据库授权</button></li>
+                <li class="nav-item"><button class="nav-link" data-tab="table">表授权</button></li>
+                <li class="nav-item"><button class="nav-link" data-tab="knowledge">知识条目授权</button></li>
+            </ul>
         </div>
-    </div>
-
-    <div class="card rm-card is-schema">
-        <div class="card-header">数据库（库）授权</div>
         <div class="card-body">
-            <p class="rm-hint">需所属数据源已授权才生效（数据源为总闸）</p>
-            <div id="schemaArea"></div>
-        </div>
-    </div>
-
-    <div class="card rm-card is-table">
-        <div class="card-header">表授权</div>
-        <div class="card-body">
-            <div class="d-flex justify-content-end mb-2">
-                <input class="form-control form-control-sm search-box" placeholder="过滤表名..." oninput="renderTables(this.value)">
-            </div>
-            <div id="tableArea" style="max-height:440px;overflow-y:auto;"></div>
-        </div>
-    </div>
-
-    <div class="card rm-card is-knowledge">
-        <div class="card-header">知识条目授权</div>
-        <div class="card-body">
-            <div class="d-flex justify-content-end mb-2">
-                <input class="form-control form-control-sm search-box" placeholder="过滤..." oninput="renderKnowledge(this.value)">
-            </div>
-            <div id="knowledgeArea" style="max-height:320px;overflow-y:auto;"></div>
+            <section id="tab-ds" class="rm-pane is-ds">
+                <p class="rm-hint">允许某数据源 = 该数据源下全部库表可见；勾选「全部数据源」= 一键全量授权</p>
+                <div id="dsArea"></div>
+            </section>
+            <section id="tab-schema" class="rm-pane is-schema" hidden>
+                <p class="rm-hint">需所属数据源已授权才生效（数据源为总闸）</p>
+                <div id="schemaArea" style="max-height:440px;overflow-y:auto;"></div>
+            </section>
+            <section id="tab-table" class="rm-pane is-table" hidden>
+                <div class="d-flex justify-content-end mb-2">
+                    <input class="form-control form-control-sm search-box" placeholder="过滤表名..." oninput="renderTables(this.value)">
+                </div>
+                <div id="tableArea" style="max-height:440px;overflow-y:auto;"></div>
+            </section>
+            <section id="tab-knowledge" class="rm-pane is-knowledge" hidden>
+                <div class="d-flex justify-content-end mb-2">
+                    <input class="form-control form-control-sm search-box" placeholder="过滤..." oninput="renderKnowledge(this.value)">
+                </div>
+                <div id="knowledgeArea" style="max-height:320px;overflow-y:auto;"></div>
+            </section>
         </div>
     </div>
 
