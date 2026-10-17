@@ -15,6 +15,8 @@ ORM 模型：
 from models.base import MainBase, TelemetryBase
 from models.role import Role, RolePermission, UserRole
 from models.scheduler import SchedulerJob, SchedulerJobLog
+from models.preference import UserPreference
+from models.knowledge import KnowledgeItem, KnowledgeVersion
 
 # 旧 Base（供未迁移脚本使用）
 Base = MainBase

@@ -12,12 +12,44 @@
 
 <div class="page-header">
     <h5>知识库管理</h5>
-    <button class="btn btn-primary btn-sm" onclick="showCreateForm()">+ 新建知识</button>
+    <div class="d-flex align-items-center gap-2">
+        <input type="search" class="form-control form-control-sm" id="knowledgeSearch" style="width:220px;"
+            placeholder="搜索标题 / 内容..." oninput="onSearchInput()">
+        <button class="btn btn-primary btn-sm" onclick="showCreateForm()">+ 新建知识</button>
+    </div>
 </div>
 
 <div class="page-body">
     <!-- List -->
     <div id="listSection">
+        <div class="filter-bar">
+            <select class="form-select form-select-sm" id="typeFilter" onchange="loadList(1)">
+                <option value="">全部类型</option>
+                <option value="note">笔记</option>
+                <option value="terminology">术语别名</option>
+                <option value="calculation">计算规则</option>
+                <option value="relation">表关系</option>
+                <option value="value_domain">取值域</option>
+                <option value="convention">约定</option>
+                <option value="entity_map">实体映射</option>
+                <option value="sample_qa">样例问答</option>
+                <option value="quality">数据质量</option>
+            </select>
+            <select class="form-select form-select-sm" id="statusFilter" onchange="loadList(1)">
+                <option value="">全部状态</option>
+                <option value="enabled">启用</option>
+                <option value="disabled">禁用</option>
+            </select>
+            <select class="form-select form-select-sm" id="pinnedFilter" onchange="loadList(1)">
+                <option value="">全部条目</option>
+                <option value="pinned">仅常驻</option>
+            </select>
+            <select class="form-select form-select-sm d-none" id="visibilityFilter" onchange="loadList(1)">
+                <option value="">全部条目</option>
+                <option value="global">仅全局</option>
+                <option value="personal">仅个人</option>
+            </select>
+        </div>
         <div id="knowledgeLoading" class="text-center py-5">
             <div class="spinner-border text-primary" role="status"></div>
             <p class="mt-2 text-muted">加载中...</p>
@@ -35,120 +67,187 @@
         <div id="knowledgeEmpty" class="d-none">
             <div class="empty-state">
                 <div class="icon">📖</div>
-                <p>暂无知识</p>
+                <p id="emptyText">暂无知识</p>
                 <button class="btn btn-primary btn-sm" onclick="showCreateForm()">添加第一条知识</button>
             </div>
         </div>
     </div>
 
-    <!-- Form -->
+    <!-- 编辑 / 新建表单 -->
     <div id="formSection" class="d-none">
-        <div class="card-custom">
-            <div class="card-header-custom">
-                <span id="formTitle">新建知识</span>
-                <button class="btn btn-sm btn-outline-secondary" onclick="showList()">← 返回列表</button>
+        <div class="editor-shell">
+            <div class="editor-header">
+                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="showList()">← 返回</button>
+                <div class="editor-header-title">
+                    <span id="formTitle">新建知识</span>
+                    <small class="d-none d-md-inline">沉淀领域知识，让 AI 更准确地理解你的数据</small>
+                </div>
+                <button type="button" class="btn btn-sm btn-outline-primary d-none" id="versionHistoryBtn" onclick="showVersionModal()">版本历史</button>
             </div>
-            <div class="card-body">
-                <form id="knowledgeForm" onsubmit="saveKnowledge(event)">
-                    <input type="hidden" id="knowledgeId">
-                    <div class="row mb-3">
-                        <div class="col-md-6">
-                            <label class="form-label fw-bold">标题</label>
-                            <input type="text" class="form-control" id="knowledgeTitle" placeholder="例如：订单状态说明、表间关系">
+            <form id="knowledgeForm" onsubmit="saveKnowledge(event)">
+                <input type="hidden" id="knowledgeId">
+                <div class="editor-body">
+                    <!-- 主栏 -->
+                    <div class="editor-main">
+                        <div class="editor-section">
+                            <div class="section-label">基本信息</div>
+                            <div class="mb-3">
+                                <label class="form-label" for="knowledgeTitle">标题 <span class="req">*</span></label>
+                                <input type="text" class="form-control form-control-lg" id="knowledgeTitle" required
+                                    placeholder="例如：订单状态说明、orders 与 order_items 的关联关系">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">知识类型 <span class="text-muted fw-normal">（决定内容的组织方式）</span></label>
+                                <div class="type-pills" id="typePills">
+                                    <button type="button" class="type-pill active" data-value="note">笔记</button>
+                                    <button type="button" class="type-pill" data-value="terminology">术语别名</button>
+                                    <button type="button" class="type-pill" data-value="calculation">计算规则</button>
+                                    <button type="button" class="type-pill" data-value="relation">表关系</button>
+                                    <button type="button" class="type-pill" data-value="value_domain">取值域</button>
+                                    <button type="button" class="type-pill" data-value="convention">约定</button>
+                                    <button type="button" class="type-pill" data-value="entity_map">实体映射</button>
+                                    <button type="button" class="type-pill" data-value="sample_qa">样例问答</button>
+                                    <button type="button" class="type-pill" data-value="quality">数据质量</button>
+                                </div>
+                                <select class="d-none" id="knowledgeType" onchange="onTypeChange()">
+                                    <option value="note">笔记 / 自由文本</option>
+                                    <option value="terminology">术语别名</option>
+                                    <option value="calculation">计算规则</option>
+                                    <option value="relation">表关系</option>
+                                    <option value="value_domain">取值域</option>
+                                    <option value="convention">约定</option>
+                                    <option value="entity_map">实体映射</option>
+                                    <option value="sample_qa">样例问答</option>
+                                    <option value="quality">数据质量 / 清洗陷阱</option>
+                                </select>
+                                <div class="form-text type-hint" id="typeHint"></div>
+                            </div>
+                            <div class="mb-1">
+                                <label class="form-label" for="knowledgeAliases">别名 / 同义词 <span class="text-muted fw-normal">（选填，逗号分隔，用户提问命中即召回）</span></label>
+                                <input type="text" class="form-control" id="knowledgeAliases" placeholder="例如：order_status, 订单状态, 单据状态">
+                            </div>
                         </div>
-                        <div class="col-md-3">
-                            <label class="form-label fw-bold">类型</label>
-                            <select class="form-select" id="knowledgeType" onchange="onTypeChange()">
-                                <option value="note">笔记 / 自由文本</option>
-                                <option value="terminology">术语别名</option>
-                                <option value="calculation">计算规则</option>
-                                <option value="relation">表关系</option>
-                                <option value="value_domain">取值域</option>
-                                <option value="convention">约定</option>
-                                <option value="entity_map">实体映射</option>
-                                <option value="sample_qa">样例问答</option>
-                            </select>
+
+                        <div class="editor-section" id="contentBlock">
+                            <div class="section-label">知识内容</div>
+                            <label class="form-label" for="knowledgeContent2">内容描述 <span class="text-muted fw-normal">（人类可读，将注入提示词供 AI 召回）</span></label>
+                            <textarea class="form-control editor-textarea" id="knowledgeContent2" rows="9"
+                                placeholder="输入领域知识，如：&#10;1. order_status 字段取值：pending=待处理, processing=处理中, completed=已完成&#10;2. orders 表与 order_items 表通过 order_id 关联&#10;3. 退款金额 = 已支付金额 - 已发货金额"></textarea>
                         </div>
-                        <div class="col-md-3">
-                            <label class="form-label fw-bold">作用域(数据库)</label>
-                            <select class="form-select" id="knowledgeScope">
-                                <option value="">全局</option>
-                            </select>
+
+                        <!-- relation 结构化子表单 -->
+                        <div class="editor-section d-none" id="relationForm">
+                            <div class="section-label">表关系配置</div>
+                            <div class="rel-sides">
+                                <div class="rel-side">
+                                    <div class="rel-side-head">左表</div>
+                                    <div class="row g-2">
+                                        <div class="col-6"><select class="form-select form-select-sm" id="relLeftSchema" onchange="onRelSchemaChange('left')"><option value="">数据库</option></select></div>
+                                        <div class="col-6"><select class="form-select form-select-sm" id="relLeftTable" onchange="onRelTableChange('left')"><option value="">表</option></select></div>
+                                        <div class="col-6"><input type="text" class="form-control form-control-sm" id="relLeftAlias" placeholder="别名(可选)"></div>
+                                        <div class="col-6"><select class="form-select form-select-sm" id="relLeftColumn"><option value="">关联字段</option></select></div>
+                                    </div>
+                                </div>
+                                <div class="rel-connector"><span class="rel-join-ic">JOIN</span></div>
+                                <div class="rel-side">
+                                    <div class="rel-side-head">右表</div>
+                                    <div class="row g-2">
+                                        <div class="col-6"><select class="form-select form-select-sm" id="relRightSchema" onchange="onRelSchemaChange('right')"><option value="">数据库</option></select></div>
+                                        <div class="col-6"><select class="form-select form-select-sm" id="relRightTable" onchange="onRelTableChange('right')"><option value="">表</option></select></div>
+                                        <div class="col-6"><input type="text" class="form-control form-control-sm" id="relRightAlias" placeholder="别名(可选)"></div>
+                                        <div class="col-6"><select class="form-select form-select-sm" id="relRightColumn"><option value="">关联字段</option></select></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row g-3 mt-1">
+                                <div class="col-md-3">
+                                    <label class="form-label small mb-1">连接类型</label>
+                                    <select class="form-select form-select-sm" id="relJoinType" onchange="refreshOnPreview()">
+                                        <option value="INNER JOIN">INNER JOIN</option>
+                                        <option value="LEFT JOIN">LEFT JOIN</option>
+                                        <option value="RIGHT JOIN">RIGHT JOIN</option>
+                                        <option value="FULL OUTER JOIN">FULL OUTER JOIN</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-9">
+                                    <label class="form-label small mb-1">ON 条件 <span class="text-muted fw-normal">（留空自动生成）</span></label>
+                                    <input type="text" class="form-control form-control-sm" id="relOn" placeholder="自动：左表.字段 = 右表.字段">
+                                </div>
+                            </div>
+                            <div class="on-preview-wrap"><span class="lbl">ON 预览</span><span class="on-preview" id="relOnPreview"></span></div>
+                            <div class="mt-2">
+                                <label class="form-label small mb-1" for="relNote">说明 <span class="text-muted fw-normal">（可选）</span></label>
+                                <input type="text" class="form-control form-control-sm" id="relNote" placeholder="例如：利润事实表与组织维度按组织编码关联">
+                            </div>
                         </div>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">别名 / 同义词<span class="text-muted fw-normal">（逗号分隔，命中即召回）</span></label>
-                        <input type="text" class="form-control" id="knowledgeAliases" placeholder="例如：order_status, 订单状态, 单据状态">
-                    </div>
-                    <div class="mb-3" id="contentBlock">
-                        <label class="form-label fw-bold">知识内容<span class="text-muted fw-normal">（人类可读描述，注入提示词）</span></label>
-                        <textarea class="form-control" id="knowledgeContent2" rows="8"
-                            placeholder="输入领域知识，如：&#10;1. order_status 字段取值：pending=待处理, processing=处理中, completed=已完成&#10;2. orders 表与 order_items 表通过 order_id 关联&#10;3. 退款金额 = 已支付金额 - 已发货金额"></textarea>
                     </div>
 
-                    <!-- relation 结构化子表单 -->
-                    <div class="relation-grid d-none" id="relationForm">
-                        <div class="row">
-                            <div class="col-md-6">
-                                <div class="side-title">左表</div>
-                                <div class="row g-2">
-                                    <div class="col-6"><select class="form-select form-select-sm" id="relLeftSchema" onchange="onRelSchemaChange('left')"><option value="">数据库</option></select></div>
-                                    <div class="col-6"><select class="form-select form-select-sm" id="relLeftTable" onchange="onRelTableChange('left')"><option value="">表</option></select></div>
-                                    <div class="col-6"><input type="text" class="form-control form-control-sm" id="relLeftAlias" placeholder="别名(可选)"></div>
-                                    <div class="col-6"><select class="form-select form-select-sm" id="relLeftColumn"><option value="">关联字段</option></select></div>
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="side-title">右表</div>
-                                <div class="row g-2">
-                                    <div class="col-6"><select class="form-select form-select-sm" id="relRightSchema" onchange="onRelSchemaChange('right')"><option value="">数据库</option></select></div>
-                                    <div class="col-6"><select class="form-select form-select-sm" id="relRightTable" onchange="onRelTableChange('right')"><option value="">表</option></select></div>
-                                    <div class="col-6"><input type="text" class="form-control form-control-sm" id="relRightAlias" placeholder="别名(可选)"></div>
-                                    <div class="col-6"><select class="form-select form-select-sm" id="relRightColumn"><option value="">关联字段</option></select></div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="row g-2 mt-2">
-                            <div class="col-md-3">
-                                <label class="form-label small mb-1">连接类型</label>
-                                <select class="form-select form-select-sm" id="relJoinType" onchange="refreshOnPreview()">
-                                    <option value="INNER JOIN">INNER JOIN</option>
-                                    <option value="LEFT JOIN">LEFT JOIN</option>
-                                    <option value="RIGHT JOIN">RIGHT JOIN</option>
-                                    <option value="FULL OUTER JOIN">FULL OUTER JOIN</option>
+                    <!-- 侧栏 -->
+                    <aside class="editor-side">
+                        <div class="side-card">
+                            <div class="side-card-title">发布设置</div>
+                            <div class="mb-3">
+                                <label class="form-label small" for="knowledgeActive">状态</label>
+                                <select class="form-select form-select-sm" id="knowledgeActive">
+                                    <option value="1">启用</option>
+                                    <option value="0">禁用</option>
                                 </select>
                             </div>
-                            <div class="col-md-9">
-                                <label class="form-label small mb-1">ON 条件<span class="text-muted">（留空自动生成）</span></label>
-                                <input type="text" class="form-control form-control-sm" id="relOn" placeholder="自动：左表.字段 = 右表.字段">
+                            <div class="mb-3">
+                                <label class="form-label small" for="knowledgeScope">作用域（数据库）</label>
+                                <select class="form-select form-select-sm" id="knowledgeScope">
+                                    <option value="">全局</option>
+                                </select>
+                                <div class="form-text">留空表示对所有数据库生效</div>
+                            </div>
+                            <div id="visibilityBlock">
+                                <div class="mb-3">
+                                    <label class="form-label small" for="knowledgeVisibility">可见范围</label>
+                                    <select class="form-select form-select-sm" id="knowledgeVisibility">
+                                        <option value="personal">个人（仅自己/被授权者）</option>
+                                        <option value="global">全局（人人可见可召回）</option>
+                                    </select>
+                                    <div class="form-text">仅管理员可发布全局</div>
+                                </div>
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="knowledgePinned">
+                                    <label class="form-check-label small fw-semibold" for="knowledgePinned">常驻上下文</label>
+                                    <div class="form-text">全局知识勾选后注入所有对话，上限 20 条</div>
+                                </div>
                             </div>
                         </div>
-                        <div class="mt-2">
-                            <span class="small text-muted">ON 预览：</span>
-                            <span class="on-preview" id="relOnPreview"></span>
+                        <div class="side-card side-tips">
+                            <div class="side-card-title">使用提示</div>
+                            <ul id="tipsList"></ul>
                         </div>
-                        <div class="mt-2">
-                            <label class="form-label small mb-1">说明（可选）</label>
-                            <input type="text" class="form-control form-control-sm" id="relNote" placeholder="例如：利润事实表与组织维度按组织编码关联">
-                        </div>
-                    </div>
+                    </aside>
+                </div>
+                <div class="editor-footer">
+                    <button type="button" class="btn btn-outline-secondary" onclick="showList()">取消</button>
+                    <button type="submit" class="btn btn-primary px-4">保存知识</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">状态</label>
-                        <select class="form-select" id="knowledgeActive" style="width:200px;">
-                            <option value="1">启用</option>
-                            <option value="0">禁用</option>
-                        </select>
-                    </div>
-                    <button type="submit" class="btn btn-primary">保存</button>
-                    <button type="button" class="btn btn-outline-secondary ms-2" onclick="showList()">取消</button>
-                </form>
+<!-- 版本历史弹窗 -->
+<div class="modal fade" id="versionModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">版本历史 <span class="text-muted small" id="versionItemTitle"></span></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" style="max-height:60vh;overflow-y:auto;">
+                <div id="versionList" class="list-group"></div>
             </div>
         </div>
     </div>
 </div>
 
 <script src="/static/js/app_common.js"></script>
+<script src="/static/js/bootstrap.bundle.min.js"></script>
 <script src="/static/js/knowledge.js"></script>
 </body>
 </html>
