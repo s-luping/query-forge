@@ -40,6 +40,12 @@ setup_server_logging()
 async def lifespan(app: FastAPI):
     # 建表前准备运行时密钥和系统配置
     init_database()
+    # 构建线程无法跨进程存活：启动时清理上次被中断的 building 脏状态
+    from core.ret_index_meta import recover_interrupted_builds
+
+    recovered = recover_interrupted_builds()
+    if recovered:
+        logger.warning(f"检测到 {recovered} 条被中断的向量索引构建状态，已标记为待更新")
     # env 与系统设置表均缺失时拒绝启动（绝不回落到硬编码值）
     _get_secret_key()
     scheduler_manager.init_scheduler()

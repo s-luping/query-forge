@@ -58,6 +58,30 @@ def set_index_meta(schema_name: str, status: str, field_count: int = 0,
         pass  # 元数据写入失败不影响索引构建
 
 
+def recover_interrupted_builds() -> int:
+    """启动恢复：把遗留的 building 状态改为 stale
+
+    构建线程无法在进程死亡（重启/reload/睡眠唤醒终止）后存活，
+    启动时任何 building 状态必然是上次构建被中断留下的脏状态。
+    改为 stale（而非 error）：索引文件本身完好（原子写），仅数据
+    可能已变化，标 stale 后定时任务会自动捡起重建，按钮也恢复可用。
+    """
+    try:
+        from models.vector_index import VectorIndexMeta
+
+        with session_scope() as db:
+            rows = db.query(VectorIndexMeta).filter(
+                VectorIndexMeta.status == 'building'
+            ).all()
+            for row in rows:
+                row.status = 'stale'  # type: ignore[assignment]
+                row.error_message = '上次构建被中断（进程重启），已标记待更新'  # type: ignore[assignment]
+            db.commit()
+            return len(rows)
+    except Exception:
+        return 0
+
+
 def get_index_meta(schema_name: str) -> Optional[dict]:
     """从数据库读取向量索引元数据"""
     try:
