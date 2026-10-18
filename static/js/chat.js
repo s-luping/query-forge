@@ -19,11 +19,14 @@ document.addEventListener('DOMContentLoaded', () => {
     loadKnowledge();
 });
 
-// ── Conversation List ──────────────────────────────────────
+// ── Conversation List（左侧栏，按时间分组） ─────────────────
 function _convListUrl(offset) {
     const kw = encodeURIComponent(convSearchKw);
     return `/api/conversation?limit=${CONV_PAGE_SIZE}&offset=${offset}&search=${kw}`;
 }
+
+// 已加载的会话累积（分页追加后整体重渲染分组）
+let _convItems = [];
 
 async function loadConvList() {
     convPage = 0;
@@ -33,7 +36,8 @@ async function loadConvList() {
         const data = await resp.json();
         const list = data.items || [];
         convHasMore = list.length >= CONV_PAGE_SIZE && (data.total || 0) > list.length;
-        renderConvList(list);
+        _convItems = list;
+        renderConvGroups();
     } catch (e) {
         console.error('加载对话列表失败:', e);
     }
@@ -55,82 +59,92 @@ async function loadMoreConvs() {
         const list = data.items || [];
         convPage += 1;
         convHasMore = (data.total || 0) > (convPage + 1) * CONV_PAGE_SIZE;
-        appendConvList(list);
+        _convItems = _convItems.concat(list);
+        renderConvGroups();
     } catch (e) {
         console.error('加载更多对话失败:', e);
     }
 }
 
-function renderConvList(list) {
-    const el = document.getElementById('convList');
-    if (!list || list.length === 0) {
-        const hint = convSearchKw ? '无匹配的会话' : '暂无对话';
-        el.innerHTML = `<div style="padding:20px;text-align:center;color:#888;font-size:13px;">${hint}</div>`;
-        return;
-    }
-    el.innerHTML = list.map(convItemHtml).join('');
-    renderConvMoreBtn();
+// updated_at（后端北京时间 ISO 字符串）→ 分组：今天 / 昨天 / 7天内 / 更早
+function _convGroupKey(updatedAt) {
+    if (!updatedAt) return '更早';
+    const d = new Date(updatedAt);
+    if (isNaN(d.getTime())) return '更早';
+    const now = new Date();
+    const startOfDay = x => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+    const days = Math.floor((startOfDay(now) - startOfDay(d)) / 86400000);
+    if (days <= 0) return '今天';
+    if (days === 1) return '昨天';
+    if (days <= 7) return '7天内';
+    return '更早';
 }
 
-function appendConvList(list) {
-    if (!list || list.length === 0) {
-        convHasMore = false;
-        renderConvMoreBtn();
+const _GROUP_ORDER = ['今天', '昨天', '7天内', '更早'];
+
+function renderConvGroups() {
+    const el = document.getElementById('convList');
+    if (!_convItems || _convItems.length === 0) {
+        const hint = convSearchKw ? '无匹配的会话' : '暂无对话';
+        el.innerHTML = `<div style="padding:20px;text-align:center;color:#98a2b3;font-size:13px;">${hint}</div>`;
         return;
     }
-    const el = document.getElementById('convList');
-    // 先移除底部"加载更多"按钮（可能已渲染在末尾）
-    el.querySelector('.conv-more-btn')?.remove();
-    el.insertAdjacentHTML('beforeend', list.map(convItemHtml).join(''));
-    renderConvMoreBtn();
+    // 按分组顺序聚合（接口本身按 updated_at 倒序，分组内天然保持新→旧）
+    const groups = new Map();
+    _convItems.forEach(c => {
+        const key = _convGroupKey(c.updated_at);
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key).push(c);
+    });
+    let html = '';
+    _GROUP_ORDER.forEach(key => {
+        const items = groups.get(key);
+        if (!items || !items.length) return;
+        html += `<div class="conv-group-title">${key}</div>`;
+        html += items.map(convItemHtml).join('');
+    });
+    if (convHasMore) {
+        html += `<div class="conv-more-btn" onclick="loadMoreConvs()">加载更多</div>`;
+    }
+    el.innerHTML = html;
 }
 
 function convItemHtml(c) {
+    const tip = `${escapeHtml(c.schema_name || '默认')} · ${c.message_count} 条消息`;
     return `
         <div class="conv-item${c.id === currentConvId ? ' active' : ''}"
-             data-id="${c.id}"
+             data-id="${c.id}" title="${escapeAttr(tip)}"
              onclick="openConv(${c.id}, '${escapeAttr(c.title || '(无标题)')}')">
             <div class="conv-item-title">${escapeHtml(c.title || '(无标题)')}</div>
-            <div class="conv-item-meta">${escapeHtml(c.schema_name || '默认')} · ${c.message_count} 条消息</div>
             <span class="conv-item-delete" onclick="event.stopPropagation();deleteConv(${c.id})" title="删除">×</span>
         </div>
     `;
 }
 
-function renderConvMoreBtn() {
-    const el = document.getElementById('convList');
-    el.querySelector('.conv-more-btn')?.remove();
-    if (convHasMore) {
-        el.insertAdjacentHTML('beforeend',
-            `<div class="conv-more-btn" onclick="loadMoreConvs()">加载更多</div>`);
-    }
+// ── 侧栏收起 / 展开 ─────────────────────────────────────────
+function toggleSidebar() {
+    const sb = document.getElementById('chatSidebar');
+    const ex = document.getElementById('sideExpand');
+    const collapsed = sb.classList.toggle('collapsed');
+    ex.style.display = collapsed ? 'flex' : 'none';
 }
 
-// ── 历史对话下拉（顶栏，DeepSeek 风格） ─────────────────────
-function toggleConvDropdown(e) {
-    e.stopPropagation();
-    const dd = document.getElementById('convDropdown');
-    const willShow = !dd.classList.contains('show');
-    dd.classList.toggle('show');
-    if (willShow) loadConvList();   // 每次打开刷新列表
+// 输入框自动增高（上限由 CSS max-height 约束）
+function autoGrowInput(el) {
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, 160) + 'px';
 }
 
-function closeConvDropdown() {
-    document.getElementById('convDropdown')?.classList.remove('show');
-}
-
-// 点击面板外关闭
-document.addEventListener('click', function (e) {
-    const dd = document.getElementById('convDropdown');
-    if (dd && dd.classList.contains('show') && !dd.contains(e.target)) {
-        dd.classList.remove('show');
-    }
-});
+// 侧栏底部用户信息（认证由 app_common.js 完成）
+window.QF.onReady = function (user) {
+    const name = (user && user.username) || '用户';
+    document.getElementById('sideUserName').textContent = name;
+    document.getElementById('sideUserAvatar').textContent = name.charAt(0).toUpperCase();
+};
 
 // ── 新对话：清空当前视图，回到待输入状态（首条消息发送时才真正创建） ──
 function startNewConv() {
     if (isLoading) return;
-    closeConvDropdown();
     currentConvId = null;
     document.getElementById('chatMessages').style.display = 'none';
     document.getElementById('chatMessages').innerHTML = '';
@@ -140,9 +154,8 @@ function startNewConv() {
 }
 
 async function openConv(id, title) {
-    closeConvDropdown();
     currentConvId = id;
-    // 下拉内切换 active 状态（不再全量重载列表）
+    // 侧栏内切换 active 状态（不再全量重载列表）
     document.querySelectorAll('.conv-item').forEach(el =>
         el.classList.toggle('active', Number(el.dataset.id) === id));
 
@@ -193,14 +206,16 @@ async function deleteConv(id) {
 }
 
 // ── Messages ───────────────────────────────────────────────
-// 助手消息元信息行：模型 · 耗时 · Token（info 结构见后端 llm_info）
+// 助手消息元信息：渲染为轻量胶囊标签（模型 / 耗时 / Token 各一枚，模型与 Token 为绿色）
 function llmMetaHtml(info) {
     if (!info || (!info.model && !info.total_tokens && !info.duration_ms)) return '';
+    const pill = (text, green) =>
+        `<span class="msg-meta-pill${green ? ' green' : ''}">${text}</span>`;
     const parts = [];
-    if (info.model) parts.push(`模型 ${escapeHtml(info.model)}`);
+    if (info.model) parts.push(pill(`模型 ${escapeHtml(info.model)}`, true));
     if (info.duration_ms != null && info.duration_ms > 0) {
         const sec = info.duration_ms / 1000;
-        parts.push(`耗时 ${sec >= 100 ? Math.round(sec) : sec.toFixed(1)}s`);
+        parts.push(pill(`耗时 ${sec >= 100 ? Math.round(sec) : sec.toFixed(1)}s`, false));
     }
     if (info.total_tokens) {
         let tk = `Token ${info.total_tokens}`;
@@ -209,9 +224,9 @@ function llmMetaHtml(info) {
             if (info.reasoning_tokens) tk += `，含思考 ${info.reasoning_tokens}`;
             tk += '）';
         }
-        parts.push(tk);
+        parts.push(pill(tk, true));
     }
-    return `<div class="msg-llm-meta">${parts.map(p => `<span>${p}</span>`).join('<i>·</i>')}</div>`;
+    return `<div class="msg-llm-meta">${parts.join('')}</div>`;
 }
 
 function renderMessage(msg) {
@@ -465,7 +480,7 @@ function renderKbOptions() {
     box.innerHTML = list.map(it => {
         const checked = _kbChecked.has(String(it.id)) ? ' checked' : '';
         return `<div class="chat-kb-option">
-            <label><input type="checkbox" value="${it.id}" data-name="${escapeAttr(it.title || '(无标题)')}"${checked}>${escapeHtml(it.title || '(无标题)')}</label>
+            <label><input type="checkbox" value="${it.id}" data-name="${escapeAttr(it.title || '(无标题)')}"${checked}>${escapeHtml(it.title || '(无标题)')}${it.visibility === 'global' ? '（全局）' : ''}</label>
         </div>`;
     }).join('');
     document.getElementById('chatKbEmpty').style.display =
@@ -551,14 +566,23 @@ async function loadKnowledge() {
             visibility: k.visibility || 'personal',
             is_pinned: !!k.is_pinned
         }));
-        // 全局条目是人人适用的规则（管理员或用户发布）：自动生效（常驻注入/自动召回），
-        // 不与个人条目混排、不在对话页提供勾选
-        _kbItems = all.filter(it => it.visibility !== 'global');
+        // 全局 = 所有人可见（可被关键词自动召回）；是否注入对话还要勾选。
+        // 仅 is_pinned=1 的全局条目才常驻注入所有人对话：无需勾选、不进勾选列表。
+        const globals = all.filter(it => it.visibility === 'global');
+        const pinnedGlobals = globals.filter(it => it.is_pinned);
+        _kbItems = all.filter(it => it.visibility !== 'global' || !it.is_pinned);
         const hint = document.getElementById('chatKbGlobalHint');
         if (hint) {
-            const n = all.length - _kbItems.length;
-            hint.style.display = n ? 'block' : 'none';
-            if (n) hint.textContent = `已发布 ${n} 条全局规则，对所有人自动生效，无需勾选`;
+            const parts = [];
+            if (pinnedGlobals.length) parts.push(`已发布 ${pinnedGlobals.length} 条全局常驻规则，自动注入所有人对话，无需勾选`);
+            const optional = globals.length - pinnedGlobals.length;
+            if (optional) parts.push(`另有 ${optional} 条全局规则对所有人可见，勾选后注入对话`);
+            if (parts.length) {
+                hint.style.display = 'block';
+                hint.textContent = parts.join('；');
+            } else {
+                hint.style.display = 'none';
+            }
         }
         await loadDefaultKb();
         renderKbOptions();

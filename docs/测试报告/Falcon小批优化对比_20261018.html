@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Falcon 小批优化对比报告 · 2026-10-18</title>
+<style>
+  :root { --ink:#1a2233; --muted:#66707f; --line:#e3e7ee; --ok:#0c8a4d; --bad:#c0392b; --accent:#2456c8; --bg:#f6f8fb; }
+  * { box-sizing:border-box; }
+  body { font-family:"Segoe UI","Microsoft YaHei",sans-serif; color:var(--ink); background:var(--bg); margin:0; padding:32px 16px; }
+  .wrap { max-width:1080px; margin:0 auto; }
+  h1 { font-size:24px; margin:0 0 4px; }
+  .sub { color:var(--muted); font-size:13px; margin-bottom:24px; }
+  .card { background:#fff; border:1px solid var(--line); border-radius:10px; padding:20px 24px; margin-bottom:20px; }
+  h2 { font-size:17px; margin:0 0 12px; border-left:4px solid var(--accent); padding-left:10px; }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th,td { border-bottom:1px solid var(--line); padding:7px 9px; text-align:left; vertical-align:top; }
+  th { background:#f0f3f8; font-weight:600; white-space:nowrap; }
+  .kpi { display:flex; gap:14px; flex-wrap:wrap; margin-bottom:4px; }
+  .kpi .box { flex:1; min-width:150px; background:#fff; border:1px solid var(--line); border-radius:10px; padding:14px 18px; }
+  .kpi .num { font-size:26px; font-weight:700; }
+  .kpi .lbl { color:var(--muted); font-size:12px; margin-top:2px; }
+  .ok { color:var(--ok); font-weight:600; }
+  .bad { color:var(--bad); font-weight:600; }
+  .tag { display:inline-block; background:#eef2fa; color:var(--accent); border-radius:4px; padding:1px 7px; font-size:12px; margin:1px 2px 1px 0; }
+  code { background:#f0f3f8; border-radius:4px; padding:1px 5px; font-size:12px; }
+  ul { margin:6px 0; padding-left:20px; }
+  li { margin:4px 0; }
+  .note { color:var(--muted); font-size:12px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Falcon 小批测试-优化循环报告（第 4 轮）</h1>
+  <div class="sub">日期 2026-10-18 · 模型 glm-5.3-flash（llm_config_id=7，NVIDIA NIM） · 对象：全量 309 题基线中 4 个未覆盖知识库的库（dev_5 独角兽 / dev_18 世界经济 / dev_9 互联网用户 / dev_17 电商）的 11 道失败题</div>
+
+  <div class="kpi">
+    <div class="box"><div class="num">35.8% → 46.6%</div><div class="lbl">全量 309 题 EX（96/268 → 125/268，比对器修复后离线重算）</div></div>
+    <div class="box"><div class="num">0/11 → 9/11</div><div class="lbl">本批失败题三轮 KB 迭代后通过数（7 题 KB 优化 + 2 题比对器翻正）</div></div>
+    <div class="box"><div class="num">2 类</div><div class="lbl">确认为不可修复类（gold 口径错 / 并列非确定性）</div></div>
+  </div>
+
+  <div class="card">
+    <h2>一、比对器 bug 修复（测量口径，影响面最大）</h2>
+    <p style="font-size:13px">发现 <code>run_eval.py</code> 无序题多重集比对用<b>精确元组相等</b>，数值容差（NUM_TOL=0.011）只在有序题路径生效——凡无序题带 AVG/占比等舍入值即被误判。典型：qid242 服务端返回 <code>5297.6471</code> vs 标准答案 <code>5297.65</code>（差 0.0029，容差内）却判错。</p>
+    <p style="font-size:13px"><b>修复</b>：无序比对新增「数值四舍五入到 2 位小数」比对层（<code>multiset_r2</code> / <code>multiset_perm_r2</code>，可叠加大小写不敏感），与 Falcon 标准答案 2 位小数舍入口径一致；超出 2 位小数舍入一致性的差异（&gt;0.01）仍正确判错。</p>
+    <p style="font-size:13px"><b>影响</b>：全量 309 题离线重算，翻正 31 题（multiset_r2 24 + perm_r2 5 + 其他 2），EX 96/268=35.8% → <b>125/268=46.6%（+10.8pp，纯测量修正，非模型提升）</b>。命中分布：multiset_perm 52、multiset_r2 24、multiset_perm_r2 5。</p>
+  </div>
+
+  <div class="card">
+    <h2>二、知识库优化（kb_seed.py 播种，三轮迭代）</h2>
+    <ul style="font-size:13px">
+      <li><b>第 1 轮</b>：为 dev_5/18/9/17 新增 4 条分库口径条目（数据实采打底：valuation 形如 '$140' 无 B 后缀、date_joined 已是 yyyy-MM-dd、dev_18/dev_9 数值列已为数值型、占比/单位口径等）。</li>
+      <li><b>第 2 轮</b>（据第 1 批复测 6 错归因）：
+        全局「输出规范」修订——排名列不再强制 tie-break 次级排序列（该建议对 gold 有害）；新增「不加题目未要求的 IS NOT NULL / TRIM 过滤」（NULL 行也参与统计）；
+        新增全局常驻「MySQL 8 语法陷阱」条目——<code>IN (SELECT...LIMIT n)</code> 报错 1235，TopN 子查询需包一层再 JOIN；
+        dev_18 修订「列出 X 和 Y 的排名情况」= 输出值列+排名列（第 1 轮规则误导模型只输出排名列）；
+        dev_17 明确「类别销量排名」= 类别级 SUM(price) 总销售额排名，不输出 product 明细。</li>
+      <li><b>第 3 轮</b>：全局规则 4 定为<b>排名列默认 ROW_NUMBER()</b>（gold 全集统计：ROW_NUMBER 44 / RANK 31 / DENSE_RANK 4）；dev_5 保留「组内估值排名用 DENSE_RANK」（qid295 gold 口径）；dev_5 新增大小写变体提示——industry/company 存在 'Artificial intelligence'/'Artificial Intelligence' 变体，SQLite 标准口径大小写敏感，MySQL ci 排序规则会合并分区，分组/排名需 <code>COLLATE utf8mb4_bin</code>（qid218 33→34 行即此因）。</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2>三、逐题明细（基线全错的 11 题 → 三轮后 9 过 2 不可修）</h2>
+    <table>
+      <tr><th>qid</th><th>库</th><th>基线根因</th><th>修复动作</th><th>轮次</th><th>最终</th></tr>
+      <tr><td>104</td><td>dev_9</td><td>col_mismatch：多余输出 code/year 列</td><td>dev_9 KB：输出列只保留题目要求列</td><td>R1</td><td class="ok">✓ ok</td></tr>
+      <tr><td>242</td><td>dev_18</td><td>比对器 bug：无序路径无数值容差</td><td>run_eval.py r2 比对层</td><td>R1 离线翻正</td><td class="ok">✓ ok</td></tr>
+      <tr><td>247</td><td>dev_5</td><td>多余 valuation 列 + join MAX 并列多行</td><td>dev_5 KB：ROW_NUMBER()=1 取一家</td><td>R1</td><td class="ok">✓ ok</td></tr>
+      <tr><td>288</td><td>dev_9</td><td>计数口径：COUNT(entity) vs DISTINCT code</td><td>dev_9 KB：国家计数以 code 为准</td><td>R1</td><td class="ok">✓ ok</td></tr>
+      <tr><td>297</td><td>dev_5</td><td>比例 ×100 vs gold 原始小数；COUNT(*) vs DISTINCT</td><td>dev_5 KB：占比输出原始小数</td><td>R1 离线翻正</td><td class="ok">✓ ok</td></tr>
+      <tr><td>273</td><td>dev_18</td><td>exec_error：IN(SELECT...LIMIT) MySQL 1235</td><td>全局「MySQL 8 语法陷阱」条目</td><td>R2</td><td class="ok">✓ ok</td></tr>
+      <tr><td>284</td><td>dev_17</td><td>product 级明细 vs gold 类别级 SUM(price) 排名</td><td>dev_17 KB：类别级 3 列口径</td><td>R2</td><td class="ok">✓ ok</td></tr>
+      <tr><td>295</td><td>dev_5</td><td>多余 valuation 列 + ROW_NUMBER tie-break vs gold DENSE_RANK</td><td>dev_5 KB：DENSE_RANK 并列同名次</td><td>R2</td><td class="ok">✓ ok</td></tr>
+      <tr><td>136</td><td>dev_18</td><td>①7 列过多→②KB 规则误导只输出排名列→③RANK vs gold ROW_NUMBER（ppi 并列）</td><td>dev_18 KB 修订 + 全局默认 ROW_NUMBER</td><td>R3</td><td class="ok">✓ ok</td></tr>
+      <tr><td>218</td><td>dev_5</td><td>①多余 date 列+多余 IS NOT NULL 过滤→②ci 排序规则合并大小写变体分区（33 vs 34）→③'Internet' 行业两家同日加入（2022-08-16），SQLite/MySQL 取行不同</td><td>dev_5 KB：COLLATE utf8mb4_bin（行数已对齐）</td><td>R3</td><td class="bad">✗ 并列非确定性（不可修）</td></tr>
+      <tr><td>298</td><td>dev_5</td><td>「平均估值超过5亿美元」gold 阈值 &gt;5（估值单位 $B，5 亿应为 0.5）——gold 出题口径自身错误</td><td>不修（污染 KB）</td><td>—</td><td class="bad">✗ gold 口径错（不可修）</td></tr>
+    </table>
+    <p class="note">轮次含义：R1=第 1 批 11 题（修复后比对器离线重算 EX 5/10）；R2=6 道剩余错题（3 过）；R3=2 道剩余错题（1 过）。</p>
+  </div>
+
+  <div class="card">
+    <h2>四、经验沉淀与建议</h2>
+    <ul style="font-size:13px">
+      <li><b>测量先行</b>：比对器 r2 修复一次性翻正 31 题（+10.8pp）——「优化收益」必须先排除测量口径误差，否则优化方向会被误导（此前 col_mismatch 74 题中有部分实为通过）。</li>
+      <li><b>KB 双刃剑</b>：第 1 轮「排名题不加原始值列」规则让 qid136 从 7 列错变 3 列错——KB 条目必须贴合 gold 的实际形态，规则写反比不写更糟；每轮必须小批复测验证。</li>
+      <li><b>gold 不一致无统一解</b>：排名函数 ROW_NUMBER(44)/RANK(31)/DENSE_RANK(4) 混用，采用「默认 ROW_NUMBER + 分库特例覆盖」策略；排名并列（qid218）与 gold 单位错误（qid298）属不可修复类，建议在报告中单独统计「gold 口径差」。</li>
+      <li><b>数据导入 artifact</b>：SQLite → MySQL 的 utf8mb4_0900_ai_ci 排序规则会合并大小写变体分组，影响 GROUP BY/PARTITION BY 基数——dev_5 类多变体库建议入库时统一 or 在库级 guideline 声明。</li>
+      <li><b>后续建议</b>：① 以修复后口径（125/268=46.6%）为新基线，对剩余 col_mismatch 69 / empty_result 40 桶继续按「小批归因 → KB/guideline 沉淀 → 小批复测」推进；② run_eval 比对器已含 r2 层，后续跑批自动生效；③ 定期将 KB 迭代结论回灌 schema guideline 与全局常驻条目。</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2>五、产物清单</h2>
+    <ul style="font-size:13px">
+      <li>比对器修复：<code>benchmark/run_eval.py</code>（_round2/_multiset_ok r2 层 + _unordered_match 分层扩展）</li>
+      <li>KB 播种脚本：<code>benchmark/kb_seed.py</code>（全局 4 条常驻 + 12 分库枚举 + 9 分库口径）</li>
+      <li>批测结果：<code>benchmark/results/falcon.c7.kbopt4_20261018.jsonl</code>（R1）、<code>falcon.c7.kbopt4r2_20261018.jsonl</code>（R2）、<code>falcon.c7.kbopt4r3_20261018.jsonl</code>（R3）</li>
+      <li>重算全量：<code>benchmark/results/falcon.c7.full309_r2.enriched.jsonl</code>（EX 125/268）</li>
+      <li>题集子集：<code>benchmark/questions/questions_falcon_batch4*.jsonl</code></li>
+    </ul>
+  </div>
+</div>
+</body>
+</html>

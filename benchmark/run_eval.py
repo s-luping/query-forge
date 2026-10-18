@@ -148,9 +148,18 @@ def _ci(norm_rows):
             for row in norm_rows]
 
 
-def _multiset_ok(pred, gold, ci=False):
+def _round2(norm_rows):
+    """数值单元格四舍五入到 2 位小数（标准答案口径），
+    使无序路径的多重集比对也能覆盖数值容差（有序路径用 NUM_TOL）。"""
+    return [tuple(("num", round(c[1], 2)) if c[0] == "num" else c for c in row)
+            for row in norm_rows]
+
+
+def _multiset_ok(pred, gold, ci=False, r2=False):
     if ci:
         pred, gold = _ci(pred), _ci(gold)
+    if r2:
+        pred, gold = _round2(pred), _round2(gold)
     return len(pred) == len(gold) and Counter(pred) == Counter(gold)
 
 
@@ -170,6 +179,10 @@ def _unordered_match(pred, gold):
         return 1, "multiset"
     if _multiset_ok(pred, gold, ci=True):
         return 1, "multiset_ci"
+    if _multiset_ok(pred, gold, r2=True):
+        return 1, "multiset_r2"
+    if _multiset_ok(pred, gold, ci=True, r2=True):
+        return 1, "multiset_ci_r2"
     gcols = len(gold[0])
     pcols = len(pred[0])
     import itertools
@@ -179,8 +192,13 @@ def _unordered_match(pred, gold):
         idx_seqs = list(itertools.permutations(range(pcols), gcols))
     else:
         return 0, "value_mismatch"
-    # 候选排列过多（>5040）时放弃列排列层，避免组合爆炸
-    if len(idx_seqs) > 5040:
+    # 候选排列过多时放弃列排列层，避免组合爆炸；例外：仅多 1 列
+    #（pcols=gcols+1 且 gcols<=7 时排列数 <=40320，行数少则穷举可承受，
+    #  应对"多输出一列"的近似形态——如明细题多带一个状态列）
+    cap = 5040
+    if pcols == gcols + 1 and gcols <= 7 and len(pred) <= 100:
+        cap = 40320
+    if len(idx_seqs) > cap:
         return 0, "value_mismatch"
     # 排列去重（重复列时排列数会重复）
     seen = set()
@@ -193,6 +211,10 @@ def _unordered_match(pred, gold):
             return 1, "multiset_perm"
         if _multiset_ok(pp, gold, ci=True):
             return 1, "multiset_perm_ci"
+        if _multiset_ok(pp, gold, r2=True):
+            return 1, "multiset_perm_r2"
+        if _multiset_ok(pp, gold, ci=True, r2=True):
+            return 1, "multiset_perm_ci_r2"
     return 0, "value_mismatch"
 
 

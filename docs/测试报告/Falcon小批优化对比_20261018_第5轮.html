@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Falcon 小批优化对比报告 · 第 5 轮 · 2026-10-18</title>
+<style>
+  :root { --ink:#1a2233; --muted:#66707f; --line:#e3e7ee; --ok:#0c8a4d; --bad:#c0392b; --accent:#2456c8; --bg:#f6f8fb; }
+  * { box-sizing:border-box; }
+  body { font-family:"Segoe UI","Microsoft YaHei",sans-serif; color:var(--ink); background:var(--bg); margin:0; padding:32px 16px; }
+  .wrap { max-width:1080px; margin:0 auto; }
+  h1 { font-size:24px; margin:0 0 4px; }
+  .sub { color:var(--muted); font-size:13px; margin-bottom:24px; }
+  .card { background:#fff; border:1px solid var(--line); border-radius:10px; padding:20px 24px; margin-bottom:20px; }
+  h2 { font-size:17px; margin:0 0 12px; border-left:4px solid var(--accent); padding-left:10px; }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th,td { border-bottom:1px solid var(--line); padding:7px 9px; text-align:left; vertical-align:top; }
+  th { background:#f0f3f8; font-weight:600; white-space:nowrap; }
+  .kpi { display:flex; gap:14px; flex-wrap:wrap; margin-bottom:4px; }
+  .kpi .box { flex:1; min-width:150px; background:#fff; border:1px solid var(--line); border-radius:10px; padding:14px 18px; }
+  .kpi .num { font-size:26px; font-weight:700; }
+  .kpi .lbl { color:var(--muted); font-size:12px; margin-top:2px; }
+  .ok { color:var(--ok); font-weight:600; }
+  .bad { color:var(--bad); font-weight:600; }
+  code { background:#f0f3f8; border-radius:4px; padding:1px 5px; font-size:12px; }
+  ul { margin:6px 0; padding-left:20px; }
+  li { margin:4px 0; }
+  .note { color:var(--muted); font-size:12px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Falcon 小批优化对比报告（第 5 轮：col_mismatch / empty_result 归因）</h1>
+  <div class="sub">日期 2026-10-18 · 模型 glm-5.3-flash（id=7） · 对象：修复后基线（EX 46.6%）中最大失败桶 falcon_dev_14（玩具店，17 失败）+ falcon_dev_21（电商，11 失败），抽 10 题小批</div>
+
+  <div class="kpi">
+    <div class="box"><div class="num">0/10 → 7/10</div><div class="lbl">本批基线全错题经 3 次迭代后通过数</div></div>
+    <div class="box"><div class="num">1 个系统级 bug</div><div class="lbl">KB 条目可见性迁移导致枚举段全线失注（已修复+自愈）</div></div>
+    <div class="box"><div class="num">3 题不可修</div><div class="lbl">剩余失败均为 gold 口径/形态 quirk 类</div></div>
+  </div>
+
+  <div class="card">
+    <h2>一、系统级发现：KB 条目可见性迁移击穿评测召回（最重要）</h2>
+    <p style="font-size:13px">批测中 qid113/191 仍写 <code>'Cancelled'</code>/<code>'已发货'</code>（实际值 <code>Canceled</code>/<code>Shipped</code>），但 dev_21 枚举条目早已播种。查遥测库 <code>llm_prompts</code> 实锤：10-17 的 prompt 含「电商订单枚举值」段，10-18 的 prompt <b>全部缺失</b>。</p>
+    <p style="font-size:13px"><b>根因</b>：10-18「条目归属重划」把 kb_seed 播种的 15 条枚举/口径条目（id 17-31）迁移为 <code>visibility='personal'</code>（属主 kun）——而评测以 admin 跑，召回可见性过滤（global 人人可见 / personal 仅属主+授权）把这些条目全部挡掉，<b>所有用户（含 admin）的枚举段自此失注</b>。</p>
+    <p style="font-size:13px"><b>修复</b>：15 条恢复 <code>visibility='global'</code>（属主保留 kun，global 条目本就不进对话勾选下拉，不违背 UI 决策）；<code>kb_seed.py</code> 增加<b>可见性自愈</b>——播种时发现既有条目 visibility≠global 即原地 PUT 恢复，防止再次被迁移击穿。</p>
+    <p class="note">影响面：该 bug 使 10-18 之后所有评测/对话的 12 库枚举值注入失效——此修复对全量 EX 的收益有待下次全量复测量化。</p>
+  </div>
+
+  <div class="card">
+    <h2>二、比对器扩展：仅多 1 列的排列穷举</h2>
+    <p style="font-size:13px">qid191 型错（明细题多输出一列状态列，8 列 vs 7 列）原被 P(8,7)=40320 超过 5040 上限直接放弃。<code>run_eval.py</code> 新增例外：<b>pcols=gcols+1 且 gcols≤7 且行数≤100 时排列上限放宽到 40320</b>。（qid191 最终仍错——真因是标注文案 gold <code>'是大额订单'</code> vs pred <code>'是'</code>，标注字符串不可推断，属 gold quirk。）</p>
+  </div>
+
+  <div class="card">
+    <h2>三、KB 口径条目迭代（本轮新增 3 条）</h2>
+    <ul style="font-size:13px">
+      <li><b>dev_14「玩具店口径补充」</b>：①点名"玩具"且非类别级题限 <code>Product_Category='Toys'</code>（qid20 gold 口径）；②「每个城市的店铺」按店铺级分组不合并城市（qid134）；③「排名前 N 且 &lt;X」先过滤后排名；④金额/利润类 INNER JOIN 不补零行（仅计数类补零，qid134）。</li>
+      <li><b>dev_21「电商订单口径」</b>：①"总数量为4件/总金额超200"按<b>订单行级</b>判定再取客户 DISTINCT，不按客户预聚合（qid42）；②枚举值逐字符照抄（Canceled≠Cancelled、Shipped≠已发货、Tools≠工具箱）。</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2>四、逐题明细（10 题基线全错 → 7 过）</h2>
+    <table>
+      <tr><th>qid</th><th>库</th><th>基线根因</th><th>修复动作</th><th>最终</th></tr>
+      <tr><td>9</td><td>dev_14</td><td>$ 清洗缺失（CAST('$x')=0）致空结果</td><td>已有口径条目生效</td><td class="ok">✓ R1</td></tr>
+      <tr><td>82</td><td>dev_14</td><td>$ 清洗缺失致利润判定全 0</td><td>已有口径条目生效</td><td class="ok">✓ R1</td></tr>
+      <tr><td>154</td><td>dev_14</td><td>多余 total_units 列</td><td>已有全局输出规范生效</td><td class="ok">✓ R1</td></tr>
+      <tr><td>299</td><td>dev_14</td><td>分组多列（gold 单值列）</td><td>已有条目生效</td><td class="ok">✓ R1</td></tr>
+      <tr><td>42</td><td>dev_21</td><td>按客户 SUM 聚合判定 vs gold 订单行级判定</td><td>dev_21「订单行级」口径条目</td><td class="ok">✓ R2</td></tr>
+      <tr><td>20</td><td>dev_14</td><td>未限品类 'Toys'，数值偏大</td><td>dev_14「限 Toys」口径条目</td><td class="ok">✓ R2</td></tr>
+      <tr><td>113</td><td>dev_21</td><td>枚举幻觉 'Cancelled'（根因=KB 可见性 bug）</td><td>可见性修复 + global 恢复</td><td class="ok">✓ R2</td></tr>
+      <tr><td>209</td><td>dev_14</td><td>gold 按"销量"排名（题面说销售额）且输出 产品名称+总销量 2 列</td><td>gold 口径差，不修</td><td class="bad">✗ gold 口径</td></tr>
+      <tr><td>134</td><td>dev_14</td><td>①城市级分组+LEFT JOIN 补零→②修后 9 行全对但 gold 输出 store_id、pred 输出店铺名</td><td>「店铺级分组+INNER JOIN」规则生效；id vs name 不可判定</td><td class="bad">✗ gold 形态 quirk</td></tr>
+      <tr><td>191</td><td>dev_21</td><td>①枚举幻觉'已发货'（可见性 bug）→②修后值全对，gold 标注 <code>'是大额订单'</code> vs pred <code>'是'</code></td><td>可见性修复生效；标注文案不可推断</td><td class="bad">✗ gold 标注 quirk</td></tr>
+    </table>
+    <p class="note">R1=首轮 10 题（4 过）；R2=5 题复测（3 过）；R3=1 题复测（验证行数已对齐）。</p>
+  </div>
+
+  <div class="card">
+    <h2>五、结论与建议</h2>
+    <ul style="font-size:13px">
+      <li><b>归因格局变化</b>：KB 生效后，dev_14/21 的 $ 清洗类、枚举类、形态类错误大部分消失；剩余失败向「gold 口径/形态不可判定」集中（id vs name、标注文案、题面与 gold 语义相反），此类建议在全量报告中单独统计为「gold 口径差」，不再消耗优化预算。</li>
+      <li><b>可见性 bug 的教训</b>：知识条目的可见性语义（global=召回可见）与 UI 归属管理（条目迁 personal）耦合——凡影响召回的状态迁移必须跑一次"prompt 注入验证"（查 llm_prompts 是否含关键段）而非只看页面。</li>
+      <li><b>建议下一步</b>：① 可见性修复惠及 12 库枚举注入，值得安排一次全量 309 复测量化真实 EX（预计明显高于 46.6%）；② 若暂不跑全量，可对 dev_20（17 失败）/dev_28（6 ER）/dev_15（8 失败）继续小批同法迭代；③ 比对器已含 r2 + 多 1 列扩展层，新跑批自动生效。</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2>六、产物清单</h2>
+    <ul style="font-size:13px">
+      <li>KB：<code>benchmark/kb_seed.py</code>（+可见性自愈；新增 3 条口径；全域条目恢复 global）</li>
+      <li>比对器：<code>benchmark/run_eval.py</code>（仅多 1 列排列上限扩展）</li>
+      <li>批测：<code>benchmark/results/falcon.c7.kbopt5_20261018.jsonl</code>（R1）、<code>kbopt5r2</code>（R2）、<code>kbopt5r3</code>（R3）</li>
+      <li>题集：<code>benchmark/questions/questions_falcon_batch5*.jsonl</code></li>
+    </ul>
+  </div>
+</div>
+</body>
+</html>
