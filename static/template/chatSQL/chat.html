@@ -9,32 +9,38 @@
     <link rel="stylesheet" href="/static/css/chat.css">
 </head>
 <body>
+<!-- ── Main Chat（DeepSeek 风格：无左侧栏，历史对话收进顶栏下拉） ── -->
 <div class="chat-layout">
-
-    <!-- ── Sidebar ─────────────────────────────────────── -->
-    <div class="chat-sidebar">
-        <div class="chat-sidebar-header">
-            <button onclick="showNewConvModal()">+ 新建对话</button>
-        </div>
-        <div class="chat-sidebar-list" id="convList">
-            <!-- filled by JS -->
-        </div>
-    </div>
-
-    <!-- ── Main Chat ───────────────────────────────────── -->
     <div class="chat-main">
-        <div class="chat-header" id="chatHeader">Chat SQL — 连续对话</div>
+        <div class="chat-header">
+            <div class="chat-header-left">
+                <button class="chat-header-btn" onclick="toggleConvDropdown(event)">🕘 历史对话</button>
+                <button class="chat-header-btn primary" onclick="startNewConv()">＋ 新对话</button>
+            </div>
+            <div class="chat-header-title" id="chatHeader">Chat SQL</div>
+        </div>
 
-        <div class="chat-messages" id="chatMessages">
+        <!-- 历史对话下拉面板 -->
+        <div class="conv-dropdown" id="convDropdown">
+            <div class="conv-search">
+                <input type="text" id="convSearch" placeholder="搜索会话标题 / 消息内容..."
+                    autocomplete="off" oninput="onConvSearch(this.value)">
+            </div>
+            <div class="conv-dropdown-list" id="convList">
+                <!-- filled by JS -->
+            </div>
+        </div>
+
+        <div class="chat-messages" id="chatMessages" style="display:none;">
         </div>
 
         <div class="chat-empty" id="chatEmpty">
             <div class="chat-empty-icon">💬</div>
-            <div>选择或创建一个对话开始生成 SQL</div>
+            <div>输入问题开始新对话，或点击左上角「历史对话」继续</div>
             <div style="font-size:12px;margin-top:6px;">支持多轮修改：生成 SQL 后可继续提出修改意见</div>
         </div>
 
-        <div class="chat-input-area" id="chatInputArea" style="display:none;">
+        <div class="chat-input-area" id="chatInputArea">
             <div class="chat-switcher" id="chatSwitcher">
                 <div class="chat-switcher-item">
                     <label for="chatLlmConfig">模型</label>
@@ -57,11 +63,12 @@
                             <div class="chat-kb-option chat-kb-opt-none">
                                 <label><input type="checkbox" value="" data-id="" data-name="">不使用知识库</label>
                             </div>
-                            <!-- 知识库选项由 JS 填充 -->
+                            <div class="chat-kb-global-hint" id="chatKbGlobalHint" style="display:none;"></div>
+                            <!-- 知识库选项由 JS 填充（仅个人条目，全局规则自动生效不提供勾选） -->
                             <div id="chatKbOptions"></div>
                             <div class="chat-kb-empty" id="chatKbEmpty" style="display:none;">无匹配的知识库</div>
                             <div class="text-center py-1" style="border-top:1px solid #eee;">
-                                <button type="button" class="btn btn-sm btn-link" onclick="saveDefaultKb()">设为默认勾选</button>
+                                <button type="button" class="btn btn-sm btn-link" onclick="saveDefaultKb()">保存勾选为我的常驻 📌</button>
                             </div>
                         </div>
                     </div>
@@ -74,28 +81,6 @@
                 <button id="sendBtn" onclick="sendMsg()">发送</button>
             </div>
             <div class="chat-input-hint">Enter 发送，Shift+Enter 换行</div>
-        </div>
-    </div>
-</div>
-
-<!-- ── New Conversation Modal ──────────────────────────── -->
-<div class="modal-overlay" id="newConvModal">
-    <div class="modal-dialog-custom">
-        <div class="modal-header-custom">新建对话</div>
-        <div class="modal-body-custom">
-            <div class="newconv-error" id="newConvError" style="display:none;"></div>
-
-            <div class="text-muted" style="font-size:12px;margin-bottom:14px;padding:8px 10px;background:#f8f9fa;border-radius:6px;">
-                数据范围由管理员授权自动决定，无需选择数据库。<br>
-                模型与知识库可在对话过程中随时切换。
-            </div>
-
-            <label>输入问题 <span style="color:#999;font-weight:normal;">（Enter 发送，Shift+Enter 换行）</span></label>
-            <textarea id="newConvQuery" placeholder="描述你想要查询的数据..."></textarea>
-        </div>
-        <div class="modal-footer-custom">
-            <button class="btn-secondary" onclick="hideNewConvModal()">取消</button>
-            <button class="btn-primary" id="newConvSubmit" onclick="createConv()">开始对话</button>
         </div>
     </div>
 </div>

@@ -406,7 +406,7 @@
         // 确保 QF.isAdmin() 可用后再渲染角色相关内容。
         // 必须无条件挂载 QF.onReady（否则角色未加载时 isAdmin()=false 会误删管理员功能）。
         function initPage() {
-            if (window.QF.isAdmin()) loadStats();
+            loadStats();   // 统计接口后端按角色自动限定范围（管理员=全部，用户=本人），所有人都要加载
             loadFilterOptions();
             loadLogs();
 

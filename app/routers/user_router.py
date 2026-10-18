@@ -112,19 +112,66 @@ class DefaultKnowledgeRequest(BaseModel):
     knowledge_ids: list  # 知识条目 id 数组（可空 = 清空默认勾选）
 
 
+def _validate_knowledge_ids_visible(user: dict, ids: list) -> None:
+    """校验知识条目存在且对用户可见（全局/本人创建/授权清单），否则 400"""
+    if not ids:
+        return
+    with session_scope() as db:
+        from sqlalchemy import or_
+        from models.knowledge import KnowledgeItem
+        from app.permissions import get_visible_knowledge_ids
+        q = db.query(KnowledgeItem).filter(
+            KnowledgeItem.id.in_(ids), KnowledgeItem.is_active == 1)
+        visible = get_visible_knowledge_ids(user)
+        if visible is not None:
+            # 非管理员：全局条目人人可勾选；个人条目属主本人或授权清单内可勾选
+            conds = [KnowledgeItem.visibility == 'global',
+                     KnowledgeItem.user_id == user['user_id']]
+            if visible:
+                conds.append(KnowledgeItem.id.in_(visible))
+            q = q.filter(or_(*conds))
+        found = {row.id for row in q.all()}
+    invalid = [i for i in ids if i not in found]
+    if invalid:
+        raise HTTPException(status_code=400,
+                            detail=f"知识条目不存在或不可见: {invalid}")
+
+
+def _get_pref_ids(user_id: int, key: str) -> list:
+    """读取用户偏好里的知识 id 列表（缺失返回 []）"""
+    from models.preference import UserPreference
+    with session_scope() as db:
+        row = db.query(UserPreference).filter(
+            UserPreference.user_id == user_id,
+            UserPreference.pref_key == key).first()
+        if row:
+            from crud.knowledge import _parse_json
+            return [int(i) for i in (_parse_json(row.pref_value, []) or []) if i]
+    return []
+
+
+def _set_pref_ids(user_id: int, key: str, ids: list, audit_user: dict, action: str) -> None:
+    """写入用户偏好里的知识 id 列表"""
+    from models.preference import UserPreference
+    with session_scope() as db:
+        row = db.query(UserPreference).filter(
+            UserPreference.user_id == user_id,
+            UserPreference.pref_key == key).first()
+        if row:
+            row.pref_value = json.dumps(ids, ensure_ascii=False)
+        else:
+            db.add(UserPreference(
+                user_id=user_id, pref_key=key,
+                pref_value=json.dumps(ids, ensure_ascii=False)))
+    log_audit(audit_user, action, f"ids={ids}")
+
+
 @router.get("/preferences/default-knowledge")
 @limiter.limit(LIMIT_READ)
 def get_default_knowledge(request: Request, current_user: CurrentUser):
     """获取用户默认勾选的知识库条目 id 列表（新对话自动带上）"""
-    from models.preference import UserPreference
-    with session_scope() as db:
-        row = db.query(UserPreference).filter(
-            UserPreference.user_id == current_user['user_id'],
-            UserPreference.pref_key == 'default_knowledge_ids').first()
-        if row:
-            from crud.knowledge import _parse_json
-            return {'knowledge_ids': _parse_json(row.pref_value, [])}
-    return {'knowledge_ids': []}
+    return {'knowledge_ids': _get_pref_ids(current_user['user_id'],
+                                           'default_knowledge_ids')}
 
 
 @router.put("/preferences/default-knowledge")
@@ -132,45 +179,50 @@ def get_default_knowledge(request: Request, current_user: CurrentUser):
 def set_default_knowledge(request: Request, body: DefaultKnowledgeRequest,
                           current_user: CurrentUser):
     """设置用户默认勾选的知识库条目（多选；校验条目存在且对用户可见）"""
-    from models.preference import UserPreference
     ids = [int(i) for i in (body.knowledge_ids or []) if i]
-    if ids:
-        with session_scope() as db:
-            from sqlalchemy import or_
-            from models.knowledge import KnowledgeItem
-            from app.permissions import get_visible_knowledge_ids
-            q = db.query(KnowledgeItem).filter(
-                KnowledgeItem.id.in_(ids), KnowledgeItem.is_active == 1)
-            visible = get_visible_knowledge_ids(current_user)
-            if visible is not None:
-                # 非管理员：全局条目人人可勾选；个人条目需在授权清单内
-                conds = [KnowledgeItem.visibility == 'global']
-                if visible:
-                    conds.append(KnowledgeItem.id.in_(visible))
-                q = q.filter(or_(*conds))
-            found = {row.id for row in q.all()}
-        invalid = [i for i in ids if i not in found]
-        if invalid:
-            raise HTTPException(status_code=400,
-                                detail=f"知识条目不存在或不可见: {invalid}")
+    _validate_knowledge_ids_visible(current_user, ids)
     try:
-        with session_scope() as db:
-            row = db.query(UserPreference).filter(
-                UserPreference.user_id == current_user['user_id'],
-                UserPreference.pref_key == 'default_knowledge_ids').first()
-            if row:
-                row.pref_value = json.dumps(ids, ensure_ascii=False)
-            else:
-                db.add(UserPreference(
-                    user_id=current_user['user_id'],
-                    pref_key='default_knowledge_ids',
-                    pref_value=json.dumps(ids, ensure_ascii=False)))
-        log_audit(current_user, "set_default_knowledge", f"ids={ids}")
+        _set_pref_ids(current_user['user_id'], 'default_knowledge_ids',
+                      ids, current_user, 'set_default_knowledge')
         return {'knowledge_ids': ids}
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"设置默认知识库失败: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# 用户自选常驻上限（个人常驻只注入本人对话，条数限制防 prompt 膨胀）
+MAX_USER_PINNED_KNOWLEDGE = 20
+
+
+@router.get("/preferences/pinned-knowledge")
+@limiter.limit(LIMIT_READ)
+def get_pinned_knowledge(request: Request, current_user: CurrentUser):
+    """获取用户自选常驻的知识条目 id 列表（每次对话自动注入，仅本人生效）"""
+    return {'knowledge_ids': _get_pref_ids(current_user['user_id'],
+                                           'pinned_knowledge_ids')}
+
+
+@router.put("/preferences/pinned-knowledge")
+@limiter.limit(LIMIT_WRITE)
+def set_pinned_knowledge(request: Request, body: DefaultKnowledgeRequest,
+                         current_user: CurrentUser):
+    """设置用户自选常驻的知识条目（每个用户独立，仅注入本人对话）"""
+    ids = [int(i) for i in (body.knowledge_ids or []) if i]
+    ids = list(dict.fromkeys(ids))   # 去重保序
+    if len(ids) > MAX_USER_PINNED_KNOWLEDGE:
+        raise HTTPException(status_code=400,
+                            detail=f"自选常驻最多 {MAX_USER_PINNED_KNOWLEDGE} 条")
+    _validate_knowledge_ids_visible(current_user, ids)
+    try:
+        _set_pref_ids(current_user['user_id'], 'pinned_knowledge_ids',
+                      ids, current_user, 'set_pinned_knowledge')
+        return {'knowledge_ids': ids}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"设置自选常驻知识失败: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

@@ -8,6 +8,9 @@ let isLoading = false;
 let convPage = 0;
 let convHasMore = false;
 const CONV_PAGE_SIZE = 20;
+// 会话搜索状态（300ms 防抖）
+let convSearchKw = '';
+let _convSearchTimer = null;
 
 // ── Init ───────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
@@ -17,10 +20,15 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // ── Conversation List ──────────────────────────────────────
+function _convListUrl(offset) {
+    const kw = encodeURIComponent(convSearchKw);
+    return `/api/conversation?limit=${CONV_PAGE_SIZE}&offset=${offset}&search=${kw}`;
+}
+
 async function loadConvList() {
     convPage = 0;
     try {
-        const resp = await apiRequest(`/api/conversation?limit=${CONV_PAGE_SIZE}&offset=0`);
+        const resp = await apiRequest(_convListUrl(0));
         if (!resp.ok) return;
         const data = await resp.json();
         const list = data.items || [];
@@ -31,10 +39,17 @@ async function loadConvList() {
     }
 }
 
+// 会话搜索（防抖后走后端过滤：标题 / 会话内消息内容）
+function onConvSearch(value) {
+    convSearchKw = (value || '').trim();
+    clearTimeout(_convSearchTimer);
+    _convSearchTimer = setTimeout(loadConvList, 300);
+}
+
 async function loadMoreConvs() {
     const nextOffset = (convPage + 1) * CONV_PAGE_SIZE;
     try {
-        const resp = await apiRequest(`/api/conversation?limit=${CONV_PAGE_SIZE}&offset=${nextOffset}`);
+        const resp = await apiRequest(_convListUrl(nextOffset));
         if (!resp.ok) return;
         const data = await resp.json();
         const list = data.items || [];
@@ -49,7 +64,8 @@ async function loadMoreConvs() {
 function renderConvList(list) {
     const el = document.getElementById('convList');
     if (!list || list.length === 0) {
-        el.innerHTML = '<div style="padding:20px;text-align:center;color:#888;font-size:13px;">暂无对话</div>';
+        const hint = convSearchKw ? '无匹配的会话' : '暂无对话';
+        el.innerHTML = `<div style="padding:20px;text-align:center;color:#888;font-size:13px;">${hint}</div>`;
         return;
     }
     el.innerHTML = list.map(convItemHtml).join('');
@@ -90,18 +106,52 @@ function renderConvMoreBtn() {
     }
 }
 
+// ── 历史对话下拉（顶栏，DeepSeek 风格） ─────────────────────
+function toggleConvDropdown(e) {
+    e.stopPropagation();
+    const dd = document.getElementById('convDropdown');
+    const willShow = !dd.classList.contains('show');
+    dd.classList.toggle('show');
+    if (willShow) loadConvList();   // 每次打开刷新列表
+}
+
+function closeConvDropdown() {
+    document.getElementById('convDropdown')?.classList.remove('show');
+}
+
+// 点击面板外关闭
+document.addEventListener('click', function (e) {
+    const dd = document.getElementById('convDropdown');
+    if (dd && dd.classList.contains('show') && !dd.contains(e.target)) {
+        dd.classList.remove('show');
+    }
+});
+
+// ── 新对话：清空当前视图，回到待输入状态（首条消息发送时才真正创建） ──
+function startNewConv() {
+    if (isLoading) return;
+    closeConvDropdown();
+    currentConvId = null;
+    document.getElementById('chatMessages').style.display = 'none';
+    document.getElementById('chatMessages').innerHTML = '';
+    document.getElementById('chatEmpty').style.display = 'flex';
+    document.getElementById('chatHeader').textContent = 'Chat SQL';
+    document.getElementById('msgInput').focus();
+}
+
 async function openConv(id, title) {
+    closeConvDropdown();
     currentConvId = id;
-    // 本地切换 active 状态（不再全量重载列表）
+    // 下拉内切换 active 状态（不再全量重载列表）
     document.querySelectorAll('.conv-item').forEach(el =>
         el.classList.toggle('active', Number(el.dataset.id) === id));
 
     const emptyEl = document.getElementById('chatEmpty');
     if (emptyEl) emptyEl.style.display = 'none';
-    document.getElementById('chatInputArea').style.display = 'block';
+    const msgContainer = document.getElementById('chatMessages');
+    msgContainer.style.display = '';
 
-    document.getElementById('chatHeader').textContent =
-        (title || 'Chat SQL') + ' — 连续对话';
+    document.getElementById('chatHeader').textContent = title || 'Chat SQL';
 
     // 恢复该对话的模型/知识库切换器选择（有记忆则恢复，无则默认）
     const prefs = getConvPref(id);
@@ -116,7 +166,6 @@ async function openConv(id, title) {
     renderKbOptions();
     updateKbLabel();
 
-    const msgContainer = document.getElementById('chatMessages');
     msgContainer.innerHTML = '<div style="text-align:center;color:#aaa;padding:40px;">加载中...</div>';
 
     try {
@@ -136,12 +185,7 @@ async function deleteConv(id) {
     if (!confirm('确定删除此对话？')) return;
     try {
         await apiRequest(`/api/conversation/${id}`, { method: 'DELETE' });
-        if (currentConvId === id) {
-            currentConvId = null;
-            document.getElementById('chatMessages').innerHTML = '';
-            document.getElementById('chatEmpty').style.display = 'flex';
-            document.getElementById('chatInputArea').style.display = 'none';
-        }
+        if (currentConvId === id) startNewConv();
         loadConvList();
     } catch (e) {
         QF.toast('删除失败: ' + e.message, 'danger');
@@ -247,18 +291,13 @@ function scrollToBottom() {
     setTimeout(() => { el.scrollTop = el.scrollHeight; }, 50);
 }
 
-// ── Send Message ───────────────────────────────────────────
+// ── Send Message（无当前对话时，首条消息直接创建新对话，DeepSeek 风格） ──
 async function sendMsg() {
     if (isLoading) return;
 
     const input = document.getElementById('msgInput');
     const content = input.value.trim();
     if (!content) return;
-
-    if (!currentConvId) {
-        QF.toast('请先选择或创建一个对话', 'warning');
-        return;
-    }
 
     isLoading = true;
     input.disabled = true;
@@ -269,12 +308,18 @@ async function sendMsg() {
     input.value = '';
     input.style.height = 'auto';
 
-    // Show loading
+    // 进入对话视图：隐藏空状态、显示消息区
+    document.getElementById('chatEmpty').style.display = 'none';
     const container = document.getElementById('chatMessages');
+    container.style.display = '';
+
+    // Show loading
     const loadingRow = document.createElement('div');
     loadingRow.className = 'msg-row assistant';
     loadingRow.id = 'loadingMsg';
-    loadingRow.innerHTML = '<div class="msg-bubble"><div class="loading-dots"><span></span><span></span><span></span></div></div>';
+    loadingRow.innerHTML = '<div class="msg-bubble"><div class="loading-dots"><span></span><span></span><span></span></div>'
+        + (currentConvId ? '' : '<div style="font-size:12px;color:#888;margin-top:4px;">正在创建对话并生成 SQL，请稍候...</div>')
+        + '</div>';
     container.appendChild(loadingRow);
     scrollToBottom();
 
@@ -287,39 +332,70 @@ async function sendMsg() {
         // 兜底超时：与建对话路径一致，防止后端长生成时前端无限等待
         const timeoutCtrl = new AbortController();
         const timer = setTimeout(() => timeoutCtrl.abort(), GEN_TIMEOUT_MS);
-        const resp = await apiRequest(`/api/conversation/${currentConvId}/messages`, {
-            method: 'POST',
-            signal: timeoutCtrl.signal,
-            body: JSON.stringify({
-                content,
-                llm_config_id: llmVal ? parseInt(llmVal) : null,
-                knowledge_ids: kbIds.map(id => parseInt(id))
-            })
-        });
+
+        let resp;
+        if (currentConvId) {
+            resp = await apiRequest(`/api/conversation/${currentConvId}/messages`, {
+                method: 'POST',
+                signal: timeoutCtrl.signal,
+                body: JSON.stringify({
+                    content,
+                    llm_config_id: llmVal ? parseInt(llmVal) : null,
+                    knowledge_ids: kbIds.map(id => parseInt(id))
+                })
+            });
+        } else {
+            // 首条消息创建新对话：数据范围由管理员授权自动决定（schema_name=null），
+            // 模型/知识库用当前切换器选择
+            resp = await apiRequest('/api/conversation', {
+                method: 'POST',
+                signal: timeoutCtrl.signal,
+                body: JSON.stringify({
+                    query: content,
+                    schema_name: null,
+                    llm_config_id: llmVal ? parseInt(llmVal) : null,
+                    knowledge_ids: kbIds.map(id => parseInt(id))
+                })
+            });
+        }
         clearTimeout(timer);
         if (!resp.ok) throw new Error((await resp.json()).detail || '请求失败');
-
-        // 发送成功后把本次选择写回记忆（切走再切回可恢复最新选择）
-        _convPrefs[currentConvId] = { llm_config_id: llmVal, knowledge_ids: kbIds };
-
         const data = await resp.json();
 
         // Remove loading
         document.getElementById('loadingMsg')?.remove();
 
-        // Show assistant message
-        renderMessage({
-            role: 'assistant',
-            sql: data.assistant_message.sql,
-            is_valid: data.assistant_message.is_valid,
-            error_message: data.assistant_message.error_message,
-            columns: data.assistant_message.columns,
-            query_result: data.assistant_message.query_result,
-            llm_info: data.assistant_message.llm_info,
-            permission_note: data.assistant_message.permission_note
-        });
+        if (currentConvId) {
+            // 发送成功后把本次选择写回记忆（切走再切回可恢复最新选择）
+            _convPrefs[currentConvId] = { llm_config_id: llmVal, knowledge_ids: kbIds };
+            renderMessage({
+                role: 'assistant',
+                sql: data.assistant_message.sql,
+                is_valid: data.assistant_message.is_valid,
+                error_message: data.assistant_message.error_message,
+                columns: data.assistant_message.columns,
+                query_result: data.assistant_message.query_result,
+                llm_info: data.assistant_message.llm_info,
+                permission_note: data.assistant_message.permission_note
+            });
+        } else {
+            currentConvId = data.conversation.id;
+            document.getElementById('chatHeader').textContent =
+                data.conversation.title || 'Chat SQL';
+            _convPrefs[currentConvId] = { llm_config_id: llmVal, knowledge_ids: kbIds };
+            renderMessage({
+                role: 'assistant',
+                sql: data.message.sql,
+                is_valid: data.message.is_valid,
+                error_message: data.message.error_message,
+                columns: data.message.columns,
+                query_result: data.message.query_result,
+                llm_info: data.message.llm_info,
+                permission_note: data.message.permission_note
+            });
+        }
 
-        loadConvList(); // refresh sidebar
+        loadConvList(); // refresh history dropdown
     } catch (e) {
         document.getElementById('loadingMsg')?.remove();
         const isTimeout = (e && e.name === 'AbortError');
@@ -337,135 +413,11 @@ async function sendMsg() {
     input.focus();
 }
 
-// ── New Conversation ───────────────────────────────────────
-let _convSubmitting = false;
-
-// 生成类请求的前端兜底超时（毫秒）：
+// ── 生成类请求的前端兜底超时（毫秒） ────────────────────────
 // 后端首条消息链路 = 可行性判断 + SQL 生成 共两次 LLM 调用（每次各受
 // LLM 配置 timeout 约束，默认 300s）+ SQL 执行时间，最坏 ≈ 2×timeout + SQL。
 // 660s 覆盖默认配置的最坏情况；此前 60s 会过早掐断正常生成（报"生成超时（60秒）"）。
 const GEN_TIMEOUT_MS = 660000;
-
-function showNewConvModal() {
-    resetNewConvForm();
-    document.getElementById('newConvModal').classList.add('show');
-    document.getElementById('newConvQuery').focus();
-}
-
-function hideNewConvModal() {
-    document.getElementById('newConvModal').classList.remove('show');
-}
-
-function resetNewConvForm() {
-    // 重置表单：清空问题、错误提示（模型/知识库在对话中切换，不在创建弹窗选择）
-    document.getElementById('newConvQuery').value = '';
-    setNewConvError('');
-}
-
-function setNewConvError(msg) {
-    const el = document.getElementById('newConvError');
-    if (!el) return;
-    el.textContent = msg;
-    el.style.display = msg ? 'block' : 'none';
-    if (!msg) el.style.color = '#dc3545';   // 清空时恢复默认红色
-}
-
-async function createConv() {
-    if (_convSubmitting) return;   // 防重复提交
-    const query = document.getElementById('newConvQuery').value.trim();
-    if (!query) { setNewConvError('请输入问题'); return; }
-
-    _convSubmitting = true;
-    const submitBtn = document.getElementById('newConvSubmit');
-    if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = '开始对话'; }
-    setNewConvError('');
-
-    // ── 立即关闭弹窗、进入对话界面，显示加载中 ──
-    hideNewConvModal();
-    resetNewConvForm();
-    const msgContainer = document.getElementById('chatMessages');
-    msgContainer.innerHTML = '';
-    const emptyEl = document.getElementById('chatEmpty');
-    if (emptyEl) emptyEl.style.display = 'none';
-    document.getElementById('chatInputArea').style.display = 'block';
-    document.getElementById('chatHeader').textContent = '生成中... — 连续对话';
-
-    // 用户问题气泡
-    renderMessage({ role: 'user', content: query });
-    // 加载中气泡
-    const loadingRow = document.createElement('div');
-    loadingRow.className = 'msg-row assistant';
-    loadingRow.id = 'convLoading';
-    loadingRow.innerHTML = '<div class="msg-bubble"><div class="loading-dots"><span></span><span></span><span></span></div><div style="font-size:12px;color:#888;margin-top:4px;">正在生成 SQL 并查询结果，请稍候...</div></div>';
-    msgContainer.appendChild(loadingRow);
-    scrollToBottom();
-
-    try {
-        // 兜底超时见 GEN_TIMEOUT_MS 注释（勿改回 60s）
-        const timeoutCtrl = new AbortController();
-        const timer = setTimeout(() => timeoutCtrl.abort(), GEN_TIMEOUT_MS);
-        const resp = await fetch('/api/conversation', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'same-origin',
-            body: JSON.stringify({
-                query,
-                schema_name: null   // 全库模式：由权限自动决定可用数据范围
-                // 模型/知识库不在创建时选择，对话中通过切换器随时调整
-            }),
-            signal: timeoutCtrl.signal
-        });
-        clearTimeout(timer);
-        if (resp.status === 401) {
-            window.top.location.href = '/login';
-            throw new Error('登录已过期');
-        }
-        if (!resp.ok) throw new Error((await resp.json()).detail || '创建失败');
-
-        const data = await resp.json();
-
-        // 移除加载中气泡
-        document.getElementById('convLoading')?.remove();
-
-        currentConvId = data.conversation.id;
-        document.getElementById('chatHeader').textContent =
-            data.conversation.title + ' — 连续对话';
-
-        // 新对话采用当前切换器选择（模型/知识库），供后续消息发送
-        _convPrefs[currentConvId] = {
-            llm_config_id: (document.getElementById('chatLlmConfig').value || null),
-            knowledge_ids: getSelectedKbIds()
-        };
-
-        // Render messages（对话界面内展示结果）
-        renderMessage({
-            role: 'assistant',
-            sql: data.message.sql,
-            is_valid: data.message.is_valid,
-            error_message: data.message.error_message,
-            columns: data.message.columns,
-            query_result: data.message.query_result,
-            llm_info: data.message.llm_info,
-            permission_note: data.message.permission_note
-        });
-
-        loadConvList();
-    } catch (e) {
-        // 失败：对话界面内展示错误（弹窗已关）
-        document.getElementById('convLoading')?.remove();
-        const isTimeout = (e && e.name === 'AbortError');
-        renderMessage({
-            role: 'assistant',
-            sql: '',
-            is_valid: false,
-            error_message: isTimeout ? `生成超时（${GEN_TIMEOUT_MS / 60000}分钟），请重试` : ('创建对话失败: ' + e.message)
-        });
-        document.getElementById('chatHeader').textContent = '生成失败 — 连续对话';
-    } finally {
-        _convSubmitting = false;
-        if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = '开始对话'; }
-    }
-}
 
 // ── LLM Config & Knowledge Loaders（对话切换器） ───────────
 // 创建对话不再选择模型/知识库；对话过程中通过输入区上方的切换器随时切换，
@@ -512,10 +464,8 @@ function renderKbOptions() {
     });
     box.innerHTML = list.map(it => {
         const checked = _kbChecked.has(String(it.id)) ? ' checked' : '';
-        const badge = it.is_pinned ? '<span class="badge bg-warning text-dark">常驻</span> '
-            : (it.visibility === 'global' ? '<span class="badge bg-dark">全局</span> ' : '');
         return `<div class="chat-kb-option">
-            <label><input type="checkbox" value="${it.id}" data-name="${escapeAttr(it.title || '(无标题)')}"${checked}>${badge}${escapeHtml(it.title || '(无标题)')}</label>
+            <label><input type="checkbox" value="${it.id}" data-name="${escapeAttr(it.title || '(无标题)')}"${checked}>${escapeHtml(it.title || '(无标题)')}</label>
         </div>`;
     }).join('');
     document.getElementById('chatKbEmpty').style.display =
@@ -589,11 +539,11 @@ async function loadLlmConfigs() {
 
 async function loadKnowledge() {
     try {
-        // 拉取尽量多的条目（接口上限 100），保证搜索/多选覆盖全量
-        const resp = await apiRequest('/api/knowledge?limit=100');
+        // mine=1：仅全局 + 本人条目（管理员也不混入他人个人条目）
+        const resp = await apiRequest('/api/knowledge?limit=100&mine=1');
         if (!resp.ok) return;
         const data = await resp.json();
-        _kbItems = (data.items || []).map(k => ({
+        const all = (data.items || []).map(k => ({
             id: k.id,
             title: k.title || '(无标题)',
             aliases: Array.isArray(k.aliases) ? k.aliases : [],
@@ -601,39 +551,48 @@ async function loadKnowledge() {
             visibility: k.visibility || 'personal',
             is_pinned: !!k.is_pinned
         }));
+        // 全局条目是人人适用的规则（管理员或用户发布）：自动生效（常驻注入/自动召回），
+        // 不与个人条目混排、不在对话页提供勾选
+        _kbItems = all.filter(it => it.visibility !== 'global');
+        const hint = document.getElementById('chatKbGlobalHint');
+        if (hint) {
+            const n = all.length - _kbItems.length;
+            hint.style.display = n ? 'block' : 'none';
+            if (n) hint.textContent = `已发布 ${n} 条全局规则，对所有人自动生效，无需勾选`;
+        }
         await loadDefaultKb();
         renderKbOptions();
     } catch (e) { console.error('加载知识库失败:', e); }
 }
 
-// 用户默认勾选（新对话自动带上；显式清空前一直生效）
+// 我的常驻（与知识库页 📌 同一偏好：勾选预填 + 「保存为我的常驻」写回，双端联动）
 let _kbDefaultIds = [];
 
 async function loadDefaultKb() {
     try {
-        const resp = await apiRequest('/api/user/preferences/default-knowledge');
+        const resp = await apiRequest('/api/user/preferences/pinned-knowledge');
         if (!resp.ok) return;
         const data = await resp.json();
         _kbDefaultIds = (data.knowledge_ids || []).map(String);
-        // 无会话记忆时以用户默认勾选为初始状态
+        // 无会话记忆时以我的常驻为初始勾选
         if (!_kbChecked.size && _kbDefaultIds.length) {
             _kbChecked = new Set(_kbDefaultIds.filter(id =>
                 _kbItems.some(it => String(it.id) === id)));
         }
-    } catch (e) { /* 默认勾选加载失败按空处理 */ }
+    } catch (e) { /* 常驻加载失败按空处理 */ }
 }
 
 async function saveDefaultKb() {
     try {
-        const resp = await apiRequest('/api/user/preferences/default-knowledge', {
+        const resp = await apiRequest('/api/user/preferences/pinned-knowledge', {
             method: 'PUT',
             body: JSON.stringify({ knowledge_ids: getSelectedKbIds().map(id => parseInt(id)) })
         });
         if (!resp.ok) throw new Error((await resp.json()).detail || '保存失败');
         _kbDefaultIds = getSelectedKbIds();
-        QF.toast(_kbDefaultIds.length ? '已保存为默认勾选（新对话自动带上）' : '已清空默认勾选', 'success');
+        QF.toast(_kbDefaultIds.length ? '已保存为我的常驻（📌 同步，每次对话自动带上）' : '已清空我的常驻', 'success');
     } catch (e) {
-        QF.toast('保存默认勾选失败: ' + e.message, 'danger');
+        QF.toast('保存我的常驻失败: ' + e.message, 'danger');
     }
 }
 
@@ -648,21 +607,6 @@ function copySql(btn, sql) {
         QF.toast('复制失败，请手动复制', 'danger');
     });
 }
-
-// Close modal on click-outside
-document.getElementById('newConvModal').addEventListener('click', function(e) {
-    if (e.target === this) hideNewConvModal();
-});
-
-// Enter 发送（Shift+Enter 换行），Esc 关闭
-document.getElementById('newConvQuery').addEventListener('keydown', function (e) {
-    if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        createConv();
-    } else if (e.key === 'Escape') {
-        hideNewConvModal();
-    }
-});
 
 // ── 完整查询结果弹窗（分页） ────────────────────────────────
 const RESULT_PAGE_SIZE = 50;

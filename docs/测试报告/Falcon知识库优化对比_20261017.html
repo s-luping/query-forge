@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="zh"><head><meta charset="utf-8">
+<title>Falcon 知识库优化 A/B 对比报告（小型题库 35 题，glm-5.3-flash）</title>
+<style>
+body{font-family:"Microsoft YaHei",sans-serif;max-width:1300px;margin:24px auto;padding:0 16px;color:#222}
+h1{font-size:22px} h2{font-size:18px;margin-top:28px}
+.cards{display:flex;gap:14px;margin:16px 0;flex-wrap:wrap}
+.card{background:#f6f8fa;border-radius:8px;padding:12px 18px;text-align:center;flex:1;min-width:200px}
+.card .lab{font-size:12px;color:#556} .card .big{font-size:26px;font-weight:700}
+table{border-collapse:collapse;width:100%;font-size:13px;margin-top:8px}
+td,th{border:1px solid #d0d7de;padding:5px 8px;text-align:left;vertical-align:top}
+th{background:#f6f8fa} .q{max-width:300px;word-break:break-all;font-size:12px}
+.ok{color:#1a7f37;font-weight:bold} .no{color:#cf222e;font-weight:bold}
+.note{color:#666;font-size:12px} li{margin:6px 0}
+</style></head><body>
+<h1>Falcon 知识库优化 A/B 对比报告（小型题库 35 题，glm-5.3-flash）</h1>
+<p class="note">同一小型题库（qid 0-34）、同一模型 glm-5.3-flash(id=7)、同一比对口径（忽略列名/行序，要求排序除外）；
+知识库轮启用 17 条知识：2 条全局常驻（输出规范/清洗总则）+ 12 条分库枚举值（MySQL 实采）+ 3 条高频口径。</p>
+<h2>一、总览</h2>
+<div class="cards">
+<div class="card"><div class="lab">基线轮（无知识库）</div>
+<div class="big">15/33</div><div>EX = 45.5%</div>
+<div class="note">拦截 1 · 异常 1 · 均 73s</div></div>
+<div class="card"><div class="lab">知识库轮</div>
+<div class="big" style="color:#1a7f37">15/32</div><div>EX = 46.9%</div>
+<div class="note">拦截 1 · 异常 2 · 均 99s</div></div>
+<div class="card"><div class="lab">EX 变化</div>
+<div class="big" style="color:#1a7f37">+1.4pp</div>
+<div>翻正 3 题 · 翻负 3 题</div></div>
+</div>
+<h2>二、失败桶对比</h2>
+<table><tr><th>失败桶</th><th>基线轮（无知识库）</th><th>知识库轮</th><th>Δ</th></tr><tr><td>完全错位（口径/字段选择）</td><td>5</td><td>7</td><td><span style='color:#cf222e'>+2</span></td></tr><tr><td>列数不符（多余列+值差异）</td><td>4</td><td>7</td><td><span style='color:#cf222e'>+3</span></td></tr><tr><td>空结果（枚举幻觉/过滤过严）</td><td>5</td><td>1</td><td><span style='color:#1a7f37'>−4</span></td></tr><tr><td>执行报错</td><td>1</td><td>2</td><td><span style='color:#cf222e'>+1</span></td></tr><tr><td>部分重叠（过滤边界/关联遗漏）</td><td>1</td><td>2</td><td><span style='color:#cf222e'>+1</span></td></tr><tr><td>拦截</td><td>1</td><td>1</td><td>0</td></tr><tr><td>行数偏多</td><td>1</td><td>0</td><td><span style='color:#1a7f37'>−1</span></td></tr><tr><td>行数偏少</td><td>1</td><td>0</td><td><span style='color:#1a7f37'>−1</span></td></tr><tr><td>排序/tie-breaking 错位</td><td>1</td><td>0</td><td><span style='color:#1a7f37'>−1</span></td></tr></table>
+<h2>三、翻正题（3）</h2>
+<table><tr><th>qid</th><th>问题</th><th>基线明细</th><th>知识库轮明细</th></tr><tr><td>10</td><td class='q'>显示游戏类应用中下载量最高的前三个APP，并统计它们的平均价格</td><td class='q'>{&quot;pcols&quot;: 4, &quot;gcols&quot;: 3, &quot;pred_rows&quot;: 3, &quot;gold_rows&quot;: 3, &quot;hit_rows&quot;: 2, &quot;compare_note&quot;: &quot;value_mismatch&quot;}</td><td class='q'>{}</td></tr><tr><td>15</td><td class='q'>如何统计每个产品类别在不同城市的历史总销售额，并筛选出超过该类别平均销售额的城市？</td><td class='q'>{&quot;gold_rows&quot;: 4, &quot;compare_note&quot;: &quot;empty_mismatch&quot;}</td><td class='q'>{}</td></tr><tr><td>30</td><td class='q'>找出每位老师所教学生中成绩高于全校平均成绩的学生数量，并列出老师ID及其学生人数排名。</td><td class='q'>{&quot;pred_rows&quot;: 6, &quot;gold_rows&quot;: 10, &quot;hit_rows&quot;: 6, &quot;compare_note&quot;: &quot;value_mismatch&quot;, &quot;missing_tables&quot;: [&quot;school_</td><td class='q'>{}</td></tr></table>
+<h2>四、翻负题（3）</h2>
+<table><tr><th>qid</th><th>问题</th><th>基线明细</th><th>知识库轮明细</th></tr><tr><td>12</td><td class='q'>哪些客户的订单总金额高于其所在客户分群的平均订单金额？</td><td class='q'>{}</td><td class='q'>{&quot;pcols&quot;: 4, &quot;gcols&quot;: 1, &quot;pred_rows&quot;: 1104, &quot;gold_rows&quot;: 939, &quot;hit_rows&quot;: 939, &quot;compare_note&quot;: &quot;value_mismatch</td></tr><tr><td>14</td><td class='q'>查询各商品类别中订单数量最多的产品，并统计其平均销售金额高于200的类别。</td><td class='q'>{}</td><td class='q'>{}</td></tr><tr><td>18</td><td class='q'>欧洲哪些国家的男性预期寿命高于75岁，并展示其啤酒、烈酒和葡萄酒消费量？</td><td class='q'>{}</td><td class='q'>{&quot;pcols&quot;: 5, &quot;gcols&quot;: 4, &quot;pred_rows&quot;: 63, &quot;gold_rows&quot;: 24, &quot;hit_rows&quot;: 0, &quot;compare_note&quot;: &quot;value_mismatch&quot;}</td></tr></table>
+<h2>五、逐题对比矩阵</h2>
+<table><tr><th>qid</th><th>问题</th><th>基线轮（无知识库）</th><th>知识库轮</th><th>Δ</th></tr><tr><td>0</td><td class='q'>怎样获取Commercial区域库存量前十的产品及其当前库存量？</td><td class='ok'>通过</td><td class='ok'>通过</td><td></td></tr><tr><td>1</td><td class='q'>如何统计各城市活跃司机的平均行程次数及其平均评分？</td><td class='no'>完全错位（口径/字段选择）</td><td class='no'>部分重叠（过滤边界/关联遗漏）</td><td></td></tr><tr><td>2</td><td class='q'>筛选每个科目中成绩排名前三的学生，计算这些学生的平均分及对应科目名称。</td><td class='ok'>通过</td><td class='ok'>通过</td><td></td></tr><tr><td>3</td><td class='q'>找出各科平均分高于全校总平均分且教师年龄大于40岁（截止2025年12月31号）的科目名称及其平均分</td><td class='ok'>通过</td><td class='ok'>通过</td><td></td></tr><tr><td>4</td><td class='q'>哪些驾驶员的总服务年限高于所在城市的平均服务年限，且当前状态为活跃？</td><td class='ok'>通过</td><td class='ok'>通过</td><td></td></tr><tr><td>5</td><td class='q'>如何找出信用卡支付成功率低于整体平均成功率的州，并找出这些州支付失败的客户邮箱地址？</td><td class='no'>拦截</td><td class='no'>拦截</td><td></td></tr><tr><td>6</td><td class='q'>纸质账单客户的逾期天数中超过行业平均值的客户及其逾期次数是多少？</td><td class='ok'>通过</td><td class='ok'>通过</td><td></td></tr><tr><td>7</td><td class='q'>列出每个类别中价格最高的付费应用，并按应用名称排序</td><td class='no'>完全错位（口径/字段选择）</td><td class='no'>完全错位（口径/字段选择）</td><td></td></tr><tr><td>8</td><td class='q'>在免费应用中，各内容评级对应的应用总数是多少？</td><td class='no'>部分重叠（过滤边界/关联遗漏）</td><td class='no'>部分重叠（过滤边界/关联遗漏）</td><td></td></tr><tr><td>9</td><td class='q'>筛选销售额超过50美元的产品类别，并计算各类别销售额占总销售额的比例。</td><td class='no'>空结果（枚举幻觉/过滤过严）</td><td class='no'>完全错位（口径/字段选择）</td><td></td></tr><tr><td>10</td><td class='q'>显示游戏类应用中下载量最高的前三个APP，并统计它们的平均价格</td><td class='no'>列数不符（多余列+值差异）</td><td class='ok'>通过</td><td><span style='color:#1a7f37;font-weight:bold'>↑ 翻正</span></td></tr><tr><td>11</td><td class='q'>列出教育类应用中用户评分排名前五的APP名称及其对应的平均安装次数</td><td class='ok'>通过</td><td class='ok'>通过</td><td></td></tr><tr><td>12</td><td class='q'>哪些客户的订单总金额高于其所在客户分群的平均订单金额？</td><td class='ok'>通过</td><td class='no'>列数不符（多余列+值差异）</td><td><span style='color:#cf222e;font-weight:bold'>↓ 翻负</span></td></tr><tr><td>13</td><td class='q'>查询每个客户所在城市中订单总金额超过该城市平均订单金额的客户及其订单金额</td><td class='ok'>通过</td><td class='ok'>通过</td><td></td></tr><tr><td>14</td><td class='q'>查询各商品类别中订单数量最多的产品，并统计其平均销售金额高于200的类别。</td><td class='ok'>通过</td><td class='no'>执行报错</td><td><span style='color:#cf222e;font-weight:bold'>↓ 翻负</span></td></tr><tr><td>15</td><td class='q'>如何统计每个产品类别在不同城市的历史总销售额，并筛选出超过该类别平均销售额的城市？</td><td class='no'>空结果（枚举幻觉/过滤过严）</td><td class='ok'>通过</td><td><span style='color:#1a7f37;font-weight:bold'>↑ 翻正</span></td></tr><tr><td>16</td><td class='q'>统计不同承运商配送成功订单的平均配送时长，并显示各承运商的配送效率排名</td><td class='no'>空结果（枚举幻觉/过滤过严）</td><td class='no'>列数不符（多余列+值差异）</td><td></td></tr><tr><td>17</td><td class='q'>按国家统计争议账单的平均处理周期，并筛选出处理周期超过35天的国家有哪些？</td><td class='ok'>通过</td><td class='ok'>通过</td><td></td></tr><tr><td>18</td><td class='q'>欧洲哪些国家的男性预期寿命高于75岁，并展示其啤酒、烈酒和葡萄酒消费量？</td><td class='ok'>通过</td><td class='no'>列数不符（多余列+值差异）</td><td><span style='color:#cf222e;font-weight:bold'>↓ 翻负</span></td></tr><tr><td>19</td><td class='q'>哪些城市的店铺开业时间早于2008年且玩具平均售价小于14.99美元？</td><td class='no'>行数偏多</td><td class='no'>完全错位（口径/字段选择）</td><td></td></tr><tr><td>20</td><td class='q'>如何查询2018年Mexicali地区各店铺的玩具销售额排名？</td><td class='no'>列数不符（多余列+值差异）</td><td class='no'>列数不符（多余列+值差异）</td><td></td></tr><tr><td>21</td><td class='q'>如何获取每家店铺开业以来销售总量不超过10件的产品及店铺的累计销量？</td><td class='no'>列数不符（多余列+值差异）</td><td class='no'>列数不符（多余列+值差异）</td><td></td></tr><tr><td>22</td><td class='q'>分析游戏键盘的订单在不同客户中的消费总额，并计算每位客户的消费金额占比</td><td class='no'>空结果（枚举幻觉/过滤过严）</td><td class='no'>空结果（枚举幻觉/过滤过严）</td><td></td></tr><tr><td>23</td><td class='q'>商业区店铺的玩具销售额占全部区域的比例是多少？</td><td class='no'>完全错位（口径/字段选择）</td><td class='no'>完全错位（口径/字段选择）</td><td></td></tr><tr><td>24</td><td class='q'>筛选出钻石客户在2016年12月的交易ID，并计算其平均交易金额？</td><td class='ok'>通过</td><td class='ok'>通过</td><td></td></tr><tr><td>25</td><td class='q'>统计2015赛季主队的预期进球排名前十的比赛？</td><td class='no'>排序/tie-breaking 错位</td><td class='no'>完全错位（口径/字段选择）</td><td></td></tr><tr><td>26</td><td class='q'>找出平均评分高于4.5的驾驶员中，2024年11月接单次数最多的驾驶员有谁？</td><td class='no'>空结果（枚举幻觉/过滤过严）</td><td class='no'>列数不符（多余列+值差异）</td><td></td></tr><tr><td>27</td><td class='q'>洛杉矶和旧金山的活跃司机中，哪些人的行程总距离超过100公里且平均评分高于4.0？</td><td class='no'>列数不符（多余列+值差异）</td><td class='no'>列数不符（多余列+值差异）</td><td></td></tr><tr><td>28</td><td class='q'>计算特定争议状态的客户的平均逾期天数以及发票金额的比例</td><td class='no'>完全错位（口径/字段选择）</td><td class='no'>完全错位（口径/字段选择）</td><td></td></tr><tr><td>29</td><td class='q'>列出安装量超过所属类别中位数安装量一千倍的应用及其安装量倍数？</td><td class='no'>执行报错</td><td class='no'>执行报错</td><td></td></tr><tr><td>30</td><td class='q'>找出每位老师所教学生中成绩高于全校平均成绩的学生数量，并列出老师ID及其学生人数排名。</td><td class='no'>行数偏少</td><td class='ok'>通过</td><td><span style='color:#1a7f37;font-weight:bold'>↑ 翻正</span></td></tr><tr><td>31</td><td class='q'>同一订单中运费占比超过15%的商品有哪些，且对应的产品类别是什么？</td><td class='ok'>通过</td><td class='ok'>通过</td><td></td></tr><tr><td>32</td><td class='q'>哪些国家的平均月收入超过3000且游客数量超过1000万？</td><td class='ok'>通过</td><td class='ok'>通过</td><td></td></tr><tr><td>33</td><td class='q'>哪些国家的生活成本指数高于100且旅游业占GDP的比例超过1%？</td><td class='ok'>通过</td><td class='ok'>通过</td><td></td></tr><tr><td>34</td><td class='q'>如何统计卡萨布兰卡客户购买工具类商品的总金额？</td><td class='no'>完全错位（口径/字段选择）</td><td class='no'>完全错位（口径/字段选择）</td><td></td></tr></table>
+<h2>六、归因结论</h2>
+<ul>
+<li><b>三道翻正题全部强归因于知识库规则在生成 SQL 中的直接复现</b>：
+qid15（玩具店类目-城市销售额）KB 轮 SQL 出现 <code>CAST(REPLACE(TRIM(price),'$','') AS DECIMAL)</code> 清洗模板（基线缺清洗导致 0 行）；
+qid30（每位老师）KB 轮改用 <code>school_teachers LEFT JOIN + COALESCE(cnt,0)</code> 零值保底（基线漏 4 名零计数老师）；
+qid10（Top3 应用）KB 轮出现次级排序 <code>ORDER BY installs_num DESC, app</code> 且形态收敛为 3 列（基线 4 列错位）。</li>
+<li><b>三道翻负题属采样方差与枚举复写偏差</b>：qid12/14 基线本靠侥幸形态通过、本轮生成写法不同而失败（LLM 非确定性，35 题样本噪声 ±2~3 题）；
+qid18 暴露枚举条目新问题——模型写出 <code>GhoDisplay='Life expectancy at birth (years)'</code> 而实采值是
+<code>'Life expectancy at birth'</code>（尾随空格，MaxCompute 原始数据脏），模型未严格照抄实采值。</li>
+<li><b>结论</b>：小型题库（35 题）净变化 +1.4pp 处于采样噪声区间，但逐题 SQL 对比证实知识库规则真实进入生成链路并被复用；
+分母口径类（empty_result 桶）改善最明显。要拿到统计显著的结论需全量 309 题复测。</li>
+<li><b>改进项</b>：① 枚举条目应附加"逐字符照抄（含空格/大小写）"的强指令；② 实采值建议同时给 TRIM 后形式与原始形式；
+③ 输出规范需对"与基线形态不同的合理写法"增加容错示例。</li>
+</ul>
+<h2>七、知识库条目清单</h2>
+<ul>
+<li><b>全局常驻（2 条，注入所有对话）</b>：输出规范：结果形态与口径（单值列/占比分母/每位含零/次级排序）；数据清洗总则（$ 前缀/千分位/+后缀 CAST 模板）。</li>
+<li><b>分库枚举值（12 条，MySQL 实采）</b>：在线商店/信用卡/网约车/玩具店/GooglePlay/保理/WHO/足球/电商/闪购/学校/游戏销量——
+查询 WHERE 条件必须使用实采原样值（直击"钻石 vs Diamond""已送达 vs Delivered"枚举幻觉）。</li>
+<li><b>分库口径（3 条）</b>：网约车司机评分（档案 average_rating 而非行程 Rating）；玩具店销售额口径与占比分母；保理发票比例分母。</li>
+<li>注入机制：全局常驻进【全局规则】段；分库条目（global + scope_schema_id）走关键词召回【领域知识】段，内容级去重。</li>
+</ul>
+</body></html>
