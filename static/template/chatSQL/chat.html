@@ -4,31 +4,51 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Chat SQL</title>
+    <link rel="icon" href="/static/img/logo.svg">
     <link rel="stylesheet" href="/static/css/bootstrap.min.css">
     <link rel="stylesheet" href="/static/css/common.css">
     <link rel="stylesheet" href="/static/css/chat.css">
 </head>
 <body>
-<!-- ── Main Chat（DeepSeek 风格：无左侧栏，历史对话收进顶栏下拉） ── -->
+<!-- ── DeepSeek 风格：左侧历史会话栏 + 右侧消息区 ── -->
 <div class="chat-layout">
-    <div class="chat-main">
-        <div class="chat-header">
-            <div class="chat-header-left">
-                <button class="chat-header-btn" onclick="toggleConvDropdown(event)">🕘 历史对话</button>
-                <button class="chat-header-btn primary" onclick="startNewConv()">＋ 新对话</button>
-            </div>
-            <div class="chat-header-title" id="chatHeader">Chat SQL</div>
+
+    <!-- 左侧栏：品牌 / 新对话 / 搜索 / 按时间分组的历史 / 用户 -->
+    <aside class="chat-sidebar" id="chatSidebar">
+        <div class="side-brand">
+            <span class="side-collapse" onclick="toggleSidebar()" title="收起/展开侧栏">«</span>
         </div>
 
-        <!-- 历史对话下拉面板 -->
-        <div class="conv-dropdown" id="convDropdown">
-            <div class="conv-search">
-                <input type="text" id="convSearch" placeholder="搜索会话标题 / 消息内容..."
-                    autocomplete="off" oninput="onConvSearch(this.value)">
+        <button class="side-new-btn" onclick="startNewConv()">⊕ 开启新对话</button>
+
+        <div class="side-search">
+            <input type="text" id="convSearch" placeholder="搜索会话标题 / 消息内容..."
+                autocomplete="off" oninput="onConvSearch(this.value)">
+        </div>
+
+        <div class="side-conv-list" id="convList">
+            <!-- 由 JS 按时间分组填充：今天 / 昨天 / 7天内 / 更早 -->
+        </div>
+
+        <div class="side-user">
+            <div class="side-user-menu">
+                <span class="side-user-avatar" id="sideUserAvatar">U</span>
+                <span class="side-user-name" id="sideUserName"></span>
+                <div class="side-user-dropdown">
+                    <a href="/static/template/change_password.html" target="_top">修改密码</a>
+                    <a href="/logout" target="_top">退出登录</a>
+                </div>
             </div>
-            <div class="conv-dropdown-list" id="convList">
-                <!-- filled by JS -->
-            </div>
+        </div>
+    </aside>
+
+    <!-- 侧栏收起后的展开按钮 -->
+    <span class="side-expand" id="sideExpand" onclick="toggleSidebar()" title="展开侧栏" style="display:none;">»</span>
+
+    <!-- 右侧主区 -->
+    <div class="chat-main">
+        <div class="chat-header">
+            <div class="chat-header-title" id="chatHeader">Chat SQL</div>
         </div>
 
         <div class="chat-messages" id="chatMessages" style="display:none;">
@@ -36,51 +56,48 @@
 
         <div class="chat-empty" id="chatEmpty">
             <div class="chat-empty-icon">💬</div>
-            <div>输入问题开始新对话，或点击左上角「历史对话」继续</div>
+            <div>输入问题开始新对话，或从左侧选择历史对话继续</div>
             <div style="font-size:12px;margin-top:6px;">支持多轮修改：生成 SQL 后可继续提出修改意见</div>
         </div>
 
-        <div class="chat-input-area" id="chatInputArea">
-            <div class="chat-switcher" id="chatSwitcher">
-                <div class="chat-switcher-item">
-                    <label for="chatLlmConfig">模型</label>
-                    <select id="chatLlmConfig">
-                        <option value="">使用默认模型</option>
-                    </select>
-                </div>
-                <div class="chat-switcher-item chat-kb-multi">
-                    <label for="chatKnowledge">知识库</label>
-                    <div class="chat-kb-select" id="chatKnowledgeWrap" onclick="event.stopPropagation()">
-                        <div class="chat-kb-trigger" onclick="toggleKbDropdown(event)">
-                            <span id="chatKbLabel">不使用知识库</span>
-                            <span class="chat-kb-arrow">▾</span>
-                        </div>
-                        <div class="chat-kb-dropdown" id="chatKbDropdown">
-                            <div class="chat-kb-search">
-                                <input type="text" id="chatKbSearch" placeholder="搜索标题 / 同义词 / 内容..."
-                                    autocomplete="off" oninput="onKbSearch(this.value)">
+        <!-- 底部悬浮输入卡片（DeepSeek 风格） -->
+        <div class="chat-input-wrap">
+            <div class="chat-input-card">
+                <textarea id="msgInput" rows="1" placeholder="输入问题或修改意见，如：表名改成 orders、加一个日期过滤..."
+                    oninput="autoGrowInput(this)"
+                    onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMsg();}"></textarea>
+                <div class="chat-input-toolbar">
+                    <div class="chat-switcher">
+                        <select id="chatLlmConfig" title="模型（切换后对下一条消息生效）">
+                            <option value="">默认模型</option>
+                        </select>
+                        <div class="chat-kb-select" id="chatKnowledgeWrap" onclick="event.stopPropagation()">
+                            <div class="chat-kb-trigger" onclick="toggleKbDropdown(event)">
+                                <span id="chatKbLabel">不使用知识库</span>
+                                <span class="chat-kb-arrow">▾</span>
                             </div>
-                            <div class="chat-kb-option chat-kb-opt-none">
-                                <label><input type="checkbox" value="" data-id="" data-name="">不使用知识库</label>
-                            </div>
-                            <div class="chat-kb-global-hint" id="chatKbGlobalHint" style="display:none;"></div>
-                            <!-- 知识库选项由 JS 填充（仅个人条目，全局规则自动生效不提供勾选） -->
-                            <div id="chatKbOptions"></div>
-                            <div class="chat-kb-empty" id="chatKbEmpty" style="display:none;">无匹配的知识库</div>
-                            <div class="text-center py-1" style="border-top:1px solid #eee;">
-                                <button type="button" class="btn btn-sm btn-link" onclick="saveDefaultKb()">保存勾选为我的常驻 📌</button>
+                            <div class="chat-kb-dropdown" id="chatKbDropdown">
+                                <div class="chat-kb-search">
+                                    <input type="text" id="chatKbSearch" placeholder="搜索标题 / 同义词 / 内容..."
+                                        autocomplete="off" oninput="onKbSearch(this.value)">
+                                </div>
+                                <div class="chat-kb-option chat-kb-opt-none">
+                                    <label><input type="checkbox" value="" data-id="" data-name="">不使用知识库</label>
+                                </div>
+                                <div class="chat-kb-global-hint" id="chatKbGlobalHint" style="display:none;"></div>
+                                <!-- 知识库选项由 JS 填充（个人条目 + 非常驻全局条目；仅常驻全局规则自动注入不提供勾选） -->
+                                <div id="chatKbOptions"></div>
+                                <div class="chat-kb-empty" id="chatKbEmpty" style="display:none;">无匹配的知识库</div>
+                                <div class="text-center py-1" style="border-top:1px solid #eee;">
+                                    <button type="button" class="btn btn-sm btn-link" onclick="saveDefaultKb()">保存勾选为我的常驻 📌</button>
+                                </div>
                             </div>
                         </div>
                     </div>
+                    <button id="sendBtn" class="send-circle" onclick="sendMsg()" title="发送">↑</button>
                 </div>
-                <span class="chat-switcher-hint">切换后对下一条消息生效</span>
             </div>
-            <div class="chat-input-row">
-                <textarea id="msgInput" rows="1" placeholder="输入修改意见，如：表名改成 orders、加一个日期过滤..."
-                    onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMsg();}"></textarea>
-                <button id="sendBtn" onclick="sendMsg()">发送</button>
-            </div>
-            <div class="chat-input-hint">Enter 发送，Shift+Enter 换行</div>
+            <div class="chat-input-hint">Enter 发送 · Shift+Enter 换行 · 模型/知识库切换对下一条消息生效</div>
         </div>
     </div>
 </div>

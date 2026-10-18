@@ -61,7 +61,8 @@
     </nav>
     <div class="home-right">
         <a href="/admin" class="btn btn-sm btn-outline-primary" data-admin-only>管理后台</a>
-        <div class="home-user">
+        <!-- 用户菜单已合并进 SQL 对话页左下角侧栏；仅在知识库/使用记录页显示 -->
+        <div class="home-user" id="homeUser" style="display:none;">
             <span class="home-user-name" id="userName"></span>
             <div class="home-user-menu">
                 <a href="/static/template/change_password.html">修改密码</a>
@@ -86,6 +87,8 @@ const PAGES = {
 function openPage(key) {
     document.querySelectorAll('.home-nav a').forEach(a => a.classList.toggle('active', a.dataset.page === key));
     document.getElementById('pageFrame').src = PAGES[key];
+    // SQL 对话页的用户菜单在左下角侧栏内；其它页无侧栏，回退到右上角
+    document.getElementById('homeUser').style.display = key === 'chat' ? 'none' : '';
 }
 
 // 等公共层认证就绪后渲染用户信息与管理员入口
