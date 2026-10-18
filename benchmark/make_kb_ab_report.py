@@ -198,7 +198,21 @@ th{{background:#f6f8fa}} .q{{max-width:300px;word-break:break-all;font-size:12px
 {flip_table(flips_down, '#cf222e')}
 <h2>五、逐题对比矩阵</h2>
 <table><tr><th>qid</th><th>问题</th><th>{esc(args.baseline_label)}</th><th>{esc(args.treated_label)}</th><th>Δ</th></tr>{matrix_rows}</table>
-<h2>六、知识库条目清单</h2>
+<h2>六、归因结论</h2>
+<ul>
+<li><b>三道翻正题全部强归因于知识库规则在生成 SQL 中的直接复现</b>：
+qid15（玩具店类目-城市销售额）KB 轮 SQL 出现 <code>CAST(REPLACE(TRIM(price),'$','') AS DECIMAL)</code> 清洗模板（基线缺清洗导致 0 行）；
+qid30（每位老师）KB 轮改用 <code>school_teachers LEFT JOIN + COALESCE(cnt,0)</code> 零值保底（基线漏 4 名零计数老师）；
+qid10（Top3 应用）KB 轮出现次级排序 <code>ORDER BY installs_num DESC, app</code> 且形态收敛为 3 列（基线 4 列错位）。</li>
+<li><b>三道翻负题属采样方差与枚举复写偏差</b>：qid12/14 基线本靠侥幸形态通过、本轮生成写法不同而失败（LLM 非确定性，35 题样本噪声 ±2~3 题）；
+qid18 暴露枚举条目新问题——模型写出 <code>GhoDisplay='Life expectancy at birth (years)'</code> 而实采值是
+<code>'Life expectancy at birth'</code>（尾随空格，MaxCompute 原始数据脏），模型未严格照抄实采值。</li>
+<li><b>结论</b>：小型题库（35 题）净变化 +1.4pp 处于采样噪声区间，但逐题 SQL 对比证实知识库规则真实进入生成链路并被复用；
+分母口径类（empty_result 桶）改善最明显。要拿到统计显著的结论需全量 309 题复测。</li>
+<li><b>改进项</b>：① 枚举条目应附加"逐字符照抄（含空格/大小写）"的强指令；② 实采值建议同时给 TRIM 后形式与原始形式；
+③ 输出规范需对"与基线形态不同的合理写法"增加容错示例。</li>
+</ul>
+<h2>七、知识库条目清单</h2>
 <ul>
 <li><b>全局常驻（2 条，注入所有对话）</b>：输出规范：结果形态与口径（单值列/占比分母/每位含零/次级排序）；数据清洗总则（$ 前缀/千分位/+后缀 CAST 模板）。</li>
 <li><b>分库枚举值（12 条，MySQL 实采）</b>：在线商店/信用卡/网约车/玩具店/GooglePlay/保理/WHO/足球/电商/闪购/学校/游戏销量——

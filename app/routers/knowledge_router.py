@@ -54,6 +54,7 @@ class KnowledgeRequest(BaseModel):
     scope_schema_id: Optional[int] = None
     visibility: Optional[str] = None   # global=管理员全局发布 / personal=个人（默认）
     is_pinned: Optional[int] = None    # 常驻上下文开关（仅 global 可置 1）
+    owner_user_id: Optional[int] = None  # 所有者变更（仅管理员更新时生效）
 
     @field_validator('title')
     @classmethod
@@ -88,6 +89,7 @@ class KnowledgeResponse(BaseModel):
     """知识库条目响应"""
     id: int
     user_id: int
+    owner_name: Optional[str] = None   # 所有者用户名（列表/详情接口附带）
     title: Optional[str]
     content: Optional[str]
     knowledge_type: str = 'note'
@@ -127,17 +129,35 @@ def _to_dict(item: KnowledgeItem) -> dict:
     return knowledge_crud.to_dict(item)
 
 
+def _attach_owner_names(items: List[dict]) -> None:
+    """就地补充 owner_name（批量查用户名，失败静默留空）"""
+    try:
+        ids = {d.get('user_id') for d in items if d.get('user_id')}
+        if not ids:
+            return
+        with session_scope() as db:
+            rows = db.query(User.id, User.username).filter(User.id.in_(ids)).all()
+        name_map = {r[0]: r[1] for r in rows}
+        for d in items:
+            d['owner_name'] = name_map.get(d.get('user_id'), f"#{d.get('user_id')}")
+    except Exception as e:
+        logger.warning(f"补充知识所有者名称失败（忽略）: {e}")
+
+
 def get_all_knowledge(user: dict, limit: int = 20, offset: int = 0,
                       visibility_filter: Optional[str] = None,
                       keyword: Optional[str] = None,
                       type_filter: Optional[str] = None,
                       status_filter: Optional[str] = None,
-                      pinned_filter: Optional[str] = None) -> tuple:
+                      pinned_filter: Optional[str] = None,
+                      mine: bool = False) -> tuple:
     """获取知识库条目（全局条目人人可见；个人条目按用户权限过滤）
 
     status_filter: enabled=仅启用 / disabled=仅禁用 / None=全部
     type_filter: knowledge_type 精确匹配
     pinned_filter: pinned=仅常驻
+    mine: True 时仅返回 全局 + 当前用户本人创建 的条目（管理员也不例外，
+          供对话页勾选使用——管理全部条目请走管理页，勿混入他人个人条目）
     """
     with session_scope() as db:
         from sqlalchemy import or_
@@ -164,10 +184,15 @@ def get_all_knowledge(user: dict, limit: int = 20, offset: int = 0,
                 KnowledgeItem.title.ilike(kw),
                 KnowledgeItem.content.ilike(kw),
             ))
+        if mine:
+            query = query.filter(or_(
+                KnowledgeItem.visibility == 'global',
+                KnowledgeItem.user_id == user['user_id']))
         visible_ids = get_visible_knowledge_ids(user)
         if visible_ids is not None and not is_admin(user):
-            # 全局条目人人可见；个人条目仅授权清单内的可见
-            conds = [KnowledgeItem.visibility == 'global']
+            # 全局条目人人可见；个人条目属主本人或授权清单内的可见
+            conds = [KnowledgeItem.visibility == 'global',
+                     KnowledgeItem.user_id == user['user_id']]
             if visible_ids:
                 conds.append(KnowledgeItem.id.in_(visible_ids))
             query = query.filter(or_(*conds))
@@ -194,15 +219,16 @@ def get_knowledge_safe(user_id: int, knowledge_id: int = None) -> dict:
         if not item:
             return {}
         if (item.visibility or 'personal') != 'global':
-            from models.role import Role, UserRole
-            usr = db.query(User).filter(User.id == user_id).first()
-            roles = [row[0] for row in db.query(Role.code).join(
-                UserRole, UserRole.role_id == Role.id).filter(UserRole.user_id == user_id).all()]
-            if not (usr and is_admin({'user_id': user_id, 'role': usr.role, 'roles': roles})):
-                visible_ids = get_visible_knowledge_ids({
-                    'user_id': user_id, 'role': usr.role if usr else 'user', 'roles': roles})
-                if visible_ids is not None and knowledge_id not in visible_ids:
-                    return {}
+            if item.user_id != user_id:   # 属主本人始终可读
+                from models.role import Role, UserRole
+                usr = db.query(User).filter(User.id == user_id).first()
+                roles = [row[0] for row in db.query(Role.code).join(
+                    UserRole, UserRole.role_id == Role.id).filter(UserRole.user_id == user_id).all()]
+                if not (usr and is_admin({'user_id': user_id, 'role': usr.role, 'roles': roles})):
+                    visible_ids = get_visible_knowledge_ids({
+                        'user_id': user_id, 'role': usr.role if usr else 'user', 'roles': roles})
+                    if visible_ids is not None and knowledge_id not in visible_ids:
+                        return {}
         return {
             'id': item.id,
             'title': item.title,
@@ -212,15 +238,20 @@ def get_knowledge_safe(user_id: int, knowledge_id: int = None) -> dict:
 
 def _validate_visibility_fields(user: dict, data: KnowledgeRequest,
                                 current_item: Optional[KnowledgeItem] = None) -> dict:
-    """校验 visibility/is_pinned 字段（仅管理员可全局发布/常驻），返回可写入字段"""
+    """校验 visibility/is_pinned 字段，返回可写入字段。
+
+    visibility：所有用户可设 global（人人可见可召回）/personal；
+    is_pinned：仅管理员（常驻注入对全部用户生效，属管理员权限）。
+    """
     provided = data.model_fields_set
     fields = {}
     if 'visibility' in provided and data.visibility is not None:
-        if data.visibility == 'global' and not is_admin(user):
-            raise HTTPException(status_code=403, detail="仅管理员可发布全局知识")
         fields['visibility'] = data.visibility
     if 'is_pinned' in provided and data.is_pinned is not None:
         pinned = 1 if data.is_pinned else 0
+        if pinned and not is_admin(user):
+            raise HTTPException(status_code=403,
+                                detail="常驻上下文仅管理员可设置（会对所有用户生效）")
         target_vis = fields.get('visibility') or (
             (current_item.visibility or 'personal') if current_item else 'personal')
         if pinned and target_vis != 'global':
@@ -265,16 +296,21 @@ def list_knowledge(
     knowledge_type: Optional[str] = Query(None, max_length=30, description="按知识类型过滤"),
     status: Optional[str] = Query(None, description="按状态过滤：enabled/disabled，留空=全部"),
     pinned: Optional[str] = Query(None, description="pinned=仅常驻条目"),
+    mine: int = Query(0, ge=0, le=1,
+                      description="1=仅返回 全局+本人创建 的条目（对话页勾选用）"),
 ):
-    """获取知识库列表（visibility 仅管理员可用作过滤，普通用户忽略）"""
-    vf = visibility if (visibility in ('global', 'personal') and is_admin(user)) else None
+    """获取知识库列表（visibility 过滤对所有用户开放，作用于各自可见范围）"""
+    vf = visibility if (visibility in ('global', 'personal')) else None
     st = status if status in ('enabled', 'disabled') else None
     items, total = get_all_knowledge(user, limit, offset, visibility_filter=vf,
                                      keyword=(keyword or '').strip() or None,
                                      type_filter=(knowledge_type or '').strip() or None,
                                      status_filter=st,
-                                     pinned_filter=('pinned' if pinned == 'pinned' else None))
-    return {'items': [_to_dict(item) for item in items], 'total': total}
+                                     pinned_filter=('pinned' if pinned == 'pinned' else None),
+                                     mine=bool(mine))
+    item_dicts = [_to_dict(item) for item in items]
+    _attach_owner_names(item_dicts)
+    return {'items': item_dicts, 'total': total}
 
 
 @router.post("", response_model=KnowledgeResponse)
@@ -321,14 +357,17 @@ def get_knowledge(
     """获取单条知识（权限过滤）"""
     try:
         visible_ids = get_visible_knowledge_ids(user)
-        if visible_ids is not None and knowledge_id not in visible_ids:
-            raise HTTPException(status_code=404, detail="知识不存在或已删除")
-
         item = knowledge_crud.get_one(id=knowledge_id, is_active=1)
         if not item:
             raise HTTPException(status_code=404, detail="知识不存在或已删除")
+        # 非管理员：本人条目 / 全局条目 / 授权清单内条目可读
+        if (visible_ids is not None and item.user_id != user['user_id']
+                and knowledge_id not in visible_ids):
+            raise HTTPException(status_code=404, detail="知识不存在或已删除")
 
-        return _to_dict(item)
+        result = _to_dict(item)
+        _attach_owner_names([result])
+        return result
     except HTTPException:
         raise
     except Exception as e:
@@ -366,12 +405,26 @@ def update_knowledge(
             update_fields['payload'] = json.dumps(data.payload or {}, ensure_ascii=False)
         if 'scope_schema_id' in provided:
             update_fields['scope_schema_id'] = data.scope_schema_id
+        if 'owner_user_id' in provided and data.owner_user_id is not None:
+            # 所有者变更：仅管理员；目标用户必须存在（创建者永远是本人，创建接口不受理此字段）
+            if not is_admin(user):
+                raise HTTPException(status_code=403, detail="仅管理员可更改知识所有者")
+            with session_scope() as db:
+                target = db.query(User.id).filter(User.id == data.owner_user_id).first()
+            if not target:
+                raise HTTPException(status_code=400, detail="目标用户不存在")
+            if data.owner_user_id != item.user_id:
+                update_fields['user_id'] = data.owner_user_id
         update_fields.update(_validate_visibility_fields(user, data, item))
 
         knowledge_crud.update(knowledge_id, **update_fields)
         knowledge_crud.record_version(knowledge_id, 'update', user['user_id'])
-        log_audit(user, "update_knowledge", f"id={knowledge_id}")
-        return _to_dict(knowledge_crud.get_by_id(knowledge_id))
+        owner_note = f" owner->{data.owner_user_id}" if (
+            'owner_user_id' in provided and data.owner_user_id is not None) else ""
+        log_audit(user, "update_knowledge", f"id={knowledge_id}{owner_note}")
+        result = _to_dict(knowledge_crud.get_by_id(knowledge_id))
+        _attach_owner_names([result])
+        return result
     except HTTPException:
         raise
     except Exception as e:
@@ -386,7 +439,7 @@ def delete_knowledge(
     knowledge_id: int,
     user: CurrentUser
 ):
-    """删除知识（软删除 + 版本快照，所有者或管理员；可从版本历史恢复）"""
+    """删除知识（物理删除，条目及其全部版本快照一并清除；所有者或管理员）"""
     try:
         item = knowledge_crud.get_by_id(knowledge_id)
         if not item:
@@ -394,10 +447,9 @@ def delete_knowledge(
         if not is_admin(user) and item.user_id != user['user_id']:
             raise HTTPException(status_code=403, detail="只能删除自己创建的知识")
 
-        knowledge_crud.update(knowledge_id, is_active=0)
-        knowledge_crud.record_version(knowledge_id, 'delete', user['user_id'])
+        knowledge_crud.hard_delete(knowledge_id)
         log_audit(user, "delete_knowledge", f"id={knowledge_id}")
-        return {"message": "知识已删除（可在版本历史中恢复）"}
+        return {"message": "知识已彻底删除（含全部版本历史）"}
     except HTTPException:
         raise
     except Exception as e:
@@ -456,13 +508,9 @@ def restore_knowledge_version(
             'is_pinned': snap.get('is_pinned') or 0,
             'is_active': 1,  # 恢复即重新启用
         }
-        # 全局发布/常驻与创建/更新同权：非管理员不得借历史快照绕过
-        # 「仅管理员可发布全局知识」校验与全局常驻上限（旧快照可能带 global/pinned）
-        if not is_admin(user):
-            if restore_fields['visibility'] == 'global':
-                restore_fields['visibility'] = 'personal'
-            if restore_fields['is_pinned']:
-                restore_fields['is_pinned'] = 0
+        # 常驻注入对全部用户生效，仅管理员可设置——非管理员恢复不得借历史快照绕过
+        if not is_admin(user) and restore_fields['is_pinned']:
+            restore_fields['is_pinned'] = 0
         knowledge_crud.update(knowledge_id, **restore_fields)
         knowledge_crud.record_version(knowledge_id, 'restore', user['user_id'])
         log_audit(user, "restore_knowledge", f"id={knowledge_id} version={body.version_no}")

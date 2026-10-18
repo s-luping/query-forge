@@ -125,9 +125,13 @@ def test_validate_visibility_admin_only(kb_db):
     # 管理员可发布全局
     fields = _validate_visibility_fields(_make_user(role='admin'), data)
     assert fields['visibility'] == 'global'
-    # 普通用户 403
+    # 普通用户同样可发布全局（2026-10-18 放开：个人条目也可设所有人可见）
+    fields = _validate_visibility_fields(_make_user(user_id=2, role='user'), data)
+    assert fields['visibility'] == 'global'
+    # 但条目级常驻仅管理员（注入对全人生效；普通用户走自选常驻偏好）
     with pytest.raises(HTTPException) as ei:
-        _validate_visibility_fields(_make_user(user_id=2, role='user'), data)
+        _validate_visibility_fields(
+            _make_user(user_id=2, role='user'), KnowledgeRequest(is_pinned=1))
     assert ei.value.status_code == 403
 
 

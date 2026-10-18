@@ -28,7 +28,8 @@ class ConversationCrud(BaseCrud):
         return self.count(user_id=user_id)
 
     def list_paged(self, user_id: Optional[int], is_admin: bool = False,
-                   limit: int = 20, offset: int = 0
+                   limit: int = 20, offset: int = 0,
+                   search: Optional[str] = None
                    ) -> Tuple[List[Conversation], int]:
         """分页对话列表 + 总数（一次会话，避免全量加载）
 
@@ -36,6 +37,7 @@ class ConversationCrud(BaseCrud):
             user_id: 用户 id；is_admin=True 时忽略（管理员看全部）
             limit: 每页条数
             offset: 偏移量
+            search: 关键字（标题或任意消息内容模糊匹配，None/空串不过滤）
 
         Returns:
             (conversations, total)
@@ -44,6 +46,13 @@ class ConversationCrud(BaseCrud):
             q = db.query(Conversation)
             if not is_admin:
                 q = q.filter(Conversation.user_id == user_id)
+            if search:
+                kw = f"%{search.strip()}%"
+                has_hit_msg = db.query(ConversationMessage.id).filter(
+                    ConversationMessage.conversation_id == Conversation.id,
+                    ConversationMessage.content.like(kw)
+                ).exists()
+                q = q.filter(Conversation.title.like(kw) | has_hit_msg)
             total = q.count()
             conversations = (q.order_by(Conversation.updated_at.desc())
                              .offset(offset).limit(limit).all())

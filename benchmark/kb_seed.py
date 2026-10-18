@@ -8,7 +8,7 @@
      —— 枚举值全部从 MySQL 实采，消灭"钻石 vs Diamond"式枚举幻觉；
   3. 分库口径（calculation）—— 评分口径/销售额口径/占比分母等归因高频错因。
 
-幂等：按 title 去重（已存在同 title 条目跳过）。
+幂等：按 title 去重（同 title 且内容一致跳过；内容有变更时 PUT 原地更新）。
 用法（管理员凭证走环境变量或默认 admin/REDACTED）：
   .venv\\Scripts\\python.exe benchmark\\kb_seed.py [--base-url http://localhost:8888]
 """
@@ -32,7 +32,9 @@ GLOBAL_PINNED = [
             "3. \"每位/每个/各 X 的…\"必须包含计数为 0 的 X：主表 LEFT JOIN 聚合子查询 + "
             "COALESCE(cnt, 0)，不要只对明细表 GROUP BY。\n"
             "4. 排名/TopN 的 ORDER BY 必须带次级排序列（如 id）保证并列时结果稳定；"
-            "问题含\"前十/最高/排名\"时用窗口函数或 ORDER BY+LIMIT。\n"
+            "问题含\"前十/最高/排名\"时用窗口函数或 ORDER BY+LIMIT；"
+            "问题要求输出\"排名\"列时，SELECT 必须包含 RANK()/ROW_NUMBER() 算出的排名列，"
+            "不能只输出数值列。\n"
             "5. 问题出现\"每月/各/分别\"才 GROUP BY；聚合结果不要把明细列混进 SELECT。"
         ),
     },
@@ -46,6 +48,20 @@ GLOBAL_PINNED = [
             "CAST(REPLACE(REPLACE(TRIM(col), ',', ''), '+', '') AS UNSIGNED)\n"
             "3. 直接 CAST 带非数字前缀的字符串会得到 0 或报错，必须先 REPLACE。\n"
             "4. NULL 与空字符串参与聚合前用 WHERE 过滤或 COALESCE 处理。"
+        ),
+    },
+    {
+        "title": "日期过滤规范：先确认字符串日期格式再比较",
+        "knowledge_type": "convention",
+        "content": (
+            "基准库日期多为字符串且格式不统一，写 WHERE 前必须先确认格式：\n"
+            "1. 'yyyy-MM-dd'（如 toy_sales.date）：可用 substr(date,1,4)='2018'、"
+            "LIKE '2018%' 或 BETWEEN '2018-01-01' AND '2018-12-31'。\n"
+            "2. 'MM/dd/yyyy'（如 city_ride_rides_data.date）：LIKE '2024-11%' 或 "
+            "substr(date,1,4) 一行都匹配不到！必须重排："
+            "substr(date,7,4)||'-'||substr(date,1,2)||'-'||substr(date,4,2) "
+            "转成 'yyyy-MM-dd' 后再 BETWEEN。\n"
+            "3. 不确定格式时先抽查几行样本（SELECT DISTINCT ... LIMIT 5）再写条件。"
         ),
     },
 ]
@@ -118,6 +134,19 @@ SCOPED_CALIBERS = [
      "销售额 = Units × Product_Price（Product_Price 含 $ 前缀必须清洗后相乘）。"
      "「占全部区域/总销售额的比例」分母 = 所有区域销售额总和；"
      "筛选类目时比例分母仍是全量总额。"),
+    ("falcon_dev_20", "网约车「行程日期」格式（高频错因）",
+     ["日期", "11月", "2024年", "月份", "接单", "date"],
+     "city_ride_rides_data.date 为 'MM/dd/yyyy' 字符串（如 '11/11/2024'），"
+     "用 LIKE '2024-11%' 或 substr(date,1,4) 过滤会得到 0 行。"
+     "过滤某年某月必须写 substr(date,7,4)='2024' AND substr(date,1,2)='11'，"
+     "或重组为 'yyyy-MM-dd' 后 BETWEEN '2024-11-01' AND '2024-11-30'。"),
+    ("falcon_dev_14", "玩具店「销售额排名」输出与日期格式（高频错因）",
+     ["销售额", "排名", "销售"],
+     "「销售额排名」类问题必须输出排名列本身："
+     "RANK() OVER (ORDER BY total_sales DESC) AS `排名`，不能只输出店铺名和销售额两列。"
+     "销售额必须先清洗价格再相乘：CAST(REPLACE(TRIM(p.product_price), '$', '') AS DECIMAL(10,2)) * "
+     "CAST(units AS SIGNED)，直接 CAST '$39.99' 会得到 0。"
+     "toy_sales.date 为 'yyyy-MM-dd'，按年过滤用 substr(date,1,4)='2018' 或 LIKE '2018%'。"),
     ("falcon_dev_4", "保理业务「发票金额比例」分母口径（高频错因）",
      ["比例", "占比", "发票金额", "逾期"],
      "\"发票金额的比例\"分母 = 全表 InvoiceAmount 总和（不区分是否争议）；"
@@ -161,26 +190,35 @@ def main():
     r = s.get(f"{args.base_url}/api/schema/schemas", timeout=30)
     schema_ids = r.json().get("schema_ids", {})
 
-    # 已有条目（按 title 去重）
-    existing = set()
+    # 已有条目（按 title 去重，记录 id/content 以便内容变更时原地更新）
+    existing = {}
     r = s.get(f"{args.base_url}/api/knowledge?limit=100", timeout=30)
     for it in r.json().get("items", []):
-        existing.add(it.get("title"))
+        existing[it.get("title")] = {"id": it.get("id"), "content": it.get("content")}
 
     created = skipped = 0
 
     def create_entry(title, knowledge_type, content, aliases, scope_name=None,
                      pinned=0):
         nonlocal created, skipped
-        if title in existing:
-            print(f"  跳过（已存在）: {title}")
-            skipped += 1
-            return
         body = {
             "title": title, "knowledge_type": knowledge_type, "content": content,
             "aliases": aliases, "visibility": "global", "is_pinned": pinned,
             "scope_schema_id": schema_ids.get(scope_name) if scope_name else None,
         }
+        if title in existing:
+            info = existing[title]
+            if info.get("content") == content:
+                print(f"  跳过（已存在且内容一致）: {title}")
+                skipped += 1
+                return
+            r = s.put(f"{args.base_url}/api/knowledge/{info['id']}", json=body, timeout=30)
+            if r.status_code != 200:
+                print(f"  [FAIL-UPDATE] {title}: {r.status_code} {r.text[:120]}")
+                return
+            created += 1
+            print(f"  更新: {title} (id={info['id']})")
+            return
         r = s.post(f"{args.base_url}/api/knowledge", json=body, timeout=30)
         if r.status_code != 200:
             print(f"  [FAIL] {title}: {r.status_code} {r.text[:120]}")

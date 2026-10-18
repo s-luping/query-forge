@@ -31,6 +31,7 @@ let currentPage = 1;
 const pageSize = 10;
 let _schemaIds = {};   // name -> id（作用域下拉）
 let _isAdmin = false;
+let _users = [];            // 全部用户 [{user_id, username, role}]（管理员加载，供所有者下拉）
 let _versionItemId = null;  // 版本弹窗当前条目
 let _listItems = [];        // 当前页列表数据（供弹窗按 id 取标题，避免把标题插进 onclick JS 串）
 
@@ -60,9 +61,57 @@ async function loadAdminStatus() {
             _isAdmin = p.role === 'admin';
         }
     } catch (e) { /* 默认按普通用户处理 */ }
-    // 全局/常驻控件与筛选仅管理员可见
-    document.getElementById('visibilityBlock').classList.toggle('d-none', !_isAdmin);
-    document.getElementById('visibilityFilter').classList.toggle('d-none', !_isAdmin);
+    // 可见范围控件与筛选对所有用户开放；条目级"常驻"仅管理员（对全人生效）
+    document.getElementById('visibilityBlock').classList.remove('d-none');
+    document.getElementById('visibilityFilter').classList.remove('d-none');
+    document.getElementById('pinnedBlock').classList.toggle('d-none', !_isAdmin);
+    loadMyPinned();
+    if (_isAdmin) loadUsers();
+}
+
+// ── 用户自选常驻（每人独立，仅注入本人对话） ──────────────
+let _myPinnedIds = new Set();
+
+async function loadMyPinned() {
+    try {
+        const resp = await apiRequest('/api/user/preferences/pinned-knowledge');
+        if (!resp.ok) return;
+        const data = await resp.json();
+        _myPinnedIds = new Set((data.knowledge_ids || []).map(String));
+    } catch (e) { /* 加载失败按空处理 */ }
+}
+
+async function toggleMyPin(id, btn) {
+    const key = String(id);
+    const next = new Set(_myPinnedIds);
+    if (next.has(key)) next.delete(key); else next.add(key);
+    try {
+        const resp = await apiRequest('/api/user/preferences/pinned-knowledge', {
+            method: 'PUT',
+            body: JSON.stringify({ knowledge_ids: Array.from(next).map(Number) })
+        });
+        if (!resp.ok) throw new Error((await resp.json()).detail || '设置失败');
+        _myPinnedIds = next;
+        if (btn) {
+            btn.classList.toggle('btn-warning', next.has(key));
+            btn.classList.toggle('btn-outline-secondary', !next.has(key));
+        }
+        QF.toast(next.has(key) ? '已设为我的常驻（每次对话自动注入，仅对自己生效）' : '已取消我的常驻', 'success');
+    } catch (e) {
+        QF.toast('常驻设置失败: ' + e.message, 'danger');
+    }
+}
+
+async function loadUsers() {
+    try {
+        const resp = await apiRequest('/api/user/list');
+        if (!resp.ok) return;
+        _users = await resp.json() || [];
+        const sel = document.getElementById('knowledgeOwner');
+        sel.innerHTML = _users.map(u =>
+            `<option value="${u.user_id}">${escapeHtml(u.username)}${u.role === 'admin' ? '（管理员）' : ''}</option>`
+        ).join('');
+    } catch (e) { /* 所有者下拉加载失败按空处理 */ }
 }
 
 // ═══════════════════════════════════════════════════════
@@ -128,8 +177,12 @@ function renderList(items) {
         }
         const aliasText = (k.aliases && k.aliases.length) ? `｜别名: ${k.aliases.join(', ')}` : '';
         const visBadge = k.visibility === 'global' ? `<span class="badge bg-dark">全局</span> ` : '';
-        const pinBadge = k.is_pinned ? `<span class="badge bg-warning text-dark">常驻</span> ` : '';
+        const pinBadge = k.is_pinned ? `<span class="badge bg-warning text-dark">全员常驻</span> ` : '';
         const visBtn = _isAdmin ? `<button class="btn btn-sm btn-outline-primary ms-1" onclick="event.stopPropagation();openVersionModal(${k.id})">版本</button>` : '';
+        const myPin = _myPinnedIds.has(String(k.id));
+        const pinBtn = `<button class="btn btn-sm ${myPin ? 'btn-warning' : 'btn-outline-secondary'} ms-1"
+            title="${myPin ? '取消我的常驻' : '设为我的常驻（每次对话自动注入，仅对自己生效）'}"
+            onclick="event.stopPropagation();toggleMyPin(${k.id}, this)">📌</button>`;
         return `
         <div class="knowledge-item p-3" onclick="editKnowledge(${k.id})">
             <div class="d-flex justify-content-between align-items-start">
@@ -139,11 +192,13 @@ function renderList(items) {
                     <div class="meta">
                         创建: ${k.created_at ? k.created_at.substring(0,10) : '-'}
                         · 更新: ${k.updated_at ? k.updated_at.substring(0,10) : '-'}
+                        · 所有者: ${escapeHtml(k.owner_name || ('#' + (k.user_id ?? '-')))}
                         ${aliasText}
                     </div>
                 </div>
                 <div class="ms-3 text-end flex-shrink-0">
                     <span class="badge ${k.is_active ? 'badge-active' : 'badge-inactive'}">${k.is_active ? '启用' : '禁用'}</span>
+                    ${pinBtn}
                     ${visBtn}
                     <button class="btn btn-sm btn-outline-danger ms-2" onclick="event.stopPropagation();deleteKnowledge(${k.id})">删除</button>
                 </div>
@@ -265,6 +320,9 @@ function showCreateForm() {
     document.getElementById('knowledgeVisibility').value = 'personal';
     document.getElementById('knowledgePinned').checked = false;
     document.getElementById('versionHistoryBtn').classList.add('d-none');
+    // 新建时所有者恒为创建者本人，不提供更改
+    document.getElementById('ownerBlock').classList.add('d-none');
+    document.getElementById('knowledgeOwner').disabled = true;
     _versionItemId = null;
     // 清空 relation 子表单
     ['Left', 'Right'].forEach(cap => {
@@ -299,6 +357,19 @@ async function editKnowledge(id) {
         document.getElementById('knowledgeActive').value = k.is_active ? '1' : '0';
         document.getElementById('knowledgeVisibility').value = k.visibility || 'personal';
         document.getElementById('knowledgePinned').checked = !!k.is_pinned;
+        // 所有者（管理员可改；下拉未加载完时回退显示 user_id）
+        document.getElementById('ownerBlock').classList.toggle('d-none', !_isAdmin);
+        const ownerSel = document.getElementById('knowledgeOwner');
+        ownerSel.disabled = !_isAdmin;
+        if (_isAdmin) {
+            if (!_users.length) ownerSel.innerHTML = `<option value="${k.user_id}">#${k.user_id}</option>`;
+            ownerSel.value = String(k.user_id);
+            if (ownerSel.value !== String(k.user_id)) {
+                ownerSel.insertAdjacentHTML('beforeend',
+                    `<option value="${k.user_id}">#${k.user_id}（已删除）</option>`);
+                ownerSel.value = String(k.user_id);
+            }
+        }
         _versionItemId = k.id;
         document.getElementById('versionHistoryBtn').classList.toggle('d-none', !_isAdmin);
         // 关系子表单回填
@@ -403,7 +474,12 @@ async function saveKnowledge(event) {
     const body = { title, knowledge_type: type, scope_schema_id, aliases, is_active: isActive };
     if (_isAdmin) {
         body.visibility = document.getElementById('knowledgeVisibility').value;
-        body.is_pinned = document.getElementById('knowledgePinned').checked ? 1 : 0;
+        if (document.getElementById('pinnedBlock').classList.contains('d-none') === false) {
+            body.is_pinned = document.getElementById('knowledgePinned').checked ? 1 : 0;
+        }
+        if (id) body.owner_user_id = parseInt(document.getElementById('knowledgeOwner').value) || null;
+    } else {
+        body.visibility = document.getElementById('knowledgeVisibility').value;
     }
     if (type === 'relation') {
         body.payload = buildRelationPayload();
@@ -430,7 +506,7 @@ async function saveKnowledge(event) {
 }
 
 async function deleteKnowledge(id) {
-    if (!confirm('确定删除此知识？删除后可在版本历史中恢复。')) return;
+    if (!confirm('确定删除此知识？将彻底删除该条目及其全部版本历史，不可恢复。')) return;
     try {
         const resp = await apiRequest(`/api/knowledge/${id}`, { method: 'DELETE' });
         if (!resp.ok) throw new Error('删除失败');

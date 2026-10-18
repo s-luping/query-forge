@@ -377,9 +377,16 @@ def _resolve_knowledge_ids(knowledge_ids: Optional[List[int]] = None,
 
 
 def _get_knowledge_safe(user_id: int, knowledge_id: Optional[int] = None,
-                        knowledge_ids: Optional[List[int]] = None) -> str:
-    """获取知识内容（支持多条拼接，安全版本，失败返回空字符串）"""
+                        knowledge_ids: Optional[List[int]] = None,
+                        exclude_ids: Optional[List[int]] = None) -> str:
+    """获取知识内容（支持多条拼接，安全版本，失败返回空字符串）
+
+    exclude_ids: 已由常驻段注入的条目 id，跳过以防同一知识双重注入
+    """
     ids = _resolve_knowledge_ids(knowledge_ids, knowledge_id)
+    if exclude_ids:
+        exclude = {int(i) for i in exclude_ids}
+        ids = [i for i in ids if i not in exclude]
     if not ids:
         return ""
     try:
@@ -438,21 +445,60 @@ def _get_global_rules_content() -> tuple:
 
 
 def _get_user_default_knowledge_ids(user_id: int) -> List[int]:
-    """用户默认勾选的知识库条目（新对话未显式选择时自动带上）"""
+    """旧版默认勾选回退（仅显式不传 knowledge_ids 的 API 调用会走到）。
+
+    我的常驻（pinned_knowledge_ids）已无条件注入，此处排除防双重注入。
+    """
     try:
-        from models.preference import UserPreference
-        with session_scope() as db:
-            row = db.query(UserPreference).filter(
-                UserPreference.user_id == user_id,
-                UserPreference.pref_key == 'default_knowledge_ids').first()
-            # 会话内取标量，避免脱离实例后访问属性（DetachedInstanceError）
-            raw = row.pref_value if row else None
-        if raw:
-            from crud.knowledge import _parse_json
-            return [int(i) for i in (_parse_json(raw, []) or []) if i]
+        from app.routers.user_router import _get_pref_ids
+        pinned = set(_get_pref_ids(user_id, 'pinned_knowledge_ids'))
+        return [i for i in _get_pref_ids(user_id, 'default_knowledge_ids')
+                if i not in pinned]
     except Exception:
-        pass
-    return []
+        return []
+
+
+def _get_user_pinned_content(user_id: int, global_text: str = '') -> tuple:
+    """用户自选常驻知识（每人自己勾选，仅注入本人对话）。
+
+    Args:
+        user_id: 用户 id
+        global_text: 管理员全局常驻内容，用于内容级去重（同条目不重复注入）
+
+    Returns:
+        (text, n, ids)：text 为拼好的多段内容（不含段标题），ids 为实际注入的条目 id
+        （供「用户勾选」段排除，防双重注入）；空字符串表示无自选常驻。
+    """
+    try:
+        from app.routers.user_router import _get_pref_ids
+        from app.routers.knowledge_router import get_knowledge_safe
+        ids = _get_pref_ids(user_id, 'pinned_knowledge_ids')
+        if not ids:
+            return "", 0, []
+        parts, total, seen, effective = [], 0, set(), []
+        for kid in ids[:20]:
+            k = get_knowledge_safe(user_id, kid)   # 内含可见性校验，越权返回 {}
+            content = (k.get('content') or '').strip()
+            if not content or content in seen:
+                continue
+            if global_text and content in global_text:
+                continue   # 与管理员全局常驻重复，跳过
+            if len(content) > _GLOBAL_RULE_ITEM_BUDGET:
+                content = content[:_GLOBAL_RULE_ITEM_BUDGET] + '…(截断)'
+            if parts and total + len(content) > _GLOBAL_RULE_TOTAL_BUDGET:
+                logger.warning(
+                    f"用户自选常驻知识超预算 user={user_id} "
+                    f"{total + len(content)}>{_GLOBAL_RULE_TOTAL_BUDGET}，仅注入前 {len(parts)} 条")
+                break
+            seen.add(content)
+            effective.append(kid)
+            title = k.get('title') or f"知识#{kid}"
+            parts.append(f"◆ {title}\n{content}")
+            total += len(content)
+        return "\n\n".join(parts), len(parts), effective
+    except Exception as e:
+        logger.warning(f"加载用户自选常驻知识失败（忽略）: {e}")
+        return "", 0, []
 
 
 def _record_telemetry(user_id: int, llm_client: LLMClient, question: str,
@@ -547,12 +593,17 @@ def create_conversation(
         if not knowledge_ids and payload.knowledge_ids is None and payload.knowledge_id is None:
             knowledge_ids = _get_user_default_knowledge_ids(user_id)
             used_default_kb = bool(knowledge_ids)
-        selected_content = _get_knowledge_safe(user_id, knowledge_ids=knowledge_ids)
-        # 全局常驻知识（管理员 pin，人人遵守）+ 用户勾选知识，各自带段标题注入
+        # 常驻知识 = 管理员全局常驻（人人遵守）+ 用户自选常驻（仅本人）+ 用户勾选知识
+        # 自选常驻条目从勾选段排除，防同一知识双重注入
         global_text, pinned_n = _get_global_rules_content()
+        user_pinned_text, user_pinned_n, user_pinned_ids = _get_user_pinned_content(user_id, global_text)
+        selected_content = _get_knowledge_safe(user_id, knowledge_ids=knowledge_ids,
+                                               exclude_ids=user_pinned_ids)
         kb_sections = []
         if global_text:
             kb_sections.append(f"【全局规则（管理员发布，人人遵守）】\n{global_text}")
+        if user_pinned_text:
+            kb_sections.append(f"【我的常驻知识（自行勾选，仅本人生效）】\n{user_pinned_text}")
         if selected_content:
             kb_sections.append(f"【领域知识（用户勾选）】\n{selected_content}")
         knowledge_content = "\n\n".join(kb_sections)
@@ -569,6 +620,7 @@ def create_conversation(
                      "user_selected": bool(payload.knowledge_ids or payload.knowledge_id),
                      "used_default_kb": used_default_kb,
                      "global_pinned": pinned_n,
+                     "user_pinned": user_pinned_n,
                      "note": "用户显式选择的知识库；链路第 8 步为自动概念召回(与勾选无关)" if not knowledge_ids else "",
                      "loaded": bool(knowledge_content),
                      "content_length": len(knowledge_content)},
@@ -824,13 +876,16 @@ def send_message(
                      "config_id": conv_llm_config_id},
         })
         # 跟进消息的知识内容需在日志步骤前加载（避免引用未赋值变量）；
-        # 全局常驻知识（管理员 pin）每次追问都注入
-        selected_content = _get_knowledge_safe(
-            user_id, knowledge_ids=conv_knowledge_ids)
+        # 常驻知识（管理员全局 + 用户自选）每次追问都注入，自选常驻条目从勾选段排除
         global_text, pinned_n = _get_global_rules_content()
+        user_pinned_text, user_pinned_n, user_pinned_ids = _get_user_pinned_content(user_id, global_text)
+        selected_content = _get_knowledge_safe(
+            user_id, knowledge_ids=conv_knowledge_ids, exclude_ids=user_pinned_ids)
         kb_sections = []
         if global_text:
             kb_sections.append(f"【全局规则（管理员发布，人人遵守）】\n{global_text}")
+        if user_pinned_text:
+            kb_sections.append(f"【我的常驻知识（自行勾选，仅本人生效）】\n{user_pinned_text}")
         if selected_content:
             kb_sections.append(f"【领域知识（用户勾选）】\n{selected_content}")
         knowledge_content = "\n\n".join(kb_sections)
@@ -839,6 +894,7 @@ def send_message(
             "data": {"knowledge_ids": conv_knowledge_ids,
                      "user_selected": bool(conv_knowledge_ids),
                      "global_pinned": pinned_n,
+                     "user_pinned": user_pinned_n,
                      "note": "用户显式选择的知识库；链路第 8 步为自动概念召回(与勾选无关)" if not conv_knowledge_ids else "",
                      "loaded": bool(knowledge_content),
                      "content_length": len(knowledge_content)},
@@ -983,12 +1039,14 @@ def list_conversations(
     user: CurrentUser,
     limit: int = Query(20, ge=1, le=200),
     offset: int = Query(0, ge=0),
+    search: Optional[str] = Query(None, max_length=200),
 ):
     """获取对话列表（分页，按更新时间倒序）。管理员看全部，用户看自己。
 
     Args:
         limit: 每页条数（默认 20，最大 200）
         offset: 偏移量（分页游标）
+        search: 关键字，匹配标题或会话内任意消息内容（空则不过滤）
 
     Returns:
         {"items": [...], "total": 总条数}
@@ -997,7 +1055,8 @@ def list_conversations(
     is_admin = user.get('role') == 'admin'
 
     conversations, total = conversation_crud.list_paged(
-        user_id, is_admin, limit=limit, offset=offset)
+        user_id, is_admin, limit=limit, offset=offset,
+        search=(search or '').strip() or None)
     # schema id → name 映射（一次查询）
     schema_names = schema_crud.name_map()
     # 各对话消息数（一次 GROUP BY 聚合，避免 N+1 count）

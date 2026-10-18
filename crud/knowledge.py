@@ -63,6 +63,25 @@ class KnowledgeCrud(BaseCrud):
                 KnowledgeItem.is_pinned == 1,
                 KnowledgeItem.is_active == 1).count()
 
+    def hard_delete(self, item_id: int) -> bool:
+        """物理删除条目及其全部版本快照（同一事务）。
+
+        先解除 conversations.knowledge_id 的外键引用（置 NULL，不动对话本身），
+        否则被对话关联过的条目删除时触发 FOREIGN KEY 约束失败。
+        """
+        with session_scope() as db:
+            from models.conversation import Conversation
+            db.query(Conversation).filter(
+                Conversation.knowledge_id == item_id).update(
+                {'knowledge_id': None}, synchronize_session=False)
+            n = db.query(KnowledgeItem).filter(
+                KnowledgeItem.id == item_id).delete(
+                synchronize_session=False)
+            db.query(KnowledgeVersion).filter(
+                KnowledgeVersion.item_id == item_id).delete(
+                synchronize_session=False)
+            return n > 0
+
     # ---------- 版本快照 ----------
 
     @staticmethod
