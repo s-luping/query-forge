@@ -219,6 +219,8 @@ class SchemaRetriever:
           （如 formula_1 的 drivers/races 未召回导致两模型一致误拦截）。
         - 向量索引可能是历史构建（缺库/权限范围不一致），仅靠向量会漏召回
           未建索引库的表 → 用 DB 关键词召回做并集兜底，保证覆盖所有可见库。
+          向量在位时兜底保留 top_k//3 名额（防向量满载把兜底整体挤出）；
+          无向量结果时兜底全量返回（原降级行为不变）。
         - 两条路径返回字段均以 DB 权限集合过滤/归一化（schema_name/column_name）。
         - 结果去重（同一字段以 DB 权威结构为准）。
         - query: 原始用户问题，用于向量编码（语义完整度高于关键词拼接）。
@@ -250,17 +252,26 @@ class SchemaRetriever:
                     # 标记来源：向量召回语义相关度高，聚合裁剪时优先保留
                     d['recall_source'] = 'vector'
                     merged.append(d)
-        # DB 关键词召回（已按权限过滤）并集补充，覆盖向量索引缺失的库/表
-        for d in self.recall_from_db(keywords, schema_name):
+        # DB 关键词召回（已按权限过滤）并集补充，覆盖向量索引缺失的库/表。
+        # 向量在位时必须给兜底保留固定名额（top_k//3）：此前按"先向量后兜底"
+        # 整体截断，向量满载 top_k 条时 DB 兜底会被 100% 挤出——
+        # 「科目」等列描述子串命中的字段永远进不了上下文（并集保证覆盖的意图失效）。
+        # 无向量结果时兜底全量返回（保持原降级行为）。
+        top_k = get_vector_config('FIELD_RECALL_TOP_K')
+        db_quota = max(1, top_k // 3) if merged else top_k
+        db_kept: List[Dict] = []
+        for d in self.recall_from_db(keywords, schema_name)[:db_quota]:
             key = (d.get('schema_name') or '', d.get('table_name', ''),
                    d.get('column_name', ''))
             if key not in seen:
                 seen.add(key)
                 d['recall_source'] = 'db'
-                merged.append(d)
-        # 超出 top_k 时截断（优先保留向量高相关结果）
-        top_k = get_vector_config('FIELD_RECALL_TOP_K')
-        return merged[:top_k] if len(merged) > top_k else merged
+                db_kept.append(d)
+        merged.extend(db_kept)
+        # 超出 top_k 时截断：向量结果让出 db_kept 同等名额，保证兜底不被挤掉
+        if len(merged) > top_k:
+            merged = merged[:max(0, top_k - len(db_kept))] + db_kept
+        return merged
 
     def _filter_recalled_by_permission(self, recalled: List[Dict],
                                        schema_name: Optional[str] = None) -> List[Dict]:
@@ -326,7 +337,11 @@ class SchemaRetriever:
             for f in recalled_fields:
                 t = f.get('table_name')
                 if t:
-                    w = 10 if f.get('recall_source') == 'vector' else 1
+                    # 权重：向量(10) > 知识扩表(5) > DB 子串兜底(1)。
+                    # 知识扩表是"口径知识确认相关"的表（如 entity_map 声明的 DM 事实表），
+                    # 不应与子串噪声表同权竞争裁剪名额。
+                    src = f.get('recall_source')
+                    w = 10 if src == 'vector' else (5 if src == 'knowledge' else 1)
                     counts[t] = counts.get(t, 0) + w
             if keep_first:
                 first_names = [t for t in table_names if t in keep_first]
@@ -380,7 +395,8 @@ class SchemaRetriever:
             {
               'items':       [{id,title,knowledge_type,aliases,payload,content,score}, ...],
               'prompt_text': str,   # 注入 system prompt【领域知识】的文本块
-              'related_tables': [table_name, ...]  # relation 类知识涉及的表（跨库扩表用）
+              'related_tables': [table_name, ...]  # relation 类两侧表 + 其他类型
+                                                    # payload.related_tables 声明的表（跨库扩表用）
             }
         """
         from crud.knowledge import knowledge_crud
@@ -410,13 +426,20 @@ class SchemaRetriever:
         related_tables: List[str] = []
         for d in items:
             serialized.append(d)
+            pl = d.get('payload') or {}
             # relation 类型：收集两侧表名用于动态扩表（实现跨库作用域发现）
             if d['knowledge_type'] == 'relation':
-                pl = d.get('payload') or {}
                 for side in ('left', 'right'):
                     t = (pl.get(side) or {}).get('table')
                     if t and t not in related_tables:
                         related_tables.append(t)
+            # 其他类型（entity_map/note 等）：payload.related_tables 显式声明关联表，
+            # 作为「口语词 → 事实表」的桥接。背景：向量召回按列名/描述语义排序，
+            # 「费用合计/EETotal/AA0003」这类业务问法排不进 top-K 时（列名是通用英文、
+            # 无采样值），由命中的知识条目把事实表补进上下文，避免判断步因表缺失误拦截。
+            for t in (pl.get('related_tables') or []):
+                if t and t not in related_tables:
+                    related_tables.append(t)
 
         return {
             'items': serialized,
@@ -533,7 +556,8 @@ class SchemaRetriever:
 
         fields_whitelist: {(表名, 字段名), ...} — 非空时仅输出白名单字段，
         并自动补齐主键(PRI)与外键列（保证 JOIN 关联可用）。
-        首轮/单次生成不传（需要完整表结构）；追问轮传"历史 SQL 引用列 ∪ 本轮召回列"。
+        首轮/单次生成不传（需要完整表结构）；追问轮传「历史 SQL 引用列 ∪ 本轮
+        召回列 ∪ 知识扩表全列」（知识表无召回列，白名单须显式保留其全部字段）。
         """
         lines = ["表名,字段名,字段类型,字段描述,主键,外键"]
         tables = aggregation.get('tables', [])

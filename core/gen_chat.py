@@ -360,6 +360,9 @@ class ChatSession:
 
         # 累积召回：首轮表集合(first_tables) ∪ 追问重召回表 ∪ 知识扩表
         # 仅当首轮表集合已知时重建（带权限裁剪），否则沿用 router 全量 schema_csv（向后兼容旧对话）
+        # 知识扩表（entity_map 等 payload.related_tables 声明的事实表）并入 keep_first：
+        # 否则首轮 10 张召回杂表占满 MAX_TABLES 名额时（无历史 SQL 时 keep_first=首轮表集合），
+        # 知识确认相关的事实表会在裁剪环节被整体挤掉（conv8「24-09费用合计」事故）。
         scope_id = scope_schema_id if scope_schema_id is not None else self.retriever.resolve_scope_schema_id(schema_name)
         # 自动召回排除已勾选知识内容（content 精确去重，防同一知识重复出现）
         kb_base = knowledge_content or ''
@@ -385,6 +388,9 @@ class ChatSession:
             used_tables = list(dict.fromkeys(used_tables))
             first_set = set(first_tables) if first_tables else set()
             keep_first = set(used_tables) or (first_set if first_tables else None)
+            # 知识扩表并入保留集：与历史 SQL 表同级的"必留表"待遇
+            if followup_recall['related_tables']:
+                keep_first = (keep_first or set()) | set(followup_recall['related_tables'])
 
             # 合并表集合：历史已用表在前（顺序稳定，供同名列去重裁决），召回/知识扩表在后
             merged_order = list(used_tables)
@@ -394,8 +400,17 @@ class ChatSession:
             try:
                 # 小库直通：本轮召回命中整库标记时，合并表集合同样整库注入
                 full_scope = bool(aggregation and aggregation.get('full_scope'))
-                recalled = [{'table_name': t, **({'full_scope': True} if full_scope else {})}
-                            for t in merged_order]
+                # 知识扩表标记 recall_source='knowledge'：聚合权重高于 DB 子串兜底，
+                # 语义上"知识确认相关"的表不应与噪声表同权竞争
+                knowledge_table_set = set(followup_recall['related_tables'])
+                recalled = []
+                for t in merged_order:
+                    item = {'table_name': t}
+                    if t in knowledge_table_set:
+                        item['recall_source'] = 'knowledge'
+                    if full_scope:
+                        item['full_scope'] = True
+                    recalled.append(item)
                 # keep_first：历史 SQL 用过的表完整保留，超限只裁剪新增召回表
                 merged_aggregation = self.retriever.aggregate_tables(
                     recalled, schema_name, keep_first=keep_first)
@@ -421,6 +436,18 @@ class ChatSession:
                 else:
                     field_whitelist = required_cols | self._trim_recall_cols(
                         merged_aggregation, required_cols, recall_cols)
+                    # 知识扩表的列全部保留（对齐首轮 extend_aggregation_with_tables
+                    # 注入完整表结构的行为）：字段级白名单只认「历史 SQL 引用列 ∪ 本轮
+                    # 召回列」，知识表没有召回列，会被裁到只剩主外键——度量列
+                    # （如 ACTUAL_VALUE）丢失，判断步仍以「缺金额字段」误拦截
+                    # （conv8 事故第三层：表进来了，列没了）。
+                    if knowledge_table_set:
+                        for _f in (merged_aggregation.get('all_fields')
+                                   or {}).values():
+                            if _f.get('table_name') in knowledge_table_set:
+                                field_whitelist.add(
+                                    (_f['table_name'],
+                                     _f.get('column_name') or ''))
                 schema_csv_used = SchemaRetriever.build_schema_csv(
                     merged_aggregation, field_whitelist or None)
                 relation_tables = merged_aggregation.get('tables', [])
@@ -479,12 +506,20 @@ class ChatSession:
 
         # Step 4.5: 可否生成 SQL 判断 — 信息不足则提前返回，引导用户补充
         # 传入最近对话历史，让判断基于上下文（追问如「只保留某列」需结合上一轮表/字段）
+        # 判断 prompt 必须并入自动召回的知识（与首轮 kb 构造保持一致）：
+        # 此前追问轮只传用户勾选知识（未勾选时为空），entity_map 等口径知识
+        # （费用→AA0003、公司汇总→EETotal、项目汇总→PJTotal）进不了判断步，
+        # 判断步看不到口径映射，只能以"缺实采值/缺表"反复拦截（conv8 连续 5 轮误拦截）。
         followup_relations_for_judge = ""
         if relation_tables:
             followup_relations_for_judge = self.retriever.get_relations_text(relation_tables)
+        judge_kb = knowledge_content or ''
+        if followup_recall['prompt_text']:
+            judge_kb = ((judge_kb + '\n\n' + followup_recall['prompt_text']).strip()
+                        if judge_kb else followup_recall['prompt_text'])
         judge_prompt = self.sql_generator.judge_generatable_prompt(
             query=new_user_content, schema_csv=schema_csv_used,
-            knowledge_content=knowledge_content,
+            knowledge_content=judge_kb,
             relations_text=followup_relations_for_judge,
             history_queries=conversation_messages)
         self._log_step(pipeline_log, "STEP_JUDGE_PROMPT", {
