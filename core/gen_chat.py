@@ -393,8 +393,13 @@ class ChatSession:
                 keep_first = (keep_first or set()) | set(followup_recall['related_tables'])
 
             # 合并表集合：历史已用表在前（顺序稳定，供同名列去重裁决），召回/知识扩表在后
+            # 注意：aggregation 可能为 None——追问无实质业务关键词（跳过向量召回）
+            # 或召回异常降级时复用上一轮 schema_csv，此时 first_tables 非空仍会进入
+            # 本分支，必须做 None 防御（与下方 full_scope / from_recall 保持一致），
+            # 否则 NoneType.get 直接 500（conv11「26年9月一级科目总金额」追问事故）
+            recall_tables = (aggregation.get('tables') or []) if aggregation else []
             merged_order = list(used_tables)
-            for t in (aggregation.get('tables') or []) + list(followup_recall['related_tables']):
+            for t in recall_tables + list(followup_recall['related_tables']):
                 if t not in merged_order:
                     merged_order.append(t)
             try:
