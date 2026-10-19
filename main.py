@@ -109,10 +109,24 @@ async def _rate_limit_handler(request: Request, exc: RateLimitExceeded):
 
 @app.exception_handler(RequestValidationError)
 async def _validation_handler(request: Request, exc: RequestValidationError):
-    """参数校验失败 — 422 → 统一错误体（40000），detail 为字段级错误"""
+    """参数校验失败 — 422 → 统一错误体（40000），detail 为字段级错误。
+
+    pydantic v2 的 errors() 里 ctx 可能携带原始异常对象（如 field_validator 抛出的
+    ValueError），json.dumps 无法序列化会二次 500——这里统一把 ctx 展平为字符串。
+    """
+    if DEBUG:
+        detail = []
+        for e in exc.errors():
+            e = dict(e)
+            ctx = e.get('ctx')
+            if isinstance(ctx, dict):
+                e['ctx'] = {k: str(v) for k, v in ctx.items()}
+            detail.append(e)
+    else:
+        detail = '请求参数格式不正确'
     return JSONResponse(
         status_code=422,
-        content=error_body(422, detail=exc.errors() if DEBUG else '请求参数格式不正确',
+        content=error_body(422, detail=detail,
                            message='请求参数格式不正确'),
     )
 
