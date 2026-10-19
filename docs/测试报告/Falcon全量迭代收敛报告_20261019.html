@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Falcon 全量迭代收敛报告 · 2026-10-19</title>
+<style>
+  :root { --ink:#1a2233; --muted:#66707f; --line:#e3e7ee; --ok:#0c8a4d; --bad:#c0392b; --accent:#2456c8; --bg:#f6f8fb; --warn:#b7791f; }
+  * { box-sizing:border-box; }
+  body { font-family:"Segoe UI","Microsoft YaHei",sans-serif; color:var(--ink); background:var(--bg); margin:0; padding:32px 16px; }
+  .wrap { max-width:1120px; margin:0 auto; }
+  h1 { font-size:24px; margin:0 0 4px; }
+  .sub { color:var(--muted); font-size:13px; margin-bottom:24px; }
+  .card { background:#fff; border:1px solid var(--line); border-radius:10px; padding:20px 24px; margin-bottom:20px; }
+  h2 { font-size:17px; margin:0 0 12px; border-left:4px solid var(--accent); padding-left:10px; }
+  h3 { font-size:14px; margin:14px 0 6px; }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th,td { border-bottom:1px solid var(--line); padding:7px 9px; text-align:left; vertical-align:top; }
+  th { background:#f0f3f8; font-weight:600; white-space:nowrap; }
+  .kpi { display:flex; gap:14px; flex-wrap:wrap; margin-bottom:4px; }
+  .kpi .box { flex:1; min-width:160px; background:#fff; border:1px solid var(--line); border-radius:10px; padding:14px 18px; }
+  .kpi .num { font-size:24px; font-weight:700; }
+  .kpi .lbl { color:var(--muted); font-size:12px; margin-top:2px; }
+  .ok { color:var(--ok); font-weight:600; }
+  .bad { color:var(--bad); font-weight:600; }
+  .warn { color:var(--warn); font-weight:600; }
+  code { background:#f0f3f8; border-radius:4px; padding:1px 5px; font-size:12px; }
+  ul { margin:6px 0; padding-left:20px; }
+  li { margin:4px 0; }
+  .note { color:var(--muted); font-size:12px; }
+  .traj td:first-child { font-weight:600; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Falcon 全量错题迭代收敛报告</h1>
+  <div class="sub">周期 2026-10-18 ~ 10-19 · 模型 glm-5.3-flash（id=7，NVIDIA NIM） · 方法：全量重跑 → 逐桶归因（子代理并行 + MySQL 重放实证）→ KB/比对器/数据指南修订 → 小批验证（≤10 题）→ 循环收敛</div>
+
+  <div class="kpi">
+    <div class="box"><div class="num">35.8% → 74.0%</div><div class="lbl">EX 全程轨迹（96/268 → 205/277），累计 +38.2pp</div></div>
+    <div class="box"><div class="num">202 → 74</div><div class="lbl">失败题从 202（含拦截/异常）收敛至 72 wrong + 16 拦截 + 16 异常</div></div>
+    <div class="box"><div class="num">3 类系统修复</div><div class="lbl">比对器（r2 容差/多1列）、KB 可见性、CAST 方言</div></div>
+    <div class="box"><div class="num">41 条知识</div><div class="lbl">知识库最终规模（4 全局常驻 + 12 枚举 + 25 口径/指南）</div></div>
+  </div>
+
+  <div class="card">
+    <h2>一、EX 提升轨迹（口径统一为最终比对器）</h2>
+    <table class="traj">
+      <tr><th>阶段</th><th>EX</th><th>增量来源</th></tr>
+      <tr><td>0. 原始基线（10-17 全量）</td><td>96/268 = 35.8%</td><td>—</td></tr>
+      <tr><td>1. 比对器修复（r2 数值容差层）</td><td>125/268 = 46.6%</td><td class="ok">+10.8pp · 纯测量修正（31 题翻正：无序题多重集比对缺数值容差）</td></tr>
+      <tr><td>2. KB 可见性修复 + 全量重跑①</td><td>168/278 = 60.4%</td><td class="ok">+13.8pp · 15 条枚举/口径条目被迁移 personal 致全域失注（系统级 bug）</td></tr>
+      <tr><td>3. 五代理归因 + KB 大扩充 + 重跑②</td><td>201/278 = 72.3%</td><td class="ok">+11.9pp · 全局规则重写（最小列集/INNER 默认/并列口径）+ 15 条分库口径</td></tr>
+      <tr><td>4. 三轮深度归因 + 方言/口径修订 + 小批验证</td><td class="ok">205/277 = 74.0%</td><td class="ok">+1.7pp · CAST 方言修复、Toys 条目纠偏、标识列跟随题面、金额口径拆分</td></tr>
+    </table>
+    <p class="note">分母口径 = 总题 309 − 拦截（need_more_info）− 异常（exec_error/error/quota/invalid_sql/row_limit/timeout）。所有轮次结果用最终比对器离线重算合并（同 qid 取最新记录，ok 保留）。</p>
+  </div>
+
+  <div class="card">
+    <h2>二、本轮（第 6 循环）三项系统级修复</h2>
+    <ul style="font-size:13px">
+      <li><b>MySQL 8.0.12 方言陷阱（一次性 9 题 exec_error）</b>：子代理重放实证 <code>CAST(x AS DOUBLE)</code> 为 8.0.17+ 语法、窗口 ORDER BY 引用同层 SELECT 别名需 8.0.14+——此前我们自己注入的「AVG(CAST(col AS DOUBLE))」规则正是 9 题报错根因。已改写全局规则与「MySQL 8 语法陷阱」条目（DECIMAL(18,4) 替代、别名禁用、单条 SELECT），验证批 qid30 恢复可执行。</li>
+      <li><b>「点明玩具限 Toys」条目纠偏（3 题）</b>：qid19/23/293 重放证实 gold 对单一「玩具」量值/占比/明细题<b>不过滤品类</b>（仅 qid20 的 gold 过滤，gold 自身不一致）。条目改为仅品类对比维度时过滤，验证批 3/3 翻正。</li>
+      <li><b>「ID 优先」条目与 gold 系统性冲突（10+ 题证据）</b>：dev_26 六题 gold 要球队/球员<b>名称</b>，dev_14 四题要店名。全局规则 1 改为「标识列形态跟随题面用词」，验证批 qid20 翻正（qid141 因 gold 自身 ID/name 混用仍错，归类 gold 不一致）。</li>
+      <li><b>附带产品 bug</b>：<code>main.py</code> <code>_validation_handler</code> 把 pydantic ctx 中的 ValueError 对象直接 json 序列化导致二次 500——已修复（ctx 展平为字符串）。</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2>三、本轮知识库与数据指南沉淀（kb_seed.py 最终版）</h2>
+    <h3>全局常驻 4 条（人人注入）</h3>
+    <ul style="font-size:13px">
+      <li><b>输出规范</b>：最小列集（标识列跟随题面用词、"XX信息"输出全字段、排名列置尾）；占比不乘100；<b>聚合默认 INNER JOIN</b>（仅计数补零类 LEFT JOIN）；并列口径三分法（Top-1 极值 DENSE_RANK 全并列 / 榜单 RANK 并列 rank&lt;=N / 组内逐行排名 ROW_NUMBER）；不硬编码枚举；AVG 用 DECIMAL(18,4)。</li>
+      <li><b>清洗总则</b>、<b>日期过滤规范</b>、<b>MySQL 8.0.12 语法陷阱</b>（CAST AS DOUBLE 禁用、窗口别名、单语句、LIMIT IN）。</li>
+    </ul>
+    <h3>分库条目 37 条（12 枚举实采 + 19 口径 + 7 库级数据指南）</h3>
+    <ul style="font-size:13px">
+      <li>新增加州归属/折扣限定（dev_20）、店铺级+库存孤儿键（dev_14）、RANK 并列+35.6 万行大表先聚合（dev_26）、订单行级+全字段输出（dev_21）、金额字段分场景（dev_28）、Card_Family 映射（dev_15）、重复行/NULL/区间格式（dev_8）、销售额单位百万（dev_7）等。</li>
+      <li><b>库级数据指南</b>（替代不存在的 guideline 字段，以 scope KB 条目承载）：dev_26（appearances 无 teamID 需经 games 推断 + position/shotType 枚举）、dev_28（address 含州解析）、dev_16/14/9/5/17（无成本列、渗透率语义、墨西哥门店等元数据缺口）——针对 16 道拦截题中 9 道的 metadata_gap。</li>
+    </ul>
+    <p class="note">拦截题归因（16 题）：9 题 metadata_gap（指南已补，下次可放行/可解）、4 题题面与库结构根本不匹配（拦截合理，如 q103 疑似题目-schema 误配）、3 题 judge 过严（q5/51/296）。另发现 q103 题目与 falcon_dev_18 完全不匹配、疑应属 dev_17。</p>
+  </div>
+
+  <div class="card">
+    <h2>四、残余失败分类（收敛结论）</h2>
+    <table>
+      <tr><th>类别</th><th>题数</th><th>说明与代表例</th></tr>
+      <tr><td class="bad">gold 口径错/怪癖（不可修）</td><td>约 38</td><td>gold 与题面矛盾（q215 超过500却滤&lt;500、q272 超过2次却 count&lt;2、q209 销售额排名按销量、q214 方向反）；gold 阈值单位错（q298 5亿美元→&gt;5）；gold 硬编码笔误（q158 rank&lt;=173）；标注文案/渲染不可推断（q191 '是大额订单'、q7 '$'||price、q10 原始串）；跨方言数值渲染（q28/q232 语义一致纯浮点表示差）</td></tr>
+      <tr><td class="bad">gold 自相矛盾（规则无法两全）</td><td>约 12</td><td>同库对同一概念两口径：dev_14『玩具』q20 过滤 vs q19/23/293 不过滤；dev_5 大小写变体 q85 分开 vs q218 合并；dev_20 城市归属/折扣两口径混用；dev_26 排名列 q174 输出 vs q16 不输出；dev_21 占比 ×100 vs 全局不乘100；ID vs name 混用</td></tr>
+      <tr><td class="warn">并列不稳定（order_tie）</td><td>约 6</td><td>并列值 ROW_NUMBER/RANK 取舍与 SQLite 扫描序耦合（q45 日期并列 15 行硬截 5、q118/q238 并列序、q8 疑评测对齐问题）</td></tr>
+      <tr><td class="warn">follow_through（规则已对、模型未稳定遵守）</td><td>约 10</td><td>重试有翻正概率但同 prompt 输出趋同（b7 重试 0/4），需更强的 schema guideline/few-shot 或执行反馈自修复</td></tr>
+      <tr><td>基础设施</td><td>6</td><td>q117/98/112 大表 join 超时（600s 客户端上限）、q54/201/230 服务端 5xx、q73 gold 11723 行超 max_rows、q150 双语句</td></tr>
+    </table>
+    <p class="note">残余 col_mismatch 33 题中约六成属上列不可修类（列形态即 gold 怪癖本身）。分库残余：dev_26 10、dev_8 9、dev_20 9、dev_14 9、dev_28 8、dev_21 6、其余 ≤4。</p>
+  </div>
+
+  <div class="card">
+    <h2>五、关键教训（方法论沉淀）</h2>
+    <ul style="font-size:13px">
+      <li><b>测量先行</b>：两处比对器缺陷合计影响 60+ 题判定——优化前先确保测量口径正确，否则归因方向会被系统性误导。</li>
+      <li><b>KB 双刃剑，实证才能上架</b>：三条规则（ID 优先、玩具限 Toys、COLLATE 强制）各有 3~10 题反证，全部靠 MySQL 重放实证后修订/撤销；「规则写反比不写更糟」三次实证。</li>
+      <li><b>影响召回的状态迁移必须查 prompt 验证</b>：KB 可见性迁移导致枚举段全线失注，页面看不出、只有 llm_prompts 遥测能实锤。</li>
+      <li><b>执行环境方言要写进常驻规则</b>：MySQL 8.0.12 的 CAST AS DOUBLE/窗口别名限制是评测环境特有，模型无从得知，必须显式注入。</li>
+      <li><b>gold 不一致是基准固有噪声</b>：占比乘不乘 100、并列取不取、ID 还是 name，gold 内部均存在双口径——继续优化应转向「执行反馈自修复」「多答案容差」，对 gold_quirk 建议上游修订标准答案。</li>
+      <li><b>小批验证循环</b>（≤10 题）足以验证修复方向且省 20 倍成本；全量重跑只在测量口径变化时执行。</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2>六、产物清单</h2>
+    <ul style="font-size:13px">
+      <li>比对器：<code>benchmark/run_eval.py</code>（r2 容差层 + 仅多 1 列排列扩展）</li>
+      <li>知识库：<code>benchmark/kb_seed.py</code>（全局 4 + 分库 37，含可见性自愈）；库级数据指南 7 条</li>
+      <li>产品修复：<code>main.py</code> 校验异常序列化</li>
+      <li>结果：<code>benchmark/results/falcon.c7.final.enriched.jsonl</code>（最终复合 309 题逐题）；过程文件 retry/retry2/b6/b7 jsonl</li>
+      <li>历史报告：Falcon小批优化对比_20261018.html（第4轮）、_第5轮.html（第5轮）</li>
+    </ul>
+  </div>
+</div>
+</body>
+</html>

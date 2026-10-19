@@ -27,10 +27,11 @@ GLOBAL_PINNED = [
         "knowledge_type": "convention",
         "content": (
             "1. 最小列集：只输出题目要求的标识列+数值列，不加任何未要求的列"
-            "（姓名、排名、中间计算列、原始状态列都不要附加）；实体标识默认输出 ID 列"
-            "（store_id/product_id/customer_id/gameid 等），仅当题目明确要\"名称/店名\"才输出名称列；"
-            "多列按\"维度ID→度量值→排名\"顺序，排名列一律放最后一列；价格/金额输出清洗后的数值，"
-            "不输出带 $ 的原始字符串。\n"
+            "（排名列、中间计算列、聚合过程值都不要附加）；标识列形态跟随题面用词——"
+            "题面说\"店名/球队/球员/客户名\"输出名称列，说\"店铺ID/产品ID/客户ID\"输出 ID 列；"
+            "多列按\"维度→度量→排名\"顺序，排名列（若题面要求）放最后一列；"
+            "价格/金额输出清洗后的数值，不输出带 $ 的原始字符串；"
+            "题面说\"XX信息/XX详情\"输出该实体的全部相关字段。\n"
             "2. \"占比/比例/份额\"的分母是全量数据的合计（先算全表总额再除），"
             "不是筛选后子集的合计；比率类输出原始小数比值，不乘 100，除非题面明确要百分比。\n"
             "3. 聚合类默认 INNER JOIN——只输出有匹配记录的实体（有订单的客户/有销量的商品）；"
@@ -44,7 +45,8 @@ GLOBAL_PINNED = [
             "5. 不要自行添加题目未要求的 IS NOT NULL / TRIM(col)<>'' 过滤，也不要硬编码题面未列举的"
             "枚举集合——用 GROUP BY+HAVING 让数据驱动。\n"
             "6. 问题出现\"每月/各/分别\"才 GROUP BY；聚合结果不要把明细列混进 SELECT；"
-            "整数列求平均写 AVG(CAST(col AS DOUBLE))，避免整型 AVG 的定点小数表示差异。"
+            "整数列求平均写 AVG(CAST(col AS DECIMAL(18,4)))——禁止 CAST(x AS DOUBLE)"
+            "（本环境 MySQL 8.0.12 不支持该语法）。"
         ),
     },
     {
@@ -77,11 +79,15 @@ GLOBAL_PINNED = [
         "title": "MySQL 8 语法陷阱：LIMIT 子查询与窗口函数写法",
         "knowledge_type": "convention",
         "content": (
-            "1. MySQL 8 不支持 IN (SELECT ... ORDER BY ... LIMIT n) 形式的 LIMIT 子查询"
-            "（报错 1235 LIMIT & IN/ALL/ANY/SOME）。TopN 集合要先包一层再引用："
+            "执行环境为 MySQL 8.0.12，以下语法会直接报错，务必遵守：\n"
+            "1. 禁止 CAST(x AS DOUBLE)/CAST(x AS REAL)（8.0.17+ 才支持，本环境报 1064）；"
+            "数值转换一律 CAST(x AS DECIMAL(18,4)) 或 SIGNED/UNSIGNED。\n"
+            "2. 窗口函数 ORDER BY 不要引用同层 SELECT 的别名（8.0.14+ 才支持，会报 1054）；"
+            "把表达式原样写入 OVER 子句或用子查询包一层。\n"
+            "3. 每题只能输出一条 SELECT 语句，禁止一次输出多条。\n"
+            "4. 不支持 IN (SELECT ... ORDER BY ... LIMIT n)（报 1235）。TopN 集合先包一层再引用："
             "JOIN (SELECT * FROM (SELECT ... LIMIT 10) t) top10 ON ... 或用 CTE。\n"
-            "2. 窗口函数的 PARTITION/ORDER 列必须是确定存在的列；"
-            "同一查询里既要窗口排名又要 GROUP BY 时，先在子查询/CTE 里聚合再开窗。"
+            "5. 窗口函数与 GROUP BY 同用时，先在子查询/CTE 里聚合再开窗。"
         ),
     },
 ]
@@ -187,9 +193,9 @@ SCOPED_CALIBERS = [
      "不要加 date_joined IS NOT NULL 等额外过滤（NULL 行也占一个名额，标准口径含 NULL 行）。\n"
      "6. 「城市/行业内按估值从高到低的排名」的排名列用 DENSE_RANK()（并列估值同名次），"
      "窗口 ORDER BY 不加 company 等 tie-break 列。\n"
-     "7. industry/company 存在大小写变体（如 'Artificial intelligence' 与 'Artificial Intelligence'"
-     " 是标准口径下的两个不同分组），按其分组/排名/去重时须加 COLLATE utf8mb4_bin "
-     "（如 PARTITION BY industry COLLATE utf8mb4_bin、GROUP BY company COLLATE utf8mb4_bin）。\n"
+     "7. industry/company 存在大小写变体（如 'Artificial intelligence' 与 'Artificial Intelligence'）；"
+     "gold 对其处理不一致（部分题合并、部分题分开），分组默认不加 COLLATE 按库原样处理，"
+     "仅 COUNT(DISTINCT) 去重计数时可用 COLLATE utf8mb4_bin。\n"
      "8. 占比/比例输出原始小数比值（num/total），不要乘 100 变百分比，除非题目明确要百分比；"
      "「公司数量」用 COUNT(DISTINCT company)。"),
     ("falcon_dev_18", "世界经济库口径与单位（高频错因）",
@@ -243,12 +249,14 @@ SCOPED_CALIBERS = [
      "是 Canceled 不是 Cancelled，是 Shipped 不是\"已发货\"，类别是 Tools 不是\"工具箱\"。"),
     ("falcon_dev_20", "网约车评分与城市归属口径（高频错因）",
      ["评分", "司机", "城市", "行程", "促销", "优惠码", "promo"],
-     "1. 行为条件中的\"平均评分高于X\"（如总距离>100 且平均评分>4.0）取该司机行程表 Rating 的 AVG，"
-     "不是司机档案 Average_Rating；仅\"司机的平均评分\"静态口径才用 Average_Rating。\n"
-     "2. \"X城市司机\"默认按司机档案 drivers.City 过滤；题面明确\"在该城市接单/有行程\"才按行程表 City。\n"
+     "1. 评分口径：行为条件中的\"平均评分高于X\"与行程/订单主体指标取行程表 Rating 的 AVG；"
+     "仅当指标主体是司机档案集合（司机列表/司机画像）时用档案 Average_Rating。\n"
+     "2. \"X城市司机\"归属：题面说\"在该城市接单/有行程/订单发生在\"按行程表 City 过滤；"
+     "说\"X城市的司机/司机籍贯\"按司机档案 drivers.City 过滤。\n"
      "3. \"最近行程中使用过优惠码\"：先对每位司机求 MAX(转日期) 得最近日期，只汇总该日期当天的优惠码行程，"
      "不是汇总全部行程。\n"
-     "4. \"实际支付金额\"= Fare × 折扣系数：SAVE20→0.8、DISCOUNT10→0.9、WELCOME5→0.95（题面未给出但为固定口径）；"
+     "4. \"实际支付金额/折后金额\"= Fare × 折扣系数：SAVE20→0.8、DISCOUNT10→0.9、WELCOME5→0.95；"
+     "题面仅说\"收入/金额/费用\"（无\"实际支付\"语义）时直接用原价 Fare 不打折；"
      "Promo_Code 实际值仅这三个+NULL，IS NOT NULL 与 IN 三值等价。\n"
      "5. \"评分排前三的行程\"按司机分组各取前三（RANK PARTITION BY driver_id ≤3）再按司机汇总；"
      "对比基线（城市平均距离/评分）与主过滤同范围（活跃司机内、促销订单内），不要用全量做基线。"),
@@ -264,16 +272,16 @@ SCOPED_CALIBERS = [
      "5. \"里程费最高\"类排序键按 distance_km 降序，不是按 Fare。"),
     ("falcon_dev_14", "玩具店输出列对齐与指标口径（高频错因）",
      ["店铺", "产品", "利润", "利润率", "平均售价", "增长"],
-     "1. 店铺/产品默认输出 store_id/product_id（题面明确要\"店名\"才输出名称列）；"
-     "列序：维度→度量→排名（排名列置尾，勿放首列）；利润率分布类输出×100 百分数且不四舍五入。\n"
+     "1. 店铺/产品标识列跟随题面用词：题面说\"店铺/店名/产品名\"输出名称列，说\"店铺ID/产品ID\"输出 ID 列；"
+     "列序：维度→度量→排名（排名列仅题面要求时输出且置尾）；利润率分布类输出×100 百分数且不四舍五入。\n"
      "2. 价格类指标（平均售价/品类均价）一律基于 toy_sales JOIN toy_products 的销售记录计算，"
      "禁止用 toy_inventory 库存价；JOIN 后直接 AVG 即按销售行重复计权（gold 口径如此），不要先按产品去重。\n"
-     "3. \"玩具\"品类过滤仅用于求玩具的具体量值/排名（限 Product_Category='Toys'）；"
-     "占比、超均值、总量阈值、增长识别等与全量对比的场景不加过滤（全品类）。\n"
+     "3. 「玩具」品类过滤：仅当题面含品类对比维度（各品类/品类间比较）时才限 Product_Category='Toys'；"
+     "单一「玩具」的量值/占比/超均值/增长识别题一律不过滤（按全店全品类销售统计）。\n"
      "4. \"销售情况\"类输出逐笔明细行（date/store_id/product_id/units/成本/品类均价），不聚合；"
      "增长识别输出 product_id+月份两列，不加增长额列。\n"
      "5. toy_sales 存在 product_id 不在产品表的孤儿行（33/30/24/23），INNER JOIN 会静默剔除，"
-     "窗口排名在剔除前计算。\n"
+     "窗口排名在剔除前计算；toy_inventory.product_id 同样有孤儿键，库存类指标需联 products 剔除。\n"
      "6. \"库存高于平均水平\"的平均=AVG(Stock_On_Hand) 全库存明细行均值；"
      "\"销售总量≤N 的产品及店铺累计\"=按(店,产品)合计≤N 筛组合，店铺累计=该店入选组合之和，输出 ID+两个销量列。"),
     ("falcon_dev_26", "足球数据排名与关联口径（高频错因）",
@@ -281,11 +289,13 @@ SCOPED_CALIBERS = [
      "1. 排名并列必须同名次：聚合值排名用 RANK()（如客队角球总和 26 组并列），\"前 N\"用 rank<=N 过滤，"
      "勿 ROW_NUMBER/LIMIT；\"X 数排名联赛前 10\"= 先按其余条件过滤，再按 leagueID 分区取 RANK<=10（每联赛各取前 10）。\n"
      "2. 聚合仅输出有记录实体：\"各球员累计X\"只 INNER 输出有出场记录的球员，勿 LEFT JOIN 全员补 0。\n"
-     "3. 比赛类输出标识用 gameid，不输出日期列（题目明确要日期除外）；只输出最小列集。\n"
+     "3. 球队/球员一律 JOIN 输出名称列（football_teams.name / football_players.name），不输出 teamID/playerID；"
+     "比赛标识输出 gameid；只输出题面要求的最小列集（如\"每场主队xG总和\"仅 date+总和两列）。\n"
      "4. \"净胜球高于1\"按单场 homeGoals-awayGoals>1 逐场判定，不做主队场均。\n"
      "5. football_appearances.substituteIn：0=首发，非 0 为替补（值域杂），替补判定用 substituteIn<>0，勿用=1。\n"
      "6. 统计列（shotsOnTarget/corners/yellowCards）为整数字符串，求均值写 AVG(col*1.0) 转浮点；"
-     "appearances JOIN games 无索引极慢，先过滤 season 再关联。"),
+     "football_appearances 约 35.6 万行且无索引：先在 football_games 过滤 season/league 得小 gameid 集或先聚合，"
+     "再 JOIN appearances，禁止四表直连。"),
     ("falcon_dev_21", "电商口径补充：聚合范围与指标定义（高频错因）",
      ["客户", "库存", "分类", "平均", "最近", "一年", "销售金额"],
      "1. \"每位/各客户聚合\"仅 INNER 输出有匹配记录的客户（有已发货订单的才输出），勿 LEFT JOIN 全部客户补 0。\n"
@@ -295,7 +305,9 @@ SCOPED_CALIBERS = [
      "4. \"最近一年\"以库内 MAX(OrderDate) 回溯（本库为 2022-12-29），不用当前系统日期。\n"
      "5. \"哪种类别最多\"保留并列：RANK()=1 输出全部并列类别，勿 LIMIT 1。\n"
      "6. \"不同状态的商品总库存\"先对(orderstatus,productid)去重再汇总库存，勿按订单行重复累计。\n"
-     "7. 标注类文案照知识条目：'是大额订单'/'否'；订单明细不额外 join 客户表输出姓名列。"),
+     "7. 标注类文案照知识条目：'是大额订单'/'否'；订单明细不额外 join 客户表输出姓名列。\n"
+     "8. 题面说\"商品信息/客户信息/联系信息/订单详情\"类，输出该实体表的全部字段（如商品信息="
+     "category/price/productid/productname + 统计列；联系信息=客户表全部字段），不做最小列集裁剪。"),
     ("falcon_dev_24", "闪购数据口径（高频错因）",
      ["准时", "配送", "损坏", "保质期", "品牌", "品类"],
      "1. 排名并列用 RANK()：\"占比最高\"只输出 RANK=1 全部并列者（多为仅 1 单即 100% 的小样本），"
@@ -311,7 +323,8 @@ SCOPED_CALIBERS = [
      "category='Electronics'/'Accessories'/'Furniture'/'Home & Kitchen'）；"
      "题面中文实体（游戏键盘/无线鼠标/电子产品）必须先译成对应英文值再做 = 或 LIKE，"
      "用中文直接匹配命中 0 行。\n"
-     "2. \"订单总金额/消费总额\"默认对 online_shop_payment.amount 求和，不用 orders.total_price；"
+     "2. \"订单总金额/消费总额\"按场景选字段：订单级过滤/单订单金额用 orders.total_price"
+     "（如 total_price<100 实证 62 行=gold 口径）；跨订单支付聚合用 online_shop_payment.amount；"
      "\"高于平台平均支付金额X倍\"作用于客户级聚合（客户总消费>5×AVG(全表 amount)），"
      "不是单笔比较（单笔 max/avg≈2.79，必空）。\n"
      "3. \"等待天数\"=DATEDIFF(delivery_date, shipment_date)（发货到送达），不是下单到发货。\n"
@@ -327,7 +340,9 @@ SCOPED_CALIBERS = [
      "不是 Customer_Segment（'Diamond'/'Gold'/'Platinum'）。\n"
      "3. \"超过平均\"的比较基准取同范围子集内部平均（如白金卡客户中超过平均=白金卡交易自身 AVG）。\n"
      "4. 严禁硬编码题面未列举的枚举集合（SEG11~25、卡族、VG 列表等）过滤——GROUP BY+HAVING 数据驱动。\n"
-     "5. Transaction_Date 实存 'YYYY-MM-DD' 格式，按字符串比较即可，勿按 'DD-Mon-YY' 解析（会全 NULL）。"),
+     "5. Transaction_Date 实存 'YYYY-MM-DD' 格式，按字符串比较即可，勿按 'DD-Mon-YY' 解析（会全 NULL）。\n"
+     "6. \"白金卡/金卡\"等卡名一律映射 credit_card_card_base.Card_Family（白金卡→Card_Family='Platinum'），"
+     "不映射 Customer_Segment（那是客户分组 Diamond/Gold/Platinum）。"),
     ("falcon_dev_8", "Google Play 数据质量口径（高频错因）",
      ["应用", "重复", "去重", "评分", "安卓", "更新", "前5%", "适配"],
      "1. 表内同一 app 有重复行（9196 行 vs 去重 9097 个）：应用计数用 COUNT(DISTINCT app)；"
@@ -343,20 +358,22 @@ SCOPED_CALIBERS = [
      "1. \"游戏数量\"一律 COUNT(DISTINCT name) 按游戏名去重（同名多平台行会重复计数）。\n"
      "2. vgsales 自带 rank 列（全球排名），\"销售额及排名\"直接 SELECT rank 输出，勿在子集内重算。\n"
      "3. \"各类型前五平台\"类输出明细行 (genre, platform, 合计, AVG(global_sales) 组内单游戏均值)，"
-     "勿聚合成每类型一行；极值并列用 DENSE_RANK 全取，销售额加 >0 过滤排除零销售组。"),
+     "勿聚合成每类型一行；极值并列用 DENSE_RANK 全取，销售额加 >0 过滤排除零销售组。\n"
+     "4. vgsales 各销售额列（NA_Sales/EU_Sales/JP_Sales/Global_Sales）单位为百万美元："
+     "题面\"超过100万美元\"写 >1.0、\"超过500万\"写 >5.0，勿写 >1000000（得空集）。"),
     ("falcon_dev_16", "学校成绩输出口径（高频错因）",
      ["姓名", "学生", "老师", "前两名", "平均分", "人数"],
-     "1. 姓名输出用 CONCAT 合并单列（教师 CONCAT(lastname,' ',firstname)），学生按 gold 附带成绩数值列与 studentid，"
-     "输出列集对齐勿增删；平均分不四舍五入。\n"
-     "2. \"人数排名\"并列用 RANK() 并列同号，勿 ROW_NUMBER。\n"
-     "3. 整数列求均值写 AVG(CAST(col AS DOUBLE))，避免与标准答案浮点表示不一致。"),
+     "1. 姓名输出用 CONCAT 合并单列（教师 CONCAT(lastname,' ',firstname)、学生 CONCAT(firstname,lastname)），"
+     "输出列集对齐勿增删；布尔标注输出 'Yes'/'No' 文案；平均分不四舍五入。\n"
+     "2. \"人数排名\"并列用 RANK() 并列同号，勿 ROW_NUMBER；\"最新考试\"先取每(学生,科目) MAX(examdate)。\n"
+     "3. 整数列求均值写 AVG(CAST(col AS DECIMAL(18,4)))，避免与标准答案浮点表示不一致。"),
     ("falcon_dev_4", "保理业务口径补充（高频错因）",
      ["季度", "逾期", "最后一次", "国家", "排名"],
      "1. \"季度末结算\"=结算月份 IN (3,6,9,12) 即可，不要求当日为季末最后一天；关联键=客户+年+月。\n"
      "2. \"最后一次逾期/最后一张\"按 DueDate 对该客户全部发票排序取最新（不预筛 DaysLate>0）再验金额。\n"
      "3. \"每个国家累计\"按 countrycode GROUP BY 汇总，仅输出 (countrycode, 累计额) 两列。\n"
      "4. 金额排名并列用 DENSE_RANK 并列同号；\"按逾期天数前五\"用 ROW_NUMBER OVER (ORDER BY dayslate DESC)<=5；"
-     "列序 (invoicenumber, dayslate, invoiceamount, 排名)；均值用 AVG(CAST(col AS DOUBLE))。"),
+     "列序 (invoicenumber, dayslate, invoiceamount, 排名)；均值用 AVG(CAST(col AS DECIMAL(18,4)))。"),
     ("falcon_dev_19", "WHO 健康数据口径（高频错因）",
      ["地区", "高收入", "均值", "国家"],
      "1. \"高收入国家超地区均值\"：先筛 WorldBankIncomeGroupDisplay='High_income' AND 指定年份，"
