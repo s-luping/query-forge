@@ -280,12 +280,21 @@ class LLMConfigCreate(BaseModel):
 
 
 class LLMConfigUpdate(BaseModel):
-    model: Optional[str] = None; api_key: Optional[str] = None
-    base_url: Optional[str] = None; max_tokens: Optional[int] = None
-    temperature: Optional[float] = None; thinking_mode: Optional[str] = None
+    # 除 id 外的所有字段均可更新；以「是否显式传参」为准（exclude_unset），
+    # 显式传 null 表示清空（如 description）
+    user_id: Optional[int] = None
+    provider: Optional[str] = None
+    model: Optional[str] = None
+    api_key: Optional[str] = None
+    base_url: Optional[str] = None
+    max_tokens: Optional[int] = None
+    temperature: Optional[float] = None
+    thinking_mode: Optional[str] = None
     timeout: Optional[int] = None
-    is_default: Optional[bool] = None; is_active: Optional[bool] = None
-    is_public: Optional[bool] = None; description: Optional[str] = None
+    is_default: Optional[bool] = None
+    is_active: Optional[bool] = None
+    is_public: Optional[bool] = None
+    description: Optional[str] = None
     status: Optional[str] = None   # normal=正常 / arrears=欠费（续费后手动恢复用）
 
 
@@ -394,22 +403,21 @@ def update_config(request: Request, config_id: int, payload: LLMConfigUpdate, us
                 raise HTTPException(status_code=400, detail="thinking_mode 仅支持 auto/enabled/disabled")
             if payload.status is not None and payload.status not in _STATUS_VALUES:
                 raise HTTPException(status_code=400, detail="status 仅支持 normal/arrears")
+            # 除 id 外所有字段均可更新：只应用显式传参的字段（exclude_unset）
+            updates = payload.model_dump(exclude_unset=True)
             # 注意：必须读 payload 而非 request — Starlette Request 自带 base_url 属性
             # （URL 对象），误读会把请求地址写进库导致 sqlite3.InterfaceError
-            for attr in ['model', 'base_url', 'max_tokens', 'temperature', 'thinking_mode',
-                         'timeout', 'description', 'status']:
-                val = getattr(payload, attr, None)
-                if val is not None:
-                    if attr == 'base_url':
-                        val = str(val)   # 防御：杜绝 URL 等非 str 对象写入 String 列
-                    setattr(config, attr, val)
-            # api_key 单独处理：非空才覆盖并加密
-            if payload.api_key is not None and payload.api_key != '':
-                config.api_key = encrypt_secret(payload.api_key)
-            if payload.is_active is not None:
-                config.is_active = payload.is_active
-            if payload.is_public is not None and _is_admin(user):
-                config.is_public = payload.is_public
+            if updates.get('base_url') is not None:
+                updates['base_url'] = str(updates['base_url'])  # 杜绝 URL 等非 str 对象写入 String 列
+            # api_key：显式传空串 = 保持原值；传非空 = 覆盖并加密
+            api_key_plain = updates.pop('api_key', None)
+            # is_public 仅管理员可改
+            if 'is_public' in updates and not _is_admin(user):
+                updates.pop('is_public')
+            for attr, val in updates.items():
+                setattr(config, attr, val)
+            if api_key_plain:
+                config.api_key = encrypt_secret(api_key_plain)
             if payload.is_default:
                 db.query(LLMConfig).filter(
                     LLMConfig.user_id == config.user_id,
