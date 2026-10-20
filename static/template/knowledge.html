@@ -14,7 +14,7 @@
     <h5>知识库管理</h5>
     <div class="d-flex align-items-center gap-2">
         <input type="search" class="form-control form-control-sm" id="knowledgeSearch" style="width:220px;"
-            placeholder="搜索标题 / 内容..." oninput="onSearchInput()">
+            placeholder="搜索标题 / 内容 / 别名..." oninput="onSearchInput()">
         <button class="btn btn-primary btn-sm" onclick="showCreateForm()">+ 新建知识</button>
     </div>
 </div>
@@ -43,6 +43,18 @@
             <select class="form-select form-select-sm" id="pinnedFilter" onchange="loadList(1)">
                 <option value="">全部条目</option>
                 <option value="pinned">仅常驻</option>
+            </select>
+            <select class="form-select form-select-sm" id="updatedFilter" onchange="loadList(1)">
+                <option value="">全部时间</option>
+                <option value="1">今天有更新</option>
+                <option value="7">近 7 天有更新</option>
+                <option value="30">近 30 天有更新</option>
+                <option value="90">近 90 天有更新</option>
+            </select>
+            <select class="form-select form-select-sm" id="sortFilter" onchange="loadList(1)">
+                <option value="updated_desc">按修改时间倒序</option>
+                <option value="created_desc">按创建时间倒序</option>
+                <option value="title_asc">按标题升序</option>
             </select>
             <select class="form-select form-select-sm d-none" id="visibilityFilter" onchange="loadList(1)">
                 <option value="">全部条目</option>
