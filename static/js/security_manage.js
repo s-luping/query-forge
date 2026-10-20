@@ -73,17 +73,41 @@ async function showPipeline(logId) {
         'STEP6_VALIDATE': '14. SQL 校验', 'STEP7_GATEWAY': '15. 权限网关',
         'STEP7_GATEWAY_ERROR': '15. 权限网关（异常）',
         // 后置步骤（路由层）
-        'SQL_EXECUTE': '16. SQL 执行', 'MESSAGE_PERSIST': '17. 消息持久化',
+        'PREFIX_REPAIR': '库前缀修复（全库模式）', 'SQL_EXECUTE': '16. SQL 执行',
+        'MESSAGE_PERSIST': '17. 消息持久化',
         'STEP_RESPONSE': '响应返回',
     };
-    document.getElementById('pipelineDetail').innerHTML = steps.length ? steps.map((s, i) => `
-        <div class="card mb-2">
+    // StepTrace 统一结构（docs/ChatSQL模块化与全链路留痕设计.md §5.2）：
+    // ok=通过 error=失败(红) intercept=拦截(黄) skip=跳过(灰)；旧格式无 status 按"通过"兼容渲染
+    const STATUS_META = {
+        ok:        { label: '通过', cls: 'success' },
+        error:     { label: '失败', cls: 'danger' },
+        intercept: { label: '拦截', cls: 'warning' },
+        skip:      { label: '跳过', cls: 'secondary' },
+    };
+    document.getElementById('pipelineDetail').innerHTML = steps.length ? steps.map((s, i) => {
+        const meta = STATUS_META[s.status];
+        const detail = s.detail !== undefined ? s.detail : s.data;   // 新结构 detail / 旧格式 data
+        const ts = s.started_at || s.timestamp || '';
+        const statusBadge = meta ? `<span class="badge bg-${meta.cls} ms-1">${meta.label}</span>` : '';
+        const durBadge = (s.duration_ms != null)
+            ? `<span class="badge bg-light text-dark ms-1">${s.duration_ms}ms</span>` : '';
+        const sumHtml = s.summary
+            ? `<div class="text-muted mb-1" style="font-size:12px;"><strong>${esc(s.summary)}</strong></div>` : '';
+        const errHtml = s.error
+            ? `<div class="alert ${s.status === 'error' ? 'alert-danger' : 'alert-warning'} py-1 px-2 my-1" style="font-size:12px;">${esc(s.error)}</div>` : '';
+        return `
+        <div class="card mb-2${meta && meta.cls === 'danger' ? ' border-danger' : ''}">
             <div class="card-header py-1 d-flex justify-content-between" style="font-size:13px;">
-                <span><strong>${esc(STEP_CN[s.step] || s.step)}</strong></span>
-                <span class="text-muted">${esc(s.timestamp || '')}</span>
+                <span><strong>${esc(STEP_CN[s.step] || s.step)}</strong>${statusBadge}${durBadge}</span>
+                <span class="text-muted">${esc(ts)}</span>
             </div>
-            <div class="card-body py-2" style="font-size:12px;"><pre class="mb-0" style="white-space:pre-wrap;word-break:break-all;background:#f8f9fa;padding:8px;border-radius:4px;">${esc(JSON.stringify(s.data, null, 2))}</pre></div>
-        </div>`).join('') : '<div class="text-muted">链路数据为空</div>';
+            <div class="card-body py-2" style="font-size:12px;">
+                ${sumHtml}${errHtml}
+                <pre class="mb-0" style="white-space:pre-wrap;word-break:break-all;background:#f8f9fa;padding:8px;border-radius:4px;">${esc(JSON.stringify(detail, null, 2))}</pre>
+            </div>
+        </div>`;
+    }).join('') : '<div class="text-muted">链路数据为空</div>';
     bootstrap.Modal.getOrCreateInstance(document.getElementById('pipelineModal')).show();
 }
 const SENSITIVE_PAGE_SIZE = 50;

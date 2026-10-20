@@ -291,6 +291,20 @@
             loadLogs();
         }
 
+        // 遥测 conditions 人话化：schema=X, db_type=Y → 库: X · 类型: Y；追问轮补会话信息
+        function formatConditions(c) {
+            if (!c) return '';
+            const fu = c.match(/^conversation=(\d+), followup(?:, schema=([^,]+), db_type=(.+))?$/);
+            if (fu) {
+                let out = `会话 #${fu[1]} · 追问`;
+                if (fu[2]) out += ` · 库: ${fu[2]} · 类型: ${fu[3]}`;
+                return out;
+            }
+            const first = c.match(/^schema=(.+?), db_type=(.+)$/);
+            if (first) return `库: ${first[1]} · 类型: ${first[2]}`;
+            return c;
+        }
+
         async function showDetail(id) {
             detailTrigger = document.activeElement;    // 记住打开者，关闭后还原焦点
             try {
@@ -319,7 +333,7 @@
                     <div class="row">
                         <div class="col-md-12 detail-item">
                             <div class="detail-label">条件</div>
-                            <div class="detail-value">${escapeHtml(item.conditions || '-')}</div>
+                            <div class="detail-value">${escapeHtml(formatConditions(item.conditions) || '-')}</div>
                         </div>
                     </div>
                     <div class="detail-item">

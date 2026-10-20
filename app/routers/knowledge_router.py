@@ -531,11 +531,13 @@ def recall_knowledge_endpoint(
 ):
     """知识条目单独召回：按 query 关键词召回 typed 知识，返回注入提示词的文本块与关联表（用于动态扩表）"""
     try:
+        from core.recall_scope import build_recall_scope
         from core.ret_retriever import SchemaRetriever
         retriever = SchemaRetriever(user=user, user_id=user['user_id'])
         result = retriever.recall_knowledge(
             query=body.query,
             scope_schema_id=body.scope_schema_id,
+            scope=build_recall_scope(user),
         )
         return result
     except HTTPException:

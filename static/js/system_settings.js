@@ -59,7 +59,7 @@ async function loadSettings() {
         const vecKeys = ['VECTOR_INDEX_THRESHOLD', 'FIELD_RECALL_TOP_K', 'MAX_TABLES', 'SMALL_SCHEMA_TABLE_LIMIT'];
         const vecItems = items.filter(s => vecKeys.includes(s.key));
         document.getElementById('vectorConfig').innerHTML = vecItems.map(s => renderSettingRow(s, {
-            'VECTOR_INDEX_THRESHOLD': { desc: '字段数达到此值自动构建索引', width: '80px' },
+            'VECTOR_INDEX_THRESHOLD': { desc: '全库字段总数低于此值时直接注入全部字段，达到后走向量召回（仅无 schema 提问生效）', width: '80px' },
             'FIELD_RECALL_TOP_K': { desc: '向量检索时召回的最大字段数', width: '80px' },
             'MAX_TABLES': { desc: '按表聚合时包含的最大表数', width: '80px' },
             'SMALL_SCHEMA_TABLE_LIMIT': { desc: '库内表数不超过此值时整库注入 Schema', width: '80px' }

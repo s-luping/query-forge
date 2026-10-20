@@ -90,8 +90,8 @@ def test_recall_fields_reserves_quota_for_db_fallback(monkeypatch):
           for col in ('ACCOUNT', 'ENTITY', 'PROJECT_LINE', 'PERIODS', 'YEARS')]
     monkeypatch.setattr(retriever, 'search_vector', lambda *a, **kw: list(vec))
     monkeypatch.setattr(retriever, '_filter_recalled_by_permission',
-                        lambda res, sn=None: res)
-    monkeypatch.setattr(retriever, 'recall_from_db', lambda kws, sn=None: list(db))
+                        lambda res, sn=None, scope=None: res)
+    monkeypatch.setattr(retriever, 'recall_from_db', lambda kws, sn=None, scope=None: list(db))
     monkeypatch.setattr('core.ret_retriever.get_vector_config', lambda key: 100)
 
     out = retriever.recall_fields(['科目'], schema_name=None, query='费用合计科目')
@@ -109,12 +109,62 @@ def test_recall_fields_db_only_full_when_vector_absent(monkeypatch):
            'column_name': f'COL_{i}', 'recall_source': 'db'}
           for i in range(60)]
     monkeypatch.setattr(retriever, 'search_vector', lambda *a, **kw: None)
-    monkeypatch.setattr(retriever, 'recall_from_db', lambda kws, sn=None: list(db))
+    monkeypatch.setattr(retriever, 'recall_from_db', lambda kws, sn=None, scope=None: list(db))
     monkeypatch.setattr('core.ret_retriever.get_vector_config', lambda key: 100)
 
     out = retriever.recall_fields(['科目'], schema_name=None, query='费用合计科目')
     assert len(out) == 60
     assert all(d.get('recall_source') == 'db' for d in out)
+
+
+# ---------- 2b. 全库直通：全库字段总数低于 VECTOR_INDEX_THRESHOLD 时免召回 ----------
+
+class _FakeRow:
+    def __init__(self, schema_name, table_name):
+        self.schema_name = schema_name
+        self.table_name = table_name
+
+
+def test_recall_fields_full_library_direct_inject_below_threshold(monkeypatch):
+    """无 schema 提问 + 全库字段总数 < 阈值 → 直接整库直通（不经向量/关键词召回）"""
+    retriever = _make_retriever()
+    rows = [_FakeRow('sakila', 'film_category'), _FakeRow('sakila', 'film'),
+            _FakeRow('falcon_dev_14', 'toy_sales'), _FakeRow('falcon_dev_14', 'toy_sales')]
+    monkeypatch.setattr(retriever, 'field_count', lambda sn=None: 300)
+    monkeypatch.setattr(retriever, 'get_field_rows',
+                        lambda sn=None, tn=None, scope=None: rows)
+    monkeypatch.setattr('core.ret_retriever.get_vector_config',
+                        lambda key: 500 if key == 'VECTOR_INDEX_THRESHOLD' else 50)
+
+    def _must_not_touch_vector(*a, **kw):
+        raise AssertionError('字段数低于阈值时不应触碰向量索引')
+    monkeypatch.setattr(retriever, 'try_load_vector_store', _must_not_touch_vector)
+
+    out = retriever.recall_fields(['任意'], schema_name=None, query='q')
+    assert all(d.get('full_scope') and d.get('recall_source') == 'full' for d in out)
+    # 同库同名表去重，占位带库名
+    assert [(d['schema_name'], d['table_name']) for d in out] == [
+        ('sakila', 'film_category'), ('sakila', 'film'),
+        ('falcon_dev_14', 'toy_sales')]
+
+
+def test_recall_fields_vector_path_when_total_fields_reach_threshold(monkeypatch):
+    """全库字段总数达到阈值 → 不直通，走向量召回（现有行为不回归）"""
+    retriever = _make_retriever()
+    retriever.vector_loaded = True
+    vec = [{'schema_name': 'DM', 'table_name': 'DM_KEY_ACTUAL_INDICATOR_DATA',
+            'column_name': 'ACCOUNT', 'recall_source': 'vector'}]
+    monkeypatch.setattr(retriever, 'field_count', lambda sn=None: 721)
+    monkeypatch.setattr(retriever, 'search_vector', lambda *a, **kw: list(vec))
+    monkeypatch.setattr(retriever, '_filter_recalled_by_permission',
+                        lambda res, sn=None, scope=None: res)
+    monkeypatch.setattr(retriever, 'recall_from_db', lambda kws, sn=None, scope=None: [])
+    monkeypatch.setattr('core.ret_retriever.get_vector_config',
+                        lambda key: 500 if key == 'VECTOR_INDEX_THRESHOLD' else 50)
+
+    out = retriever.recall_fields(['科目'], schema_name=None, query='费用合计科目')
+    assert [d['column_name'] for d in out] == ['ACCOUNT']
+    assert all(not d.get('full_scope') for d in out)
 
 
 # ---------- 3/4. 追问轮：判断 prompt 注入自动召回知识 + 知识表进 keep_first ----------
@@ -153,11 +203,12 @@ class _FakeRetriever:
     def __init__(self):
         self.agg_calls = []
 
-    def recall_fields(self, keywords, schema_name=None, query=None):
+    def recall_fields(self, keywords, schema_name=None, query=None, scope=None):
         return [{'schema_name': 'ODS', 'table_name': 'ODS_FILL_RD_MIANBODY_INFO',
                  'column_name': 'VALUE', 'recall_source': 'vector'}]
 
-    def aggregate_tables(self, recalled_fields, schema_name=None, keep_first=None):
+    def aggregate_tables(self, recalled_fields, schema_name=None, keep_first=None,
+                         scope=None):
         tables = list(dict.fromkeys(
             f['table_name'] for f in recalled_fields if f.get('table_name')))
         all_fields = {}
@@ -178,7 +229,7 @@ class _FakeRetriever:
                 'schema_name': schema_name}
 
     def recall_knowledge(self, query, scope_schema_id=None,
-                         keywords=None, exclude_contents=None):
+                         keywords=None, exclude_contents=None, scope=None):
         return {'items': [{'id': 14, 'title': '口语词到科目编码映射',
                            'knowledge_type': 'entity_map', 'aliases': ['费用'],
                            'content': ENTITY_MAP_TEXT,
@@ -189,7 +240,7 @@ class _FakeRetriever:
     def resolve_scope_schema_id(self, schema_name):
         return None
 
-    def get_relations_text(self, tables):
+    def get_relations_text(self, tables, max_relations=30, scope=None):
         return ''
 
 

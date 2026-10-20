@@ -558,19 +558,21 @@ def create_conversation(
     """
     user_id = user['user_id']
 
-    # 链路追踪：前置步骤（鉴权/模型/知识库）
+    # 链路追踪：前置步骤（鉴权/模型/知识库）— StepTrace 统一结构（docs §5.2）
     from app.permissions import is_schema_visible
-    from app.timezone import now_beijing as _nb
-    pre_log = [{
-        "step": "AUTH_SCHEMA_CHECK", "timestamp": _nb().strftime("%Y-%m-%d %H:%M:%S"),
-        "data": {"schema_name": payload.schema_name, "role": user.get('role', ''),
-                 "passed": True},
-    }]
+    from core.gen_audit import StepTracker
+    pre_tracker = StepTracker()
+    pre_log = []
+    pre_tracker.add(pre_log, "AUTH_SCHEMA_CHECK", data={
+        "schema_name": payload.schema_name, "role": user.get('role', ''),
+        "passed": True}, summary="库级可见性校验")
 
     # 库级可见性二次校验（防绕过前端下拉直接请求无权限库）
     if not is_schema_visible(user, payload.schema_name):
-        pre_log[-1]["data"]["passed"] = False
-        pre_log[-1]["data"]["reason"] = "库级可见性校验未通过"
+        pre_log[-1]["detail"]["passed"] = False
+        pre_log[-1]["detail"]["reason"] = "库级可见性校验未通过"
+        pre_log[-1]["status"] = "intercept"
+        pre_log[-1]["error"] = "库级可见性校验未通过"
         raise HTTPException(status_code=403, detail="无权访问该数据库")
 
     # 数据库类型：选了库则以库类型为准；全库模式（None）从可见库推断（供 LLM 引用符提示）
@@ -608,23 +610,22 @@ def create_conversation(
             kb_sections.append(f"【领域知识（用户勾选）】\n{selected_content}")
         knowledge_content = "\n\n".join(kb_sections)
 
-        pre_log.append({
-            "step": "LLM_CONFIG_LOAD", "timestamp": _nb().strftime("%Y-%m-%d %H:%M:%S"),
-            "data": {"provider": getattr(llm_client, 'provider', '') or 'default',
-                     "model": getattr(llm_client, 'model', '') or 'default',
-                     "config_id": payload.llm_config_id},
-        })
-        pre_log.append({
-            "step": "KNOWLEDGE_LOAD", "timestamp": _nb().strftime("%Y-%m-%d %H:%M:%S"),
-            "data": {"knowledge_ids": knowledge_ids,
-                     "user_selected": bool(payload.knowledge_ids or payload.knowledge_id),
-                     "used_default_kb": used_default_kb,
-                     "global_pinned": pinned_n,
-                     "user_pinned": user_pinned_n,
-                     "note": "用户显式选择的知识库；链路第 8 步为自动概念召回(与勾选无关)" if not knowledge_ids else "",
-                     "loaded": bool(knowledge_content),
-                     "content_length": len(knowledge_content)},
-        })
+        pre_tracker.add(pre_log, "LLM_CONFIG_LOAD", data={
+            "provider": getattr(llm_client, 'provider', '') or 'default',
+            "model": getattr(llm_client, 'model', '') or 'default',
+            "config_id": payload.llm_config_id},
+            summary=f"模型 {getattr(llm_client, 'model', '') or 'default'}")
+        pre_tracker.add(pre_log, "KNOWLEDGE_LOAD", data={
+            "knowledge_ids": knowledge_ids,
+            "user_selected": bool(payload.knowledge_ids or payload.knowledge_id),
+            "used_default_kb": used_default_kb,
+            "global_pinned": pinned_n,
+            "user_pinned": user_pinned_n,
+            "note": "用户显式选择的知识库；链路第 8 步为自动概念召回(与勾选无关)" if not knowledge_ids else "",
+            "loaded": bool(knowledge_content),
+            "content_length": len(knowledge_content)},
+            summary=(f"全局常驻 {pinned_n} · 我的常驻 {user_pinned_n} · "
+                     f"勾选 {len(knowledge_ids or [])} 条"))
 
         session = ChatSession(
             user_id=user_id,
@@ -652,6 +653,8 @@ def create_conversation(
                 result.get('sql', ''), exec_schema, db_type)
 
         # 保存到数据库
+        import time as _time
+        _persist_t0 = _time.time()
         with session_scope() as db:
             title = payload.query[:80] + ("..." if len(payload.query) > 80 else "")
 
@@ -699,9 +702,13 @@ def create_conversation(
             assistant_msg_id = cast(int, assistant_msg.id)
             db.commit()
         # 保存 LLM 调用记录（遥测库）+ 回填关联键（主库）
+        # 条件留痕：记录实际路由的库与数据源类型（全库模式下区别于请求参数 None/sqlite 兜底值）
+        cond_schema = ((query_result or {}).get('schema')
+                       or payload.schema_name or '全库')
+        cond_db = ((query_result or {}).get('datasource_type') or db_type or 'unknown')
         call_id = _record_telemetry(
             user_id, llm_client, payload.query,
-            conditions=f"schema={payload.schema_name}, db_type={payload.db_type}",
+            conditions=f"schema={cond_schema}, db_type={cond_db}",
             result=result, conversation_id=conversation_id,
             config_id=payload.llm_config_id)
 
@@ -713,18 +720,44 @@ def create_conversation(
         logger.info(f"对话创建成功: id={conversation_id}, user_id={user_id}")
 
         # 后置步骤：SQL 执行 + 消息持久化（追加到 pipeline_log，回写审计）
+        # StepTrace 统一结构（docs §5.2）：PREFIX_REPAIR / SQL_EXECUTE / MESSAGE_PERSIST
         pipeline_log = result.get('pipeline_log') or []
-        pipeline_log.append({
-            "step": "SQL_EXECUTE", "timestamp": _nb().strftime("%Y-%m-%d %H:%M:%S"),
-            "data": {"executed": bool(query_result and not query_result.get('error')),
-                     "row_count": (query_result or {}).get('row_count', 0),
-                     "error": (query_result or {}).get('error', '') or None},
-        })
-        pipeline_log.append({
-            "step": "MESSAGE_PERSIST", "timestamp": _nb().strftime("%Y-%m-%d %H:%M:%S"),
-            "data": {"conversation_id": conversation_id, "assistant_msg_id": assistant_msg_id,
-                     "telemetry_call_id": call_id, "prompt_id": prompt_id},
-        })
+        post_tracker = StepTracker()
+        _pr = (query_result or {}).get('prefix_repair')
+        if _pr is not None:
+            post_tracker.add(pipeline_log, "PREFIX_REPAIR", data=_pr,
+                             status='ok' if _pr.get('repaired') else 'skip',
+                             error=_pr.get('error'),
+                             summary=('补前缀: ' + '; '.join(_pr.get('repaired') or []))
+                             if _pr.get('repaired') else
+                             ('解析失败，跳过补前缀' if _pr.get('error') else '无需补前缀'))
+        _exec_error = (query_result or {}).get('error', '') or None
+        _executed = bool(query_result) and not _exec_error
+        if query_result is None:
+            _exec_status = 'skip'
+        elif _exec_error:
+            _exec_status = 'error'
+        else:
+            _exec_status = 'ok'
+        post_tracker.add(pipeline_log, "SQL_EXECUTE", data={
+            "executed": _executed,
+            "row_count": (query_result or {}).get('row_count', 0),
+            "schema": (query_result or {}).get('schema'),
+            "datasource_type": (query_result or {}).get('datasource_type'),
+            "error": _exec_error},
+            status=_exec_status,
+            error=_exec_error if _exec_status != 'skip' else '未执行：生成被拦截或 SQL 校验未通过',
+            summary=(f"执行 {('成功' if _executed else '失败')} · "
+                     f"{(query_result or {}).get('row_count', 0)} 行 · "
+                     f"库 {(query_result or {}).get('schema') or '-'}"
+                     f"({(query_result or {}).get('datasource_type') or '-'})")
+            if query_result is not None else "未执行",
+            duration_ms=(query_result or {}).get('duration_ms'))
+        post_tracker.add(pipeline_log, "MESSAGE_PERSIST", data={
+            "conversation_id": conversation_id, "assistant_msg_id": assistant_msg_id,
+            "telemetry_call_id": call_id, "prompt_id": prompt_id},
+            status='ok', summary="消息与遥测已落库",
+            duration_ms=int((_time.time() - _persist_t0) * 1000))
         from core.gen_audit import update_pipeline_log
         update_pipeline_log(result.get('audit_log_id'),
                             json.dumps(pipeline_log, ensure_ascii=False, default=str))
@@ -846,8 +879,10 @@ def send_message(
                 f"llm_config_id={conv_llm_config_id}, knowledge_ids={conv_knowledge_ids}")
 
         # 从三层模型重建 schema CSV（fallback 全量，用于未记录首轮表集合的旧对话；
-        # 权限裁剪在 SchemaRetriever.get_field_rows 内完成）
-        schema_csv = SchemaRetriever(user=user).build_full_schema_csv(schema_name)
+        # 权限裁剪在 SchemaRetriever.get_field_rows 内完成——编排层构建权限快照传入）
+        from core.recall_scope import build_recall_scope
+        schema_csv = SchemaRetriever(user=user).build_full_schema_csv(
+            schema_name, scope=build_recall_scope(user))
         # 首轮召回表集合（新对话已记录；旧对话为空则追问轮沿用全量 schema_csv）
         first_tables: list = []
         if conv_schema_tables:
@@ -858,23 +893,25 @@ def send_message(
 
         llm_client = _build_llm_client(user_id, conv_llm_config_id)
 
-        # 链路追踪：前置步骤（鉴权/模型/知识库）
+        # 链路追踪：前置步骤（鉴权/模型/知识库）— StepTrace 统一结构（docs §5.2）
         from app.permissions import is_schema_visible as _is_visible
-        from app.timezone import now_beijing as _nb
+        from core.gen_audit import StepTracker
+        pre_tracker = StepTracker()
+        pre_log = []
         schema_visible = _is_visible(user, schema_name)
-        pre_log = [{
-            "step": "AUTH_SCHEMA_CHECK", "timestamp": _nb().strftime("%Y-%m-%d %H:%M:%S"),
-            "data": {"schema_name": schema_name, "role": user.get('role', ''),
-                     "passed": schema_visible, "conversation_id": conversation_id},
-        }]
+        _auth_entry = pre_tracker.add(pre_log, "AUTH_SCHEMA_CHECK", data={
+            "schema_name": schema_name, "role": user.get('role', ''),
+            "passed": schema_visible, "conversation_id": conversation_id},
+            summary="库级可见性校验")
         if not schema_visible:
+            _auth_entry["status"] = "intercept"
+            _auth_entry["error"] = "对话关联库权限已变更，库级可见性校验未通过"
             raise HTTPException(status_code=403, detail="无权访问该数据库（对话关联库权限已变更）")
-        pre_log.append({
-            "step": "LLM_CONFIG_LOAD", "timestamp": _nb().strftime("%Y-%m-%d %H:%M:%S"),
-            "data": {"provider": getattr(llm_client, 'provider', '') or 'default',
-                     "model": getattr(llm_client, 'model', '') or 'default',
-                     "config_id": conv_llm_config_id},
-        })
+        pre_tracker.add(pre_log, "LLM_CONFIG_LOAD", data={
+            "provider": getattr(llm_client, 'provider', '') or 'default',
+            "model": getattr(llm_client, 'model', '') or 'default',
+            "config_id": conv_llm_config_id},
+            summary=f"模型 {getattr(llm_client, 'model', '') or 'default'}")
         # 跟进消息的知识内容需在日志步骤前加载（避免引用未赋值变量）；
         # 常驻知识（管理员全局 + 用户自选）每次追问都注入，自选常驻条目从勾选段排除
         global_text, pinned_n = _get_global_rules_content()
@@ -889,16 +926,16 @@ def send_message(
         if selected_content:
             kb_sections.append(f"【领域知识（用户勾选）】\n{selected_content}")
         knowledge_content = "\n\n".join(kb_sections)
-        pre_log.append({
-            "step": "KNOWLEDGE_LOAD", "timestamp": _nb().strftime("%Y-%m-%d %H:%M:%S"),
-            "data": {"knowledge_ids": conv_knowledge_ids,
-                     "user_selected": bool(conv_knowledge_ids),
-                     "global_pinned": pinned_n,
-                     "user_pinned": user_pinned_n,
-                     "note": "用户显式选择的知识库；链路第 8 步为自动概念召回(与勾选无关)" if not conv_knowledge_ids else "",
-                     "loaded": bool(knowledge_content),
-                     "content_length": len(knowledge_content)},
-        })
+        pre_tracker.add(pre_log, "KNOWLEDGE_LOAD", data={
+            "knowledge_ids": conv_knowledge_ids,
+            "user_selected": bool(conv_knowledge_ids),
+            "global_pinned": pinned_n,
+            "user_pinned": user_pinned_n,
+            "note": "用户显式选择的知识库；链路第 8 步为自动概念召回(与勾选无关)" if not conv_knowledge_ids else "",
+            "loaded": bool(knowledge_content),
+            "content_length": len(knowledge_content)},
+            summary=(f"全局常驻 {pinned_n} · 我的常驻 {user_pinned_n} · "
+                     f"勾选 {len(conv_knowledge_ids or [])} 条"))
 
         session = ChatSession(
             user_id=user_id,
@@ -929,6 +966,8 @@ def send_message(
                 result.get('sql', ''), exec_schema, conv_db_type)
 
         # 保存消息
+        import time as _time
+        _persist_t0 = _time.time()
         with session_scope() as db:
             user_msg = ConversationMessage(
                 conversation_id=conversation_id,
@@ -962,9 +1001,14 @@ def send_message(
             assistant_msg_id = assistant_msg.id
             db.commit()
         # 保存 LLM 调用记录（遥测库）+ 回填消息关联
+        # 条件留痕：追问轮同样记录实际路由的库与数据源类型
+        cond_schema = ((query_result or {}).get('schema')
+                       or schema_name or '全库')
+        cond_db = ((query_result or {}).get('datasource_type') or conv_db_type or 'unknown')
         call_id = _record_telemetry(
             user_id, llm_client, payload.content,
-            conditions=f"conversation={conversation_id}, followup",
+            conditions=(f"conversation={conversation_id}, followup, "
+                        f"schema={cond_schema}, db_type={cond_db}"),
             result=result, conversation_id=conversation_id,
             config_id=conv_llm_config_id)
 
@@ -979,19 +1023,45 @@ def send_message(
         logger.info(f"对话消息已发送: conversation_id={conversation_id}")
 
         # 后置步骤：SQL 执行 + 消息持久化（追加到 pipeline_log，回写审计）
+        # StepTrace 统一结构（docs §5.2）：PREFIX_REPAIR / SQL_EXECUTE / MESSAGE_PERSIST
         pipeline_log = result.get('pipeline_log') or []
-        pipeline_log.append({
-            "step": "SQL_EXECUTE", "timestamp": _nb().strftime("%Y-%m-%d %H:%M:%S"),
-            "data": {"executed": bool(query_result and not query_result.get('error')),
-                     "row_count": (query_result or {}).get('row_count', 0),
-                     "error": (query_result or {}).get('error', '') or None},
-        })
-        pipeline_log.append({
-            "step": "MESSAGE_PERSIST", "timestamp": _nb().strftime("%Y-%m-%d %H:%M:%S"),
-            "data": {"conversation_id": conversation_id,
-                     "user_msg_id": user_msg_id, "assistant_msg_id": assistant_msg_id,
-                     "telemetry_call_id": call_id},
-        })
+        post_tracker = StepTracker()
+        _pr = (query_result or {}).get('prefix_repair')
+        if _pr is not None:
+            post_tracker.add(pipeline_log, "PREFIX_REPAIR", data=_pr,
+                             status='ok' if _pr.get('repaired') else 'skip',
+                             error=_pr.get('error'),
+                             summary=('补前缀: ' + '; '.join(_pr.get('repaired') or []))
+                             if _pr.get('repaired') else
+                             ('解析失败，跳过补前缀' if _pr.get('error') else '无需补前缀'))
+        _exec_error = (query_result or {}).get('error', '') or None
+        _executed = bool(query_result) and not _exec_error
+        if query_result is None:
+            _exec_status = 'skip'
+        elif _exec_error:
+            _exec_status = 'error'
+        else:
+            _exec_status = 'ok'
+        post_tracker.add(pipeline_log, "SQL_EXECUTE", data={
+            "executed": _executed,
+            "row_count": (query_result or {}).get('row_count', 0),
+            "schema": (query_result or {}).get('schema'),
+            "datasource_type": (query_result or {}).get('datasource_type'),
+            "error": _exec_error},
+            status=_exec_status,
+            error=_exec_error if _exec_status != 'skip' else '未执行：生成被拦截或 SQL 校验未通过',
+            summary=(f"执行 {('成功' if _executed else '失败')} · "
+                     f"{(query_result or {}).get('row_count', 0)} 行 · "
+                     f"库 {(query_result or {}).get('schema') or '-'}"
+                     f"({(query_result or {}).get('datasource_type') or '-'})")
+            if query_result is not None else "未执行",
+            duration_ms=(query_result or {}).get('duration_ms'))
+        post_tracker.add(pipeline_log, "MESSAGE_PERSIST", data={
+            "conversation_id": conversation_id,
+            "user_msg_id": user_msg_id, "assistant_msg_id": assistant_msg_id,
+            "telemetry_call_id": call_id},
+            status='ok', summary="消息与遥测已落库",
+            duration_ms=int((_time.time() - _persist_t0) * 1000))
         from core.gen_audit import update_pipeline_log
         update_pipeline_log(result.get('audit_log_id'),
                             json.dumps(pipeline_log, ensure_ascii=False, default=str))

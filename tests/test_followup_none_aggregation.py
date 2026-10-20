@@ -26,12 +26,13 @@ class _StubRetriever:
         self._knowledge_tables = knowledge_tables or []
         self.aggregate_calls = []
 
-    def recall_fields(self, keywords, schema_name, query=None):
+    def recall_fields(self, keywords, schema_name, query=None, scope=None):
         if isinstance(self._recall_fields, Exception):
             raise self._recall_fields
         return self._recall_fields
 
-    def aggregate_tables(self, recalled_fields, schema_name=None, keep_first=None):
+    def aggregate_tables(self, recalled_fields, schema_name=None, keep_first=None,
+                         scope=None):
         self.aggregate_calls.append({
             'recalled': list(recalled_fields),
             'schema_name': schema_name,
@@ -42,14 +43,14 @@ class _StubRetriever:
                 'full_scope': False}
 
     def recall_knowledge(self, query, scope_schema_id=None, exclude_contents=None,
-                         keywords=None):
+                         keywords=None, scope=None):
         return {'items': [], 'prompt_text': '',
                 'related_tables': list(self._knowledge_tables)}
 
     def resolve_scope_schema_id(self, schema_name):
         return None
 
-    def get_relations_text(self, table_names, max_relations=30):
+    def get_relations_text(self, table_names, max_relations=30, scope=None):
         return ''
 
 
