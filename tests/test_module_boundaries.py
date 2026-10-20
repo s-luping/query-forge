@@ -1,5 +1,5 @@
 # -*- coding: UTF-8 -*-
-"""P3 模块依赖红线（静态 AST 检查）— docs/ChatSQL模块化与全链路留痕设计.md §6.3
+"""P3 模块依赖红线（静态 AST 检查）— docs/07-ChatSQL模块化与全链路留痕设计.md §6.3
 
 不引入新依赖：ast.parse 逐文件收集 import，断言禁止的依赖边不存在。
 新增红线时在 FORBIDDEN_EDGES 加一行即可；业务模块 → app.routers 为全局规则。

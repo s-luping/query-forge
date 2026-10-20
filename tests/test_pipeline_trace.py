@@ -1,5 +1,5 @@
 # -*- coding: UTF-8 -*-
-"""P1 留痕统一（StepTrace）回归 — docs/ChatSQL模块化与全链路留痕设计.md §5.2
+"""P1 留痕统一（StepTrace）回归 — docs/07-ChatSQL模块化与全链路留痕设计.md §5.2
 
 覆盖：
 1. StepTracker：字段完整性 / 耗时单调 / 显式 duration 覆盖

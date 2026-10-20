@@ -112,7 +112,7 @@ def _repair_missing_schema_prefix(sql: str, db_type: str = '',
 
     Args:
         info: 可选 dict，调用方（execute_sql）传入用于链路留痕（PREFIX_REPAIR 步，
-              docs/ChatSQL模块化与全链路留痕设计.md §5.2）——repaired/ambiguous/
+              docs/07-ChatSQL模块化与全链路留痕设计.md §5.2）——repaired/ambiguous/
               unknown/error/bare_tables 字段就地填充。
     """
     dialect = _SQLGLOT_DIALECT.get((db_type or '').lower(), 'sqlite')

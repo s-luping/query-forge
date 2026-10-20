@@ -293,7 +293,7 @@ gold SQL 全部显式处理而生成 SQL 常漏——清洗片段模板直接进
 {KB_SECTION}
 </body></html>"""
 
-    out_dir = os.path.join(BASE_DIR, "..", "docs", "测试报告")
+    out_dir = os.path.join(BASE_DIR, "..", "..", "docs", "测试报告")
     os.makedirs(out_dir, exist_ok=True)
     out_path = os.path.join(out_dir, args.out_name)
     with open(out_path, "w", encoding="utf-8") as f:

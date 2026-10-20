@@ -22,11 +22,11 @@ import time
 import pymysql
 import requests
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-SPIDER_DIR = os.path.join(BASE_DIR, "data", "spider", "spider")
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))  # benchmark/spider/
+SPIDER_DIR = os.path.join(BASE_DIR, "..", "data", "spider", "spider")
 DB_DIR = os.path.join(SPIDER_DIR, "database")
-QUESTIONS_DIR = os.path.join(BASE_DIR, "questions")
-RESULTS_DIR = os.path.join(BASE_DIR, "results")
+QUESTIONS_DIR = os.path.join(BASE_DIR, "..", "questions", "spider")
+RESULTS_DIR = os.path.join(BASE_DIR, "..", "results", "spider")
 
 MYSQL = dict(host="127.0.0.1", port=3306, user="root", password="REDACTED",
              charset="utf8mb4", autocommit=True)
@@ -246,7 +246,8 @@ def norm_rows(rows):
 
 
 def _norm_r2ci(rows):
-    """宽口径归一化：字符串小写去空格、float 2 位小数"""
+    """宽口径归一化：字符串小写去空格、float 3 位小数（吸收 AVG 半进位 0.0001
+    级漂移与 gold 落标 4 位舍入的双重舍入差）"""
     out = []
     for r in rows:
         rr = []
@@ -254,16 +255,40 @@ def _norm_r2ci(rows):
             if c is None:
                 rr.append("NULL")
             elif isinstance(c, float):
-                rr.append(round(c, 2))
+                rr.append(round(c, 3))
             else:
                 rr.append(str(c).strip().lower())
         out.append(tuple(rr))
     return out
 
 
+def _match_tol(g, s, tol=1.5e-3):
+    """容差多重集匹配：字符串单元格为锚点分组，组内浮点排序后配对，
+    全部数值格 |a-b|<=tol 记匹配（吸收 AVG 半进位/双重舍入的 0.0001 级漂移；
+    tol 取 1.5e-3 覆盖 r3 舍入后 0.001 名义差 + 二进制浮点噪声）"""
+    from collections import defaultdict
+    gs, ss = defaultdict(list), defaultdict(list)
+    for r in g:
+        k = tuple(c for c in r if not isinstance(c, float))
+        gs[k].append(tuple(c for c in r if isinstance(c, float)))
+    for r in s:
+        k = tuple(c for c in r if not isinstance(c, float))
+        ss[k].append(tuple(c for c in r if isinstance(c, float)))
+    if gs.keys() != ss.keys():
+        return False
+    for k in gs:
+        a, b = sorted(gs[k]), sorted(ss[k])
+        if len(a) != len(b):
+            return False
+        for ra, rb in zip(a, b):
+            if any(abs(x - y) > tol for x, y in zip(ra, rb)):
+                return False
+    return True
+
+
 def wide_compare(gen_rows, gold_rows):
-    """宽口径分层比对（对齐 Falcon 收敛版比对器）：r2/ci 精确 -> 列排列 -> 多余列剔除。
-    返回 (bool, layer)。仅用于 match_wide 统计，不改变严格 match。"""
+    """宽口径分层比对（对齐 Falcon 收敛版比对器）：r3/ci 精确 -> 数值容差 ->
+    列排列 -> 列排列+容差 -> 多余列剔除。返回 (bool, layer)。仅用于 match_wide 统计。"""
     from itertools import permutations
     g = _norm_r2ci(gen_rows)
     s = _norm_r2ci(gold_rows)
@@ -273,11 +298,17 @@ def wide_compare(gen_rows, gold_rows):
         return True, "r2ci"
     pc = len(g[0])
     gc = len(s[0])
-    # 列排列（同列数；排列上限 8!=40320、行数限制防组合爆炸）
-    if pc == gc and 2 <= pc <= 8 and len(g) <= 200:
+    if pc == gc and _match_tol(g, s):
+        return True, "tol"
+    # 列排列（同列数；小列数放宽行数上限：2/3 列排列代价低）
+    if pc == gc and 2 <= pc <= 8 and (len(g) <= 200 or (pc <= 3 and len(g) <= 2000)):
         for perm in permutations(range(pc)):
             if sorted(tuple(r[i] for i in perm) for r in g) == sorted(s):
                 return True, "perm"
+        if pc <= 3:  # 排列+容差（2/3 列代价低）
+            for perm in permutations(range(pc)):
+                if _match_tol([tuple(r[i] for i in perm) for r in g], s):
+                    return True, "perm_tol"
     # 多余列剔除（gen 列数 = gold+1）
     if pc == gc + 1 and gc <= 7 and len(g) <= 200:
         for drop in range(pc):
@@ -376,7 +407,7 @@ def cmd_select(n=10, existing_file=None, out_file=None):
             print(f"[{db_id}] 选 q{i} (该库第{r}题): {q['question']}", flush=True)
 
     os.makedirs(QUESTIONS_DIR, exist_ok=True)
-    out = out_file or os.path.join(QUESTIONS_DIR, "spider_selected_10.json")
+    out = out_file or os.path.join(QUESTIONS_DIR, "spider_selected.json")
     with open(out, "w", encoding="utf-8") as f:
         json.dump(selected, f, ensure_ascii=False, indent=1)
     print(f"\n共 {len(selected)} 题（本轮新增 {n}）-> {out}", flush=True)

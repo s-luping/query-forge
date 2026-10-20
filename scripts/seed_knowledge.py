@@ -6,9 +6,9 @@
       不替代知识库管理页的日常维护；页面上改坏了可用版本恢复，本脚本只增不改。
 
 知识来源（均有事实依据，非脑补）：
-  - docs/系统使用文档.md §4/§7         知识类型用法与管理员最佳实践
-  - docs/NL2SQL设计与实现.md            注入链路与降级策略
-  - docs/知识库改造实施方案.md          global/pin/版本化机制与六层映射
+  - docs/01-系统使用文档.md §4/§7         知识类型用法与管理员最佳实践
+  - docs/06-NL2SQL设计与实现.md            注入链路与降级策略
+  - docs/archive/知识库改造实施方案.md    global/pin/版本化机制与六层映射
   - docs/测试报告/Falcon知识库优化对比_20261017.html
                                           枚举值必须逐字符照抄实采值、结果形态规范
   - scripts/sample_enum_values.py 实采   DM 库 PERIODS/SCENARIO/VERSION 等原样值
