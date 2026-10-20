@@ -131,12 +131,16 @@ async function loadList(page) {
         const tf = document.getElementById('typeFilter').value;
         const sf = document.getElementById('statusFilter').value;
         const pf = document.getElementById('pinnedFilter').value;
+        const uf = document.getElementById('updatedFilter').value;
+        const sort = document.getElementById('sortFilter').value;
         const resp = await apiRequest(`/api/knowledge?limit=${pageSize}&offset=${(page-1)*pageSize}` +
             (vf ? `&visibility=${vf}` : '') +
             (kw ? `&keyword=${encodeURIComponent(kw)}` : '') +
             (tf ? `&knowledge_type=${encodeURIComponent(tf)}` : '') +
             (sf ? `&status=${sf}` : '') +
-            (pf ? `&pinned=${pf}` : ''));
+            (pf ? `&pinned=${pf}` : '') +
+            (uf ? `&updated_within=${uf}` : '') +
+            `&sort=${sort}`);
         if (!resp.ok) throw new Error('加载失败');
         const data = await resp.json();
         const items = data.items || [];
@@ -150,9 +154,11 @@ async function loadList(page) {
         } else {
             document.getElementById('knowledgeContent').classList.remove('d-none');
             renderList(items);
+            const total = data.total || 0;
+            const totalPages = Math.max(1, Math.ceil(total / pageSize));
             document.getElementById('prevBtn').disabled = page <= 1;
-            document.getElementById('nextBtn').disabled = items.length < pageSize;
-            document.getElementById('pageInfo').textContent = `第 ${page} 页`;
+            document.getElementById('nextBtn').disabled = page >= totalPages || items.length < pageSize;
+            document.getElementById('pageInfo').textContent = `第 ${page} / ${totalPages} 页 · 共 ${total} 条`;
         }
     } catch (e) {
         document.getElementById('knowledgeLoading').classList.add('d-none');

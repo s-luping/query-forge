@@ -150,7 +150,9 @@ def get_all_knowledge(user: dict, limit: int = 20, offset: int = 0,
                       type_filter: Optional[str] = None,
                       status_filter: Optional[str] = None,
                       pinned_filter: Optional[str] = None,
-                      mine: bool = False) -> tuple:
+                      mine: bool = False,
+                      sort: str = 'updated_desc',
+                      updated_within: Optional[int] = None) -> tuple:
     """获取知识库条目（全局条目人人可见；个人条目按用户权限过滤）
 
     status_filter: enabled=仅启用 / disabled=仅禁用 / None=全部
@@ -158,6 +160,8 @@ def get_all_knowledge(user: dict, limit: int = 20, offset: int = 0,
     pinned_filter: pinned=仅常驻
     mine: True 时仅返回 全局 + 当前用户本人创建 的条目（管理员也不例外，
           供对话页勾选使用——管理全部条目请走管理页，勿混入他人个人条目）
+    sort: updated_desc=按修改时间倒序（默认）/ created_desc=按创建时间倒序 / title_asc=按标题升序
+    updated_within: 仅返回最近 N 天内有更新的条目（None=不限）
     """
     with session_scope() as db:
         from sqlalchemy import or_
@@ -183,7 +187,13 @@ def get_all_knowledge(user: dict, limit: int = 20, offset: int = 0,
             query = query.filter(or_(
                 KnowledgeItem.title.ilike(kw),
                 KnowledgeItem.content.ilike(kw),
+                KnowledgeItem.aliases.ilike(kw),
+                KnowledgeItem.payload.ilike(kw),
             ))
+        if updated_within:
+            from datetime import datetime, timedelta
+            query = query.filter(
+                KnowledgeItem.updated_at >= datetime.now() - timedelta(days=updated_within))
         if mine:
             query = query.filter(or_(
                 KnowledgeItem.visibility == 'global',
@@ -197,7 +207,14 @@ def get_all_knowledge(user: dict, limit: int = 20, offset: int = 0,
                 conds.append(KnowledgeItem.id.in_(visible_ids))
             query = query.filter(or_(*conds))
         total = query.count()
-        items = query.order_by(KnowledgeItem.updated_at.desc()).limit(limit).offset(offset).all()
+        order_map = {
+            'updated_desc': KnowledgeItem.updated_at.desc(),
+            'created_desc': KnowledgeItem.created_at.desc(),
+            'title_asc': KnowledgeItem.title.asc(),
+        }
+        items = query.order_by(
+            order_map.get(sort, KnowledgeItem.updated_at.desc())
+        ).limit(limit).offset(offset).all()
         # 必须在会话关闭前 expunge，否则 session.close() 会过期属性，
         # 会话外访问 item.id 触发惰性刷新 → DetachedInstanceError
         for obj in items:
@@ -298,6 +315,10 @@ def list_knowledge(
     pinned: Optional[str] = Query(None, description="pinned=仅常驻条目"),
     mine: int = Query(0, ge=0, le=1,
                       description="1=仅返回 全局+本人创建 的条目（对话页勾选用）"),
+    sort: Optional[str] = Query(None,
+                                description="排序：updated_desc=修改时间倒序(默认)/created_desc=创建时间倒序/title_asc=标题升序"),
+    updated_within: Optional[int] = Query(None, ge=1, le=3650,
+                                          description="仅返回最近 N 天内有更新的条目，留空=不限"),
 ):
     """获取知识库列表（visibility 过滤对所有用户开放，作用于各自可见范围）"""
     vf = visibility if (visibility in ('global', 'personal')) else None
@@ -307,7 +328,9 @@ def list_knowledge(
                                      type_filter=(knowledge_type or '').strip() or None,
                                      status_filter=st,
                                      pinned_filter=('pinned' if pinned == 'pinned' else None),
-                                     mine=bool(mine))
+                                     mine=bool(mine),
+                                     sort=(sort or '').strip() or 'updated_desc',
+                                     updated_within=updated_within)
     item_dicts = [_to_dict(item) for item in items]
     _attach_owner_names(item_dicts)
     return {'items': item_dicts, 'total': total}
