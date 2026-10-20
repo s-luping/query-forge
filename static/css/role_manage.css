@@ -1,6 +1,12 @@
 /* role_manage.css — 角色与权限页专属样式（依赖 common.css 的卡片基底） */
 .rm-page { max-width: 1100px; }
 .rm-title { font-size: 16px; font-weight: 600; color: #1e293b; }
+.rm-meta { margin-top: 12px; padding-top: 10px; border-top: 1px dashed #e8edf3; font-size: 12px; color: #64748b; display: flex; flex-wrap: wrap; gap: 6px 18px; }
+.rm-meta:empty { display: none; }
+.rm-meta .meta-item { display: inline-flex; align-items: center; gap: 5px; }
+.rm-meta .meta-val { color: #1e293b; font-weight: 600; }
+.rm-meta .meta-user { display: inline-block; background: #f1f5f9; border-radius: 8px; padding: 1px 8px; font-size: 11px; color: #475569; }
+.rm-meta .meta-user.inactive { background: #fef2f2; color: #b91c1c; text-decoration: line-through; }
 
 /* 分区卡片：页签导航 + 各分区主题色 */
 .rm-card { position: relative; padding: 0; }
@@ -14,10 +20,12 @@
 .rm-pane.is-schema { --rm-accent: #7c3aed; }
 .rm-pane.is-table { --rm-accent: #059669; }
 .rm-pane.is-knowledge { --rm-accent: #d97706; }
+.rm-pane.is-row { --rm-accent: #0891b2; }
 .rm-tabs .nav-item:nth-child(1) .nav-link.active { color: #2563eb; border-bottom-color: #2563eb; }
 .rm-tabs .nav-item:nth-child(2) .nav-link.active { color: #7c3aed; border-bottom-color: #7c3aed; }
 .rm-tabs .nav-item:nth-child(3) .nav-link.active { color: #059669; border-bottom-color: #059669; }
 .rm-tabs .nav-item:nth-child(4) .nav-link.active { color: #d97706; border-bottom-color: #d97706; }
+.rm-tabs .nav-item:nth-child(5) .nav-link.active { color: #0891b2; border-bottom-color: #0891b2; }
 .rm-hint { color: #94a3b8; font-size: 12px; margin: 0 0 12px; }
 
 /* 资源行 */
@@ -56,11 +64,20 @@
 /* 空态 */
 .area-empty { color: #94a3b8; font-size: 12px; text-align: center; padding: 18px 0; }
 
+/* 行级过滤规则行 */
+.rule-row { grid-template-columns: minmax(0, 260px) minmax(0, 1fr); }
+.rule-input { font-family: Consolas, Menlo, monospace; font-size: 12px; color: #0f172a; }
+.rule-input::placeholder { color: #cbd5e1; }
+.rule-input:focus { border-color: #0891b2; box-shadow: 0 0 0 3px rgba(8, 145, 178, .12); }
+.rule-tag { display: inline-block; font-size: 10px; color: #0891b2; background: #cffafe; padding: 1px 6px; border-radius: 8px; margin-left: 6px; vertical-align: middle; }
+.rule-count { color: #94a3b8; font-size: 11px; text-align: right; padding: 6px 8px 2px; }
+
 /* 底部操作条 */
 .rm-actions { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 0 4px; }
 
 @media (max-width: 480px) {
     .res-row { grid-template-columns: 1fr; }
+    .rule-row { grid-template-columns: 1fr; }
     .lvl-group { width: 100%; }
     .lvl-btn { flex: 1; }
 }

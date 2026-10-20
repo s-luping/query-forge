@@ -48,7 +48,6 @@
                 document.getElementById('totalTokens').textContent = data.total_tokens.toLocaleString();
                 document.getElementById('promptTokens').textContent = data.total_prompt_tokens.toLocaleString();
                 document.getElementById('completionTokens').textContent = data.total_completion_tokens.toLocaleString();
-                document.getElementById('totalCost').textContent = '$' + ((data.total_cost || 0).toFixed(4));
                 document.getElementById('avgDuration').textContent = data.avg_duration_ms.toFixed(0);
                 document.getElementById('successRate').textContent = data.success_rate + '%';
             } catch (e) {
@@ -108,7 +107,7 @@
                 if (token !== loadToken) return;
                 console.error('加载记录失败:', e);
                 document.getElementById('logsTable').innerHTML =
-                    '<tr><td colspan="12" class="text-center text-danger py-4">加载失败</td></tr>';
+                    '<tr><td colspan="11" class="text-center text-danger py-4">加载失败</td></tr>';
             }
         }
 
@@ -195,12 +194,6 @@
                 smallTokens.textContent = `${item.total_tokens || 0} (${item.prompt_tokens || 0}/${item.completion_tokens || 0})`;
                 tdTokens.appendChild(smallTokens);
                 tr.appendChild(tdTokens);
-
-                const tdCost = document.createElement('td');
-                const smallCost = document.createElement('small');
-                smallCost.textContent = item.cost ? '$' + item.cost.toFixed(6) : '-';
-                tdCost.appendChild(smallCost);
-                tr.appendChild(tdCost);
 
                 const tdStatus = document.createElement('td');
                 const spanStatus = document.createElement('span');
@@ -344,7 +337,7 @@
                         </details>
                     </div>
                     <div class="row">
-                        <div class="col-md-3 detail-item">
+                        <div class="col-md-6 detail-item">
                             <div class="detail-label">耗时</div>
                             <div class="detail-value">${item.duration_ms ? item.duration_ms.toFixed(2) : '-'} ms</div>
                         </div>
@@ -359,10 +352,6 @@
                         <div class="col-md-2 detail-item">
                             <div class="detail-label">总Token</div>
                             <div class="detail-value">${item.total_tokens || 0}</div>
-                        </div>
-                        <div class="col-md-3 detail-item">
-                            <div class="detail-label">成本</div>
-                            <div class="detail-value">${item.cost ? '$' + item.cost.toFixed(6) : '-'}</div>
                         </div>
                     </div>
                     <div class="detail-item">

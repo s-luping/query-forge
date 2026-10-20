@@ -65,7 +65,7 @@ class LLMUsageStat(MainBase):
     prompt_tokens = Column(Integer, default=0, comment='输入Token合计')
     completion_tokens = Column(Integer, default=0, comment='输出Token合计')
     total_tokens = Column(Integer, default=0, comment='总Token合计')
-    cost = Column(Float, default=0.0, comment='成本合计')
+    cost = Column(Float, default=0.0, comment='成本合计（预留，暂无单价计算，恒为0）')
     updated_at = Column(DateTime, default=now_beijing, onupdate=now_beijing, comment='更新时间（北京时间）')
 
 
@@ -112,7 +112,7 @@ class LLMCall(TelemetryBase):
     completion_tokens = Column(Integer, default=0, comment='输出Token')
     reasoning_tokens = Column(Integer, default=0, comment='输出中的思考Token(深度思考模型)')
     total_tokens = Column(Integer, default=0, comment='总Token')
-    cost = Column(Float, default=0.0, comment='调用成本')
+    cost = Column(Float, default=0.0, comment='调用成本（预留，暂无单价计算，恒为0）')
     status = Column(String(20), default='success', index=True, comment='状态(success/warning/error)')
     error_message = Column(Text, comment='错误信息')
     created_at = Column(DateTime, default=now_beijing, index=True, comment='创建时间（北京时间）')

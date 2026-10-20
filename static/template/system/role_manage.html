@@ -32,6 +32,7 @@
                     <button class="btn btn-outline-primary w-100" onclick="saveDescription()">保存说明</button>
                 </div>
             </div>
+            <div id="roleMeta" class="rm-meta"></div>
         </div>
     </div>
 
@@ -42,6 +43,7 @@
                 <li class="nav-item"><button class="nav-link" data-tab="schema">数据库授权</button></li>
                 <li class="nav-item"><button class="nav-link" data-tab="table">表授权</button></li>
                 <li class="nav-item"><button class="nav-link" data-tab="knowledge">知识条目授权</button></li>
+                <li class="nav-item"><button class="nav-link" data-tab="row">行级过滤</button></li>
             </ul>
         </div>
         <div class="card-body">
@@ -64,6 +66,13 @@
                     <input class="form-control form-control-sm search-box" placeholder="过滤..." oninput="renderKnowledge(this.value)">
                 </div>
                 <div id="knowledgeArea" style="max-height:320px;overflow-y:auto;"></div>
+            </section>
+            <section id="tab-row" class="rm-pane is-row" hidden>
+                <p class="rm-hint">为表配置 SQL 布尔表达式（如 sales_region = '华东'），该角色的查询会被 SQL 网关自动注入 WHERE 条件；留空表示不限制。管理员角色不受行级过滤约束。</p>
+                <div class="d-flex justify-content-end mb-2">
+                    <input class="form-control form-control-sm search-box" placeholder="过滤表名..." oninput="renderRows(this.value)">
+                </div>
+                <div id="rowArea" style="max-height:440px;overflow-y:auto;"></div>
             </section>
         </div>
     </div>
