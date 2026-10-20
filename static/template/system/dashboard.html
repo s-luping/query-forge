@@ -47,6 +47,18 @@
         </div>
     </div>
 
+    <!-- LLM 用量趋势 -->
+    <div class="section-card">
+        <div class="card-header">
+            <span>LLM 用量趋势（近 7 天）</span>
+            <a href="#" onclick="jump('/static/template/llm/llm_logs.html')" style="font-size:12px;color:#0d6efd;text-decoration:none;">使用记录 →</a>
+        </div>
+        <div class="card-body p-3">
+            <div class="trend-summary" id="trendSummary"></div>
+            <div class="trend-chart" id="trendChart"><div class="empty-state w-100">加载中...</div></div>
+        </div>
+    </div>
+
     <div class="row">
         <!-- 最近同步记录 -->
         <div class="col-md-6">

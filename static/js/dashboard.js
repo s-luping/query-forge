@@ -111,7 +111,36 @@ async function loadAll() {
     } catch (e) { /* 静默 */ }
 }
 
-window.QF.onReady = function () { loadAll(); };
+// LLM 用量趋势（读主库聚合表 llm_usage_stats，每小时刷新，当天最多滞后 1 小时）
+async function loadUsageTrend() {
+    const chart = document.getElementById('trendChart');
+    try {
+        const resp = await apiRequest('/api/llm/usage-trend?days=7');
+        const data = await resp.json();
+        const items = data.items || [];
+        const totalCalls = items.reduce((s, i) => s + i.call_count, 0);
+        const totalTokens = items.reduce((s, i) => s + i.total_tokens, 0);
+        document.getElementById('trendSummary').textContent =
+            `合计调用 ${totalCalls.toLocaleString()} 次 · Token ${totalTokens.toLocaleString()}（每小时聚合刷新）`;
+        if (!totalCalls) { chart.innerHTML = '<div class="empty-state w-100">近 7 天暂无调用</div>'; return; }
+        const max = Math.max(...items.map(i => i.call_count));
+        chart.innerHTML = items.map(i => {
+            const d = new Date(i.stat_date + 'T00:00:00');
+            const tip = `${i.stat_date}｜调用 ${i.call_count} 次（成功 ${i.success_count}）｜Token ${i.total_tokens.toLocaleString()}`;
+            return `<div class="trend-col">
+                <div class="trend-plot" title="${tip}">
+                    <div class="trend-bar" style="height:${Math.max(Math.round(i.call_count / max * 100), 2)}%"></div>
+                </div>
+                <div class="trend-val">${i.call_count || ''}</div>
+                <div class="trend-day">${d.getMonth() + 1}/${d.getDate()}</div>
+            </div>`;
+        }).join('');
+    } catch (e) {
+        chart.innerHTML = '<div class="empty-state w-100">趋势加载失败</div>';
+    }
+}
+
+window.QF.onReady = function () { loadAll(); loadUsageTrend(); };
 window.addEventListener('storage', event => {
     if (event.key === 'qf_schema_refresh') loadAll();
 });
