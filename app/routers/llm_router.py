@@ -12,6 +12,7 @@ from typing import List, Optional
 
 from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel
+from sqlalchemy import func
 
 from app.auth import CurrentUser
 from app.crypto import decrypt_secret, encrypt_secret, mask_api_key
@@ -20,7 +21,7 @@ from app.logger import log_audit, logger
 from app.response import ErrorCode, fail
 from core import LLMClient
 from crud.base import session_scope
-from models.llm import LLMCall, LLMConfig, LLMPrompt
+from models.llm import LLMCall, LLMConfig, LLMPrompt, LLMUsageStat
 
 log_router = APIRouter()
 config_router = APIRouter()
@@ -193,6 +194,43 @@ def get_llm_stats(request: Request, user: CurrentUser,
     except Exception as e:
         logger.error(f"获取LLM统计失败: {e}")
         raise HTTPException(status_code=500, detail=f"获取统计失败: {str(e)}")
+
+
+@log_router.get("/usage-trend")
+@limiter.limit(LIMIT_READ)
+def get_usage_trend(request: Request, user: CurrentUser,
+                    days: int = Query(7, ge=1, le=30)):
+    """近 N 天用量趋势（读主库聚合表 llm_usage_stats，管理员看全部，用户看自己）
+
+    数据由 scheduler 每小时聚合，当天数据最多滞后 1 小时；缺失日期补零。
+    """
+    try:
+        today = datetime.now().date()
+        start = today - timedelta(days=days - 1)
+        with session_scope() as db:
+            q = db.query(
+                LLMUsageStat.stat_date,
+                func.sum(LLMUsageStat.call_count).label('call_count'),
+                func.sum(LLMUsageStat.success_count).label('success_count'),
+                func.sum(LLMUsageStat.total_tokens).label('total_tokens'),
+            ).filter(LLMUsageStat.stat_date >= start)
+            if not _is_admin(user):
+                q = q.filter(LLMUsageStat.user_id == user['user_id'])
+            rows = {r[0]: {'call_count': r[1] or 0, 'success_count': r[2] or 0,
+                           'total_tokens': r[3] or 0}
+                    for r in q.group_by(LLMUsageStat.stat_date).all()}
+        items = []
+        for i in range(days):
+            d = start + timedelta(days=i)
+            r = rows.get(d, {})
+            items.append({'stat_date': d.isoformat(),
+                          'call_count': r.get('call_count', 0),
+                          'success_count': r.get('success_count', 0),
+                          'total_tokens': r.get('total_tokens', 0)})
+        return {'days': days, 'items': items}
+    except Exception as e:
+        logger.error(f"获取用量趋势失败: {e}")
+        raise HTTPException(status_code=500, detail=f"获取用量趋势失败: {str(e)}")
 
 
 @log_router.get("/filter-options")

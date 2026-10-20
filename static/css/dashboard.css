@@ -27,3 +27,13 @@ body { background: #f5f6fa; }
 .table td { font-size: 13px; vertical-align: middle; }
 .greeting { font-size: 20px; font-weight: 700; color: #333; }
 .greeting-sub { font-size: 13px; color: #888; margin-bottom: 18px; }
+
+/* LLM 用量趋势（纯 CSS 柱状图） */
+.trend-summary { font-size: 12px; color: #6c757d; margin-bottom: 10px; }
+.trend-chart { display: flex; align-items: stretch; gap: 10px; height: 170px; }
+.trend-col { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; }
+.trend-plot { width: 100%; flex: 1; display: flex; align-items: flex-end; justify-content: center; }
+.trend-bar { width: 60%; max-width: 46px; background: linear-gradient(180deg, #667eea, #764ba2); border-radius: 6px 6px 0 0; min-height: 2px; }
+.trend-col:hover .trend-bar { background: linear-gradient(180deg, #2196f3, #1e88e5); }
+.trend-val { font-size: 11px; color: #495057; }
+.trend-day { font-size: 11px; color: #888; margin-top: 6px; white-space: nowrap; }
