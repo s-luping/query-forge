@@ -273,7 +273,8 @@ function renderMessage(msg) {
                 const PREVIEW_ROWS = 10;
                 const total = qr.row_count != null ? qr.row_count : (qr.rows || []).length;
                 const preview = (qr.rows || []).slice(0, PREVIEW_ROWS);
-                html += `<div style="margin-top:8px;font-size:12px;color:#6c757d;">查询结果：共 ${total} 行${qr.duration_ms != null ? ` · ${qr.duration_ms}ms` : ''}</div>`;
+                const srcBadge = qr.schema ? ` · 数据源 ${escapeHtml(qr.schema)}${qr.datasource_type ? `(${escapeHtml(qr.datasource_type)})` : ''}` : '';
+                html += `<div style="margin-top:8px;font-size:12px;color:#6c757d;">查询结果：共 ${total} 行${qr.duration_ms != null ? ` · ${qr.duration_ms}ms` : ''}${srcBadge}</div>`;
                 if (total === 0 && !msg.permission_note) {
                     // 历史消息可能无后端归因提示，前端兜底提示空结果可能原因
                     html += `<div class="msg-perm-note" style="margin-top:4px;">ℹ️ 返回 0 行：可能筛选条件过严或数据本身为空；如涉及数据权限过滤，请联系管理员确认</div>`;

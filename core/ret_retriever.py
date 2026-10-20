@@ -15,11 +15,7 @@ from typing import Dict, List, Optional
 import numpy as np
 
 from app.logger import logger
-from app.permissions import (
-    filter_fields_by_permission,
-    get_table_grants_by_schema,
-    get_visible_schema_ids,
-)
+from core.recall_scope import RecallScope
 from core.ret_keywords import KeywordExtractor
 from core.ret_vector_store import SchemaVectorStore, get_vector_config
 from crud.base import session_scope
@@ -30,13 +26,31 @@ from services import schema_service
 class SchemaRetriever:
     """Schema 检索器：召回 → 聚合 → CSV"""
 
-    def __init__(self, user: dict = None, user_id: int = None):
+    def __init__(self, user: dict = None, user_id: int = None,
+                 scope: Optional[RecallScope] = None):
         self.user = user or {'user_id': user_id, 'role': 'user'}
         self.user_id = user_id or self.user.get('user_id')
         self.keyword_extractor = KeywordExtractor()
         self.vector_store: Optional[SchemaVectorStore] = None
         self.vector_loaded = False
         self.vector_error: Optional[str] = None
+        self._explicit_scope = scope
+        self._default_scope: Optional[RecallScope] = None
+
+    def _scope(self, scope: Optional[RecallScope] = None) -> RecallScope:
+        """解析本次调用使用的权限快照
+
+        优先级：本次调用显式传入 > 构造时传入 > 惰性构建一次并缓存
+        （遗留调用方兼容路径，chat 主链路已全部显式传 scope）。
+        """
+        if scope is not None:
+            return scope
+        if self._explicit_scope is not None:
+            return self._explicit_scope
+        if self._default_scope is None:
+            from core.recall_scope import build_recall_scope
+            self._default_scope = build_recall_scope(self.user)
+        return self._default_scope
 
     # ---------- 基础数据访问（权限裁剪在 schema_service 之上叠加） ----------
 
@@ -57,14 +71,26 @@ class SchemaRetriever:
         }
 
     def get_field_rows(self, schema_name: Optional[str] = None,
-                       table_names: Optional[List[str]] = None) -> List:
-        """按 schema/表名取字段行，并按用户权限裁剪（库级 + 表级 + 字段级）"""
-        visible = get_visible_schema_ids(self.user)
+                       table_names: Optional[List[str]] = None,
+                       scope: Optional[RecallScope] = None) -> List:
+        """按 schema/表名取字段行，并按权限快照裁剪（库级 + 表级 + 字段级）
+
+        字段级裁剪与原 filter_fields_by_permission 逐字段等价：
+        column_access 中 NONE 的行剔除，不在快照中的 column_id 默认 SELECT 放行；
+        行集无 column_id 时整批放行（与原实现 col_ids 为空的短路一致）。
+        """
+        s = self._scope(scope)
         rows = schema_service.iter_field_rows(
             schema_name=schema_name, table_names=table_names,
-            visible_schema_ids=visible,
-            table_grants_by_schema=get_table_grants_by_schema(self.user))
-        return filter_fields_by_permission(rows, self.user)
+            visible_schema_ids=s.visible_schema_ids,
+            table_grants_by_schema=s.table_grants)
+        if not rows:
+            return rows
+        col_ids = [getattr(r, 'column_id', 0) for r in rows if getattr(r, 'column_id', 0)]
+        if not col_ids:
+            return rows
+        return [r for r in rows
+                if s.column_access.get(getattr(r, 'column_id', 0), 'SELECT') != 'NONE']
 
     def field_count(self, schema_name: Optional[str] = None) -> int:
         return schema_service.field_count(schema_name)
@@ -83,18 +109,19 @@ class SchemaRetriever:
     # ---------- 向量索引 ----------
 
     def try_load_vector_store(self, schema_name: Optional[str] = None) -> bool:
-        """尝试加载向量索引（不再自动构建）；字段数低于阈值或失败时返回 False
+        """尝试加载磁盘上已存在的向量索引；失败/无索引文件时返回 False
 
         全库统一索引：始终加载无前缀 fields 索引（schema_name 仅记录用途）。
+        - 阈值 VECTOR_INDEX_THRESHOLD 仅约束「自动构建」（该职责已全部移交给
+          定时任务「向量索引重建」），不再拦截「加载」——此前 721 个全库字段
+          < 阈值 1000 时直接跳过加载，导致无 schema 的全库提问永远走 DB 关键词
+          兜底（中文关键词撞英文元数据近乎零命中，如「玩具销售额」只召回
+          milk_tea_sales.stores），判定步误报"信息不足"。
         - 索引状态为 stale（导入/同步后标记）时，用旧索引继续服务，
           重建统一由定时任务「向量索引重建」执行，避免与用户使用冲突。
         - 无索引文件时降级 DB 关键词召回，等待定时任务首次构建。
         """
         try:
-            threshold = get_vector_config('VECTOR_INDEX_THRESHOLD')
-            if self.field_count(None) < threshold:
-                return False
-
             store = SchemaVectorStore()
             if store.load(None):
                 self.vector_store, self.vector_loaded = store, True
@@ -125,7 +152,8 @@ class SchemaRetriever:
 
     def search_vector(self, keywords: List[str],
                       query: Optional[str] = None,
-                      schema_name: Optional[str] = None) -> Optional[List[Dict]]:
+                      schema_name: Optional[str] = None,
+                      scope: Optional[RecallScope] = None) -> Optional[List[Dict]]:
         """向量检索字段；未加载或失败时返回 None
 
         编码文本优先使用原始 query（完整语义），未提供时回退关键词拼接。
@@ -135,7 +163,7 @@ class SchemaRetriever:
             return None
         try:
             text = (query or '').strip() or ' '.join(keywords)
-            mask = self._build_search_mask(schema_name)
+            mask = self._build_search_mask(schema_name, scope=scope)
             return self.vector_store.search_fields(
                 text, top_k=get_vector_config('FIELD_RECALL_TOP_K'), mask=mask)
         except Exception as e:
@@ -145,11 +173,12 @@ class SchemaRetriever:
     # ---------- 召回 ----------
 
     def recall_from_db(self, keywords: List[str],
-                       schema_name: Optional[str] = None) -> List[Dict]:
+                       schema_name: Optional[str] = None,
+                       scope: Optional[RecallScope] = None) -> List[Dict]:
         """DB 关键词匹配召回（降级方案）"""
         keyword_set = set(k.lower() for k in keywords)
         results = []
-        for r in self.get_field_rows(schema_name):
+        for r in self.get_field_rows(schema_name, scope=scope):
             table = r.table_name.lower()
             column = r.column_name.lower()
             desc = (r.column_description or '').lower()
@@ -157,7 +186,27 @@ class SchemaRetriever:
                 results.append(self._row_to_dict(r))
         return results[:get_vector_config('FIELD_RECALL_TOP_K')]
 
-    def _build_search_mask(self, schema_name: Optional[str] = None) -> Optional[np.ndarray]:
+    def _full_scope_all_tables(self, scope: Optional[RecallScope] = None) -> List[Dict]:
+        """全库直通：权限内所有 (库名, 表名) 生成 full_scope 占位字段
+
+        与小库直通同构，但带库名（跨库 CSV 需要库名.表名前缀）。
+        行集来自 get_field_rows（库级/表级/字段级权限已裁剪）。
+        """
+        tables = []
+        seen = set()
+        for r in self.get_field_rows(None, scope=scope):
+            key = (r.schema_name or '', r.table_name)
+            if key in seen or not key[1]:
+                continue
+            seen.add(key)
+            tables.append({'schema_name': r.schema_name or '', 'table_name': r.table_name,
+                           'column_name': '', 'recall_source': 'full',
+                           'full_scope': True})
+        logger.info(f"[SchemaRetriever] 全库字段数低于阈值，直通注入全部 {len(tables)} 张表")
+        return tables
+
+    def _build_search_mask(self, schema_name: Optional[str] = None,
+                           scope: Optional[RecallScope] = None) -> Optional[np.ndarray]:
         """构建向量搜索权限掩码：仅允许用户可见的字段参与 top-K 竞争。
 
         索引为全库索引（含所有库字段），用户可能只对部分库/表有权限。
@@ -172,8 +221,8 @@ class SchemaRetriever:
             metas = store.field_index.metadata
             if not metas:
                 return None
-            # 管理员（无权限限制）直接放行
-            visible = get_visible_schema_ids(self.user)
+            # 管理员/全量快照（None）直接放行
+            visible = self._scope(scope).visible_schema_ids
             if visible is None:
                 return None
             # 可见 schema id → 库名集合（掩码按库名匹配索引 metadata）
@@ -199,24 +248,51 @@ class SchemaRetriever:
             logger.warning(f"[SchemaRetriever] 构建搜索掩码失败，放行全量: {e}")
             return None
 
-    def list_schema_tables(self, schema_name: str) -> List[str]:
+    def list_schema_tables(self, schema_name: str,
+                           scope: Optional[RecallScope] = None) -> List[str]:
         """权限约束下的库内表名列表（库级 + 表级权限裁剪）"""
+        s = self._scope(scope)
         with session_scope() as db:
             tables = schema_service.list_tables(
                 db, schema_name=schema_name,
-                visible_schema_ids=get_visible_schema_ids(self.user),
-                table_grants_by_schema=get_table_grants_by_schema(self.user))
+                visible_schema_ids=s.visible_schema_ids,
+                table_grants_by_schema=s.table_grants)
             return [t[0] for t in tables]
+
+    def _direct_inject_candidates(self, schema_name: Optional[str],
+                                  scope: Optional[RecallScope] = None) -> Optional[List[Dict]]:
+        """直通判定：命中返回 full_scope 占位字段（免召回整量注入），未命中返回 None
+
+        - 绑库：库内表数 ≤ SMALL_SCHEMA_TABLE_LIMIT → 整库注入
+          （十几张表的库全量 CSV 仅千余 token，TopK 截断反而会丢核心表，
+          如 formula_1 的 drivers/races 未召回导致两模型一致误拦截）
+        - 无库：全库字段总数 < VECTOR_INDEX_THRESHOLD → 全库注入
+          （字段总量少时召回没有意义，全量注入既无遗漏也不费 token；
+          阈值旧语义"自动构建门槛"已随自动构建路径移交定时任务而废弃）
+        判定失败（权限/DB 异常）返回 None 降级常规召回。
+        """
+        try:
+            if schema_name:
+                all_tables = self.list_schema_tables(schema_name, scope=scope)
+                if 0 < len(all_tables) <= get_vector_config('SMALL_SCHEMA_TABLE_LIMIT'):
+                    return [{'schema_name': schema_name, 'table_name': t,
+                             'column_name': '', 'recall_source': 'full',
+                             'full_scope': True}
+                            for t in all_tables]
+            elif 0 < self.field_count(None) < get_vector_config('VECTOR_INDEX_THRESHOLD'):
+                return self._full_scope_all_tables(scope=scope)
+        except Exception as e:
+            logger.warning(f"[SchemaRetriever] 直通判定失败，走常规召回: {e}")
+        return None
 
     def recall_fields(self, keywords: List[str],
                       schema_name: Optional[str] = None,
-                      query: Optional[str] = None) -> List[Dict]:
-        """字段召回统一入口：向量优先（懒加载）+ DB 关键词兜底合并。
+                      query: Optional[str] = None,
+                      scope: Optional[RecallScope] = None) -> List[Dict]:
+        """字段召回统一入口：直通判定 → 向量优先（懒加载）+ DB 关键词兜底合并。
 
-        - 小库直通：指定库且表数不超过 SMALL_SCHEMA_TABLE_LIMIT 时跳过召回，
-          每表返回一个 full_scope 标记的占位字段，整库进入上下文。
-          十几张表的库全量 CSV 仅千余 token，字段召回 TopK 截断反而会丢核心表
-          （如 formula_1 的 drivers/races 未召回导致两模型一致误拦截）。
+        - 直通（免召回）：见 _direct_inject_candidates——绑库小库整库注入、
+          无库且全库字段总量低于阈值时全库注入，返回 full_scope 占位字段。
         - 向量索引可能是历史构建（缺库/权限范围不一致），仅靠向量会漏召回
           未建索引库的表 → 用 DB 关键词召回做并集兜底，保证覆盖所有可见库。
           向量在位时兜底保留 top_k//3 名额（防向量满载把兜底整体挤出）；
@@ -225,26 +301,21 @@ class SchemaRetriever:
         - 结果去重（同一字段以 DB 权威结构为准）。
         - query: 原始用户问题，用于向量编码（语义完整度高于关键词拼接）。
         - 全库索引下用权限掩码避免 top-K 名额被无权限字段挤占。
+        - scope: 权限快照（编排层构建）；未传时惰性构建（遗留调用方兼容）。
         """
-        if schema_name:
-            try:
-                all_tables = self.list_schema_tables(schema_name)
-                if 0 < len(all_tables) <= get_vector_config('SMALL_SCHEMA_TABLE_LIMIT'):
-                    return [{'schema_name': schema_name, 'table_name': t,
-                             'column_name': '', 'recall_source': 'full',
-                             'full_scope': True}
-                            for t in all_tables]
-            except Exception as e:
-                logger.warning(f"[SchemaRetriever] 小库直通判定失败，走常规召回: {e}")
+        direct = self._direct_inject_candidates(schema_name, scope=scope)
+        if direct:
+            return direct
 
         if not self.vector_loaded and self.vector_error is None:
             self.try_load_vector_store(schema_name)
 
-        results = self.search_vector(keywords, query=query, schema_name=schema_name)
+        results = self.search_vector(keywords, query=query, schema_name=schema_name,
+                                     scope=scope)
         merged: List[Dict] = []
         seen = set()
         if results:
-            for d in self._filter_recalled_by_permission(results, schema_name):
+            for d in self._filter_recalled_by_permission(results, schema_name, scope=scope):
                 key = (d.get('schema_name') or '', d.get('table_name', ''),
                        d.get('column_name', ''))
                 if key not in seen:
@@ -260,7 +331,7 @@ class SchemaRetriever:
         top_k = get_vector_config('FIELD_RECALL_TOP_K')
         db_quota = max(1, top_k // 3) if merged else top_k
         db_kept: List[Dict] = []
-        for d in self.recall_from_db(keywords, schema_name)[:db_quota]:
+        for d in self.recall_from_db(keywords, schema_name, scope=scope)[:db_quota]:
             key = (d.get('schema_name') or '', d.get('table_name', ''),
                    d.get('column_name', ''))
             if key not in seen:
@@ -274,8 +345,9 @@ class SchemaRetriever:
         return merged
 
     def _filter_recalled_by_permission(self, recalled: List[Dict],
-                                       schema_name: Optional[str] = None) -> List[Dict]:
-        """按当前用户权限过滤向量召回结果（DB 权限集合为权威）
+                                       schema_name: Optional[str] = None,
+                                       scope: Optional[RecallScope] = None) -> List[Dict]:
+        """按权限快照过滤向量召回结果（DB 权限集合为权威）
 
         向量索引可能构建于权限更宽的时期，或为全量索引；
         召回字段若不在当前用户可见字段集合内则剔除。
@@ -288,7 +360,7 @@ class SchemaRetriever:
             table_names = list({f.get('table_name') for f in recalled if f.get('table_name')})
             allowed = {}
             allowed_flat = {}   # (table, column) → field dict，兼容旧向量索引（无 schema 信息）
-            for r in self.get_field_rows(schema_name, table_names or None):
+            for r in self.get_field_rows(schema_name, table_names or None, scope=scope):
                 d = self._row_to_dict(r)
                 allowed[(r.schema_name or '', r.table_name, r.column_name)] = d
                 allowed_flat.setdefault((r.table_name, r.column_name), d)
@@ -311,7 +383,8 @@ class SchemaRetriever:
 
     def aggregate_tables(self, recalled_fields: List[Dict],
                          schema_name: Optional[str] = None,
-                         keep_first: Optional[set] = None) -> Dict:
+                         keep_first: Optional[set] = None,
+                         scope: Optional[RecallScope] = None) -> Dict:
         """召回字段 → 表名去重（超限按命中数裁剪）→ 完整表结构
 
         keep_first: 优先保留的表名集合（追问轮首轮表）。超限时首轮表完整保留，
@@ -356,15 +429,16 @@ class SchemaRetriever:
 
         if not table_names:
             # 未召回任何表时兜底：取前 N 张表（库级 + 表级权限约束）
+            s = self._scope(scope)
             with session_scope() as db:
                 tables = schema_service.list_tables(
                     db, schema_name=schema_name,
-                    visible_schema_ids=get_visible_schema_ids(self.user),
-                    table_grants_by_schema=get_table_grants_by_schema(self.user))
+                    visible_schema_ids=s.visible_schema_ids,
+                    table_grants_by_schema=s.table_grants)
                 table_names = [t[0] for t in tables][:max_tables]
         all_fields: Dict[str, Dict] = {}
         if table_names:
-            for r in self.get_field_rows(schema_name, table_names):
+            for r in self.get_field_rows(schema_name, table_names, scope=scope):
                 # key 带库名前缀消歧（跨库同名表场景）
                 key = f"{r.schema_name}.{r.table_name}.{r.column_name}"
                 field = self._row_to_dict(r)
@@ -385,7 +459,8 @@ class SchemaRetriever:
 
     def recall_knowledge(self, query: str, scope_schema_id: Optional[int] = None,
                          keywords: Optional[List[str]] = None,
-                         exclude_contents: Optional[set] = None) -> Dict:
+                         exclude_contents: Optional[set] = None,
+                         scope: Optional[RecallScope] = None) -> Dict:
         """按 query 关键词召回 typed 知识条目，返回注入提示词的文本块与关联表（用于动态扩表）。
 
         exclude_contents: 已注入 prompt 的知识内容集合（如用户勾选知识库的 content），
@@ -406,19 +481,12 @@ class SchemaRetriever:
             return {'items': [], 'prompt_text': '', 'related_tables': []}
 
         # 可见性：global 条目人人可召回；personal 仅属主/被授权者
-        # （get_visible_knowledge_ids 对管理员/通配授权返回 None = 不限制）
+        # （快照的 visible_knowledge_ids 对管理员/通配授权为 None = 不限制）
         owner_user_id = self.user_id
-        visible_ids = None
-        try:
-            from app.permissions import get_visible_knowledge_ids
-            ids = get_visible_knowledge_ids(self.user) if self.user else None
-            visible_ids = set(ids) if ids is not None else None
-        except Exception:
-            pass
-
+        s = self._scope(scope)
         items = knowledge_crud.search_matched_items(
             kw_set, scope_schema_id=scope_schema_id, limit=12,
-            owner_user_id=owner_user_id, visible_ids=visible_ids)
+            owner_user_id=owner_user_id, visible_ids=s.visible_knowledge_ids)
         if exclude_contents:
             items = [d for d in items
                      if (d.get('content') or '').strip() not in exclude_contents]
@@ -448,7 +516,8 @@ class SchemaRetriever:
         }
 
     def extend_aggregation_with_tables(self, aggregation: Dict, table_names: List[str],
-                                       schema_name: Optional[str] = None) -> Dict:
+                                       schema_name: Optional[str] = None,
+                                       scope: Optional[RecallScope] = None) -> Dict:
         """把额外表（如 relation 知识涉及的表）并入聚合结果，补齐完整字段结构。
 
         跨库扩表：不过滤 schema_name（传 None），仅按用户权限裁剪，
@@ -458,7 +527,7 @@ class SchemaRetriever:
         to_add = [t for t in table_names if t not in existing]
         if not to_add:
             return aggregation
-        for r in self.get_field_rows(None, to_add):
+        for r in self.get_field_rows(None, to_add, scope=scope):
             # key 与 aggregate_tables 保持一致（库名.表名.字段名 消歧）
             key = f"{r.schema_name}.{r.table_name}.{r.column_name}"
             if key not in aggregation['all_fields']:
@@ -474,7 +543,8 @@ class SchemaRetriever:
     # ---------- 表关系召回（人工维护的 JOIN 提示，注入 prompt） ----------
 
     def get_relations_text(self, table_names: Optional[List[str]],
-                           max_relations: int = 30) -> str:
+                           max_relations: int = 30,
+                           scope: Optional[RecallScope] = None) -> str:
         """按聚合命中的表匹配表间关系，渲染为 JOIN 提示文本。
 
         仅返回两侧表都在上下文中的关系（另一侧表不在 schema CSV 中时，
@@ -488,7 +558,7 @@ class SchemaRetriever:
         tables = set(table_names)
         pure_tables = {t.split('.', 1)[1] if '.' in t else t for t in tables}
         try:
-            visible = get_visible_schema_ids(self.user)
+            visible = self._scope(scope).visible_schema_ids
             if visible == []:
                 return ''
             # None = 管理员/未配置权限，可见全部 schema
@@ -517,13 +587,14 @@ class SchemaRetriever:
 
     # ---------- CSV ----------
 
-    def build_full_schema_csv(self, schema_name: Optional[str] = None) -> str:
+    def build_full_schema_csv(self, schema_name: Optional[str] = None,
+                              scope: Optional[RecallScope] = None) -> str:
         """全量重建 schema CSV（追问轮 fallback：旧对话未存首轮表集合时用）
 
         权限裁剪（库级 + 表级 + 字段级）统一走 get_field_rows——路由层不再
         自行拼权限原语，避免遗漏某级裁剪造成数据泄漏（2026-10-17 修过一次）。
         """
-        rows = self.get_field_rows(schema_name)
+        rows = self.get_field_rows(schema_name, scope=scope)
         if not rows:
             return "表名,字段名,字段类型,字段描述,主键,外键"
 

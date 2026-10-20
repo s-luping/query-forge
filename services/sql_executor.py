@@ -21,7 +21,7 @@ from app.crypto import decrypt_secret
 from app.logger import logger
 from crud.base import session_scope
 from models.datasource import DataSource
-from models.schema import DbSchema
+from models.schema import DbSchema, DbTable
 
 
 class SqlExecutionError(Exception):
@@ -93,6 +93,80 @@ def _has_write_node(sql: str, db_type: str) -> bool:
         return any(node.__class__.__name__ in _WRITE_NODES for node in tree.walk())
     except Exception:
         return False
+
+
+def _repair_missing_schema_prefix(sql: str, db_type: str = '',
+                                  info: Optional[dict] = None) -> str:
+    """全库模式确定性兜底：为漏带库前缀的表引用补上唯一归属库
+
+    背景：全库召回（schema_name=None）下 LLM 偶发漏写库前缀（FROM toy_sales
+    而非 falcon_dev_14.toy_sales），而可见库通常有多个，路由层不敢猜 →
+    执行报"未找到数据源连接"。本函数按元数据注册表（db_tables×db_schemas）
+    查每个无前缀表名的归属库：
+      - 恰好归属 1 个库 → AST 改写补前缀（确定性，非 LLM 二次生成）
+      - 跨库同名 / 元数据无此表 → 保持原样（走既有报错路径，不猜）
+      - CTE 名（用户自定义别名）不参与改写，防同名误补
+    无需修补时原样返回原字符串（不做 sqlglot round-trip，保持 LLM 原始输出）。
+    权限说明：聊天链路网关已按召回白名单（纯表名）放行在先，此处仅补路由前缀，
+    不会把未授权表带入执行。
+
+    Args:
+        info: 可选 dict，调用方（execute_sql）传入用于链路留痕（PREFIX_REPAIR 步，
+              docs/ChatSQL模块化与全链路留痕设计.md §5.2）——repaired/ambiguous/
+              unknown/error/bare_tables 字段就地填充。
+    """
+    dialect = _SQLGLOT_DIALECT.get((db_type or '').lower(), 'sqlite')
+    try:
+        import sqlglot
+        from sqlglot import exp
+        tree = sqlglot.parse_one(sql, dialect=dialect)
+    except Exception as e:
+        if info is not None:
+            info['error'] = f'SQL 解析失败，跳过补前缀: {e}'
+        return sql
+    try:
+        cte_names = {c.alias_or_name for c in tree.find_all(exp.CTE)}
+        bare = {t.name for t in tree.find_all(exp.Table)
+                if not t.db and t.name and t.name not in cte_names}
+        if info is not None:
+            info['bare_tables'] = sorted(bare)
+            info['repaired'] = []
+            info['ambiguous'] = []
+            info['unknown'] = []
+        if not bare:
+            return sql
+        with session_scope() as db_session:
+            rows = (db_session.query(DbTable.name, DbSchema.name)
+                    .join(DbSchema, DbTable.schema_id == DbSchema.id)
+                    .filter(DbTable.name.in_(bare)).all())
+        owner: dict = {}
+        for tname, sname in rows:
+            owner.setdefault(tname, []).append(sname)
+        changed = False
+        for t in tree.find_all(exp.Table):
+            if t.db or not t.name or t.name in cte_names:
+                continue
+            schemas = owner.get(t.name) or []
+            if len(schemas) == 1:
+                t.set('db', schemas[0])
+                changed = True
+                if info is not None:
+                    info['repaired'].append(f"{t.name} → {schemas[0]}")
+                logger.info(f"[SQL补前缀] {t.name} → {schemas[0]}（全库模式唯一归属）")
+            elif len(schemas) > 1:
+                if info is not None:
+                    info['ambiguous'].append(t.name)
+            else:
+                if info is not None:
+                    info['unknown'].append(t.name)
+        if not changed:
+            return sql
+        return tree.sql(dialect=dialect)
+    except Exception as e:
+        logger.warning(f"[SQL补前缀] 改写失败，保持原样: {e}")
+        if info is not None:
+            info['error'] = f'改写失败，保持原样: {e}'
+        return sql
 
 
 def _validate_select_only(sql: str, db_type: str = '') -> None:
@@ -238,10 +312,14 @@ def execute_sql(sql: str, schema_name: Optional[str] = None,
         max_rows = _max_rows_config()
     start = time.time()
 
-    # 跨库模式（schema_name=None）：从 SQL 表前缀解析目标库，路由到对应数据源
+    # 跨库模式（schema_name=None）：先确定性补齐漏写的库前缀（唯一归属才改写），
+    # 再从 SQL 表前缀解析目标库路由到对应数据源
     # 例如「pjmall.asset JOIN sys.sys_config」→ 优先用 SQL 中第一个库的数据源连接
     resolved_schema = schema_name
+    prefix_repair: Optional[dict] = None
     if not schema_name:
+        prefix_repair = {}   # 供链路留痕（PREFIX_REPAIR 步）；绑库模式不产出此字段
+        sql = _repair_missing_schema_prefix(sql, db_type, info=prefix_repair)
         sql_schemas = _extract_sql_schema_names(sql, db_type)
         if sql_schemas:
             resolved_schema = sql_schemas[0]
@@ -272,12 +350,18 @@ def execute_sql(sql: str, schema_name: Optional[str] = None,
 
         duration_ms = int((time.time() - start) * 1000)
         logger.info(f"SQL 执行完成: schema={resolved_schema} rows={row_count} 耗时={duration_ms}ms")
+        actual_type = ((ds or {}).get('db_type') or db_type or 'sqlite').lower()
         return {
             'columns': col_names,
             'rows': rows,
             'row_count': row_count,
             'duration_ms': duration_ms,
             'error': None,
+            # 实际路由结果（全库模式下由 SQL 库前缀/前缀修复解析，区别于请求参数）
+            'schema': resolved_schema,
+            'datasource_type': actual_type,
+            # 库前缀修复留痕（仅全库模式产出；路由层据此追加 PREFIX_REPAIR 步）
+            'prefix_repair': prefix_repair or None,
         }
     except SqlExecutionError:
         raise

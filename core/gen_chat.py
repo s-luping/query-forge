@@ -9,9 +9,10 @@ from typing import Dict, List, Optional
 
 from app.logger import logger
 from app.timezone import now_beijing
-from core.gen_audit import write_query_audit_log
+from core.gen_audit import StepTracker, write_query_audit_log
 from core.gen_sql import SqlGenerator
 from core.llm_client import LLMClient
+from core.recall_scope import RecallScope, build_recall_scope
 from core.ret_keywords import KeywordExtractor
 from core.ret_retriever import SchemaRetriever
 
@@ -92,6 +93,59 @@ def _extract_columns_from_sql(sql: str, db_type: str = 'mysql') -> set:
     return cols
 
 
+def _resolve_involved_db_type(schema_names) -> Optional[str]:
+    """全库模式：按本轮实际涉及的库推断 SQL 方言（出现次数最多的库类型）
+
+    相比路由层"取首个有类型库"的粗推断（_infer_visible_db_type），本函数在
+    召回聚合完成后调用——已知本轮上下文真正涉及哪些库，方言按多数库类型取：
+    混合类型数据源（如 20 个 MySQL 库 + 1 个 Oracle 库）下目标库是 Oracle 时
+    不再被首库带偏，引用符/特有函数提示与执行目标一致。
+    查询失败 / 库全部无类型返回 None（沿用调用方传入的兜底类型）。
+    """
+    names = sorted({s for s in (schema_names or []) if s})
+    if not names:
+        return None
+    try:
+        from collections import Counter
+        from crud.base import session_scope
+        from models.schema import DbSchema
+        with session_scope() as db:
+            rows = (db.query(DbSchema.db_type)
+                    .filter(DbSchema.name.in_(names),
+                            DbSchema.db_type.isnot(None),
+                            DbSchema.db_type != '').all())
+        counts = Counter(r[0].lower() for r in rows if r[0])
+        if not counts:
+            return None
+        return counts.most_common(1)[0][0]
+    except Exception as e:
+        logger.warning(f"[ChatSession] 按涉及库推断方言失败: {e}")
+        return None
+
+
+def _refine_dialect_db_type(aggregation: dict, schema_name: Optional[str],
+                            db_type: str, log_fn=None) -> str:
+    """全库模式下用本轮涉及库的多数类型覆盖方言（绑库模式路由层已精确解析，跳过）
+
+    log_fn: 可选 (step_name, data) 链路日志回调；返回最终 db_type，
+    aggregation 为空/无 schema 信息时原样返回。
+    """
+    if schema_name:
+        return db_type
+    involved = {f.get('schema_name')
+                for f in (aggregation.get('all_fields') or {}).values()
+                if f.get('schema_name')}
+    inferred = _resolve_involved_db_type(involved)
+    if inferred and inferred != (db_type or '').lower():
+        if log_fn:
+            log_fn("STEP_DIALECT_INFER", {
+                "involved_schemas": sorted(involved),
+                "db_type": f"{db_type} → {inferred}",
+                "note": "方言按本轮涉及库的多数类型推断"})
+        return inferred
+    return db_type
+
+
 class ChatSession:
     """对话 SQL 生成器"""
 
@@ -103,15 +157,20 @@ class ChatSession:
         self.keyword_extractor = KeywordExtractor()
         self.retriever = SchemaRetriever(user=user, user_id=user_id)
         self.user = user or {'user_id': user_id, 'role': 'user'}
+        self._tracker = StepTracker()
 
     # ---------- 链路日志（与 pipeline 对齐，供审计查看） ----------
 
-    def _log_step(self, steps: list, step_name: str, data: dict):
-        steps.append({
-            "step": step_name,
-            "timestamp": now_beijing().strftime("%Y-%m-%d %H:%M:%S"),
-            "data": data,
-        })
+    def _log_step(self, steps: list, step_name: str, data: dict,
+                  status: str = 'ok', error: Optional[str] = None,
+                  summary: str = ''):
+        """追加 StepTrace（status/duration_ms/summary/error，docs §5.2）
+
+        duration_ms 由 _tracker 自动计算：距上一次记步的时间差即该步工作耗时
+        （调用点均为"步骤完成后记步"，无需手工起止计时）。
+        """
+        return self._tracker.add(steps, step_name, data=data, status=status,
+                                 error=error, summary=summary)
 
     # ---------- 消息处理 ----------
 
@@ -134,33 +193,43 @@ class ChatSession:
         """
         import json
         start_time = now_beijing()
+        self._tracker = StepTracker()   # 每条消息重置计时（前置步骤耗时由路由层自己的 tracker 计）
+        # 权限快照：编排层一次性构建（P2 召回/权限解耦，docs §3.2），召回模块只消费数据
+        self._scope = build_recall_scope(self.user)
         pipeline_log = list(pre_log) if pre_log else []
         self._log_step(pipeline_log, "PIPELINE_START", {
             "user_id": self.user_id, "query": query,
             "schema_name": schema_name or "全部",
-        })
+        }, summary="首轮全链路")
 
         # Step 1: 关键词提取
         keywords = self.keyword_extractor.extract(query, top_k=10)
         self._log_step(pipeline_log, "STEP1_KEYWORDS", {
-            "query": query, "keywords": keywords, "count": len(keywords)})
+            "query": query, "keywords": keywords, "count": len(keywords)},
+            summary=f"{len(keywords)} 个关键词")
 
         # Step 2: 字段召回（向量优先，DB 降级；向量编码用原始 query 语义）
-        recalled_fields = self.retriever.recall_fields(keywords, schema_name, query=query)
+        recalled_fields = self.retriever.recall_fields(keywords, schema_name, query=query,
+                                                       scope=self._scope)
+        _recall_method = "vector" if self.retriever.vector_loaded else "database_query"
         self._log_step(pipeline_log, "STEP2_RECALL", {
-            "method": "vector" if self.retriever.vector_loaded else "database_query",
+            "method": _recall_method,
             "keywords": keywords, "recalled_count": len(recalled_fields),
             "recalled_fields": [{"schema": f.get("schema_name") or '',
                                  "table": f.get("table_name"), "column": f.get("column_name"),
                                  "sensitive_level": f.get("sensitive_level") or 'public'}
-                                for f in recalled_fields]})
+                                for f in recalled_fields]},
+            summary=f"{_recall_method} · 召回 {len(recalled_fields)} 字段")
 
         # Step 3: 按表聚合，获取完整表结构
-        aggregation = self.retriever.aggregate_tables(recalled_fields, schema_name)
+        aggregation = self.retriever.aggregate_tables(recalled_fields, schema_name,
+                                                      scope=self._scope)
         self._log_step(pipeline_log, "STEP3_AGGREGATE", {
             "recalled_table_count": len(aggregation.get('tables', [])),
             "tables": aggregation.get('tables', []),
-            "total_field_count": len(aggregation.get('all_fields', {}))})
+            "total_field_count": len(aggregation.get('all_fields', {}))},
+            summary=(f"{len(aggregation.get('tables', []))} 表 / "
+                     f"{len(aggregation.get('all_fields', {}))} 字段"))
 
         # Step 3.5: 权限裁剪统计（库级 / 表级 / 字段级）
         self._log_permission_stats(pipeline_log, aggregation, schema_name)
@@ -171,26 +240,37 @@ class ChatSession:
         kb_base = knowledge_content or ''
         kb_parts = {p.strip() for p in kb_base.split('\n\n') if p.strip()}
         recall = self.retriever.recall_knowledge(
-            query, scope_schema_id=scope_id, exclude_contents=kb_parts or None)
+            query, scope_schema_id=scope_id, exclude_contents=kb_parts or None,
+            scope=self._scope)
         self._log_step(pipeline_log, "STEP_RECALL_KNOWLEDGE", {
             "source": "auto_concept_recall",
             "note": "自动概念召回（对全部知识条目关键词匹配，无需勾选知识库）",
             "matched_count": len(recall['items']),
-            "related_tables": recall['related_tables']})
+            "related_tables": recall['related_tables']},
+            summary=f"自动概念召回 {len(recall['items'])} 条")
         if recall['related_tables']:
             aggregation = self.retriever.extend_aggregation_with_tables(
-                aggregation, recall['related_tables'], schema_name)
+                aggregation, recall['related_tables'], schema_name,
+                scope=self._scope)
             self._log_step(pipeline_log, "STEP_EXTEND_TABLES", {
                 "tables": aggregation.get('tables', []),
-                "total_field_count": len(aggregation.get('all_fields', {}))})
+                "total_field_count": len(aggregation.get('all_fields', {}))},
+                summary=f"知识扩表至 {len(aggregation.get('tables', []))} 表")
 
         # 构建 schema CSV（会保存到对话上下文，供后续轮次复用）
         schema_csv = SchemaRetriever.build_schema_csv(aggregation)
 
         # 人工维护的表关系 → JOIN 提示（随 schema 上下文一并注入）
-        relations_text = self.retriever.get_relations_text(aggregation.get('tables', []))
+        relations_text = self.retriever.get_relations_text(
+            aggregation.get('tables', []), scope=self._scope)
 
         logger.info(f"[ChatSession] 第一轮 - schema 上下文已构建，字段数: {len(aggregation.get('all_fields', {}))}")
+
+        # 全库模式：方言按本轮实际涉及库的多数类型修正（请求兜底类型可能不准，
+        # 如混合类型数据源下首库是 MySQL 而目标库是 Oracle）
+        db_type = _refine_dialect_db_type(
+            aggregation, schema_name, db_type,
+            log_fn=lambda name, data: self._log_step(pipeline_log, name, data))
 
         # Step 4: 构建 messages 数组（召回的知识文本并入【领域知识】）
         kb = knowledge_content or ""
@@ -203,24 +283,31 @@ class ChatSession:
         ]
         self._log_step(pipeline_log, "STEP4_CONTEXT", {
             "has_knowledge": bool(knowledge_content),
-            "schema_csv_lines": len(schema_csv.split('\n'))})
+            "schema_csv_lines": len(schema_csv.split('\n'))},
+            summary=f"CSV {len(schema_csv.split(chr(10)))} 行")
 
         # Step 4.5: 可否生成 SQL 判断 — 信息不足则提前返回，引导用户补充
         judge_prompt = self.sql_generator.judge_generatable_prompt(
             query=query, schema_csv=schema_csv,
             knowledge_content=kb, relations_text=relations_text)
         self._log_step(pipeline_log, "STEP_JUDGE_PROMPT", {
-            "prompt_length": len(judge_prompt)})
+            "prompt_length": len(judge_prompt)},
+            summary=f"判断 prompt {len(judge_prompt)} 字符")
         try:
             judge = self.llm_client.call_llm_json(judge_prompt)
         except Exception as e:
-            self._log_step(pipeline_log, "STEP_JUDGE_ERROR", {"error": str(e)})
+            self._log_step(pipeline_log, "STEP_JUDGE_ERROR", {"error": str(e)},
+                           status='error', error=str(e), summary="判断调用失败，放行继续生成")
             judge = None
+        _judge_intercept = bool(judge) and not judge.get('can_generate', True)
         self._log_step(pipeline_log, "STEP_JUDGE_RESULT", {
             "can_generate": (judge or {}).get('can_generate'),
             "reason": (judge or {}).get('reason', ''),
             "missing_info": (judge or {}).get('missing_info', []),
-            "suggestion": (judge or {}).get('suggestion', '')})
+            "suggestion": (judge or {}).get('suggestion', '')},
+            status='intercept' if _judge_intercept else 'ok',
+            error=((judge or {}).get('reason', '') or None) if _judge_intercept else None,
+            summary='拦截：信息不足' if _judge_intercept else '判断可生成')
         if judge and not judge.get('can_generate', True):
             return self._need_more_info_result(
                 judge, query, messages, pipeline_log, start_time, aggregation,
@@ -229,9 +316,14 @@ class ChatSession:
 
         # Step 5: 调用 LLM
         llm_result = self.llm_client.chat(messages)
+        _gen_sql_text = llm_result.get('sql', '')
         self._log_step(pipeline_log, "STEP5_RESULT", {
-            "sql": llm_result.get('sql', ''),
-            "total_tokens": llm_result.get("total_tokens", 0)})
+            "sql": _gen_sql_text,
+            "total_tokens": llm_result.get("total_tokens", 0)},
+            status='ok' if _gen_sql_text else 'error',
+            error=None if _gen_sql_text else 'LLM 未返回 SQL',
+            summary=(f"生成 SQL {len(_gen_sql_text)} 字符 · "
+                     f"token {llm_result.get('total_tokens', 0)}"))
 
         # Step 6-7: 验证 + 权限网关
         sql = llm_result.get('sql', '')
@@ -241,14 +333,22 @@ class ChatSession:
             sql, is_valid, error_msg, db_type, schema_name)
         self._log_step(pipeline_log, "STEP6_VALIDATE", {
             "is_valid": is_valid, "error_message": error_msg,
-            "columns": columns[:10] if columns else None})
+            "columns": columns[:10] if columns else None},
+            status='ok' if is_valid else 'intercept',
+            error=error_msg if not is_valid else None,
+            summary='SQL 校验通过' if is_valid else 'SQL 校验未通过')
         if gateway_info:
+            _gw_allowed = gateway_info.get("is_allowed")
             self._log_step(pipeline_log, "STEP7_GATEWAY", {
                 "is_allowed": gateway_info.get("is_allowed"),
                 "block_reason": gateway_info.get("block_reason"),
                 "was_modified": gateway_info.get("was_modified"),
                 "tables": gateway_info.get("tables", []),
-                "hit_sensitive": gateway_info.get("hit_sensitive", False)})
+                "hit_sensitive": gateway_info.get("hit_sensitive", False)},
+                status='ok' if _gw_allowed else 'intercept',
+                error=gateway_info.get("block_reason") if not _gw_allowed else None,
+                summary=('网关放行' + ('，SQL 已改写' if gateway_info.get("was_modified") else ''))
+                if _gw_allowed else '网关拦截')
 
         # Step 8: 审计日志
         duration_ms = int((now_beijing() - start_time).total_seconds() * 1000)
@@ -308,17 +408,21 @@ class ChatSession:
         """
         import json
         start_time = now_beijing()
+        self._tracker = StepTracker()   # 每条消息重置计时（前置步骤耗时由路由层自己的 tracker 计）
+        # 权限快照：编排层一次性构建（P2 召回/权限解耦），追问轮同样按当次权限
+        self._scope = build_recall_scope(self.user)
         pipeline_log = list(pre_log) if pre_log else []
         self._log_step(pipeline_log, "PIPELINE_START", {
             "user_id": self.user_id, "query": new_user_content,
             "schema_name": schema_name or "复用上一轮", "mode": "followup",
-        })
+        }, summary="追问轮全链路")
 
         # Step 1: 关键词提取（对追问重新提取，保证链路完整）
         keywords = self.keyword_extractor.extract(new_user_content, top_k=10)
         self._log_step(pipeline_log, "STEP1_KEYWORDS", {
             "query": new_user_content, "keywords": keywords,
-            "count": len(keywords), "mode": "followup"})
+            "count": len(keywords), "mode": "followup"},
+            summary=f"{len(keywords)} 个关键词")
 
         # Step 2-3: 针对新问题重新召回/聚合（仅链路追踪；失败降级不阻断主流程）
         # 追问/修改指令（如"不对 条件不对"）可能不含实质业务词——停用词过滤后为空，
@@ -329,33 +433,43 @@ class ChatSession:
             self._log_step(pipeline_log, "STEP2_RECALL", {
                 "method": "reuse_previous_context", "keywords": keywords,
                 "recalled_count": 0, "recalled_fields": [],
-                "reason": "追问无实质业务关键词，跳过向量召回，直接复用上一轮表集合"})
+                "reason": "追问无实质业务关键词，跳过向量召回，直接复用上一轮表集合"},
+                status='skip', summary="无业务关键词，复用上一轮表集合")
             self._log_step(pipeline_log, "STEP3_AGGREGATE", {
                 "reuse_schema_csv": True,
-                "schema_csv_lines": len(schema_csv.split('\n'))})
+                "schema_csv_lines": len(schema_csv.split('\n'))},
+                status='skip', summary="复用上一轮 CSV")
         else:
             try:
                 recalled_fields = self.retriever.recall_fields(
-                    keywords, schema_name, query=new_user_content)
+                    keywords, schema_name, query=new_user_content, scope=self._scope)
+                _recall_method = "vector" if self.retriever.vector_loaded else "database_query"
                 self._log_step(pipeline_log, "STEP2_RECALL", {
-                    "method": "vector" if self.retriever.vector_loaded else "database_query",
+                    "method": _recall_method,
                     "keywords": keywords, "recalled_count": len(recalled_fields),
                     "recalled_fields": [{"schema": f.get("schema_name") or '',
                                          "table": f.get("table_name"), "column": f.get("column_name")}
-                                        for f in recalled_fields[:10]]})
-                aggregation = self.retriever.aggregate_tables(recalled_fields, schema_name)
+                                        for f in recalled_fields[:10]]},
+                    summary=f"{_recall_method} · 召回 {len(recalled_fields)} 字段")
+                aggregation = self.retriever.aggregate_tables(recalled_fields, schema_name,
+                                                              scope=self._scope)
                 self._log_step(pipeline_log, "STEP3_AGGREGATE", {
                     "recalled_table_count": len(aggregation.get('tables', [])),
                     "tables": aggregation.get('tables', []),
-                    "total_field_count": len(aggregation.get('all_fields', {}))})
+                    "total_field_count": len(aggregation.get('all_fields', {}))},
+                    summary=(f"{len(aggregation.get('tables', []))} 表 / "
+                             f"{len(aggregation.get('all_fields', {}))} 字段"))
             except Exception as e:
                 logger.warning(f"[ChatSession] 追问召回失败，降级复用上一轮上下文: {e}")
                 self._log_step(pipeline_log, "STEP2_RECALL", {
                     "method": "reuse_previous_context", "keywords": keywords,
-                    "recalled_count": 0, "recalled_fields": []})
+                    "recalled_count": 0, "recalled_fields": []},
+                    status='error', error=f"召回失败降级复用上一轮上下文: {e}",
+                    summary="召回异常，降级复用上一轮")
                 self._log_step(pipeline_log, "STEP3_AGGREGATE", {
                     "reuse_schema_csv": True,
-                    "schema_csv_lines": len(schema_csv.split('\n'))})
+                    "schema_csv_lines": len(schema_csv.split('\n'))},
+                    status='skip', summary="复用上一轮 CSV")
                 aggregation = None
 
         # 累积召回：首轮表集合(first_tables) ∪ 追问重召回表 ∪ 知识扩表
@@ -368,12 +482,14 @@ class ChatSession:
         kb_base = knowledge_content or ''
         kb_parts = {p.strip() for p in kb_base.split('\n\n') if p.strip()}
         followup_recall = self.retriever.recall_knowledge(
-            new_user_content, scope_schema_id=scope_id, exclude_contents=kb_parts or None)
+            new_user_content, scope_schema_id=scope_id, exclude_contents=kb_parts or None,
+            scope=self._scope)
         self._log_step(pipeline_log, "STEP_RECALL_KNOWLEDGE", {
             "source": "auto_concept_recall",
             "note": "自动概念召回（对全部知识条目关键词匹配，无需勾选知识库）",
             "matched_count": len(followup_recall['items']),
-            "related_tables": followup_recall['related_tables']})
+            "related_tables": followup_recall['related_tables']},
+            summary=f"自动概念召回 {len(followup_recall['items'])} 条")
 
         relation_tables = None
         if first_tables or aggregation is not None:
@@ -418,7 +534,11 @@ class ChatSession:
                     recalled.append(item)
                 # keep_first：历史 SQL 用过的表完整保留，超限只裁剪新增召回表
                 merged_aggregation = self.retriever.aggregate_tables(
-                    recalled, schema_name, keep_first=keep_first)
+                    recalled, schema_name, keep_first=keep_first, scope=self._scope)
+                # 全库模式：方言按本轮涉及库的多数类型修正（与首轮同规则）
+                db_type = _refine_dialect_db_type(
+                    merged_aggregation, schema_name, db_type,
+                    log_fn=lambda name, data: self._log_step(pipeline_log, name, data))
                 # 字段级裁剪：白名单 = 历史 SQL 引用列(保底) ∪ 本轮召回列(可裁剪)
                 # 召回列裁剪：同名列跨表只保留首个（按 merged_order 顺序）+ 未引用表每表上限，
                 # 消除 product_brand 多表重复、维度表整表灌入的问题（主外键由 CSV 自动补齐）
@@ -462,11 +582,19 @@ class ChatSession:
                     "from_history": len(used_tables),
                     "from_recall": len(aggregation.get('tables', [])) if aggregation else 0,
                     "from_knowledge": len(followup_recall['related_tables']),
-                    "note": "首轮表不再全量继承，仅保留历史SQL用过的+本轮召回到的表"})
+                    "note": "首轮表不再全量继承，仅保留历史SQL用过的+本轮召回到的表"},
+                    summary=f"累积聚合 {len(relation_tables)} 表 "
+                            f"(历史SQL {len(used_tables)} / 召回 "
+                            f"{len(aggregation.get('tables', [])) if aggregation else 0} / "
+                            f"知识 {len(followup_recall['related_tables'])})")
                 # Step 3.5: 权限裁剪统计（累积后）
                 self._log_permission_stats(pipeline_log, merged_aggregation, schema_name)
             except Exception as e:
                 logger.warning(f"[ChatSession] 累积聚合失败，回退全量 schema_csv: {e}")
+                self._log_step(pipeline_log, "STEP_CUMULATIVE_AGGREGATE", {
+                    "fallback": "full_schema_csv", "error": str(e)},
+                    status='error', error=f"累积聚合失败回退全量 CSV: {e}",
+                    summary="累积聚合异常，回退全量 schema_csv")
                 schema_csv_used = schema_csv
                 relation_tables = _parse_tables_from_csv(schema_csv)
         else:
@@ -488,7 +616,8 @@ class ChatSession:
 
         # 人工维护的表关系（基于累积/全量表集合）：追加 JOIN 提示
         if relation_tables:
-            followup_relations = self.retriever.get_relations_text(relation_tables)
+            followup_relations = self.retriever.get_relations_text(
+                relation_tables, scope=self._scope)
             if followup_relations and messages and messages[0].get('role') == 'system':
                 base = messages[0]['content']
                 if '【表关系（已人工确认的 JOIN 条件）】' not in base:
@@ -507,7 +636,9 @@ class ChatSession:
             "has_knowledge": bool(knowledge_content),
             "history_rounds": len(conversation_messages),
             "schema_csv_lines": len(schema_csv_used.split('\n')),
-            "tables_in_context": len(relation_tables) if relation_tables else 0})
+            "tables_in_context": len(relation_tables) if relation_tables else 0},
+            summary=(f"上下文 {len(schema_csv_used.split(chr(10)))} 行 / "
+                     f"历史 {len(conversation_messages)} 轮"))
 
         # Step 4.5: 可否生成 SQL 判断 — 信息不足则提前返回，引导用户补充
         # 传入最近对话历史，让判断基于上下文（追问如「只保留某列」需结合上一轮表/字段）
@@ -517,7 +648,8 @@ class ChatSession:
         # 判断步看不到口径映射，只能以"缺实采值/缺表"反复拦截（conv8 连续 5 轮误拦截）。
         followup_relations_for_judge = ""
         if relation_tables:
-            followup_relations_for_judge = self.retriever.get_relations_text(relation_tables)
+            followup_relations_for_judge = self.retriever.get_relations_text(
+                relation_tables, scope=self._scope)
         judge_kb = knowledge_content or ''
         if followup_recall['prompt_text']:
             judge_kb = ((judge_kb + '\n\n' + followup_recall['prompt_text']).strip()
@@ -528,17 +660,23 @@ class ChatSession:
             relations_text=followup_relations_for_judge,
             history_queries=conversation_messages)
         self._log_step(pipeline_log, "STEP_JUDGE_PROMPT", {
-            "prompt_length": len(judge_prompt)})
+            "prompt_length": len(judge_prompt)},
+            summary=f"判断 prompt {len(judge_prompt)} 字符")
         try:
             judge = self.llm_client.call_llm_json(judge_prompt)
         except Exception as e:
-            self._log_step(pipeline_log, "STEP_JUDGE_ERROR", {"error": str(e)})
+            self._log_step(pipeline_log, "STEP_JUDGE_ERROR", {"error": str(e)},
+                           status='error', error=str(e), summary="判断调用失败，放行继续生成")
             judge = None
+        _judge_intercept = bool(judge) and not judge.get('can_generate', True)
         self._log_step(pipeline_log, "STEP_JUDGE_RESULT", {
             "can_generate": (judge or {}).get('can_generate'),
             "reason": (judge or {}).get('reason', ''),
             "missing_info": (judge or {}).get('missing_info', []),
-            "suggestion": (judge or {}).get('suggestion', '')})
+            "suggestion": (judge or {}).get('suggestion', '')},
+            status='intercept' if _judge_intercept else 'ok',
+            error=((judge or {}).get('reason', '') or None) if _judge_intercept else None,
+            summary='拦截：信息不足' if _judge_intercept else '判断可生成')
         if judge and not judge.get('can_generate', True):
             return self._need_more_info_result(
                 judge, new_user_content, messages, pipeline_log, start_time,
@@ -546,9 +684,14 @@ class ChatSession:
 
         # Step 5: 调用 LLM
         llm_result = self.llm_client.chat(messages)
+        _gen_sql_text = llm_result.get('sql', '')
         self._log_step(pipeline_log, "STEP5_RESULT", {
-            "sql": llm_result.get('sql', ''),
-            "total_tokens": llm_result.get("total_tokens", 0)})
+            "sql": _gen_sql_text,
+            "total_tokens": llm_result.get("total_tokens", 0)},
+            status='ok' if _gen_sql_text else 'error',
+            error=None if _gen_sql_text else 'LLM 未返回 SQL',
+            summary=(f"生成 SQL {len(_gen_sql_text)} 字符 · "
+                     f"token {llm_result.get('total_tokens', 0)}"))
 
         # Step 6-7: 验证 + 权限网关
         sql = llm_result.get('sql', '')
@@ -558,14 +701,22 @@ class ChatSession:
             sql, is_valid, error_msg, db_type, schema_name)
         self._log_step(pipeline_log, "STEP6_VALIDATE", {
             "is_valid": is_valid, "error_message": error_msg,
-            "columns": columns[:10] if columns else None})
+            "columns": columns[:10] if columns else None},
+            status='ok' if is_valid else 'intercept',
+            error=error_msg if not is_valid else None,
+            summary='SQL 校验通过' if is_valid else 'SQL 校验未通过')
         if gateway_info:
+            _gw_allowed = gateway_info.get("is_allowed")
             self._log_step(pipeline_log, "STEP7_GATEWAY", {
                 "is_allowed": gateway_info.get("is_allowed"),
                 "block_reason": gateway_info.get("block_reason"),
                 "was_modified": gateway_info.get("was_modified"),
                 "tables": gateway_info.get("tables", []),
-                "hit_sensitive": gateway_info.get("hit_sensitive", False)})
+                "hit_sensitive": gateway_info.get("hit_sensitive", False)},
+                status='ok' if _gw_allowed else 'intercept',
+                error=gateway_info.get("block_reason") if not _gw_allowed else None,
+                summary=('网关放行' + ('，SQL 已改写' if gateway_info.get("was_modified") else ''))
+                if _gw_allowed else '网关拦截')
 
         # Step 8: 审计日志（与首轮一致：完整链路 问题→关键词→召回→生成）
         duration_ms = int((now_beijing() - start_time).total_seconds() * 1000)
@@ -731,9 +882,13 @@ class ChatSession:
                 },
                 "sensitive_fields": by_level['sensitive'],
                 "confidential_fields": by_level['confidential'],
-            })
+            },
+                summary=(f"可见库 {'全部' if visible is None else len(visible) or '无'} · "
+                         f"字段 SELECT {dist.get('SELECT', 0)} / FILTER {dist.get('FILTER', 0)}"
+                         f" / NONE {dist.get('NONE', 0)}"))
         except Exception as e:
-            self._log_step(pipeline_log, "STEP_PERMISSION_ERROR", {"error": str(e)})
+            self._log_step(pipeline_log, "STEP_PERMISSION_ERROR", {"error": str(e)},
+                           status='error', error=str(e), summary="权限统计异常（不影响裁剪本身）")
 
     def _apply_gateway(self, sql: str, is_valid: bool, error_msg: Optional[str],
                        db_type: str, schema_name: Optional[str] = None):
