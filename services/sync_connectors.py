@@ -150,12 +150,21 @@ class MySQLConnector(BaseConnector):
             ORDER BY t.TABLE_NAME, c.ORDINAL_POSITION
         """)
         tables_dict: dict = {}
+        seen_cols: set = set()  # (table, column) 防止一列多外键时 JOIN 行翻倍
+        fk_extra: dict = {}  # (table, column) -> 追加的外键引用
         with engine.connect() as conn:
             rows = conn.execute(sql, {"db_name": self.database}).fetchall()
         for r in rows:
             table_name = r[0]
             if not self._should_include(table_name, include_tables, exclude_tables):
                 continue
+            col_key = (table_name, r[2])
+            if col_key in seen_cols:
+                # 同列多外键（源库重复声明）：合并外键引用，不重复出列
+                if r[9] and r[10]:
+                    fk_extra.setdefault(col_key, []).append(f"{r[9]}.{r[10]}")
+                continue
+            seen_cols.add(col_key)
             if table_name not in tables_dict:
                 tables_dict[table_name] = TableMetadata(name=table_name, description=r[1] or '')
             col = ColumnMetadata(
@@ -167,6 +176,14 @@ class MySQLConnector(BaseConnector):
             if r[9] and r[10]:
                 col.foreign_key = f"{r[9]}.{r[10]}"
             tables_dict[table_name].columns.append(col)
+        for (table_name, col_name), refs in fk_extra.items():
+            t = tables_dict.get(table_name)
+            if not t:
+                continue
+            for c in t.columns:
+                if c.name == col_name and refs:
+                    c.foreign_key = " | ".join(filter(None, [c.foreign_key, *refs]))
+                    break
         return list(tables_dict.values())
 
 
