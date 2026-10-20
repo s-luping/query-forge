@@ -14,7 +14,7 @@ from crud.base import session_scope
 
 
 class StepTracker:
-    """顺序步骤计时器（StepTrace 统一结构，见 docs/ChatSQL模块化与全链路留痕设计.md §5.2）
+    """顺序步骤计时器（StepTrace 统一结构，见 docs/07-ChatSQL模块化与全链路留痕设计.md §5.2）
 
     调用方在"步骤工作完成后"记步，两次 add 之间的时间差即该步的实际工作
     耗时（duration_ms），无需在每个调用点手工起止计时。

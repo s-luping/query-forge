@@ -1,5 +1,5 @@
 # -*- coding: UTF-8 -*-
-"""P2 召回/权限解耦（RecallScope）回归 — docs/ChatSQL模块化与全链路留痕设计.md §3.2
+"""P2 召回/权限解耦（RecallScope）回归 — docs/07-ChatSQL模块化与全链路留痕设计.md §3.2
 
 黄金对照原则：改造前行为 = permissions 模块实时查权限 → 裁剪；改造后 = 编排层
 构建 RecallScope 快照 → 召回模块纯数据过滤。本文件断言：

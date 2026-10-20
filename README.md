@@ -32,7 +32,7 @@ QueryForge 是一款基于自然语言的数据查询工具，通过大模型技
 - **规范结构导入**：支持规范 CSV（中文表头）与 JSON（Spider/自定义格式）导入
 - **元数据同步**：MySQL、PostgreSQL、SQLite 定时同步表结构并自动比对变更（新增自动应用、删除待审批）
 - **库/表/字段搜索**：支持按数据库名、表名、字段名、描述模糊搜索
-- **自动向量索引**：字段数量 >= 50 时自动后台构建向量索引
+- **向量索引**：导入/同步后自动标记过期，定时任务「向量索引重建」幂等重建（构建期间旧索引继续服务）；小库（表数 ≤ 阈值）整库直通不走向量
 - **数据源管理**：外部数据库连接配置（密码加密存储），数据源 → 库 → 表 → 字段四层结构
 
 ### 5. 完善的权限与安全
@@ -61,12 +61,13 @@ QueryForge/
 │   ├── config.py           # 全部配置唯一初始值来源
 │   ├── crypto.py           # Fernet 加解密
 │   ├── limiter.py          # 限流配置
-│   └── timezone.py / utils.py
+│   └── timezone.py
 ├── core/                   # 核心业务（扁平化按功能文件）
 │   ├── gen_chat.py         # ChatSession 多轮对话生成链路
 │   ├── gen_sql.py          # SQL prompt 构建 + 安全校验
-│   ├── gen_audit.py        # 查询审计日志写入
-│   ├── llm_client.py       # LLMClient（OpenAI 兼容 API，SSRF 防护，连接池复用）
+│   ├── gen_audit.py        # 查询审计日志写入（StepTrace 链路留痕）
+│   ├── recall_scope.py     # 召回/权限解耦（RecallScope 快照）
+│   ├── llm_client.py       # LLMClient（OpenAI 兼容 API，SSRF 防护，欠费自动标记）
 │   ├── ret_retriever.py    # SchemaRetriever 共享检索器（召回→聚合→CSV→知识召回）
 │   ├── ret_keywords.py     # 关键词提取（jieba 分词）
 │   ├── ret_vector_store.py # 向量存储（EmbeddingModel + SchemaVectorStore）
@@ -93,10 +94,14 @@ QueryForge/
 ├── static/                 # 前端（纯 HTML+JS，Bootstrap5）
 │   ├── css/ js/ img/ vendor/ webfonts/
 │   └── template/           # login/home/index/chatSQL/knowledge/schema/llm/system 页面
-├── scripts/                # 运维脚本（reset_admin_password / verify_db_split 等）
-├── docs/                   # 文档（见下方"文档"一节）
+├── scripts/                # 运维脚本（ci_guard 资产自检 / gen_schema_sql DDL 再生成 /
+│                           #   reset_admin_password / sample_enum_values 枚举实采 / seed_knowledge 知识批量）
+├── tests/                  # pytest 回归（含模块红线 AST 检查 test_module_boundaries）
+├── benchmark/              # NL2SQL 基准评测工具链（Falcon/BIRD/Spider；脚本/题目/结果/数据，
+│                           #   报告产出 docs/测试报告/；详见 docs/README.md）
+├── docs/                   # 文档（入口索引 docs/README.md；测试报告统一 docs/测试报告/）
 ├── logs/                   # 日志文件（自动轮转）
-├── download_model.py       # BGE-M3 模型下载脚本
+├── download_model.py       # BGE-M3 模型下载脚本（system_router 一键下载调用）
 ├── requirements.txt
 └── start_server.bat        # 启动脚本（Windows）
 ```
@@ -121,7 +126,7 @@ QueryForge/
 - **规范 CSV 导入**：中文表头模板（库名/表名/字段名/字段类型/…），支持 .csv / .json 文件
 - **元数据同步**：配置数据源 + 同步任务，定时自动同步外部库表结构，变更自动应用或待审批
 - **搜索功能**：按数据库名、表名、字段名、描述模糊搜索
-- **自动向量索引**：字段数 >= 50 时后台自动构建，支持重试和并发保护
+- **自动向量索引**：同步后自动标记过期，调度中心「向量索引重建」任务幂等重建，支持重试和并发保护
 
 ### 4. 知识库
 - **typed 知识**：note/terminology/calculation/relation/value_domain/convention/entity_map/sample_qa 八种类型
@@ -135,11 +140,13 @@ QueryForge/
 - **用户管理**：创建/编辑/启停/重置密码/删除用户（级联清理关联数据）；保护规则（不能删/禁用自己、至少保留一名管理员）
 - **注册开关**：`ALLOW_REGISTER` 控制是否开放自助注册
 
-### 6. 调度任务
+### 6. 调度任务（调度中心可视化管理，6 个内置系统任务）
 - **用量聚合**：每小时将 llm_calls 聚合到 llm_usage_stats（回溯 7 天幂等覆盖）
 - **数据清理**：每日清理过期遥测数据（90 天）、主库审计/同步历史（90 天）、对话结果 JSON（30 天）
 - **WAL checkpoint**：每日 04:00 回收 SQLite WAL 文件体积
 - **自动同步**：每 10 分钟检查并执行到期的元数据同步任务
+- **向量索引重建**：每小时检查 stale/error 索引并幂等重建
+- 任务定义持久化 + cron 预览 + 运行日志 + 暂停/恢复，支持注册自定义处理器
 
 ---
 
@@ -164,7 +171,7 @@ pip install -r requirements.txt
 python download_model.py
 ```
 
-> 向量索引与 NL2SQL 链路的详细设计，请参考 [docs/NL2SQL设计与实现.md](docs/NL2SQL设计与实现.md) 与 [docs/系统架构设计.md](docs/系统架构设计.md)
+> 向量索引与 NL2SQL 链路的详细设计，请参考 [docs/06-NL2SQL设计与实现.md](docs/06-NL2SQL设计与实现.md) 与 [docs/05-系统架构设计.md](docs/05-系统架构设计.md)
 
 ### 4. 启动服务
 
@@ -181,7 +188,7 @@ start_server.bat
 ### 5. 默认管理员账号
 
 - 用户名：`admin`
-- 密码：`REDACTED`
+- 密码：`REDACTED`（首次登录后请立即修改；遗忘可用 `scripts/reset_admin_password.py` 重置）
 
 ---
 
@@ -229,18 +236,32 @@ start_server.bat
 
 ## 文档
 
+> 完整文档地图见 [docs/README.md](docs/README.md)。
+
 | 文档 | 说明 |
 |------|------|
-| [docs/系统使用文档.md](docs/系统使用文档.md) | 面向业务用户与管理员的使用手册 |
-| [docs/系统架构设计.md](docs/系统架构设计.md) | 总体架构、三库分离、权限与安全体系 |
-| [docs/NL2SQL设计与实现.md](docs/NL2SQL设计与实现.md) | NL2SQL 全链路（召回/聚合/知识/网关/执行）设计与实现 |
-| [docs/部署运维手册.md](docs/部署运维手册.md) | 安装部署、配置项、日常运维、故障排查 |
-| [docs/资产总表.md](docs/资产总表.md) | 接口/表/页面/作业登记总表（开发纲领 §5，CI 核对） |
-| docs/NL2SQL经典场景测试报告.pdf · docs/NL2SQL验证测试报告.pdf | NL2SQL 测试报告 |
+| [docs/01-系统使用文档.md](docs/01-系统使用文档.md) | 面向业务用户与管理员的使用手册 |
+| [docs/05-系统架构设计.md](docs/05-系统架构设计.md) | 总体架构、三库分离、权限与安全体系 |
+| [docs/06-NL2SQL设计与实现.md](docs/06-NL2SQL设计与实现.md) | NL2SQL 全链路（召回/聚合/知识/网关/执行）设计与实现 |
+| [docs/04-新数据源接入指南.md](docs/04-新数据源接入指南.md) | 接入新库的单一完整指南（SOP + 准确率治理清单） |
+| [docs/08-NL2SQL基准测试方案.md](docs/08-NL2SQL基准测试方案.md) | 基准选型与评测流程（Falcon/BIRD/Spider） |
+| [docs/09-NL2SQL评测失败类型手册.md](docs/09-NL2SQL评测失败类型手册.md) | 跑批失败归因标准与优化预算分配 |
+| [docs/02-部署运维手册.md](docs/02-部署运维手册.md) | 安装部署、配置项、日常运维、故障排查 |
+| [docs/03-资产总表.md](docs/03-资产总表.md) | 接口/表/页面/作业登记总表（开发纲领 §5，CI 核对） |
+| docs/测试报告/ | 全部评测报告（BIRD / Falcon / Spider，HTML） |
 
 ---
 
 ## 更新日志
+
+### v1.6.0（2026-10-20）
+- **调度任务中心**：任务定义持久化 + cron 预览 + 运行日志 + 暂停/恢复，6 个内置系统任务（含向量索引重建），支持自定义处理器
+- **知识库改造**：全局常驻（pin）/版本化（restore）/用户默认勾选/我的常驻/全局可见性召回/所有者管理，六层知识类型映射
+- **NL2SQL 链路增强**：小库直通与全库直通召回、SQL 前缀确定性修复（PREFIX_REPAIR）、StepTrace 全链路留痕、空结果归因、欠费自动标记、多线程评测工具链（benchmark workers + fallback 配置链）
+- **模块解耦与红线**：RecallScope 权限快照解耦 + 模块依赖 AST 红线测试（test_module_boundaries）
+- **基准评测落地**：Falcon dev 全量 309 题（EX 74.0%）/ BIRD dev 24 题 / Spider dev 140 题（严格 80.0% / 宽口径 85.0%），报告统一 docs/测试报告/
+- **安全加固**：XSS 修复（属性上下文转义）、restore 授权绕过修复、SSRF IPv6/IPv4-mapped 防护、网关根类型断言拦 SELECT INTO
+- **会话可靠性**：expire_on_commit=False 根治 DetachedInstance、同请求鉴权复用 resolve_request_user
 
 ### v1.5.0（2026-08-28）
 - **日志系统瘦身**：移除未使用的 pipeline.log / sqlalchemy.log，日志按类型分离（app/llm/audit/server）

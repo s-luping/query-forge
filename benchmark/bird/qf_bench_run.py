@@ -17,8 +17,8 @@ USER, PWD = "admin", "REDACTED"
 LLM_CONFIG_ID = 5  # doubao-seed-2-1-turbo-260628（id=4 pro 配额已耗尽被暂停）
 DBS = [("bird_superhero", "superhero"), ("bird_formula_1", "formula_1"),
        ("bird_financial", "financial")]
-SEL = os.path.join(os.path.dirname(os.path.abspath(__file__)), "questions", "bird_selected_questions.json")
-OUT = r"D:\projects\query-forge\benchmark\results\bird_eval_turbo.json"
+SEL = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "questions", "bird", "bird_selected_questions.json")
+OUT = r"D:\projects\query-forge\benchmark\results\bird\bird_eval_turbo.json"
 TOKEN = None
 SESSION = requests.Session()  # token 经 HttpOnly cookie 下发，用 session 自动携带
 TIMEOUT = 600

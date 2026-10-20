@@ -18,10 +18,10 @@ import os
 import sqlite3
 import html
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-RESULTS = os.path.join(BASE_DIR, "results")
-TELEMETRY_DB = os.path.join(BASE_DIR, "..", "db", "llm_telemetry.db")
-OUT = os.path.join(BASE_DIR, "..", "docs", "测试报告", "BIRD基准NL2SQL测试报告.html")
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))  # benchmark/bird/
+RESULTS = os.path.join(BASE_DIR, "..", "results", "bird")
+TELEMETRY_DB = os.path.join(BASE_DIR, "..", "..", "db", "llm_telemetry.db")
+OUT = os.path.join(BASE_DIR, "..", "..", "docs", "测试报告", "BIRD基准NL2SQL测试报告.html")
 
 # (key, 展示名, 结果文件, 表头色)
 ROUNDS = [
@@ -280,7 +280,7 @@ ds 仅多过 1 题（107，且属侥幸）。ds 的 need_more_info 明显更保�
 <li><b>剩余 8 败（799/877/927/107/94/829/144 + 939 拦截）均为 gold 口径/数据语义类</b>：
 各轮 SQL 逻辑高度一致、模型间无差异，继续优化应走数据指南与知识库沉淀（NULL 语义、tie-breaking、字段口径），而非改 prompt 或换模型。</li>
 </ul>
-<p class="note">结果文件：benchmark/results/bird_eval_*.json；生成脚本 benchmark/make_bird_report.py（替代原 make_compare_report.py / make_opt1_report.py 及 4 份独立 HTML）。</p>
+<p class="note">结果文件：benchmark/results/bird/bird_eval_*.json；生成脚本 benchmark/bird/make_bird_report.py（替代原 make_compare_report.py / make_opt1_report.py 及 4 份独立 HTML）。</p>
 </body></html>"""
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     with open(OUT, "w", encoding="utf-8") as f:

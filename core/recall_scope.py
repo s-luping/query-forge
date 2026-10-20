@@ -1,7 +1,7 @@
 # -*- coding: UTF-8 -*-
 """召回权限快照（RecallScope）— 召回模块与权限模块的隔离契约
 
-设计见 docs/ChatSQL模块化与全链路留痕设计.md §3.2：
+设计见 docs/07-ChatSQL模块化与全链路留痕设计.md §3.2：
 召回只负责"找最相关的"，权限以注入数据参与——SchemaRetriever 消费本模块的
 RecallScope 纯数据结构，不 import app.permissions；权限三件套的读取只发生在
 build_recall_scope（编排层调用），依赖方向保持 `编排层 → 权限横切模块` 单向。

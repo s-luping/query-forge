@@ -75,9 +75,8 @@ id_rsa.pub
 *.jsonl
 
 # ---------- 基准测试运行产物 ----------
-# 结果目录整体排除，仅 .report.md 汇总报告入库（先 /* 才能反选目录内文件）
-benchmark/results/*
-!benchmark/results/*.report.md
+# 结果/题目/数据集整体排除（原始数据不入库）；评测报告统一 docs/测试报告/（HTML，入库）
+benchmark/results/
 benchmark/data/
 benchmark/questions/
 

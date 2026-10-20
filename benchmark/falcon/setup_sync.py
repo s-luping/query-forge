@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Falcon 基准库一键接入 QueryForge（对应 docs/NL2SQL基准测试方案.md 第 3 节）。
+"""Falcon 基准库一键接入 QueryForge（对应 docs/08-NL2SQL基准测试方案.md 第 3 节）。
 
 动作：登录 → 为每个 falcon_dev_<db_id> 创建数据源 → 连通性测试 →
 创建同步任务 → 触发同步并轮询完成 → 最后重建全量向量索引。

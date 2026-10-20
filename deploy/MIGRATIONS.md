@@ -85,5 +85,5 @@
 1. 每次改 `models/` 必须同步：
    - 重新生成 `deploy/*.sql`（`python scripts/gen_schema_sql.py`）；
    - 若涉及存量库兼容，在 `db/sqlite_hooks.py` 增加幂等迁移，并在本文件第二节登记；
-   - 在 `docs/资产总表.md` 表清单登记新表（CI 检查项 4 强制）。
+   - 在 `docs/03-资产总表.md` 表清单登记新表（CI 检查项 4 强制）。
 2. 禁止只改一边：ORM 与 `deploy/*.sql` 漂移会被 CI 检查项 6 拦截。

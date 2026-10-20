@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""NL2SQL 基准批量评测脚本（对应 docs/NL2SQL基准测试方案.md 第 3/5 节）。
+"""NL2SQL 基准批量评测脚本（对应 docs/08-NL2SQL基准测试方案.md 第 3/5 节）。
 
 流程：登录 QueryForge → 遍历题目调 POST /api/conversation →
 执行生成的 SQL → 与 Falcon dev.json 自带标准答案比对（EX）→
@@ -429,8 +429,8 @@ def main():
     args = ap.parse_args()
 
     name = os.path.splitext(os.path.basename(args.questions))[0]
-    os.makedirs("benchmark/results", exist_ok=True)
-    out_path = args.out or f"benchmark/results/{name}.c{args.llm_config_id}.jsonl"
+    os.makedirs("benchmark/results/falcon", exist_ok=True)
+    out_path = args.out or f"benchmark/results/falcon/{name}.c{args.llm_config_id}.jsonl"
     report_path = out_path.rsplit(".", 1)[0] + ".report.md"
 
     if args.relabel_quota:

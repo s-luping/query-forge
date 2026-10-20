@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>Spider 1.0 累计 140 题 NL2SQL 测试报告（glm-5.3-flash）</title>
+<style>
+  body { font-family: "Segoe UI", "Microsoft YaHei", sans-serif; margin: 0; background: #f5f6f8; color: #222; }
+  .wrap { max-width: 1240px; margin: 0 auto; padding: 32px 24px 64px; }
+  h1 { font-size: 26px; margin: 0 0 4px; }
+  .sub { color: #666; font-size: 13px; margin-bottom: 24px; }
+  h2 { font-size: 19px; border-left: 4px solid #3564d9; padding-left: 10px; margin-top: 36px; }
+  .cards { display: flex; gap: 14px; flex-wrap: wrap; }
+  .card { background: #fff; border-radius: 10px; padding: 16px 20px; min-width: 150px; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+  .card .v { font-size: 26px; font-weight: 700; color: #3564d9; }
+  .card .k { font-size: 12px; color: #777; margin-top: 2px; }
+  table { border-collapse: collapse; width: 100%; background: #fff; font-size: 13px; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+  th, td { border: 1px solid #e3e6ea; padding: 8px 10px; vertical-align: top; text-align: left; }
+  th { background: #eef1f6; white-space: nowrap; }
+  td.sql { font-family: Consolas, monospace; font-size: 11.5px; white-space: pre-wrap; max-width: 320px; }
+  li { margin: 6px 0; }
+  code { background: #f0f2f5; padding: 1px 5px; border-radius: 4px; }
+  .note { background: #fff8e6; border: 1px solid #f0d98c; border-radius: 8px; padding: 12px 16px; font-size: 13px; }
+</style>
+</head>
+<body><div class="wrap">
+<h1>Spider 1.0 累计 140 题 NL2SQL 测试报告</h1>
+<div class="sub">评测日期 2026-10-20 · 模型 llm_config_id=7（NVIDIA NIM z-ai/glm-5.3-flash）·
+Spider 1.0 官方 dev 抽样（20 库全覆盖，固定规则可复现）· 统一口径离线重算（gen SQL 全量重放 + 分层比对）</div>
+
+<h2>一、结论速览</h2>
+<div class="cards">
+  <div class="card"><div class="v">112/140</div><div class="k">执行准确率 EX（严格多重集）= 80.0%</div></div>
+  <div class="card"><div class="v">119/140</div><div class="k">宽口径 EX（列序/多余列/容差）= 85.0%</div></div>
+  <div class="card"><div class="v">9</div><div class="k">并列保序（gen ⊇ gold，另计）</div></div>
+  <div class="card"><div class="v">12</div><div class="k">真错（含 gold quirk 与方言错误）</div></div>
+  <div class="card"><div class="v">37.8s</div><div class="k">平均端到端耗时</div></div>
+  <div class="card"><div class="v">20/20</div><div class="k">库覆盖 · 0 拦截误伤 · 0 召回遗漏</div></div>
+</div>
+<p style="margin-top:14px">三轮累计（抽样 10 → 增测 30 → 增测 100）共 <b>140</b> 题，统一以最新一轮作答离线重算。
+严格 EX <b>80.0%</b>；加列序翻转/多余列剔除/数值容差后 <b>85.0%</b>；
+另有 9 题模型结果严格包含 gold（并列最值 gold 任意取一行）。真错 12 题
+中约半数为 <b>gold 口径 quirk</b>（TEXT 字典序、count(*) 代 SUM、GROUP BY first_name、边界 &lt;=2 等），
+模型侧可改进项集中在：<b>枚举值逐字符照抄</b>（q610 丢「!」、q1033 写错枚举方向）与 <b>MySQL 方言 HAVING 限制</b>（q923）。
+无拦截误伤、无召回遗漏、无网关问题——链路健康，失败格局与 Falcon 收敛后一致。</p>
+
+<h2>二、分库统计</h2>
+<table>
+<tr><th>库</th><th style="width:110px">EX（严格/题数）</th><th style="width:110px">失败题数</th></tr>
+<tr><td>battle_death</td><td style='text-align:center'>5/8</td><td>3</td></tr><tr><td>car_1</td><td style='text-align:center'>6/8</td><td>2</td></tr><tr><td>concert_singer</td><td style='text-align:center'>9/9</td><td>0</td></tr><tr><td>course_teach</td><td style='text-align:center'>8/8</td><td>0</td></tr><tr><td>cre_Doc_Template_Mgt</td><td style='text-align:center'>6/8</td><td>2</td></tr><tr><td>dog_kennels</td><td style='text-align:center'>5/6</td><td>1</td></tr><tr><td>employee_hire_evaluation</td><td style='text-align:center'>6/8</td><td>2</td></tr><tr><td>flight_2</td><td style='text-align:center'>8/8</td><td>0</td></tr><tr><td>museum_visit</td><td style='text-align:center'>7/8</td><td>1</td></tr><tr><td>network_1</td><td style='text-align:center'>6/6</td><td>0</td></tr><tr><td>orchestra</td><td style='text-align:center'>4/6</td><td>2</td></tr><tr><td>pets_1</td><td style='text-align:center'>9/9</td><td>0</td></tr><tr><td>poker_player</td><td style='text-align:center'>6/6</td><td>0</td></tr><tr><td>real_estate_properties</td><td style='text-align:center'>2/4</td><td>2</td></tr><tr><td>singer</td><td style='text-align:center'>6/6</td><td>0</td></tr><tr><td>student_transcripts_tracking</td><td style='text-align:center'>4/6</td><td>2</td></tr><tr><td>tvshow</td><td style='text-align:center'>5/6</td><td>1</td></tr><tr><td>voter_1</td><td style='text-align:center'>3/6</td><td>3</td></tr><tr><td>world_1</td><td style='text-align:center'>6/6</td><td>0</td></tr><tr><td>wta_1</td><td style='text-align:center'>1/8</td><td>7</td></tr>
+</table>
+
+<h2>三、失败题明细（28 题）</h2>
+<table>
+<tr><th style="width:110px">库 / qid</th><th style="width:95px">分桶</th><th style="width:200px">问题</th><th>生成 SQL</th><th>gold SQL</th><th style="width:280px">归因</th></tr>
+
+<tr><td style="white-space:nowrap">dog_kennels<br><code style="font-size:11px">spider_dev_923</code></td>
+<td style="width:90px">执行错误（方言）</td><td>Find the id, last name and cell phone of the professionals who live in the state of Indiana or have performed more than </td>
+<td class="sql">SELECT p.professional_id, p.last_name, p.cell_number
+FROM professionals p
+LEFT JOIN treatments t ON p.professional_id = t.professional_id
+GROUP BY p.professional_id
+HAVING p.state = 'Indiana' OR COUNT(t.treatment_id) &gt; 2;</td>
+<td class="sql">SELECT professional_id ,  last_name ,  cell_number FROM Professionals WHERE state  =  'Indiana' UNION SELECT T1.professional_id ,  T1.last_name ,  T1.cell_number FROM Professionals AS T1 JOIN Treatments AS T2 ON T1.professional_id  =  T2.professional_id GROUP BY T1.professional_id HAVING count(*)  &gt;  2</td>
+<td>方言错误：HAVING 引用非聚合列 p.state（SQLite 允许，MySQL 报 1054），应把 state 条件放入 WHERE</td></tr>
+<tr><td style="white-space:nowrap">cre_Doc_Template_Mgt<br><code style="font-size:11px">spider_dev_311</code></td>
+<td style="width:90px">并列保序</td><td>What is the id and type code for the template used by the most documents?</td>
+<td class="sql">WITH doc_counts AS (
+    SELECT Template_ID, COUNT(*) AS cnt
+    FROM documents
+    GROUP BY Template_ID
+),
+ranked AS (
+    SELECT Template_ID, cnt,
+           DENSE_RANK() OVER (ORDER BY cnt DESC) AS rnk
+    FROM doc_counts
+)
+SELECT t.Template_ID, t.Template_Type_Code
+FROM ranked r
+JOIN templates t ON t.Template_ID = r.Template_ID
+WHERE r.rnk = 1;</td>
+<td class="sql">SELECT T1.template_id ,  T2.Template_Type_Code FROM Documents AS T1 JOIN Templates AS T2 ON T1.template_id  =  T2.template_id GROUP BY T1.template_id ORDER BY count(*) DESC LIMIT 1</td>
+<td>并列最值/并列计数：模型 DENSE_RANK/RANK 保留全部并列行（gen ⊇ gold），gold LIMIT 1 任意取一行</td></tr>
+<tr><td style="white-space:nowrap">cre_Doc_Template_Mgt<br><code style="font-size:11px">spider_dev_312</code></td>
+<td style="width:90px">并列保序</td><td>Return the id and type code of the template that is used for the greatest number of documents.</td>
+<td class="sql">SELECT t.Template_ID, t.Template_Type_Code
+FROM (
+    SELECT Template_ID,
+           DENSE_RANK() OVER (ORDER BY COUNT(*) DESC) AS rnk
+    FROM documents
+    GROUP BY Template_ID
+) d
+JOIN templates t ON t.Template_ID = d.Template_ID
+WHERE d.rnk = 1;</td>
+<td class="sql">SELECT T1.template_id ,  T2.Template_Type_Code FROM Documents AS T1 JOIN Templates AS T2 ON T1.template_id  =  T2.template_id GROUP BY T1.template_id ORDER BY count(*) DESC LIMIT 1</td>
+<td>并列最值/并列计数：模型 DENSE_RANK/RANK 保留全部并列行（gen ⊇ gold），gold LIMIT 1 任意取一行</td></tr>
+<tr><td style="white-space:nowrap">museum_visit<br><code style="font-size:11px">spider_dev_421</code></td>
+<td style="width:90px">并列保序</td><td>What are the id and name of the museum visited most times?</td>
+<td class="sql">SELECT t.Museum_ID, t.Name
+FROM (
+    SELECT m.Museum_ID, m.Name,
+           DENSE_RANK() OVER (ORDER BY v.cnt DESC) AS rnk
+    FROM museum m
+    JOIN (
+        SELECT Museum_ID, COUNT(*) AS cnt
+        FROM visit
+        GROUP BY Museum_ID
+    ) v ON m.Museum_ID = v.Museum_ID
+) t
+WHERE t.rnk = 1;</td>
+<td class="sql">SELECT t2.Museum_ID ,  t1.name FROM museum AS t1 JOIN visit AS t2 ON t1.Museum_ID  =  t2.Museum_ID GROUP BY t2.Museum_ID ORDER BY count(*) DESC LIMIT 1</td>
+<td>并列最值/并列计数：模型 DENSE_RANK/RANK 保留全部并列行（gen ⊇ gold），gold LIMIT 1 任意取一行</td></tr>
+<tr><td style="white-space:nowrap">wta_1<br><code style="font-size:11px">spider_dev_487</code></td>
+<td style="width:90px">并列保序</td><td>Find the first name, country code and birth date of the winner who has the highest rank points in all matches.</td>
+<td class="sql">SELECT p.first_name, p.country_code, p.birth_date
+FROM (
+    SELECT winner_id, winner_rank_points,
+           DENSE_RANK() OVER (ORDER BY winner_rank_points DESC) AS rnk
+    FROM matches
+) t
+JOIN players p ON t.winner_id = p.player_id
+WHERE t.rnk = 1;</td>
+<td class="sql">SELECT T1.first_name ,  T1.country_code ,  T1.birth_date FROM players AS T1 JOIN matches AS T2 ON T1.player_id  =  T2.winner_id ORDER BY T2.winner_rank_points DESC LIMIT 1</td>
+<td>并列最值/并列计数：模型 DENSE_RANK/RANK 保留全部并列行（gen ⊇ gold），gold LIMIT 1 任意取一行</td></tr>
+<tr><td style="white-space:nowrap">student_transcripts_tracking<br><code style="font-size:11px">spider_dev_525</code></td>
+<td style="width:90px">并列保序</td><td>What are the names and id of courses having at most 2 sections?</td>
+<td class="sql">SELECT course_name, course_id
+FROM courses
+WHERE course_id NOT IN (
+    SELECT course_id
+    FROM sections
+    GROUP BY course_id
+    HAVING COUNT(*) &gt; 2
+);</td>
+<td class="sql">SELECT T1.course_name ,  T1.course_id FROM Courses AS T1 JOIN Sections AS T2 ON T1.course_id  =  T2.course_id GROUP BY T1.course_id HAVING count(*)  &lt;=  2</td>
+<td>并列最值/并列计数：模型 DENSE_RANK/RANK 保留全部并列行（gen ⊇ gold），gold LIMIT 1 任意取一行</td></tr>
+<tr><td style="white-space:nowrap">voter_1<br><code style="font-size:11px">spider_dev_695</code></td>
+<td style="width:90px">并列保序</td><td>Of all the contestants who got voted, what is the contestant number and name of the contestant who got least votes?</td>
+<td class="sql">SELECT contestant_number, contestant_name
+FROM (
+    SELECT agg.contestant_number,
+           c.contestant_name,
+           DENSE_RANK() OVER (ORDER BY agg.cnt ASC) AS rnk
+    FROM (
+        SELECT contestant_number, COUNT(*) AS cnt
+        FROM votes
+        GROUP BY contestant_number
+    ) agg
+    JOIN contestants c ON agg.contestant_number = c.contestant_number
+) t
+WHERE rnk = 1;</td>
+<td class="sql">SELECT T1.contestant_number , T1.contestant_name FROM contestants AS T1 JOIN votes AS T2 ON T1.contestant_number  =  T2.contestant_number GROUP BY T1.contestant_number ORDER BY count(*) ASC LIMIT 1</td>
+<td>并列最值/并列计数：模型 DENSE_RANK/RANK 保留全部并列行（gen ⊇ gold），gold LIMIT 1 任意取一行</td></tr>
+<tr><td style="white-space:nowrap">orchestra<br><code style="font-size:11px">spider_dev_844</code></td>
+<td style="width:90px">并列保序</td><td>Show the name of the conductor that has conducted the most number of orchestras.</td>
+<td class="sql">SELECT c.Name
+FROM conductor c
+JOIN orchestra o ON o.Conductor_ID = c.Conductor_ID
+GROUP BY c.Conductor_ID, c.Name
+HAVING COUNT(*) = (
+    SELECT MAX(cnt)
+    FROM (
+        SELECT COUNT(*) AS cnt
+        FROM orchestra
+        GROUP BY Conductor_ID
+    ) x
+)</td>
+<td class="sql">SELECT T1.Name FROM conductor AS T1 JOIN orchestra AS T2 ON T1.Conductor_ID  =  T2.Conductor_ID GROUP BY T2.Conductor_ID ORDER BY COUNT(*) DESC LIMIT 1</td>
+<td>并列最值/并列计数：模型 DENSE_RANK/RANK 保留全部并列行（gen ⊇ gold），gold LIMIT 1 任意取一行</td></tr>
+<tr><td style="white-space:nowrap">orchestra<br><code style="font-size:11px">spider_dev_845</code></td>
+<td style="width:90px">并列保序</td><td>What is the name of the conductor who has conducted the most orchestras?</td>
+<td class="sql">SELECT c.Name
+FROM (
+    SELECT Conductor_ID,
+           DENSE_RANK() OVER (ORDER BY cnt DESC) AS rnk
+    FROM (
+        SELECT Conductor_ID, COUNT(*) AS cnt
+        FROM orchestra
+        GROUP BY Conductor_ID
+    ) agg
+) ranked
+JOIN conductor c ON c.Conductor_ID = ranked.Conductor_ID
+WHERE ranked.rnk = 1;</td>
+<td class="sql">SELECT T1.Name FROM conductor AS T1 JOIN orchestra AS T2 ON T1.Conductor_ID  =  T2.Conductor_ID GROUP BY T2.Conductor_ID ORDER BY COUNT(*) DESC LIMIT 1</td>
+<td>并列最值/并列计数：模型 DENSE_RANK/RANK 保留全部并列行（gen ⊇ gold），gold LIMIT 1 任意取一行</td></tr>
+<tr><td style="white-space:nowrap">real_estate_properties<br><code style="font-size:11px">spider_dev_1032</code></td>
+<td style="width:90px">并列保序</td><td>Show the property type descriptions of properties belonging to that code.</td>
+<td class="sql">SELECT T2.property_type_description
+FROM properties AS T1
+JOIN ref_property_types AS T2 ON T1.property_type_code = T2.property_type_code</td>
+<td class="sql">SELECT T2.property_type_description FROM Properties AS T1 JOIN Ref_Property_Types AS T2 ON T1.property_type_code  =  T2.property_type_code GROUP BY T1.property_type_code</td>
+<td>并列最值/并列计数：模型 DENSE_RANK/RANK 保留全部并列行（gen ⊇ gold），gold LIMIT 1 任意取一行</td></tr>
+<tr><td style="white-space:nowrap">car_1<br><code style="font-size:11px">spider_dev_95</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>Which model of the car has the minimum horsepower?</td>
+<td class="sql">SELECT cn.Model
+FROM car_names cn
+JOIN cars_data cd ON cn.MakeId = cd.Id
+WHERE CAST(cd.Horsepower AS DECIMAL(18,4)) = (
+    SELECT MIN(CAST(Horsepower AS DECIMAL(18,4)))
+    FROM cars_data
+);</td>
+<td class="sql">SELECT T1.Model FROM CAR_NAMES AS T1 JOIN CARS_DATA AS T2 ON T1.MakeId  =  T2.Id ORDER BY T2.horsepower ASC LIMIT 1;</td>
+<td>gold quirk + tie：horsepower 为 TEXT 列，gold ORDER BY 字典序 LIMIT 1；模型 CAST 数值排序并保并列 6 行（数值语义下模型对）</td></tr>
+<tr><td style="white-space:nowrap">car_1<br><code style="font-size:11px">spider_dev_96</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>What is the model of the car with the smallest amount of horsepower?</td>
+<td class="sql">SELECT model
+FROM (
+    SELECT cn.Model AS model,
+           DENSE_RANK() OVER (ORDER BY CAST(cd.Horsepower AS DECIMAL(18,4)) ASC) AS rnk
+    FROM cars_data cd
+    JOIN car_names cn ON cn.MakeId = cd.Id
+    WHERE cd.Horsepower IS NOT NULL
+) t
+WHERE rnk = 1;</td>
+<td class="sql">SELECT T1.Model FROM CAR_NAMES AS T1 JOIN CARS_DATA AS T2 ON T1.MakeId  =  T2.Id ORDER BY T2.horsepower ASC LIMIT 1;</td>
+<td>同 q95：TEXT 列字典序 vs 数值排序 + 并列保留（6 行 vs 1 行）</td></tr>
+<tr><td style="white-space:nowrap">wta_1<br><code style="font-size:11px">spider_dev_459</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>Find the first name and country code of the player who did the most number of tours.</td>
+<td class="sql">SELECT p.first_name, p.country_code
+FROM (
+    SELECT player_id, DENSE_RANK() OVER (ORDER BY total_tours DESC) AS rnk
+    FROM (
+        SELECT player_id, SUM(tours) AS total_tours
+        FROM rankings
+        GROUP BY player_id
+    ) agg
+) ranked
+JOIN players p ON p.player_id = ranked.player_id
+WHERE ranked.rnk = 1;</td>
+<td class="sql">SELECT T1.country_code ,  T1.first_name FROM players AS T1 JOIN rankings AS T2 ON T1.player_id  =  T2.player_id ORDER BY T2.tours DESC LIMIT 1</td>
+<td>口径类：gold 按 rankings 单行 tours DESC LIMIT 1（SQLite 弱语义），模型按 SUM(tours) 聚合，胜者不同（不可两全）</td></tr>
+<tr><td style="white-space:nowrap">wta_1<br><code style="font-size:11px">spider_dev_469</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>Find the average ranking for each player and their first name.</td>
+<td class="sql">SELECT p.first_name, AVG(CAST(r.ranking AS DECIMAL(18,4))) AS avg_ranking
+FROM players p
+JOIN rankings r ON p.player_id = r.player_id
+GROUP BY p.player_id, p.first_name;</td>
+<td class="sql">SELECT avg(ranking) ,  T1.first_name FROM players AS T1 JOIN rankings AS T2 ON T1.player_id  =  T2.player_id GROUP BY T1.first_name</td>
+<td>gold quirk：gold GROUP BY first_name（同名球员合并 1580 组），模型按 player_id 分组（2000 组）——按题意「each player」模型是对的</td></tr>
+<tr><td style="white-space:nowrap">wta_1<br><code style="font-size:11px">spider_dev_471</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>Find the total ranking points for each player and their first name.</td>
+<td class="sql">SELECT p.first_name, SUM(r.ranking_points) AS total_ranking_points
+FROM players p
+JOIN rankings r ON p.player_id = r.player_id
+GROUP BY p.player_id, p.first_name;</td>
+<td class="sql">SELECT sum(ranking_points) ,  T1.first_name FROM players AS T1 JOIN rankings AS T2 ON T1.player_id  =  T2.player_id GROUP BY T1.first_name</td>
+<td>同 q469：gold GROUP BY first_name vs 模型按 player_id（口径差，不可两全）</td></tr>
+<tr><td style="white-space:nowrap">battle_death<br><code style="font-size:11px">spider_dev_500</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>What is the ship id and name that caused most total injuries?</td>
+<td class="sql">SELECT ship_id, name
+FROM (
+    SELECT ship_id, name, total_injuries,
+           DENSE_RANK() OVER (ORDER BY total_injuries DESC) AS rnk
+    FROM (
+        SELECT d.caused_by_ship_id AS ship_id, s.name AS name, SUM(d.injured) AS total_injuries
+        FROM death d
+        JOIN ship s ON d.caused_by_ship_id = s.id
+        GROUP BY d.caused_by_ship_id, s.name
+    ) agg
+) ranked
+WHERE rnk = 1;</td>
+<td class="sql">SELECT T2.id ,  T2.name FROM death AS T1 JOIN ship AS t2 ON T1.caused_by_ship_id  =  T2.id GROUP BY T2.id ORDER BY count(*) DESC LIMIT 1</td>
+<td>gold quirk：题面「most total injuries」应为 SUM(injured)，gold 用 count(*) 计死亡行数，两者选出不同船</td></tr>
+<tr><td style="white-space:nowrap">student_transcripts_tracking<br><code style="font-size:11px">spider_dev_526</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>What are the names and ids of every course with less than 2 sections?</td>
+<td class="sql">SELECT c.course_name, c.course_id
+FROM courses c
+JOIN sections s ON c.course_id = s.course_id
+GROUP BY c.course_id, c.course_name
+HAVING COUNT(*) &lt; 2;</td>
+<td class="sql">SELECT T1.course_name ,  T1.course_id FROM Courses AS T1 JOIN Sections AS T2 ON T1.course_id  =  T2.course_id GROUP BY T1.course_id HAVING count(*)  &lt;=  2</td>
+<td>边界口径：题面「less than 2」，gold HAVING count(*)&lt;=2（含 2），模型 &lt;2（7 行 vs 11 行）——gold 自身口径存疑</td></tr>
+<tr><td style="white-space:nowrap">tvshow<br><code style="font-size:11px">spider_dev_610</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>What is the series name of the TV Channel that shows the cartoon "The Rise of the Blue Beetle"?</td>
+<td class="sql">SELECT t1.series_name FROM tv_channel AS t1 JOIN cartoon AS t2 ON t1.id = t2.Channel WHERE t2.Title = 'The Rise of the Blue Beetle'</td>
+<td class="sql">SELECT T1.series_name FROM TV_Channel AS T1 JOIN Cartoon AS T2 ON T1.id = T2.Channel WHERE T2.Title = "The Rise of the Blue Beetle!";</td>
+<td>枚举照抄偏差：题面「The Rise of the Blue Beetle!」带感叹号，模型生成 SQL 丢「!」→ 0 行（枚举值需逐字符照抄）</td></tr>
+<tr><td style="white-space:nowrap">voter_1<br><code style="font-size:11px">spider_dev_687</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>How many states are there?</td>
+<td class="sql">SELECT COUNT(DISTINCT state) FROM area_code_state;</td>
+<td class="sql">SELECT count(*) FROM area_code_state</td>
+<td>gold quirk：area_code_state 表含重复 state 行，gold count(*)=19 按行数，模型 COUNT(DISTINCT state) 按州数——按题意模型对</td></tr>
+<tr><td style="white-space:nowrap">voter_1<br><code style="font-size:11px">spider_dev_698</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>What is the area code in which the most voters voted?</td>
+<td class="sql">SELECT area_code
+FROM (
+  SELECT area_code,
+         DENSE_RANK() OVER (ORDER BY cnt DESC) AS rnk
+  FROM (
+    SELECT SUBSTR(phone_number, 1, 3) AS area_code,
+           COUNT(*) AS cnt
+    FROM votes
+    GROUP BY SUBSTR(phone_number, 1, 3)
+  ) agg
+) ranked
+WHERE rnk = 1;</td>
+<td class="sql">SELECT T1.area_code FROM area_code_state AS T1 JOIN votes AS T2 ON T1.state  =  T2.state GROUP BY T1.area_code ORDER BY count(*) DESC LIMIT 1</td>
+<td>口径差 + tie：gold 用 area_code_state 映射表 JOIN，模型 SUBSTR(phone_number) 推导区号，且并列保序 4 行 vs gold LIMIT 1</td></tr>
+<tr><td style="white-space:nowrap">real_estate_properties<br><code style="font-size:11px">spider_dev_1033</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>What are the names of properties that are either houses or apartments with more than 1 room?</td>
+<td class="sql">SELECT property_name
+FROM properties
+WHERE property_type_code IN ('Hse', 'Apt')
+  AND room_count &gt; 1;</td>
+<td class="sql">SELECT property_name FROM Properties WHERE property_type_code  =  "House" UNION SELECT property_name FROM Properties WHERE property_type_code  =  "Apartment" AND room_count  &gt;  1</td>
+<td>枚举幻觉：实际枚举值 'House'/'Apartment'，模型写了 Spider 训练集惯例的 'Hse'/'Apt' → 0 行（方向与常见幻觉相反）</td></tr>
+<tr><td style="white-space:nowrap">employee_hire_evaluation<br><code style="font-size:11px">spider_dev_287</code></td>
+<td style="width:90px">形态类（宽口径过）</td><td>Find the number of employees hired in each shop; show the shop name as well.</td>
+<td class="sql">SELECT s.Name, COUNT(h.Employee_ID) AS num_employees
+FROM shop s
+JOIN hiring h ON s.Shop_ID = h.Shop_ID
+GROUP BY s.Shop_ID, s.Name;</td>
+<td class="sql">SELECT count(*) ,  t2.name FROM hiring AS t1 JOIN shop AS t2 ON t1.shop_id  =  t2.shop_id GROUP BY t2.name</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">employee_hire_evaluation<br><code style="font-size:11px">spider_dev_288</code></td>
+<td style="width:90px">形态类（宽口径过）</td><td>For each shop, return the number of employees working there and the name of the shop.</td>
+<td class="sql">SELECT s.Name, COUNT(*) AS num_employees
+FROM shop AS s
+JOIN hiring AS h ON s.Shop_ID = h.Shop_ID
+GROUP BY s.Shop_ID, s.Name;</td>
+<td class="sql">SELECT count(*) ,  t2.name FROM hiring AS t1 JOIN shop AS t2 ON t1.shop_id  =  t2.shop_id GROUP BY t2.name</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">wta_1<br><code style="font-size:11px">spider_dev_460</code></td>
+<td style="width:90px">形态类（宽口径过）</td><td>What is the first name and country code of the player with the most tours?</td>
+<td class="sql">SELECT first_name, country_code
+FROM (
+    SELECT p.first_name, p.country_code,
+           DENSE_RANK() OVER (ORDER BY r.tours DESC) AS rk
+    FROM players p
+    JOIN rankings r ON p.player_id = r.player_id
+) t
+WHERE rk = 1;</td>
+<td class="sql">SELECT T1.country_code ,  T1.first_name FROM players AS T1 JOIN rankings AS T2 ON T1.player_id  =  T2.player_id ORDER BY T2.tours DESC LIMIT 1</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">wta_1<br><code style="font-size:11px">spider_dev_470</code></td>
+<td style="width:90px">形态类（宽口径过）</td><td>What are the first names of all players, and their average rankings?</td>
+<td class="sql">SELECT p.first_name, AVG(CAST(r.ranking AS DECIMAL(18,4))) AS avg_ranking
+FROM players p
+JOIN rankings r ON p.player_id = r.player_id
+GROUP BY p.first_name</td>
+<td class="sql">SELECT avg(ranking) ,  T1.first_name FROM players AS T1 JOIN rankings AS T2 ON T1.player_id  =  T2.player_id GROUP BY T1.first_name</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">wta_1<br><code style="font-size:11px">spider_dev_472</code></td>
+<td style="width:90px">形态类（宽口径过）</td><td>What are the first names of all players, and their total ranking points?</td>
+<td class="sql">SELECT p.first_name, SUM(r.ranking_points) AS total_ranking_points
+FROM players p
+JOIN rankings r ON p.player_id = r.player_id
+GROUP BY p.first_name;</td>
+<td class="sql">SELECT sum(ranking_points) ,  T1.first_name FROM players AS T1 JOIN rankings AS T2 ON T1.player_id  =  T2.player_id GROUP BY T1.first_name</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">battle_death<br><code style="font-size:11px">spider_dev_493</code></td>
+<td style="width:90px">形态类（宽口径过）</td><td>List the name, date and result of each battle.</td>
+<td class="sql">SELECT name, date, result FROM battle;</td>
+<td class="sql">SELECT name ,  date FROM battle</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">battle_death<br><code style="font-size:11px">spider_dev_496</code></td>
+<td style="width:90px">形态类（宽口径过）</td><td>What are the death and injury situations caused by the ship with tonnage 't'?</td>
+<td class="sql">SELECT d.note, d.killed, d.injured
+FROM death d
+JOIN ship s ON d.caused_by_ship_id = s.id
+WHERE s.tonnage = 't';</td>
+<td class="sql">SELECT T1.killed ,  T1.injured FROM death AS T1 JOIN ship AS t2 ON T1.caused_by_ship_id  =  T2.id WHERE T2.tonnage  =  't'</td>
+<td></td></tr>
+</table>
+
+<h2>四、失败分桶说明</h2>
+<ul>
+  <li><b>并列保序（9 题）</b>：并列最值/并列计数：模型 DENSE_RANK/RANK 保留全部并列行（gen ⊇ gold），gold LIMIT 1 任意取一行。模型结果 ⊇ gold，
+      建议评测时「并列分桶」单独统计（BIRD/Falcon 同款 tie-breaking 问题），不耗优化预算。</li>
+  <li><b>形态类（7 题，宽口径通过）</b>：列序与题面用词不一致（perm 层）、
+      多输出 1 列（extra_col 层）、AVG 半进位 0.0001 级精度漂移（tol 层 ±0.0015）。</li>
+  <li><b>gold quirk（true_wrong 内约 6 题）</b>：TEXT 列字典序排序、count(*) 代 SUM、
+      GROUP BY first_name、边界 &lt;=2、行数代州数——gold 自身口径与题面语义不符，不可两全。</li>
+  <li><b>模型侧可改进（2 类）</b>：① <b>枚举值照抄</b>——q610 丢「!」、q1033 写 'Hse'/'Apt'
+      而实际是 'House'/'Apartment'（Spider 训练集先验反噬），沉淀「枚举值逐字符照抄实际值」知识条目；
+      ② <b>方言</b>——q923 HAVING 非聚合列，MySQL 不允许，生成 prompt 已有方言提示可再强化「聚合条件放 WHERE/HAVING 的边界」。</li>
+</ul>
+
+<h2>五、口径与工具链</h2>
+<ul>
+  <li><b>统一比对器</b>（<code>spider_bench.wide_compare</code>，对齐 Falcon 收敛版）：
+      ① r3/ci 精确多重集 → ② 数值容差（字符串锚点分组配对，±0.0015，吸收 AVG 半进位漂移）→
+      ③ 列排列（≤3 列放宽到 2000 行）→ ④ 排列+容差 → ⑤ 多余列剔除（gen 列 = gold+1）。</li>
+  <li><b>离线重算</b>（<code>analyze_spider.py</code>）：三轮结果按 qid 取最新，gen SQL 全量重放 MySQL，
+      统一 strict/wide/分桶；重放含 Decimal→float 安全转换（MySQL AVG 返回 DECIMAL）。</li>
+  <li><b>多线程</b>：<code>spider_bench test</code> 已支持 <code>workers</code> 并发 +
+      <code>fallback_ids</code> 配置链（单题超时/5xx 按序换配置重试）；本轮 4 道异常题 80 秒并发重试完成
+      （2 题翻正）。配置链 = [7] + 用户新增的 9/10/8。</li>
+  <li>新增 LLM 配置（id=9 minimax-m3.1-flash、id=10 mimo-v2.6-pro，腾讯 tokenhub）已接入并验证可用；
+      按用户指示未重跑模型对比。</li>
+</ul>
+
+<h2>六、结论与下一步</h2>
+<ul>
+  <li><b>基线定格</b>：Spider dev 累计 140 题严格 EX 80.0% / 宽口径 85.0%，与 Falcon 收敛后（74.0% 严格）
+      同一量级、同一失败格局——两套基准互证链路稳定性。</li>
+  <li><b>近期可做</b>：① 知识库补「枚举值逐字符照抄」与「MySQL HAVING 非聚合列」条目，小批复测
+      （q610/1033/923 三题为目标）；② tie 分桶纳入报告口径；③ 新模型（id=9/10）待用户指示后跑同题集对比。</li>
+</ul>
+</div></body></html>

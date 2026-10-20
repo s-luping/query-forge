@@ -6,7 +6,7 @@
        total_row / total_size_mb 等纲领 §6.2 点名能力禁止出现在代码中
     2. 循环 SHOW：for 循环窗口内出现 SHOW CREATE TABLE / SHOW DATA / 逐表统计
        （人工单表详情接口允许一次 SHOW，需行内标注 `# ci-guard: allow` 并登记总表）
-    3. 路由登记：所有 router 的路由必须在 docs/资产总表.md 接口清单中登记；
+    3. 路由登记：所有 router 的路由必须在 docs/03-资产总表.md 接口清单中登记；
        新增 router 文件必须先在 ROUTER_REGISTRY 登记（纲领 §5.3）
     4. 表登记：models 中所有 __tablename__ 必须在总表「表清单」登记
     5. 作业登记：scheduler/jobs/ 下每个作业必须在总表「调度作业」登记；
@@ -32,7 +32,7 @@ FORBIDDEN_TOKENS = [
 ]
 
 # 允许包含红线 token 的文件（纲领文档自身）
-TOKEN_ALLOW_FILES = {'开发纲领.md', 'docs\\资产总表.md', 'docs/资产总表.md',
+TOKEN_ALLOW_FILES = {'开发纲领.md', 'docs\\03-资产总表.md', 'docs/03-资产总表.md',
                      'scripts\\ci_guard.py', 'scripts/ci_guard.py'}
 
 # 扫描范围：业务代码 + 前端
@@ -74,7 +74,7 @@ ROUTE_DECORATOR_RE = re.compile(
 ROUTE_METHODS = {'get': 'GET', 'post': 'POST', 'put': 'PUT', 'delete': 'DELETE', 'patch': 'PATCH'}
 
 # 总表解析
-REGISTRY_FILE = ROOT / 'docs' / '资产总表.md'
+REGISTRY_FILE = ROOT / 'docs' / '03-资产总表.md'
 REGISTRY_ROUTE_RE = re.compile(r'\b(GET|POST|PUT|DELETE|PATCH)\s+(/[^\s|`]*)')
 SECTION_SPLIT_RE = re.compile(r'^##\s+(.+)$', re.M)
 TABLENAME_RE = re.compile(r'`([a-z][a-z0-9_]+)`')
@@ -176,7 +176,7 @@ def check_routes(errors, registry_routes):
             continue
         if rel not in ROUTER_REGISTRY:
             errors.append(f"[路由登记] 存在未登记的 router 文件: {rel}（"
-                          f"需加入 ROUTER_REGISTRY 并登记 docs/资产总表.md）")
+                          f"需加入 ROUTER_REGISTRY 并登记 docs/03-资产总表.md）")
 
     unregistered = code_routes - registry_routes
     for method, path in sorted(unregistered):

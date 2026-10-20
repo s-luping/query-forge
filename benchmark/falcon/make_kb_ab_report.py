@@ -222,7 +222,7 @@ qid18 暴露枚举条目新问题——模型写出 <code>GhoDisplay='Life expec
 </ul>
 </body></html>"""
 
-    out_dir = os.path.join(BASE_DIR, "..", "docs", "测试报告")
+    out_dir = os.path.join(BASE_DIR, "..", "..", "docs", "测试报告")
     os.makedirs(out_dir, exist_ok=True)
     out_path = os.path.join(out_dir, args.out_name)
     with open(out_path, "w", encoding="utf-8") as f:

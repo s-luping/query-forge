@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Falcon dev 数据导入脚本（对应 docs/NL2SQL基准测试方案.md 第 3 节）。
+"""Falcon dev 数据导入脚本（对应 docs/08-NL2SQL基准测试方案.md 第 3 节）。
 
 两个功能：
 1. --import：把 Falcon dev_data 的 16 个 SQLite 库导入本地 MySQL，
@@ -21,7 +21,8 @@ import sys
 
 import pymysql
 
-DEFAULT_SRC = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "falcon")
+DEFAULT_SRC = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                           "..", "data", "falcon")
 MYSQL_CONF = dict(
     host=os.environ.get("QF_MYSQL_HOST", "127.0.0.1"),
     port=int(os.environ.get("QF_MYSQL_PORT", "3306")),
@@ -158,7 +159,7 @@ def main():
     ap.add_argument("--src", default=DEFAULT_SRC)
     ap.add_argument("--import", dest="do_import", action="store_true")
     ap.add_argument("--questions", dest="do_questions", action="store_true")
-    ap.add_argument("--out", default=os.path.join("benchmark", "questions", "questions_falcon.jsonl"))
+    ap.add_argument("--out", default=os.path.join("benchmark", "questions", "falcon", "questions_falcon.jsonl"))
     args = ap.parse_args()
     if not (args.do_import or args.do_questions):
         print("无操作：指定 --import 和/或 --questions")
