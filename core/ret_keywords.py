@@ -25,46 +25,34 @@ class KeywordExtractor:
         self._load_custom_words()
 
     def _load_stop_words(self) -> Set[str]:
-        """加载停用词"""
-        stop_words = {
-            '的', '了', '在', '是', '我', '有', '和', '就', '不', '人',
-            '都', '一', '一个', '上', '也', '很', '到', '说', '要', '去',
-            '你', '会', '着', '没有', '看', '好', '自己', '这', '那', '些',
-            '吗', '啊', '吧', '呢', '哦', '嗯', '呀', '啦', '呗', '嘛',
-            '查询', '显示', '列出', '统计', '计算', '获取', '找出', '返回',
-            '想要', '需要', '希望', '请', '帮我', '帮我查', '帮我找',
-            '数据', '信息', '记录', '内容', '详情', '情况', '状态',
-            '所有', '全部', '每个', '各个', '所有', '整个', '总共',
-            '多少', '几个', '几', '数量', '个数', '总数', '合计',
-            '什么', '哪些', '哪个', '如何', '怎样', '怎么', '为什么',
-            # 追问/修改场景操作词（无业务语义，不参与召回）
-            '不对', '错了', '不对呀', '不对啊', '有问题', '不行', '不是',
-            '修改', '改成', '改为', '更改', '调整', '变更', '换', '换成',
-            '变为', '替换', '加上', '添加', '加入', '去掉', '删除', '移除',
-            '取消', '保留', '只要', '只看', '只显示', '过滤', '重新', '再来',
-            '再查', '再看看', '看看', '条件', '还是', '重新生成', '改一下',
-            '这个', '那个', '这里', '那里', '一下', '点了', '帮', '麻烦',
-            '应该', '应当是', '应该是', '应当', '可能', '大概', '大概',
-        }
+        """加载停用词：唯一来源为 data/jieba/stop_words.txt（每行一个词，# 开头为注释）"""
+        stop_words: Set[str] = set()
+        stop_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'jieba', 'stop_words.txt')
+        if not os.path.exists(stop_file):
+            logger.warning(f"停用词文件不存在: {stop_file}，停用词过滤将不生效")
+            return stop_words
+        with open(stop_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                word = line.strip()
+                if word and not word.startswith('#'):
+                    stop_words.add(word)
+        logger.info(f"已加载停用词文件 {stop_file}，共 {len(stop_words)} 个停用词")
         return stop_words
 
     def _load_custom_words(self):
-        """加载自定义词库"""
-        custom_words = [
-            '用户', '订单', '商品', '金额', '数量', '时间', '日期', '状态',
-            '姓名', '年龄', '性别', '地址', '电话', '邮箱', '身份证',
-            '部门', '职位', '工资', '入职', '离职', '请假', '加班',
-            '销售额', '利润', '成本', '库存', '采购', '供应商', '客户',
-            '登录', '注册', '支付', '退款', '发货', '收货', '评价',
-            '浏览', '点击', '收藏', '购买', '加入购物车', '下单',
-            '完成', '取消', '待处理', '处理中', '已发货', '已收货',
-            '创建时间', '更新时间', '删除时间', '操作时间',
-            '主键', '外键', '索引', '唯一', '非空', '默认值',
-            '平均值', '最大值', '最小值', '总和', '计数', '分组',
-            '排序', '升序', '降序', '限制', '偏移', '分页'
-        ]
-        for word in custom_words:
-            jieba.add_word(word)
+        """加载自定义词库：唯一来源为 data/jieba/custom_words.txt（每行一个词，# 开头为注释）"""
+        custom_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'jieba', 'custom_words.txt')
+        if not os.path.exists(custom_file):
+            logger.warning(f"自定义词库文件不存在: {custom_file}，跳过加载")
+            return
+        count = 0
+        with open(custom_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                word = line.strip()
+                if word and not word.startswith('#'):
+                    jieba.add_word(word)
+                    count += 1
+        logger.info(f"已加载自定义词库 {custom_file}，共 {count} 个自定义词")
 
     def extract(self, text: str, top_k: int = 10) -> List[str]:
         """
@@ -139,34 +127,3 @@ class KeywordExtractor:
         logger.debug(
             f"从文本 '{text[:50]}...' 中抽取带权重关键词: {keywords_with_weights}")
         return keywords_with_weights
-
-    def extract_from_query(self, query: str) -> dict:
-        """
-        从查询中提取结构化信息
-        :param query: 用户查询
-        :return: 包含关键词、表名、字段名等的字典
-        """
-        result = {
-            'keywords': [],
-            'table_names': [],
-            'field_names': [],
-            'values': [],
-            'aggregations': [],
-            'conditions': []
-        }
-
-        keywords = self.extract(query, top_k=20)
-        result['keywords'] = keywords
-
-        aggregation_keywords = ['总数', '数量', '个数', '平均', '最大', '最小', '总和', '合计']
-        for keyword in keywords:
-            if any(agg in keyword for agg in aggregation_keywords):
-                result['aggregations'].append(keyword)
-
-        condition_keywords = ['等于', '大于', '小于', '包含', '不等于', '在', '是']
-        for keyword in keywords:
-            if any(cond in keyword for cond in condition_keywords):
-                result['conditions'].append(keyword)
-
-        logger.debug(f"从查询 '{query[:50]}...' 中提取结构化信息: {result}")
-        return result

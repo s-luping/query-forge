@@ -73,6 +73,12 @@ flowchart TD
 
 `KeywordExtractor.extract(query, top_k=10)`：jieba 分词 + 停用词过滤 + TF 统计，取前 10 个关键词。
 
+词典文件（位于 `data/jieba/`，初始化时加载一次）：
+
+- `dict.txt`：启动时 `jieba.set_dictionary()` 设为主词典，避免 pip 包缺 dict.txt；
+- `custom_words.txt`：自定义词库，每行一个词、`#` 为注释，启动时 `jieba.add_word` 加入词典（`_load_custom_words`）；
+- `stop_words.txt`：停用词唯一来源，每行一个词、`#` 为注释，由 `_load_stop_words` 加载；文件缺失时停用词过滤不生效（仅告警不阻断）。
+
 设计要点：**追问轮若无实质业务词**（如"不对，条件改一下"），提取结果为空——此时跳过向量召回直接复用首轮表集合（全库向量召回必然跑偏，召回过百无关字段反而污染上下文）。
 
 ### 3.3 ③ 字段召回（向量 + DB 并集）
