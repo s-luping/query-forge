@@ -8,6 +8,7 @@ function jump(url) {
             '/static/template/system/sync_manage.html': '同步管理',
             '/static/template/system/sync_manage.html#runs': '同步历史',
             '/static/template/llm/llm_config.html': '模型配置',
+            '/static/template/llm/llm_logs.html': '使用记录',
             '/static/template/system/security_manage.html#overview': '审计概览',
             '/static/template/system/security_manage.html#logs': '审计日志',
             '/static/template/system/user_manage.html': '用户管理',
