@@ -151,18 +151,21 @@ def get_role_permissions(request: Request, role_id: int, user: AdminUser):
 @router.put('/roles/{role_id}/permissions')
 @limiter.limit(LIMIT_WRITE)
 def set_role_permissions(request: Request, role_id: int, req: RolePermissionsRequest, user: AdminUser):
-    allowed_types = {'datasource', 'schema', 'table', 'column', 'knowledge', 'metric'}
+    allowed_types = {'datasource', 'schema', 'table', 'column', 'knowledge', 'metric', 'row'}
     allowed_access = {'ALLOW', 'SELECT', 'FILTER', 'NONE', 'DENY'}
     if any(item.resource_type not in allowed_types or item.access_type not in allowed_access
            for item in req.permissions):
         raise HTTPException(400, '资源类型或权限级别无效')
+    if any(item.resource_type == 'row' and (item.resource_id is None or not (item.filter_expression or '').strip())
+           for item in req.permissions):
+        raise HTTPException(400, '行级过滤规则必须指定表且过滤表达式不能为空')
     role = role_crud.get_by_id(role_id)
     if not role:
         raise HTTPException(404, '角色不存在')
     role_permission_crud.replace_role_permissions(role_id, [
         {'permission_code': 'access', 'resource_type': item.resource_type,
          'resource_id': item.resource_id, 'resource_key': item.resource_key,
-         'access_type': item.access_type}
+         'access_type': item.access_type, 'filter_expression': item.filter_expression}
         for item in req.permissions
     ])
     log_audit(user, 'assign_role_permissions', f'role={role.code} count={len(req.permissions)}')

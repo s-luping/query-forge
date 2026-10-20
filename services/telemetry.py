@@ -51,7 +51,6 @@ def record_call(
     config_id: Optional[int] = None,
     purpose: str = 'chat_sql',
     system_prompt: Optional[str] = None,
-    cost: float = 0.0,
 ) -> Optional[int]:
     """记录一次 LLM 调用（永不抛异常），返回 llm_calls.id"""
     try:
@@ -78,7 +77,6 @@ def record_call(
                 completion_tokens=completion_tokens or 0,
                 reasoning_tokens=reasoning_tokens or 0,
                 total_tokens=total_tokens or 0,
-                cost=cost or 0.0,
                 status=status,
                 error_message=error_message,
             )

@@ -80,7 +80,6 @@ class LLMLogItem(BaseModel):
     completion_tokens: Optional[int]
     reasoning_tokens: Optional[int] = 0
     total_tokens: Optional[int]
-    cost: Optional[float] = None
     status: Optional[str]
     error_message: Optional[str]
     created_at: Optional[datetime]
@@ -101,7 +100,6 @@ class LLMLogStats(BaseModel):
     total_completion_tokens: int
     avg_duration_ms: float
     success_rate: float
-    total_cost: Optional[float] = 0.0
 
 
 def _call_to_item(call: LLMCall, prompt_content: Optional[str]) -> LLMLogItem:
@@ -120,7 +118,6 @@ def _call_to_item(call: LLMCall, prompt_content: Optional[str]) -> LLMLogItem:
         completion_tokens=call.completion_tokens,
         reasoning_tokens=call.reasoning_tokens,
         total_tokens=call.total_tokens,
-        cost=call.cost,
         status=call.status,
         error_message=call.error_message,
         created_at=call.created_at,
@@ -182,8 +179,7 @@ def get_llm_stats(request: Request, user: CurrentUser,
             success_calls = succ.count()
 
             sq = db.query(func.sum(LLMCall.total_tokens), func.sum(LLMCall.prompt_tokens),
-                          func.sum(LLMCall.completion_tokens), func.avg(LLMCall.duration_ms),
-                          func.sum(LLMCall.cost))
+                          func.sum(LLMCall.completion_tokens), func.avg(LLMCall.duration_ms))
             sq = _apply_log_filters(sq, user['user_id'], _is_admin(user),
                                     status=status, provider=provider, model=model,
                                     days=days, min_duration_ms=min_duration_ms,
@@ -193,8 +189,7 @@ def get_llm_stats(request: Request, user: CurrentUser,
                 total_calls=total_calls, total_tokens=st[0] or 0,
                 total_prompt_tokens=st[1] or 0, total_completion_tokens=st[2] or 0,
                 avg_duration_ms=round(st[3] or 0, 2),
-                success_rate=round(success_calls / total_calls * 100, 2) if total_calls > 0 else 0,
-                total_cost=round(st[4] or 0, 6))
+                success_rate=round(success_calls / total_calls * 100, 2) if total_calls > 0 else 0)
     except Exception as e:
         logger.error(f"获取LLM统计失败: {e}")
         raise HTTPException(status_code=500, detail=f"获取统计失败: {str(e)}")

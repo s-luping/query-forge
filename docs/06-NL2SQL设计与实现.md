@@ -225,7 +225,7 @@ left.col = right.col (INNER JOIN, 1:N) — 说明
 | 数据 | 位置 |
 |---|---|
 | 对话 + 消息（user/assistant，含 sql/columns/result_data） | 主库 conversations / conversation_messages |
-| LLM 调用明细（token/成本/耗时/状态/prompt 快照去重） | 遥测库 llm_calls / llm_prompts |
+| LLM 调用明细（token/耗时/状态/prompt 快照去重，cost 字段预留恒 0） | 遥测库 llm_calls / llm_prompts |
 | 查询审计（问题/生成SQL/改写SQL/网关判定/**全链路 pipeline_log**） | 日志库 query_audit_logs |
 | 链路后置步骤（SQL_EXECUTE / MESSAGE_PERSIST） | 回写 pipeline_log |
 

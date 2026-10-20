@@ -42,7 +42,6 @@ def aggregate_usage_stats(days_back: int = 7) -> dict:
             func.coalesce(func.sum(LLMCall.prompt_tokens), 0).label('prompt_tokens'),
             func.coalesce(func.sum(LLMCall.completion_tokens), 0).label('completion_tokens'),
             func.coalesce(func.sum(LLMCall.total_tokens), 0).label('total_tokens'),
-            func.coalesce(func.sum(LLMCall.cost), 0.0).label('cost'),
         )
         .filter(LLMCall.created_at >= start_datetime)
         .group_by(
@@ -81,7 +80,6 @@ def aggregate_usage_stats(days_back: int = 7) -> dict:
                     row.prompt_tokens = r.prompt_tokens
                     row.completion_tokens = r.completion_tokens
                     row.total_tokens = r.total_tokens
-                    row.cost = r.cost
                 else:
                     db.add(LLMUsageStat(
                         stat_date=stat_date,
@@ -93,7 +91,6 @@ def aggregate_usage_stats(days_back: int = 7) -> dict:
                         prompt_tokens=r.prompt_tokens,
                         completion_tokens=r.completion_tokens,
                         total_tokens=r.total_tokens,
-                        cost=r.cost,
                     ))
                 upserted += 1
 

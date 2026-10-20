@@ -1,18 +1,22 @@
-/* role_manage.js — 角色与权限页逻辑（四分区授权 + 数据源门控语义） */
+/* role_manage.js — 角色与权限页逻辑（五分区授权 + 数据源门控语义） */
 let roles = [], selectedRole = null, catalog = {};
 let dsState = {}, schemaState = {}, tableState = {}, knowledgeState = {};
-let tableFilter = '', knFilter = '';
+let rowState = {};   // 行级过滤 {tableId: filter_expression}，仅收录非空表达式
+let tableFilter = '', knFilter = '', rowFilter = '';
 const LEVEL_OPTS = [['', '未设置'], ['ALLOW', '允许'], ['DENY', '拒绝']];
 const TYPE_STATE = { datasource: () => dsState, schema: () => schemaState, table: () => tableState, knowledge: () => knowledgeState };
 
-async function load() {
+async function load(keepId) {
     [roles, catalog] = await Promise.all([
         apiRequest('/api/permission/roles').then(r => r.json()),
         apiRequest('/api/permission/permission-catalog').then(r => r.json())
     ]);
     buildCatalog();
     renderRoles();
-    if (roles.length) selectRole(roles[0].id);
+    const target = keepId ? roles.find(r => String(r.id) === String(keepId)) : null;
+    if (target) await selectRole(target.id);
+    else if (roles.length) selectRole(roles[0].id);
+    else renderMeta(null);
 }
 
 function buildCatalog() {
@@ -40,13 +44,32 @@ async function selectRole(id) {
     document.getElementById('roleDescription').value = selectedRole.description || '';
     document.getElementById('btnDeleteRole').style.display = selectedRole.is_system ? 'none' : '';
     renderRoles();
+    renderMeta(selectedRole);
     await loadPermissions();
+}
+
+/* 角色信息条：权限数 / 创建时间 / 绑定用户 */
+function renderMeta(role) {
+    const el = document.getElementById('roleMeta');
+    if (!role) { el.innerHTML = ''; return; }
+    el.innerHTML = `
+        <span class="meta-item">权限条数 <span class="meta-val">${role.permission_count ?? 0}</span></span>
+        <span class="meta-item">绑定用户 <span class="meta-val">${role.user_count ?? 0}</span></span>
+        ${role.created_at ? `<span class="meta-item">创建于 <span class="meta-val">${esc(role.created_at)}</span></span>` : ''}
+        <span class="meta-item" id="metaUsers">成员加载中...</span>`;
+    apiRequest(`/api/permission/roles/${role.id}/users`).then(r => r.json()).then(users => {
+        const holder = document.getElementById('metaUsers');
+        if (!holder) return;
+        if (!users.length) { holder.textContent = '成员：暂无绑定用户'; return; }
+        holder.innerHTML = '成员：' + users.map(u =>
+            `<span class="meta-user${u.is_active ? '' : ' inactive'}" title="${u.is_active ? '' : '已停用'}">${esc(u.username)}</span>`).join('');
+    }).catch(() => { const h = document.getElementById('metaUsers'); if (h) h.textContent = '成员加载失败'; });
 }
 
 async function loadPermissions() {
     if (!selectedRole) return;
     const assigned = await (await apiRequest(`/api/permission/roles/${selectedRole.id}/permissions`)).json();
-    dsState = {}; schemaState = {}; tableState = {}; knowledgeState = {};
+    dsState = {}; schemaState = {}; tableState = {}; knowledgeState = {}; rowState = {};
     for (const p of assigned) {
         const at = ['ALLOW', 'SELECT', 'DENY'].includes(p.access_type) ? p.access_type : null;
         if (!at) continue;
@@ -55,6 +78,7 @@ async function loadPermissions() {
         else if (p.resource_type === 'schema') schemaState[key] = at;
         else if (p.resource_type === 'table') tableState[key] = at;
         else if (p.resource_type === 'knowledge') knowledgeState[key] = at;
+        else if (p.resource_type === 'row' && p.filter_expression) rowState[key] = p.filter_expression;
     }
     renderAll();
 }
@@ -86,7 +110,7 @@ function levelRow(type, id, label, sub, allTag) {
 
 function empty(msg) { return `<div class="area-empty">${msg}</div>`; }
 
-function renderAll() { renderDatasources(); renderSchemas(); renderTables(); renderKnowledge(); }
+function renderAll() { renderDatasources(); renderSchemas(); renderTables(); renderKnowledge(); renderRows(); }
 
 function renderDatasources() {
     const rows = [levelRow('datasource', null, '全部数据源', '不限具体资源，授予所有数据源、全部库表', true)];
@@ -143,8 +167,54 @@ function renderKnowledge(f) {
         || empty(kw ? '无匹配条目' : '暂无知识条目');
 }
 
+/* 行级过滤分区：表 + 过滤表达式输入 */
+function renderRows(f) {
+    if (f !== undefined) rowFilter = f;
+    const kw = (rowFilter || '').toLowerCase();
+    const bySch = {};
+    for (const t of (catalog.tables || [])) { const k = String(t.schema_id); (bySch[k] = bySch[k] || []).push(t); }
+    const schName = id => { const s = (catalog.schemas || []).find(x => x.id === id); return s ? (s.display || s.name) : ('库#' + id); };
+    const keys = Object.keys(bySch);
+    if (!keys.length) { document.getElementById('rowArea').innerHTML = empty('暂无表，请先完成元数据同步'); return; }
+    let html = '', shown = 0;
+    for (const k of keys) {
+        const schid = Number(k);
+        let items = bySch[k];
+        if (kw) items = items.filter(t => (t.name || '').toLowerCase().includes(kw));
+        if (!items.length) continue;
+        shown += items.length;
+        html += `<details class="res-group"${kw ? ' open' : ''}><summary><span class="caret">▸</span>${esc(schName(schid))} <span class="count">（${items.length}）</span></summary>`;
+        html += `<div class="res-body">`;
+        for (const t of items) html += rowRuleRow(t);
+        html += `</div></details>`;
+    }
+    document.getElementById('rowArea').innerHTML = (html || empty(kw ? `无匹配表（共 ${catalog.tables.length} 张）` : '暂无表'))
+        + (shown ? `<div class="rule-count">已配置规则 ${Object.keys(rowState).length} 条</div>` : '');
+}
+
+function rowRuleRow(t) {
+    const expr = rowState[String(t.id)] || '';
+    const tag = expr ? '<span class="rule-tag">已配置</span>' : '';
+    return `<div class="res-row rule-row"><div class="res-cell">
+        <div class="lbl">${esc(t.display || t.name)}${tag}</div></div>
+        <input class="form-control form-control-sm rule-input" spellcheck="false"
+            placeholder="如：sales_region = '华东'" value="${esc(expr)}"
+            oninput="onRowExpr(this, ${t.id})"></div>`;
+}
+
+function onRowExpr(el, id) {
+    const expr = (el.value || '').trim();
+    if (expr) rowState[String(id)] = expr; else delete rowState[String(id)];
+    const lbl = el.closest('.res-row').querySelector('.lbl');
+    let tag = lbl.querySelector('.rule-tag');
+    if (expr && !tag) { tag = document.createElement('span'); tag.className = 'rule-tag'; tag.textContent = '已配置'; lbl.appendChild(tag); }
+    else if (!expr && tag) tag.remove();
+    const counter = document.querySelector('#rowArea .rule-count');
+    if (counter) counter.textContent = `已配置规则 ${Object.keys(rowState).length} 条`;
+}
+
 function resetAll() {
-    dsState = {}; schemaState = {}; tableState = {}; knowledgeState = {};
+    dsState = {}; schemaState = {}; tableState = {}; knowledgeState = {}; rowState = {};
     renderAll();
     QF.toast('已重置未保存的改动', 'info');
 }
@@ -162,13 +232,17 @@ async function savePermissions() {
     collect('schema', schemaState);
     collect('table', tableState);
     collect('knowledge', knowledgeState);
+    for (const k in rowState) {
+        payload.push({ permission_code: 'access', resource_type: 'row', resource_id: Number(k),
+                       access_type: 'ALLOW', filter_expression: rowState[k] });
+    }
     const resp = await apiRequest(`/api/permission/roles/${selectedRole.id}/permissions`, {
         method: 'PUT', body: JSON.stringify({ permissions: payload })
     });
     const data = await resp.json();
     if (!resp.ok) return QF.toast(data.detail || '保存失败', 'danger');
     QF.toast(data.message || '已保存', 'success');
-    await loadPermissions();
+    await load(selectedRole.id);   // 重新拉取角色列表，刷新权限数/用户数
 }
 
 async function saveDescription() {
@@ -214,7 +288,7 @@ function esc(v) { return String(v || '').replace(/[&<>"']/g, x => ({ '&': '&amp;
 document.querySelectorAll('[data-tab]').forEach(button => button.addEventListener('click', () => {
     document.querySelectorAll('[data-tab]').forEach(item => item.classList.remove('active'));
     button.classList.add('active');
-    ['ds', 'schema', 'table', 'knowledge'].forEach(tab => document.getElementById('tab-' + tab).hidden = tab !== button.dataset.tab);
+    ['ds', 'schema', 'table', 'knowledge', 'row'].forEach(tab => document.getElementById('tab-' + tab).hidden = tab !== button.dataset.tab);
 }));
 
 load();

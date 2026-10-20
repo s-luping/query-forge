@@ -44,6 +44,7 @@ class RoleCrud(BaseCrud):
                 'description': r.description or '', 'is_system': r.is_system,
                 'user_count': user_counts.get(r.id, 0),
                 'permission_count': perm_counts.get(r.id, 0),
+                'created_at': r.created_at.strftime('%Y-%m-%d %H:%M') if r.created_at else '',
             } for r in roles]
 
     def get_user_roles(self, user_id: int) -> List[Role]:
