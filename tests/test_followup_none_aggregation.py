@@ -15,6 +15,14 @@ class _Stop(Exception):
     """哨兵异常：到达 LLM 调用即截停（证明流程已越过原崩溃点）"""
 
 
+@pytest.fixture(autouse=True)
+def _allow_all_schemas(monkeypatch):
+    """单测不触达真实权限库：库级鉴权（AUTH_SCHEMA_CHECK，表聚合后执行）一律放行"""
+    import app.permissions as _perms
+    monkeypatch.setattr(_perms, 'is_schema_visible',
+                        lambda user, schema_name: True)
+
+
 class _StubRetriever:
     """SchemaRetriever 桩：记录 aggregate_tables 调用参数供断言"""
 

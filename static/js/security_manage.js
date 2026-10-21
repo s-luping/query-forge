@@ -52,22 +52,24 @@ async function showPipeline(logId) {
         // 流程框架（无序号）
         'PIPELINE_START': '流程开始', 'PIPELINE_END': '流程结束',
         'VECTOR_LOAD': '向量索引加载', 'VECTOR_CHECK': '向量检查',
-        // 前置步骤（路由层）
-        'AUTH_SCHEMA_CHECK': '1. 数据库鉴权', 'LLM_CONFIG_LOAD': '2. 模型选择',
+        // 前置步骤（路由层）：问题登记 → 模型 → 知识库
+        'LLM_CONFIG_LOAD': '2. 模型选择',
         'KNOWLEDGE_LOAD': '3. 知识库加载',
         // 召回与聚合
         'STEP1_KEYWORDS': '4. 关键词提取',
         'STEP2_VECTOR_RECALL': '5. 字段召回（向量）', 'STEP2_DB_RECALL': '5. 字段召回（数据库）',
         'STEP2_RECALL': '5. 字段召回',
         'STEP3_AGGREGATE': '6. 表聚合', 'STEP_CUMULATIVE_AGGREGATE': '6. 累积表聚合',
-        'STEP_PERMISSION': '7. 权限裁剪统计（库/表/字段级）',
-        'STEP_PERMISSION_ERROR': '7. 权限裁剪统计（异常）',
+        // 鉴权在表聚合之后：本次涉及的库/表已明确，再做库级硬闸门
+        'AUTH_SCHEMA_CHECK': '7. 数据库鉴权',
+        'STEP_PERMISSION': '8. 权限裁剪统计（库/表/字段级）',
+        'STEP_PERMISSION_ERROR': '8. 权限裁剪统计（异常）',
         // 知识与上下文
-        'STEP_RECALL_KNOWLEDGE': '8. 知识召回', 'STEP_EXTEND_TABLES': '9. 知识扩表',
-        'STEP4_CONTEXT': '10. 上下文构建',
+        'STEP_RECALL_KNOWLEDGE': '9. 知识召回', 'STEP_EXTEND_TABLES': '10. 知识扩表',
+        'STEP4_CONTEXT': '11. 上下文构建',
         // 判断与生成
-        'STEP_JUDGE_PROMPT': '11. 可否生成判断', 'STEP_JUDGE_RESULT': '11. 可否生成判断',
-        'STEP_JUDGE_ERROR': '11. 可否生成判断（异常）',
+        'STEP_JUDGE_PROMPT': '12. 可否生成判断', 'STEP_JUDGE_RESULT': '12. 可否生成判断',
+        'STEP_JUDGE_ERROR': '12. 可否生成判断（异常）',
         'STEP5_PROMPT': '12. 提示词构建', 'STEP5_RESULT': '13. LLM 生成',
         // 校验与网关
         'STEP6_VALIDATE': '14. SQL 校验', 'STEP7_GATEWAY': '15. 权限网关',

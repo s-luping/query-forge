@@ -21,7 +21,7 @@ from app.response import ok, ok_msg
 from app.timezone import now_beijing
 from core import LLMClient
 from core.llm_client import LLMArrearsError
-from core.gen_chat import ChatSession
+from core.gen_chat import ChatSession, SchemaAuthError
 from core.gen_sql import SqlGenerator
 from core.ret_retriever import SchemaRetriever
 from crud.base import session_scope
@@ -558,22 +558,11 @@ def create_conversation(
     """
     user_id = user['user_id']
 
-    # 链路追踪：前置步骤（鉴权/模型/知识库）— StepTrace 统一结构（docs §5.2）
-    from app.permissions import is_schema_visible
+    # 链路追踪：前置步骤（模型/知识库）— StepTrace 统一结构（docs §5.2）
+    # 鉴权（AUTH_SCHEMA_CHECK）移至链路表聚合之后：召回确定本次涉及的库/表再校验
     from core.gen_audit import StepTracker
     pre_tracker = StepTracker()
     pre_log = []
-    pre_tracker.add(pre_log, "AUTH_SCHEMA_CHECK", data={
-        "schema_name": payload.schema_name, "role": user.get('role', ''),
-        "passed": True}, summary="库级可见性校验")
-
-    # 库级可见性二次校验（防绕过前端下拉直接请求无权限库）
-    if not is_schema_visible(user, payload.schema_name):
-        pre_log[-1]["detail"]["passed"] = False
-        pre_log[-1]["detail"]["reason"] = "库级可见性校验未通过"
-        pre_log[-1]["status"] = "intercept"
-        pre_log[-1]["error"] = "库级可见性校验未通过"
-        raise HTTPException(status_code=403, detail="无权访问该数据库")
 
     # 数据库类型：选了库则以库类型为准；全库模式（None）从可见库推断（供 LLM 引用符提示）
     db_type = payload.db_type
@@ -621,7 +610,7 @@ def create_conversation(
             "used_default_kb": used_default_kb,
             "global_pinned": pinned_n,
             "user_pinned": user_pinned_n,
-            "note": "用户显式选择的知识库；链路第 8 步为自动概念召回(与勾选无关)" if not knowledge_ids else "",
+            "note": "用户显式选择的知识库；链路「知识召回」步为自动概念召回(与勾选无关)" if not knowledge_ids else "",
             "loaded": bool(knowledge_content),
             "content_length": len(knowledge_content)},
             summary=(f"全局常驻 {pinned_n} · 我的常驻 {user_pinned_n} · "
@@ -634,7 +623,7 @@ def create_conversation(
             user=user
         )
 
-        # 第一轮：走完整流水线
+        # 第一轮：走完整流水线（库不可见时流水线抛 SchemaAuthError → 403）
         result = session.process_first_message(
             query=payload.query,
             schema_name=payload.schema_name,
@@ -795,6 +784,10 @@ def create_conversation(
         logger.error(f"创建对话失败(模型欠费): {e}")
         raise HTTPException(status_code=502,
                             detail="模型欠费/余额不足，已标记该 LLM 配置为欠费状态，续费后请在模型管理页恢复")
+    except SchemaAuthError as e:
+        # 库级鉴权拦截（链路表聚合后的 AUTH_SCHEMA_CHECK 步）：不建会话、不落消息
+        logger.warning(f"创建对话被鉴权拦截: {e}")
+        raise HTTPException(status_code=403, detail=str(e))
     except Exception as e:
         raise _classify_llm_failure(e, f"创建对话失败")
 
@@ -893,20 +886,11 @@ def send_message(
 
         llm_client = _build_llm_client(user_id, conv_llm_config_id)
 
-        # 链路追踪：前置步骤（鉴权/模型/知识库）— StepTrace 统一结构（docs §5.2）
-        from app.permissions import is_schema_visible as _is_visible
+        # 链路追踪：前置步骤（模型/知识库）— StepTrace 统一结构（docs §5.2）
+        # 鉴权（AUTH_SCHEMA_CHECK）移至链路表聚合之后：召回确定本次涉及的库/表再校验
         from core.gen_audit import StepTracker
         pre_tracker = StepTracker()
         pre_log = []
-        schema_visible = _is_visible(user, schema_name)
-        _auth_entry = pre_tracker.add(pre_log, "AUTH_SCHEMA_CHECK", data={
-            "schema_name": schema_name, "role": user.get('role', ''),
-            "passed": schema_visible, "conversation_id": conversation_id},
-            summary="库级可见性校验")
-        if not schema_visible:
-            _auth_entry["status"] = "intercept"
-            _auth_entry["error"] = "对话关联库权限已变更，库级可见性校验未通过"
-            raise HTTPException(status_code=403, detail="无权访问该数据库（对话关联库权限已变更）")
         pre_tracker.add(pre_log, "LLM_CONFIG_LOAD", data={
             "provider": getattr(llm_client, 'provider', '') or 'default',
             "model": getattr(llm_client, 'model', '') or 'default',
@@ -931,7 +915,7 @@ def send_message(
             "user_selected": bool(conv_knowledge_ids),
             "global_pinned": pinned_n,
             "user_pinned": user_pinned_n,
-            "note": "用户显式选择的知识库；链路第 8 步为自动概念召回(与勾选无关)" if not conv_knowledge_ids else "",
+            "note": "用户显式选择的知识库；链路「知识召回」步为自动概念召回(与勾选无关)" if not conv_knowledge_ids else "",
             "loaded": bool(knowledge_content),
             "content_length": len(knowledge_content)},
             summary=(f"全局常驻 {pinned_n} · 我的常驻 {user_pinned_n} · "
@@ -944,7 +928,7 @@ def send_message(
             user=user
         )
 
-        # 跟进消息
+        # 跟进消息（库不可见时流水线抛 SchemaAuthError → 403）
         result = session.process_followup_message(
             conversation_messages=history,
             new_user_content=payload.content,
@@ -1098,6 +1082,10 @@ def send_message(
         logger.error(f"发送消息失败(模型欠费): {e}")
         raise HTTPException(status_code=502,
                             detail="模型欠费/余额不足，已标记该 LLM 配置为欠费状态，续费后请在模型管理页恢复")
+    except SchemaAuthError as e:
+        # 库级鉴权拦截（链路表聚合后的 AUTH_SCHEMA_CHECK 步）：不落消息、不执行
+        logger.warning(f"发送消息被鉴权拦截: {e}")
+        raise HTTPException(status_code=403, detail=str(e))
     except Exception as e:
         raise _classify_llm_failure(e, f"发送消息失败")
 

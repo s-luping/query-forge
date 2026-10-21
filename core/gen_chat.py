@@ -17,6 +17,14 @@ from core.ret_keywords import KeywordExtractor
 from core.ret_retriever import SchemaRetriever
 
 
+class SchemaAuthError(Exception):
+    """库级鉴权拦截（链路 AUTH_SCHEMA_CHECK 步，表聚合后触发）
+
+    召回确定本次涉及的库/表后再做库级可见性硬闸门；不可见时由流水线抛出，
+    路由层捕获转为 403。消息即用户可见原因。
+    """
+
+
 def _parse_tables_from_csv(schema_csv: str) -> List[str]:
     """从 schema CSV 解析表名（第一列，跳过表头行）
 
@@ -196,11 +204,14 @@ class ChatSession:
         self._tracker = StepTracker()   # 每条消息重置计时（前置步骤耗时由路由层自己的 tracker 计）
         # 权限快照：编排层一次性构建（P2 召回/权限解耦，docs §3.2），召回模块只消费数据
         self._scope = build_recall_scope(self.user)
-        pipeline_log = list(pre_log) if pre_log else []
+        # 流程开始登记在最前（前台只带问题/模型/知识库，鉴权在召回确定涉及库表后再做）
+        pipeline_log = []
         self._log_step(pipeline_log, "PIPELINE_START", {
             "user_id": self.user_id, "query": query,
             "schema_name": schema_name or "全部",
         }, summary="首轮全链路")
+        if pre_log:
+            pipeline_log.extend(pre_log)
 
         # Step 1: 关键词提取
         keywords = self.keyword_extractor.extract(query, top_k=10)
@@ -231,7 +242,22 @@ class ChatSession:
             summary=(f"{len(aggregation.get('tables', []))} 表 / "
                      f"{len(aggregation.get('all_fields', {}))} 字段"))
 
-        # Step 3.5: 权限裁剪统计（库级 / 表级 / 字段级）
+        # Step 3.5: 数据库鉴权（库级可见性校验）
+        # 顺序：表聚合后本次涉及的库/表已明确，再做库级硬闸门（防绕过前端请求无权限库）。
+        # 召回本身已按权限快照过滤（无权限库召回为空，无泄露），此处校验负责拦截 + 留痕。
+        from app.permissions import is_schema_visible
+        schema_visible = is_schema_visible(self.user, schema_name)
+        self._log_step(pipeline_log, "AUTH_SCHEMA_CHECK", {
+            "schema_name": schema_name, "role": self.user.get('role', ''),
+            "passed": schema_visible},
+            status='ok' if schema_visible else 'intercept',
+            error=None if schema_visible else "库级可见性校验未通过",
+            summary="库级可见性校验")
+        if not schema_visible:
+            self._audit_auth_intercept(query, pipeline_log, start_time)
+            raise SchemaAuthError("无权访问该数据库")
+
+        # Step 3.6: 权限裁剪统计（库级 / 表级 / 字段级）
         self._log_permission_stats(pipeline_log, aggregation, schema_name)
 
         # 概念级召回：typed 知识单独召回 + relation 动态扩表（自动执行，与用户勾选知识库无关）
@@ -304,7 +330,8 @@ class ChatSession:
             "can_generate": (judge or {}).get('can_generate'),
             "reason": (judge or {}).get('reason', ''),
             "missing_info": (judge or {}).get('missing_info', []),
-            "suggestion": (judge or {}).get('suggestion', '')},
+            "suggestion": (judge or {}).get('suggestion', ''),
+            "judge_tokens": (judge or {}).get('_judge_tokens', {})},
             status='intercept' if _judge_intercept else 'ok',
             error=((judge or {}).get('reason', '') or None) if _judge_intercept else None,
             summary='拦截：信息不足' if _judge_intercept else '判断可生成')
@@ -324,6 +351,8 @@ class ChatSession:
             error=None if _gen_sql_text else 'LLM 未返回 SQL',
             summary=(f"生成 SQL {len(_gen_sql_text)} 字符 · "
                      f"token {llm_result.get('total_tokens', 0)}"))
+        # 判断步 token 并入总量（放行路径此前漏计判断调用的消耗）
+        self._merge_judge_tokens(llm_result, judge)
 
         # Step 6-7: 验证 + 权限网关
         sql = llm_result.get('sql', '')
@@ -411,11 +440,14 @@ class ChatSession:
         self._tracker = StepTracker()   # 每条消息重置计时（前置步骤耗时由路由层自己的 tracker 计）
         # 权限快照：编排层一次性构建（P2 召回/权限解耦），追问轮同样按当次权限
         self._scope = build_recall_scope(self.user)
-        pipeline_log = list(pre_log) if pre_log else []
+        # 流程开始登记在最前，前置步骤（模型/知识库）随后（与首轮链路顺序对齐）
+        pipeline_log = []
         self._log_step(pipeline_log, "PIPELINE_START", {
             "user_id": self.user_id, "query": new_user_content,
             "schema_name": schema_name or "复用上一轮", "mode": "followup",
         }, summary="追问轮全链路")
+        if pre_log:
+            pipeline_log.extend(pre_log)
 
         # Step 1: 关键词提取（对追问重新提取，保证链路完整）
         keywords = self.keyword_extractor.extract(new_user_content, top_k=10)
@@ -471,6 +503,20 @@ class ChatSession:
                     "schema_csv_lines": len(schema_csv.split('\n'))},
                     status='skip', summary="复用上一轮 CSV")
                 aggregation = None
+
+        # Step 3.5: 数据库鉴权（库级可见性校验）— 与首轮对齐：召回确定涉及库表后再校验
+        # （对话关联库权限被管理员变更的场景在此拦截，不再进入知识召回与生成）
+        from app.permissions import is_schema_visible
+        schema_visible = is_schema_visible(self.user, schema_name)
+        self._log_step(pipeline_log, "AUTH_SCHEMA_CHECK", {
+            "schema_name": schema_name, "role": self.user.get('role', ''),
+            "passed": schema_visible},
+            status='ok' if schema_visible else 'intercept',
+            error=None if schema_visible else "库级可见性校验未通过",
+            summary="库级可见性校验")
+        if not schema_visible:
+            self._audit_auth_intercept(new_user_content, pipeline_log, start_time)
+            raise SchemaAuthError("无权访问该数据库（对话关联库权限已变更）")
 
         # 累积召回：首轮表集合(first_tables) ∪ 追问重召回表 ∪ 知识扩表
         # 仅当首轮表集合已知时重建（带权限裁剪），否则沿用 router 全量 schema_csv（向后兼容旧对话）
@@ -673,7 +719,8 @@ class ChatSession:
             "can_generate": (judge or {}).get('can_generate'),
             "reason": (judge or {}).get('reason', ''),
             "missing_info": (judge or {}).get('missing_info', []),
-            "suggestion": (judge or {}).get('suggestion', '')},
+            "suggestion": (judge or {}).get('suggestion', ''),
+            "judge_tokens": (judge or {}).get('_judge_tokens', {})},
             status='intercept' if _judge_intercept else 'ok',
             error=((judge or {}).get('reason', '') or None) if _judge_intercept else None,
             summary='拦截：信息不足' if _judge_intercept else '判断可生成')
@@ -692,6 +739,8 @@ class ChatSession:
             error=None if _gen_sql_text else 'LLM 未返回 SQL',
             summary=(f"生成 SQL {len(_gen_sql_text)} 字符 · "
                      f"token {llm_result.get('total_tokens', 0)}"))
+        # 判断步 token 并入总量（放行路径此前漏计判断调用的消耗）
+        self._merge_judge_tokens(llm_result, judge)
 
         # Step 6-7: 验证 + 权限网关
         sql = llm_result.get('sql', '')
@@ -750,6 +799,19 @@ class ChatSession:
 
     # ---------- 内部方法 ----------
 
+    @staticmethod
+    def _merge_judge_tokens(llm_result: dict, judge: Optional[dict]) -> None:
+        """判断步 token 并入生成结果统计 — 放行路径共用（首轮/追问）
+
+        判断调用（Step 4.5）是一次真实 LLM 请求，其 usage 此前只在拦截路径
+        计入结果，放行路径被静默丢弃导致总 token 少报。此处就地累加进
+        llm_result，使最终返回的 tokens 字段覆盖两次调用之和。
+        """
+        jt = (judge or {}).get('_judge_tokens') or {}
+        for k in ('prompt_tokens', 'completion_tokens',
+                  'reasoning_tokens', 'total_tokens'):
+            llm_result[k] = llm_result.get(k, 0) + (jt.get(k, 0) or 0)
+
     def _need_more_info_result(self, judge: dict, query_text: str,
                                messages: list, pipeline_log: list,
                                start_time, aggregation: Optional[dict],
@@ -801,6 +863,19 @@ class ChatSession:
         if keywords is not None:
             result["keywords"] = keywords
         return result
+
+    def _audit_auth_intercept(self, query_text: str, pipeline_log: list,
+                              start_time) -> None:
+        """库级鉴权拦截的审计留痕（失败不阻断），随后由调用方抛 SchemaAuthError"""
+        import json
+        duration_ms = int((now_beijing() - start_time).total_seconds() * 1000)
+        try:
+            write_query_audit_log(
+                self.user_id, self.user, query_text, '', '',
+                gateway_result=None, duration_ms=duration_ms,
+                pipeline_log=json.dumps(pipeline_log, ensure_ascii=False, default=str))
+        except Exception:
+            logger.warning("鉴权拦截审计日志写入失败（不影响主流程）")
 
     def _permission_context_hint(self, aggregation: Optional[dict]) -> str:
         """生成用户可见的权限归因提示（用于「信息不足」场景）。

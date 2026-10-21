@@ -62,12 +62,14 @@ flowchart TD
 `POST /api/conversation`（首轮）/ `POST /api/conversation/{id}/messages`（追问）：
 
 1. **鉴权**：`CurrentUser` 依赖解析 token；
-2. **库级可见性二次校验**：`is_schema_visible(user, schema_name)`——防绕过前端直接请求无权限库，失败 403；
-3. **db_type 判定**：指定库取库自身类型；全库模式（schema_name=None）从用户可见库推断（供 prompt 引用符提示）；
-4. **模型配置解析**（`_get_user_llm_client` 优先级）：请求指定 config_id（限本人或公共）→ 本人默认 → 公共默认（管理员公开的模型）→ 空客户端（后续调用报"未配置 API 密钥"）；
-5. **知识加载**：用户勾选的多条知识 content 拼接（内容级去重）。
+2. **db_type 判定**：指定库取库自身类型；全库模式（schema_name=None）从用户可见库推断（供 prompt 引用符提示）；
+3. **模型配置解析**（`_get_user_llm_client` 优先级）：请求指定 config_id（限本人或公共）→ 本人默认 → 公共默认（管理员公开的模型）→ 空客户端（后续调用报"未配置 API 密钥"）；
+4. **知识加载**：用户勾选的多条知识 content 拼接（内容级去重）。
 
-以上步骤作为 `AUTH_SCHEMA_CHECK / LLM_CONFIG_LOAD / KNOWLEDGE_LOAD` 写入链路日志头部。
+模型/知识库加载作为 `LLM_CONFIG_LOAD / KNOWLEDGE_LOAD` 写入链路日志头部（PIPELINE_START 之后）；
+**库级可见性校验（AUTH_SCHEMA_CHECK）不在入口执行**——前台只带问题/模型/知识库，
+先召回聚合确定本次涉及的库/表，再做库级硬闸门（`is_schema_visible`，失败 403，
+见 §3.4a）。
 
 ### 3.2 ② 关键词提取（jieba）
 
@@ -112,6 +114,14 @@ flowchart TD
 5. 未召回任何表时兜底：取前 N 张可见表。
 
 产出 `schema_csv`（表名,字段名,字段类型,字段描述,主键,外键）——**跨库模式表名带库前缀**（`库名.表名`），供 LLM 生成可路由执行的 SQL。
+
+### 3.4a ④+ 数据库鉴权（库级可见性，表聚合之后）
+
+`is_schema_visible(user, schema_name)` 硬闸门：表聚合后本次涉及的库/表已明确，再校验
+请求库对用户是否可见（防绕过前端直接请求无权限库），失败 403、链路留痕
+`AUTH_SCHEMA_CHECK`（status=intercept）。此前该校验在链路最前——但前台只带
+问题/模型/知识库，未召回前无法确定涉及哪些库，故后移至此。
+召回本身已按权限快照（RecallScope.visible_schema_ids）过滤，无权限库召回为空，无泄露。
 
 ### 3.5 ⑤ 权限裁剪统计
 
@@ -297,8 +307,8 @@ assistant 消息通过 `llm_call_id` 关联调用明细，首轮 schema 上下�
 每一步以 `{step, timestamp, data}` 追加，最终 JSON 存入 `query_audit_logs.pipeline_log`，前端「安全审计 → 链路追踪」弹窗展示：
 
 ```
-AUTH_SCHEMA_CHECK → LLM_CONFIG_LOAD → KNOWLEDGE_LOAD → PIPELINE_START
-→ STEP1_KEYWORDS → STEP2_RECALL → STEP3_AGGREGATE → STEP_PERMISSION
+PIPELINE_START → LLM_CONFIG_LOAD → KNOWLEDGE_LOAD
+→ STEP1_KEYWORDS → STEP2_RECALL → STEP3_AGGREGATE → AUTH_SCHEMA_CHECK → STEP_PERMISSION
 → STEP_RECALL_KNOWLEDGE → STEP_EXTEND_TABLES → STEP4_CONTEXT
 → STEP_JUDGE_PROMPT → STEP_JUDGE_RESULT → STEP5_RESULT
 → STEP6_VALIDATE → STEP7_GATEWAY → SQL_EXECUTE → MESSAGE_PERSIST
