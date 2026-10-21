@@ -21,16 +21,19 @@ BATCHES = [
                                 "spider.c7.extra30_20261020.json")),
     ("c7.extra100", os.path.join(BASE, "..", "results", "spider",
                                  "spider.c7.extra100_20261020.json")),
+    ("c7.fulldiv", os.path.join(BASE, "..", "results", "spider",
+                                "spider.c7.fulldiv_20261021.json")),
 ]
 QUESTIONS = [
-    os.path.join(BASE, "..", "questions", "spider", "spider_selected.json"),
+    os.path.join(BASE, "..", "questions", "spider", "spider_full_dev.json"),
 ]
-OUT = os.path.join(BASE, "..", "results", "spider", "spider.cumulative_140.analysis.json")
+OUT = os.path.join(BASE, "..", "results", "spider", "spider.fulldiv_946.analysis.json")
 
 
 def replay(mysql_db, sql):
     my = pymysql.connect(database=mysql_db, host="127.0.0.1", port=3306,
-                         user="root", password="REDACTED", charset="utf8mb4")
+                         user="root", password=os.environ.get("QF_MYSQL_PASSWORD", ""),
+                         charset="utf8mb4")
     try:
         with my.cursor() as c:
             c.execute("SET SESSION MAX_EXECUTION_TIME=60000")

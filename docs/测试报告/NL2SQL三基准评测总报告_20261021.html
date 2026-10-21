@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>NL2SQL 三基准评测总报告（Falcon · BIRD · Spider）</title>
+<style>
+  body { font-family: "Segoe UI", "Microsoft YaHei", sans-serif; margin: 0; background: #f5f6f8; color: #222; }
+  .wrap { max-width: 1240px; margin: 0 auto; padding: 32px 24px 64px; }
+  h1 { font-size: 26px; margin: 0 0 4px; }
+  .sub { color: #666; font-size: 13px; margin-bottom: 24px; }
+  h2 { font-size: 19px; border-left: 4px solid #3564d9; padding-left: 10px; margin-top: 36px; }
+  h3 { font-size: 15px; margin: 20px 0 8px; }
+  .cards { display: flex; gap: 14px; flex-wrap: wrap; }
+  .card { background: #fff; border-radius: 10px; padding: 16px 20px; min-width: 170px; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+  .card .v { font-size: 26px; font-weight: 700; color: #3564d9; }
+  .card .k { font-size: 12px; color: #777; margin-top: 2px; }
+  table { border-collapse: collapse; width: 100%; background: #fff; font-size: 13px; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+  th, td { border: 1px solid #e3e6ea; padding: 8px 10px; vertical-align: top; text-align: left; }
+  th { background: #eef1f6; white-space: nowrap; }
+  .ok { color: #1a7f37; font-weight: 600; }
+  .warn { color: #b58900; }
+  .bad { color: #c0392b; }
+  li { margin: 6px 0; }
+  code { background: #f0f2f5; padding: 1px 5px; border-radius: 4px; }
+  .note { background: #fff8e6; border: 1px solid #f0d98c; border-radius: 8px; padding: 12px 16px; font-size: 13px; }
+  a { color: #3564d9; }
+</style>
+</head>
+<body><div class="wrap">
+<h1>NL2SQL 三基准评测总报告</h1>
+<div class="sub">汇总日期 2026-10-21 · 被测系统 QueryForge ChatSQL 链路（召回 → 可行性判断 → 生成 → SQL 网关 → 执行）·
+主力模型 glm-5.3-flash（NVIDIA NIM id=7）· 汇总自 Falcon / BIRD / Spider 三套独立报告</div>
+
+<h2>一、结论速览</h2>
+<div class="cards">
+  <div class="card"><div class="v">74.0%</div><div class="k">Falcon dev 全量 EX（205/277，309 题全测完）</div></div>
+  <div class="card"><div class="v">77.2%</div><div class="k">Spider dev 全量 EX 严格（730/946，946 题全测完）</div></div>
+  <div class="card"><div class="v">84.2%</div><div class="k">Spider 宽口径 EX（797/946：列序/多余列/容差）</div></div>
+  <div class="card"><div class="v">50%</div><div class="k">BIRD dev 抽样 24 题 EX（12/24，优化轮）</div></div>
+  <div class="card"><div class="v">0</div><div class="k">拦截误伤 · 召回遗漏（三基准合计）</div></div>
+  <div class="card"><div class="v">+38.2pp</div><div class="k">Falcon 全程优化轨迹（35.8% → 74.0%）</div></div>
+</div>
+<p style="margin-top:14px">三套基准（中文真实业务 Falcon、英文学术 BIRD、英文跨域 Spider）在统一比对口径下
+严格 EX 收敛于 <b>74% ~ 77%</b> 区间，宽口径（吸收形态类差异）84% 以上。失败格局高度一致：
+<b>gold 口径 quirk 与并列保序（tie）占大头</b>，模型侧真实可改进项集中于枚举值照抄、MySQL 方言、
+复杂口径推理三类；召回、权限、网关、拦截四条链路在三套基准上均零缺陷。评测-归因-知识库沉淀-复测的
+闭环已跑通并贡献了 Falcon 35.8%→74.0% 的全部增量。</p>
+
+<h2>二、三基准总览</h2>
+<table>
+<tr><th>基准</th><th>规模</th><th>语言/特点</th><th>EX（严格）</th><th>EX（宽口径）</th><th>拦截</th><th>异常/基建</th></tr>
+<tr>
+  <td><b>Falcon</b>（eosphoros-ai）</td>
+  <td>dev 309 题 · 16 库全测完</td>
+  <td>中文 · 真实业务库</td>
+  <td class="ok">205/277 = 74.0%<br><span style="font-weight:400;font-size:12px">分母 = 总题 − 拦截16 − 异常15</span></td>
+  <td>—（比对器分层已内建）</td>
+  <td>16（9 已补数据指南）</td>
+  <td>15（超时/配额期残留）</td>
+</tr>
+<tr>
+  <td><b>Spider</b> 1.0 dev</td>
+  <td>946 题 · 20 库全测完<br><span style="font-weight:400;font-size:12px">1034 题中 88 题 gold 为 SQLite 专有语法剔除</span></td>
+  <td>英文 · 跨域学术</td>
+  <td class="ok">730/946 = 77.2%</td>
+  <td class="ok">797/946 = 84.2%</td>
+  <td>4（均合理）</td>
+  <td>4（方言 exec_error）</td>
+</tr>
+<tr>
+  <td><b>BIRD</b> dev</td>
+  <td>抽样 24 题 · 3 库（superhero/formula_1/financial）</td>
+  <td>英文 · 含 evidence 提示 · 难度高</td>
+  <td class="ok">12/24 = 50%（glm-5.3-flash 优化轮）</td>
+  <td>—</td>
+  <td>1（语义歧义）</td>
+  <td>偶发 NVIDIA 超时</td>
+</tr>
+</table>
+<p style="font-size:12px;color:#666;margin-top:6px">注：三套基准题集与难度构成不同，EX 不构成横向排名依据；
+BIRD 抽样含 challenging 难题占比高，50% 属正常水位。全部结果的生成都走与线上完全一致的 ChatSQL 全链路
+（含向量召回、权限裁剪、SQL 网关、前缀修复），非裸模型测试。</p>
+
+<h2>三、跨基准失败类型分布（对照《NL2SQL评测失败类型手册》）</h2>
+<table>
+<tr><th>类型</th><th>手册分类</th><th>Falcon（309 题）</th><th>Spider（946 题）</th><th>处置</th></tr>
+<tr><td><b>并列保序 tie</b>：模型 DENSE_RANK 保并列 ⊇ gold LIMIT 1 任取</td><td>A1 不耗预算</td>
+  <td>~6 题</td><td class="warn">39 题（tie_superset）</td><td>单独分桶统计，建议上游 gold 修订</td></tr>
+<tr><td><b>gold quirk</b>：TEXT 字典序、count(*) 代 SUM、GROUP BY 姓、边界 ≤2、单位错</td><td>A2 不耗预算</td>
+  <td>~38+12 题（怪癖+自相矛盾）</td><td class="warn">~50 题（true_wrong 内约半数）</td><td>不修，报告单列</td></tr>
+<tr><td><b>形态类</b>：列序不一致 / 多输出 1 列 / AVG 半进位精度漂移</td><td>B3 低成本可修</td>
+  <td>比对器分层已吸收</td><td class="ok">67 题（wide_pass，宽口径全部翻正）</td><td>比对器五层比对吸收</td></tr>
+<tr><td><b>枚举照抄</b>：丢「!」、写 'Hse' 而实际 'House' 等</td><td>B1 低成本可修</td>
+  <td>枚举注入后大幅收敛</td><td class="warn">~10 题</td><td>知识库沉淀「逐字符照抄实际值」</td></tr>
+<tr><td><b>方言</b>：HAVING 非聚合列（MySQL 1054）、CAST DOUBLE（8.0.12 无）</td><td>B2 低成本可修</td>
+  <td>已修（CAST→DECIMAL）</td><td class="warn">4 题 exec_error</td><td>prompt 方言段强化</td></tr>
+<tr><td><b>拦截/召回</b>：metadata_gap / judge 过严 / 召回遗漏</td><td>C1 C2 查链路</td>
+  <td>拦截 16 题（9 题补指南后消除）</td><td class="ok">仅 4 题且合理</td><td>数据指南 + 小库直通已闭环</td></tr>
+<tr><td><b>基建</b>：超时 / 限流 / 5xx</td><td>C4</td>
+  <td>fallback 链自愈</td><td class="ok">0（模型分片后无限速致败）</td><td>跑批侧已解决</td></tr>
+</table>
+
+<h2>四、优化轨迹（评测-归因-沉淀-复测闭环）</h2>
+<table>
+<tr><th style="width:170px">阶段</th><th>动作</th><th style="width:150px">效果</th></tr>
+<tr><td>比对器口径升级</td><td>无序题多重集比对 + 数值 2 位舍入（r2）+ 容差匹配（tol=1.5e-3，吸收 AVG 半进位漂移——固定舍入位数消不掉双重舍入反弹）+ 列排列 + 多余列剔除</td><td class="ok">Falcon +10.8pp（纯测量修正）</td></tr>
+<tr><td>知识库六层建模 + 枚举注入</td><td>元数据同步低基数 VARCHAR 自动采样 DISTINCT 值注入召回；L1~L6 知识条目（术语/口径/清洗/链路/规范/few-shot）随召回注入</td><td class="ok">Falcon 46.6% → 60.4% → 72.3%</td></tr>
+<tr><td>召回与拦截治理</td><td>小库直通（SMALL_SCHEMA_TABLE_LIMIT）、全库直通门槛、数据指南（schema guideline）、可行性判断标准细化</td><td class="ok">拦截从"缺表"质变为语义歧义，召回问题清零</td></tr>
+<tr><td>方言与形态约束</td><td>CAST DECIMAL 化、【结果形态】常驻段（差值/均值单值列、GROUP BY 触发词）、标识列跟随题面用词</td><td class="ok">Falcon 收敛至 74.0%</td></tr>
+<tr><td>跑批工程化</td><td>多线程「一个模型一个线程」分片（7/9/10/8 轮转均分，规避单模型限速）+ 断点续跑 + 失败按链轮换重试</td><td class="ok">946 题 ~1.5 小时跑完，0 基建失败</td></tr>
+</table>
+
+<h2>五、链路健康度结论</h2>
+<ul>
+  <li><b>召回</b>：三基准 1285 次提问零召回遗漏（BIRD 早期问题已由小库直通/枚举注入解决）。</li>
+  <li><b>拦截</b>： Spider 全量 946 题仅 4 题拦截且全部合理；Falcon 拦截 16 题中 9 题 metadata_gap 已通过数据指南补齐复测通过。</li>
+  <li><b>安全网关</b>：零误拦截、零越权执行（只读断言 + 行级过滤 + 表白名单全程在线）。</li>
+  <li><b>稳定性</b>：Spider 946 题连续跑批零 infra 失败；模型分片策略彻底消除了单模型限速致败。</li>
+</ul>
+
+<h2>六、下一步建议</h2>
+<ul>
+  <li><b>不耗预算项</b>：tie 分桶（39 题）与 gold quirk（约 50 题）保持单列统计，推动上游 gold 修订而非模型改造。</li>
+  <li><b>低成本可修项</b>：知识库补「枚举值逐字符照抄」「MySQL HAVING 非聚合列」条目后小批（≤10 题）复测
+      （Spider 目标 q610/1033/923）。</li>
+  <li><b>工程项</b>：执行反馈自修复（空结果回灌重生成一次）与多值列截断器，预期能覆盖 empty_result 桶的剩余部分。</li>
+  <li><b>模型对比</b>：id=9（minimax-m3.1-flash）/ id=10（mimo-v2.6-pro）在分片跑批中表现可观
+      （Spider 分片 EX 75.1% / 75.7% vs id=7 分片 82.9%，非受控对比仅供参考），如需正式对比请用同题集单模型受控重跑。</li>
+</ul>
+
+<h2>七、明细报告索引</h2>
+<table>
+<tr><th>报告</th><th>范围</th></tr>
+<tr><td><a href="Falcon全量迭代收敛报告_20261019.html">Falcon全量迭代收敛报告_20261019.html</a></td><td>Falcon 309 题全量 + 35.8%→74.0% 优化全程轨迹与逐题归因</td></tr>
+<tr><td><a href="Spider全量946题报告_glm53_20261021.html">Spider全量946题报告_glm53_20261021.html</a></td><td>Spider dev 全量 946 题：分库/模型分片统计 + 216 失败题逐题 SQL 明细</td></tr>
+<tr><td><a href="BIRD基准NL2SQL测试报告.html">BIRD基准NL2SQL测试报告.html</a></td><td>BIRD 24 题：轮次总览 + 分库/分难度 + 逐题跨轮次矩阵</td></tr>
+<tr><td><a href="Falcon知识库优化对比_20261017.html">Falcon知识库优化对比_20261017.html</a></td><td>知识库 A/B 评测（qid0-34）：KB 注入 +1.4pp 与逐题强归因</td></tr>
+<tr><td><a href="Falcon小批优化对比_20261018.html">Falcon小批优化对比_20261018.html</a> / <a href="Falcon小批优化对比_20261018_第5轮.html">第5轮</a></td><td>比对器修复 + KB 迭代小批复测</td></tr>
+<tr><td><a href="Falcon抽样5题报告_glm53_20261017.html">Falcon抽样5题报告</a> / <a href="Falcon抽样30题报告_glm53_20261017.html">30题报告</a></td><td>Falcon 抽样期报告（历史保留）</td></tr>
+<tr><td>NL2SQL验证测试报告.pdf / NL2SQL经典场景测试报告.pdf</td><td>milk_tea_sales / northwind / sakila 手工验证两轮（2026-10-14~15）</td></tr>
+</table>
+
+<p class="note" style="margin-top:24px">口径备注：EX = 执行准确率（生成 SQL 与 gold 在 MySQL 执行结果多重集比对）；
+宽口径 = 严格之外再吸收列排列、多余单列、±0.0015 数值容差三类形态差异；
+分母剔除口径 = 总题 − 拦截（need_more_info）− 基建异常（超时/5xx/配额）。
+所有结果文件与工具链见 <code>benchmark/</code>（results/{falcon,bird,spider}），比对与分桶脚本
+<code>analyze_spider.py</code> / <code>analyze_falcon.py</code>，失败类型判定标准见
+<code>docs/09-NL2SQL评测失败类型手册.md</code>。</p>
+</div></body></html>

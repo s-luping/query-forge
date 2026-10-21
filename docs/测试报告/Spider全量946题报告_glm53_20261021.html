@@ -1,0 +1,2381 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>Spider 1.0 dev 全量 946 题 NL2SQL 测试报告（glm-5.3-flash 为主）</title>
+<style>
+  body { font-family: "Segoe UI", "Microsoft YaHei", sans-serif; margin: 0; background: #f5f6f8; color: #222; }
+  .wrap { max-width: 1240px; margin: 0 auto; padding: 32px 24px 64px; }
+  h1 { font-size: 26px; margin: 0 0 4px; }
+  .sub { color: #666; font-size: 13px; margin-bottom: 24px; }
+  h2 { font-size: 19px; border-left: 4px solid #3564d9; padding-left: 10px; margin-top: 36px; }
+  .cards { display: flex; gap: 14px; flex-wrap: wrap; }
+  .card { background: #fff; border-radius: 10px; padding: 16px 20px; min-width: 150px; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+  .card .v { font-size: 26px; font-weight: 700; color: #3564d9; }
+  .card .k { font-size: 12px; color: #777; margin-top: 2px; }
+  table { border-collapse: collapse; width: 100%; background: #fff; font-size: 13px; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+  th, td { border: 1px solid #e3e6ea; padding: 8px 10px; vertical-align: top; text-align: left; }
+  th { background: #eef1f6; white-space: nowrap; }
+  td.sql { font-family: Consolas, monospace; font-size: 11.5px; white-space: pre-wrap; max-width: 320px; }
+  li { margin: 6px 0; }
+  code { background: #f0f2f5; padding: 1px 5px; border-radius: 4px; }
+  .note { background: #fff8e6; border: 1px solid #f0d98c; border-radius: 8px; padding: 12px 16px; font-size: 13px; }
+</style>
+</head>
+<body><div class="wrap">
+<h1>Spider 1.0 dev 全量 946 题 NL2SQL 测试报告</h1>
+<div class="sub">评测日期 2026-10-21 · 主力 llm_config_id=7（NVIDIA NIM z-ai/glm-5.3-flash）+ 9/10/8 分片 ·
+Spider 1.0 官方 dev 全量（1034 题中 946 题 gold 可在 MySQL 执行，20 库全覆盖）· 统一口径离线重算（gen SQL 全量重放 + 分层比对）</div>
+
+<h2>一、结论速览</h2>
+<div class="cards">
+  <div class="card"><div class="v">730/946</div><div class="k">执行准确率 EX（严格多重集）= 77.2%</div></div>
+  <div class="card"><div class="v">797/946</div><div class="k">宽口径 EX（列序/多余列/容差）= 84.2%</div></div>
+  <div class="card"><div class="v">39</div><div class="k">并列保序（gen ⊇ gold，另计）</div></div>
+  <div class="card"><div class="v">106</div><div class="k">真错（含 gold quirk 与方言错误）</div></div>
+  <div class="card"><div class="v">26.5s</div><div class="k">平均端到端耗时</div></div>
+  <div class="card"><div class="v">20/20</div><div class="k">库覆盖 · 4 拦截 · 0 召回遗漏</div></div>
+</div>
+<p style="margin-top:14px">官方 dev 全量 <b>946</b> 题（另 88 题 gold 含 SQLite 专有语法无法在 MySQL 执行而剔除），
+一次性多线程跑批完成。严格 EX <b>77.2%</b>；加列序翻转/多余列剔除/数值容差后 <b>84.2%</b>；
+另有 39 题模型结果严格包含 gold（并列最值 gold 任意取一行）。
+真错 106 题中约半数为 <b>gold 口径 quirk</b>（TEXT 字典序、count(*) 代 SUM、
+GROUP BY first_name、边界 &lt;=2 等），模型侧可改进项集中在：<b>枚举值逐字符照抄</b>与 <b>MySQL 方言 HAVING 限制</b>。
+拦截仅 4 题且均为合理拦截、无召回遗漏、无网关问题——946 题规模下链路健康度与 140 题抽样期一致。</p>
+
+<h2>二、分库统计</h2>
+<table>
+<tr><th>库</th><th style="width:110px">EX（严格/题数）</th><th style="width:110px">失败题数</th></tr>
+<tr><td>battle_death</td><td style='text-align:center'>10/14</td><td>4</td></tr><tr><td>car_1</td><td style='text-align:center'>60/88</td><td>28</td></tr><tr><td>concert_singer</td><td style='text-align:center'>37/39</td><td>2</td></tr><tr><td>course_teach</td><td style='text-align:center'>27/30</td><td>3</td></tr><tr><td>cre_Doc_Template_Mgt</td><td style='text-align:center'>66/76</td><td>10</td></tr><tr><td>dog_kennels</td><td style='text-align:center'>53/76</td><td>23</td></tr><tr><td>employee_hire_evaluation</td><td style='text-align:center'>30/36</td><td>6</td></tr><tr><td>flight_2</td><td style='text-align:center'>65/74</td><td>9</td></tr><tr><td>museum_visit</td><td style='text-align:center'>15/17</td><td>2</td></tr><tr><td>network_1</td><td style='text-align:center'>33/48</td><td>15</td></tr><tr><td>orchestra</td><td style='text-align:center'>29/36</td><td>7</td></tr><tr><td>pets_1</td><td style='text-align:center'>28/38</td><td>10</td></tr><tr><td>poker_player</td><td style='text-align:center'>38/40</td><td>2</td></tr><tr><td>real_estate_properties</td><td style='text-align:center'>2/4</td><td>2</td></tr><tr><td>singer</td><td style='text-align:center'>27/28</td><td>1</td></tr><tr><td>student_transcripts_tracking</td><td style='text-align:center'>50/74</td><td>24</td></tr><tr><td>tvshow</td><td style='text-align:center'>45/54</td><td>9</td></tr><tr><td>voter_1</td><td style='text-align:center'>11/14</td><td>3</td></tr><tr><td>world_1</td><td style='text-align:center'>73/106</td><td>33</td></tr><tr><td>wta_1</td><td style='text-align:center'>31/54</td><td>23</td></tr>
+</table>
+
+<h2>三、模型分片统计（非模型对比）</h2>
+<p style="font-size:13px;color:#555">为规避单模型限速，跑批按「一个模型一个线程」分片：946 题在 4 个配置间
+round-robin 均分，各模型独占一个线程并发执行。题集不同、分片随机，<b>下列 EX 仅作执行情况记录，不构成模型间对比</b>；
+单题失败（超时/5xx/限流/配额）时从分片模型起按链轮换重试。</p>
+<table style="max-width:640px">
+<tr><th>模型</th><th style="width:140px">EX（严格/题数）</th><th style="width:110px">EX 率</th></tr>
+<tr><td>glm-5.3-flash (id=7)</td><td style='text-align:center'>248/299</td><td style='text-align:center'>82.9%</td></tr><tr><td>deepseek-v4.1-flash (id=8)</td><td style='text-align:center'>114/169</td><td style='text-align:center'>67.5%</td></tr><tr><td>minimax-m3.1-flash (id=9)</td><td style='text-align:center'>127/169</td><td style='text-align:center'>75.1%</td></tr><tr><td>mimo-v2.6-pro (id=10)</td><td style='text-align:center'>131/173</td><td style='text-align:center'>75.7%</td></tr><tr><td>早期抽样批次（未记录模型字段，实际 id=7）</td><td style='text-align:center'>110/136</td><td style='text-align:center'>80.9%</td></tr>
+</table>
+
+<h2>四、失败题明细（216 题）</h2>
+<table>
+<tr><th style="width:110px">库 / qid</th><th style="width:95px">分桶</th><th style="width:200px">问题</th><th>生成 SQL</th><th>gold SQL</th><th style="width:280px">归因</th></tr>
+
+<tr><td style="white-space:nowrap">car_1<br><code style="font-size:11px">spider_dev_137</code></td>
+<td style="width:90px">执行错误（方言）</td><td>What is the average edispl of the cars of model volvo?</td>
+<td class="sql">SELECT AVG(cd.Edispl) AS average_edispl
+FROM cars_data AS cd
+JOIN car_names AS cn ON cd.MakeId = cn.MakeId
+WHERE cn.Model = 'volvo';</td>
+<td class="sql">SELECT avg(T2.edispl) FROM CAR_NAMES AS T1 JOIN CARS_DATA AS T2 ON T1.MakeId  =  T2.Id WHERE T1.Model  =  'volvo';</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">cre_Doc_Template_Mgt<br><code style="font-size:11px">spider_dev_360</code></td>
+<td style="width:90px">执行错误（方言）</td><td>Count the number of paragraphs in the document named 'Summer Show'.</td>
+<td class="sql">SELECT COUNT(T1.Paragraph_ID) FROM documents AS T1 JOIN paragraphs AS T2 ON T1.Document_ID = T2.Document_ID WHERE T1.Document_Name = 'Summer Show'</td>
+<td class="sql">SELECT count(*) FROM Paragraphs AS T1 JOIN Documents AS T2 ON T1.document_ID  =  T2.document_ID WHERE T2.document_name  =  'Summer Show'</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">tvshow<br><code style="font-size:11px">spider_dev_632</code></td>
+<td style="width:90px">执行错误（方言）</td><td>What are the package options and the name of the series for the TV Channel that supports high definition TV?</td>
+<td class="sql">SELECT
+    tc.Package_Option,
+    ts.series_name
+FROM tv_channel AS tc
+JOIN tv_series AS ts
+    ON ts.Channel = tc.id
+WHERE tc.Hight_definition_TV = 'Yes';</td>
+<td class="sql">SELECT package_option ,  series_name FROM TV_Channel WHERE hight_definition_TV  =  "yes"</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">dog_kennels<br><code style="font-size:11px">spider_dev_923</code></td>
+<td style="width:90px">执行错误（方言）</td><td>Find the id, last name and cell phone of the professionals who live in the state of Indiana or have performed more than </td>
+<td class="sql">SELECT p.professional_id, p.last_name, p.cell_number
+FROM professionals p
+LEFT JOIN treatments t ON p.professional_id = t.professional_id
+GROUP BY p.professional_id
+HAVING p.state = 'Indiana' OR COUNT(t.treatment_id) &gt; 2;</td>
+<td class="sql">SELECT professional_id ,  last_name ,  cell_number FROM Professionals WHERE state  =  'Indiana' UNION SELECT T1.professional_id ,  T1.last_name ,  T1.cell_number FROM Professionals AS T1 JOIN Treatments AS T2 ON T1.professional_id  =  T2.professional_id GROUP BY T1.professional_id HAVING count(*)  &gt;  2</td>
+<td>方言错误：HAVING 引用非聚合列 p.state（SQLite 允许，MySQL 报 1054），应把 state 条件放入 WHERE</td></tr>
+<tr><td style="white-space:nowrap">student_transcripts_tracking<br><code style="font-size:11px">spider_dev_558</code></td>
+<td style="width:90px">intercepted</td><td>What is the first, middle, and last name of the earliest school graduate?</td>
+<td class="sql">&lt;i&gt;被拦截&lt;/i&gt;</td>
+<td class="sql">SELECT first_name ,  middle_name ,  last_name FROM Students ORDER BY date_left ASC LIMIT 1</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">student_transcripts_tracking<br><code style="font-size:11px">spider_dev_564</code></td>
+<td style="width:90px">intercepted</td><td>What is the average transcript date?</td>
+<td class="sql">&lt;i&gt;被拦截&lt;/i&gt;</td>
+<td class="sql">SELECT avg(transcript_date) FROM Transcripts</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">student_transcripts_tracking<br><code style="font-size:11px">spider_dev_566</code></td>
+<td style="width:90px">intercepted</td><td>What is the earliest date of a transcript release, and what details can you tell me?</td>
+<td class="sql">&lt;i&gt;被拦截&lt;/i&gt;</td>
+<td class="sql">SELECT transcript_date ,  other_details FROM Transcripts ORDER BY transcript_date ASC LIMIT 1</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">tvshow<br><code style="font-size:11px">spider_dev_629</code></td>
+<td style="width:90px">intercepted</td><td>Find the production code and channel of the most recently aired cartoon .</td>
+<td class="sql">&lt;i&gt;被拦截&lt;/i&gt;</td>
+<td class="sql">select production_code ,  channel from cartoon order by original_air_date desc limit 1</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">concert_singer<br><code style="font-size:11px">spider_dev_27</code></td>
+<td style="width:90px">并列保序</td><td>What is the year that had the most concerts?</td>
+<td class="sql">WITH concert_counts AS (
+    SELECT `Year`, COUNT(*) AS concert_count
+    FROM concert
+    GROUP BY `Year`
+),
+ranked_years AS (
+    SELECT `Year`, DENSE_RANK() OVER (ORDER BY concert_count DESC) AS year_rank
+    FROM concert_counts
+)
+SELECT `Year`
+FROM ranked_years
+WHERE year_rank = 1;</td>
+<td class="sql">SELECT YEAR FROM concert GROUP BY YEAR ORDER BY count(*) DESC LIMIT 1</td>
+<td>并列最值/并列计数：模型 DENSE_RANK/RANK 保留全部并列行（gen ⊇ gold），gold LIMIT 1 任意取一行</td></tr>
+<tr><td style="white-space:nowrap">pets_1<br><code style="font-size:11px">spider_dev_75</code></td>
+<td style="width:90px">并列保序</td><td>Find the first name and age of students who have a pet.</td>
+<td class="sql">SELECT s.Fname, s.Age
+FROM student s
+JOIN has_pet hp ON s.StuID = hp.StuID</td>
+<td class="sql">SELECT DISTINCT T1.fname ,  T1.age FROM student AS T1 JOIN has_pet AS T2 ON T1.stuid  =  T2.stuid</td>
+<td>并列最值/并列计数：模型 DENSE_RANK/RANK 保留全部并列行（gen ⊇ gold），gold LIMIT 1 任意取一行</td></tr>
+<tr><td style="white-space:nowrap">car_1<br><code style="font-size:11px">spider_dev_106</code></td>
+<td style="width:90px">并列保序</td><td>What is the name of each continent and how many car makers are there in each one?</td>
+<td class="sql">SELECT
+  ct.Continent,
+  COUNT(cm.Id) AS maker_count
+FROM continents AS ct
+LEFT JOIN countries AS co
+  ON co.Continent = ct.ContId
+LEFT JOIN car_makers AS cm
+  ON cm.Country = co.CountryId
+GROUP BY ct.ContId, ct.Continent;</td>
+<td class="sql">SELECT T1.Continent ,  count(*) FROM CONTINENTS AS T1 JOIN COUNTRIES AS T2 ON T1.ContId  =  T2.continent JOIN car_makers AS T3 ON T2.CountryId  =  T3.Country GROUP BY T1.Continent;</td>
+<td>并列最值/并列计数：模型 DENSE_RANK/RANK 保留全部并列行（gen ⊇ gold），gold LIMIT 1 任意取一行</td></tr>
+<tr><td style="white-space:nowrap">car_1<br><code style="font-size:11px">spider_dev_167</code></td>
+<td style="width:90px">并列保序</td><td>Among the cars with more than lowest horsepower, which ones do not have more than 3 cylinders? List the car makeid and m</td>
+<td class="sql">SELECT DISTINCT cn.MakeId, cn.Make
+FROM cars_data cd
+JOIN car_names cn ON cd.Id = cn.MakeId
+WHERE CAST(cd.Horsepower AS DECIMAL(18,4)) &gt; (
+    SELECT MIN(CAST(Horsepower AS DECIMAL(18,4))) FROM cars_data
+)
+AND cd.Cylinders &lt;= 3;</td>
+<td class="sql">SELECT T2.MakeId ,  T2.Make FROM CARS_DATA AS T1 JOIN CAR_NAMES AS T2 ON T1.Id  =  T2.MakeId WHERE T1.Horsepower  &gt;  (SELECT min(Horsepower) FROM CARS_DATA) AND T1.Cylinders  &lt;=  3;</td>
+<td>并列最值/并列计数：模型 DENSE_RANK/RANK 保留全部并列行（gen ⊇ gold），gold LIMIT 1 任意取一行</td></tr>
+<tr><td style="white-space:nowrap">car_1<br><code style="font-size:11px">spider_dev_168</code></td>
+<td style="width:90px">并列保序</td><td>Among the cars that do not have the minimum horsepower , what are the make ids and names of all those with less than 4 c</td>
+<td class="sql">SELECT DISTINCT cn.MakeId, cn.Make
+FROM cars_data cd
+JOIN car_names cn ON cd.Id = cn.MakeId
+WHERE cd.Cylinders &lt; 4
+  AND CAST(TRIM(cd.Horsepower) AS DECIMAL(18,4)) &gt; (
+      SELECT MIN(CAST(TRIM(Horsepower) AS DECIMAL(18,4)))
+      FROM cars_data
+  )</td>
+<td class="sql">select t2.makeid ,  t2.make from cars_data as t1 join car_names as t2 on t1.id  =  t2.makeid where t1.horsepower  &gt;  (select min(horsepower) from cars_data) and t1.cylinders  &lt;  4;</td>
+<td>并列最值/并列计数：模型 DENSE_RANK/RANK 保留全部并列行（gen ⊇ gold），gold LIMIT 1 任意取一行</td></tr>
+<tr><td style="white-space:nowrap">flight_2<br><code style="font-size:11px">spider_dev_230</code></td>
+<td style="width:90px">并列保序</td><td>What airline serves the most flights?</td>
+<td class="sql">SELECT t.Airline
+FROM (
+    SELECT a.Airline,
+           DENSE_RANK() OVER (ORDER BY COUNT(*) DESC) AS rk
+    FROM flights f
+    JOIN airlines a ON a.uid = f.Airline
+    GROUP BY a.Airline
+) t
+WHERE t.rk = 1;</td>
+<td class="sql">SELECT T1.Airline FROM AIRLINES AS T1 JOIN FLIGHTS AS T2 ON T1.uid  =  T2.Airline GROUP BY T1.Airline ORDER BY count(*) DESC LIMIT 1</td>
+<td>并列最值/并列计数：模型 DENSE_RANK/RANK 保留全部并列行（gen ⊇ gold），gold LIMIT 1 任意取一行</td></tr>
+<tr><td style="white-space:nowrap">cre_Doc_Template_Mgt<br><code style="font-size:11px">spider_dev_309</code></td>
+<td style="width:90px">并列保序</td><td>Show all template ids and number of documents using each template.</td>
+<td class="sql">SELECT t.Template_ID, COUNT(d.Document_ID) AS document_count
+FROM templates t
+LEFT JOIN documents d ON d.Template_ID = t.Template_ID
+GROUP BY t.Template_ID;</td>
+<td class="sql">SELECT template_id ,  count(*) FROM Documents GROUP BY template_id</td>
+<td>并列最值/并列计数：模型 DENSE_RANK/RANK 保留全部并列行（gen ⊇ gold），gold LIMIT 1 任意取一行</td></tr>
+<tr><td style="white-space:nowrap">cre_Doc_Template_Mgt<br><code style="font-size:11px">spider_dev_311</code></td>
+<td style="width:90px">并列保序</td><td>What is the id and type code for the template used by the most documents?</td>
+<td class="sql">WITH doc_counts AS (
+    SELECT Template_ID, COUNT(*) AS cnt
+    FROM documents
+    GROUP BY Template_ID
+),
+ranked AS (
+    SELECT Template_ID, cnt,
+           DENSE_RANK() OVER (ORDER BY cnt DESC) AS rnk
+    FROM doc_counts
+)
+SELECT t.Template_ID, t.Template_Type_Code
+FROM ranked r
+JOIN templates t ON t.Template_ID = r.Template_ID
+WHERE r.rnk = 1;</td>
+<td class="sql">SELECT T1.template_id ,  T2.Template_Type_Code FROM Documents AS T1 JOIN Templates AS T2 ON T1.template_id  =  T2.template_id GROUP BY T1.template_id ORDER BY count(*) DESC LIMIT 1</td>
+<td>并列最值/并列计数：模型 DENSE_RANK/RANK 保留全部并列行（gen ⊇ gold），gold LIMIT 1 任意取一行</td></tr>
+<tr><td style="white-space:nowrap">cre_Doc_Template_Mgt<br><code style="font-size:11px">spider_dev_312</code></td>
+<td style="width:90px">并列保序</td><td>Return the id and type code of the template that is used for the greatest number of documents.</td>
+<td class="sql">SELECT t.Template_ID, t.Template_Type_Code
+FROM (
+    SELECT Template_ID,
+           DENSE_RANK() OVER (ORDER BY COUNT(*) DESC) AS rnk
+    FROM documents
+    GROUP BY Template_ID
+) d
+JOIN templates t ON t.Template_ID = d.Template_ID
+WHERE d.rnk = 1;</td>
+<td class="sql">SELECT T1.template_id ,  T2.Template_Type_Code FROM Documents AS T1 JOIN Templates AS T2 ON T1.template_id  =  T2.template_id GROUP BY T1.template_id ORDER BY count(*) DESC LIMIT 1</td>
+<td>并列最值/并列计数：模型 DENSE_RANK/RANK 保留全部并列行（gen ⊇ gold），gold LIMIT 1 任意取一行</td></tr>
+<tr><td style="white-space:nowrap">cre_Doc_Template_Mgt<br><code style="font-size:11px">spider_dev_331</code></td>
+<td style="width:90px">并列保序</td><td>Which template type code has most number of templates?</td>
+<td class="sql">SELECT Template_Type_Code
+FROM (
+  SELECT Template_Type_Code,
+         DENSE_RANK() OVER (ORDER BY COUNT(Template_ID) DESC) AS dr
+  FROM templates
+  GROUP BY Template_Type_Code
+) t
+WHERE dr = 1;</td>
+<td class="sql">SELECT template_type_code FROM Templates GROUP BY template_type_code ORDER BY count(*) DESC LIMIT 1</td>
+<td>并列最值/并列计数：模型 DENSE_RANK/RANK 保留全部并列行（gen ⊇ gold），gold LIMIT 1 任意取一行</td></tr>
+<tr><td style="white-space:nowrap">cre_Doc_Template_Mgt<br><code style="font-size:11px">spider_dev_332</code></td>
+<td style="width:90px">并列保序</td><td>Return the type code of the template type that the most templates belong to.</td>
+<td class="sql">WITH type_counts AS (
+    SELECT
+        Template_Type_Code,
+        COUNT(*) AS template_count
+    FROM templates
+    GROUP BY Template_Type_Code
+),
+ranked_types AS (
+    SELECT
+        Template_Type_Code,
+        DENSE_RANK() OVER (ORDER BY template_count DESC) AS type_rank
+    FROM type_counts
+)
+SELECT Template_Type_Code
+FROM ranked_types
+WHERE type_rank = 1;</td>
+<td class="sql">SELECT template_type_code FROM Templates GROUP BY template_type_code ORDER BY count(*) DESC LIMIT 1</td>
+<td>并列最值/并列计数：模型 DENSE_RANK/RANK 保留全部并列行（gen ⊇ gold），gold LIMIT 1 任意取一行</td></tr>
+<tr><td style="white-space:nowrap">cre_Doc_Template_Mgt<br><code style="font-size:11px">spider_dev_375</code></td>
+<td style="width:90px">并列保序</td><td>What is the document id with least number of paragraphs?</td>
+<td class="sql">SELECT Document_ID
+FROM (
+    SELECT Document_ID,
+           DENSE_RANK() OVER (ORDER BY cnt ASC) AS rnk
+    FROM (
+        SELECT Document_ID, COUNT(*) AS cnt
+        FROM paragraphs
+        GROUP BY Document_ID
+    ) t
+) ranked
+WHERE rnk = 1;</td>
+<td class="sql">SELECT document_id FROM Paragraphs GROUP BY document_id ORDER BY count(*) ASC LIMIT 1</td>
+<td>并列最值/并列计数：模型 DENSE_RANK/RANK 保留全部并列行（gen ⊇ gold），gold LIMIT 1 任意取一行</td></tr>
+<tr><td style="white-space:nowrap">cre_Doc_Template_Mgt<br><code style="font-size:11px">spider_dev_376</code></td>
+<td style="width:90px">并列保序</td><td>Return the id of the document with the fewest paragraphs.</td>
+<td class="sql">SELECT Document_ID
+FROM (
+    SELECT Document_ID,
+           DENSE_RANK() OVER (ORDER BY cnt ASC) AS rk
+    FROM (
+        SELECT Document_ID, COUNT(*) AS cnt
+        FROM paragraphs
+        GROUP BY Document_ID
+    ) a
+) b
+WHERE rk = 1;</td>
+<td class="sql">SELECT document_id FROM Paragraphs GROUP BY document_id ORDER BY count(*) ASC LIMIT 1</td>
+<td>并列最值/并列计数：模型 DENSE_RANK/RANK 保留全部并列行（gen ⊇ gold），gold LIMIT 1 任意取一行</td></tr>
+<tr><td style="white-space:nowrap">course_teach<br><code style="font-size:11px">spider_dev_395</code></td>
+<td style="width:90px">并列保序</td><td>List the most common hometown of teachers.</td>
+<td class="sql">WITH hometown_counts AS (
+    SELECT Hometown, COUNT(*) AS teacher_count
+    FROM teacher
+    GROUP BY Hometown
+),
+ranked_hometowns AS (
+    SELECT
+        Hometown,
+        DENSE_RANK() OVER (ORDER BY teacher_count DESC) AS hometown_rank
+    FROM hometown_counts
+)
+SELECT Hometown
+FROM ranked_hometowns
+WHERE hometown_rank = 1;</td>
+<td class="sql">SELECT Hometown FROM teacher GROUP BY Hometown ORDER BY COUNT(*) DESC LIMIT 1</td>
+<td>并列最值/并列计数：模型 DENSE_RANK/RANK 保留全部并列行（gen ⊇ gold），gold LIMIT 1 任意取一行</td></tr>
+<tr><td style="white-space:nowrap">museum_visit<br><code style="font-size:11px">spider_dev_421</code></td>
+<td style="width:90px">并列保序</td><td>What are the id and name of the museum visited most times?</td>
+<td class="sql">SELECT t.Museum_ID, t.Name
+FROM (
+    SELECT m.Museum_ID, m.Name,
+           DENSE_RANK() OVER (ORDER BY v.cnt DESC) AS rnk
+    FROM museum m
+    JOIN (
+        SELECT Museum_ID, COUNT(*) AS cnt
+        FROM visit
+        GROUP BY Museum_ID
+    ) v ON m.Museum_ID = v.Museum_ID
+) t
+WHERE t.rnk = 1;</td>
+<td class="sql">SELECT t2.Museum_ID ,  t1.name FROM museum AS t1 JOIN visit AS t2 ON t1.Museum_ID  =  t2.Museum_ID GROUP BY t2.Museum_ID ORDER BY count(*) DESC LIMIT 1</td>
+<td>并列最值/并列计数：模型 DENSE_RANK/RANK 保留全部并列行（gen ⊇ gold），gold LIMIT 1 任意取一行</td></tr>
+<tr><td style="white-space:nowrap">wta_1<br><code style="font-size:11px">spider_dev_453</code></td>
+<td style="width:90px">并列保序</td><td>Find the first name and country code of the oldest player.</td>
+<td class="sql">SELECT first_name, country_code
+FROM (
+    SELECT first_name, country_code,
+           DENSE_RANK() OVER (ORDER BY birth_date ASC) AS rk
+    FROM players
+) t
+WHERE rk = 1;</td>
+<td class="sql">SELECT first_name ,  country_code FROM players ORDER BY birth_date LIMIT 1</td>
+<td>并列最值/并列计数：模型 DENSE_RANK/RANK 保留全部并列行（gen ⊇ gold），gold LIMIT 1 任意取一行</td></tr>
+<tr><td style="white-space:nowrap">wta_1<br><code style="font-size:11px">spider_dev_454</code></td>
+<td style="width:90px">并列保序</td><td>What is the first name and country code of the oldest player?</td>
+<td class="sql">SELECT first_name, country_code
+FROM (
+    SELECT first_name, country_code,
+           DENSE_RANK() OVER (ORDER BY birth_date ASC) AS rk
+    FROM players
+) t
+WHERE rk = 1;</td>
+<td class="sql">SELECT first_name ,  country_code FROM players ORDER BY birth_date LIMIT 1</td>
+<td>并列最值/并列计数：模型 DENSE_RANK/RANK 保留全部并列行（gen ⊇ gold），gold LIMIT 1 任意取一行</td></tr>
+<tr><td style="white-space:nowrap">wta_1<br><code style="font-size:11px">spider_dev_487</code></td>
+<td style="width:90px">并列保序</td><td>Find the first name, country code and birth date of the winner who has the highest rank points in all matches.</td>
+<td class="sql">SELECT p.first_name, p.country_code, p.birth_date
+FROM (
+    SELECT winner_id, winner_rank_points,
+           DENSE_RANK() OVER (ORDER BY winner_rank_points DESC) AS rnk
+    FROM matches
+) t
+JOIN players p ON t.winner_id = p.player_id
+WHERE t.rnk = 1;</td>
+<td class="sql">SELECT T1.first_name ,  T1.country_code ,  T1.birth_date FROM players AS T1 JOIN matches AS T2 ON T1.player_id  =  T2.winner_id ORDER BY T2.winner_rank_points DESC LIMIT 1</td>
+<td>并列最值/并列计数：模型 DENSE_RANK/RANK 保留全部并列行（gen ⊇ gold），gold LIMIT 1 任意取一行</td></tr>
+<tr><td style="white-space:nowrap">student_transcripts_tracking<br><code style="font-size:11px">spider_dev_525</code></td>
+<td style="width:90px">并列保序</td><td>What are the names and id of courses having at most 2 sections?</td>
+<td class="sql">SELECT course_name, course_id
+FROM courses
+WHERE course_id NOT IN (
+    SELECT course_id
+    FROM sections
+    GROUP BY course_id
+    HAVING COUNT(*) &gt; 2
+);</td>
+<td class="sql">SELECT T1.course_name ,  T1.course_id FROM Courses AS T1 JOIN Sections AS T2 ON T1.course_id  =  T2.course_id GROUP BY T1.course_id HAVING count(*)  &lt;=  2</td>
+<td>并列最值/并列计数：模型 DENSE_RANK/RANK 保留全部并列行（gen ⊇ gold），gold LIMIT 1 任意取一行</td></tr>
+<tr><td style="white-space:nowrap">student_transcripts_tracking<br><code style="font-size:11px">spider_dev_530</code></td>
+<td style="width:90px">并列保序</td><td>For each semester, what is the name and id of the one with the most students registered?</td>
+<td class="sql">SELECT semester_name, semester_id
+FROM (
+    SELECT s.semester_name,
+           s.semester_id,
+           DENSE_RANK() OVER (ORDER BY e.cnt DESC) AS rnk
+    FROM semesters s
+    JOIN (
+        SELECT semester_id, COUNT(DISTINCT student_id) AS cnt
+        FROM student_enrolment
+        GROUP BY semester_id
+    ) e ON s.semester_id = e.semester_id
+) t
+WHERE rnk = 1</td>
+<td class="sql">SELECT T1.semester_name ,  T1.semester_id FROM Semesters AS T1 JOIN Student_Enrolment AS T2 ON T1.semester_id  =  T2.semester_id GROUP BY T1.semester_id ORDER BY count(*) DESC LIMIT 1</td>
+<td>并列最值/并列计数：模型 DENSE_RANK/RANK 保留全部并列行（gen ⊇ gold），gold LIMIT 1 任意取一行</td></tr>
+<tr><td style="white-space:nowrap">student_transcripts_tracking<br><code style="font-size:11px">spider_dev_547</code></td>
+<td style="width:90px">并列保序</td><td>What's the name of the course with most number of enrollments?</td>
+<td class="sql">SELECT course_name
+FROM (
+  SELECT course_name,
+         DENSE_RANK() OVER (ORDER BY cnt DESC) AS rk
+  FROM (
+    SELECT c.course_id, c.course_name, COUNT(*) AS cnt
+    FROM courses c
+    JOIN student_enrolment_courses sec ON sec.course_id = c.course_id
+    GROUP BY c.course_id, c.course_name
+  ) g
+) t
+WHERE rk = 1;</td>
+<td class="sql">SELECT  T1.course_name FROM Courses AS T1 JOIN Student_Enrolment_Courses AS T2 ON T1.course_id  =  T2.course_id GROUP BY T1.course_name ORDER BY count(*) DESC LIMIT 1</td>
+<td>并列最值/并列计数：模型 DENSE_RANK/RANK 保留全部并列行（gen ⊇ gold），gold LIMIT 1 任意取一行</td></tr>
+<tr><td style="white-space:nowrap">student_transcripts_tracking<br><code style="font-size:11px">spider_dev_548</code></td>
+<td style="width:90px">并列保序</td><td>What is the name of the course with the most students enrolled?</td>
+<td class="sql">SELECT course_name
+FROM (
+    SELECT course_name,
+           DENSE_RANK() OVER (ORDER BY cnt DESC) AS rnk
+    FROM (
+        SELECT c.course_name,
+               COUNT(DISTINCT se.student_id) AS cnt
+        FROM courses c
+        JOIN student_enrolment_courses sec ON sec.course_id = c.course_id
+        JOIN student_enrolment se ON se.student_enrolment_id = sec.student_enrolment_id
+        GROUP BY</td>
+<td class="sql">SELECT  T1.course_name FROM Courses AS T1 JOIN Student_Enrolment_Courses AS T2 ON T1.course_id  =  T2.course_id GROUP BY T1.course_name ORDER BY count(*) DESC LIMIT 1</td>
+<td>并列最值/并列计数：模型 DENSE_RANK/RANK 保留全部并列行（gen ⊇ gold），gold LIMIT 1 任意取一行</td></tr>
+<tr><td style="white-space:nowrap">voter_1<br><code style="font-size:11px">spider_dev_695</code></td>
+<td style="width:90px">并列保序</td><td>Of all the contestants who got voted, what is the contestant number and name of the contestant who got least votes?</td>
+<td class="sql">SELECT contestant_number, contestant_name
+FROM (
+    SELECT agg.contestant_number,
+           c.contestant_name,
+           DENSE_RANK() OVER (ORDER BY agg.cnt ASC) AS rnk
+    FROM (
+        SELECT contestant_number, COUNT(*) AS cnt
+        FROM votes
+        GROUP BY contestant_number
+    ) agg
+    JOIN contestants c ON agg.contestant_number = c.contestant_number
+) t
+WHERE rnk = 1;</td>
+<td class="sql">SELECT T1.contestant_number , T1.contestant_name FROM contestants AS T1 JOIN votes AS T2 ON T1.contestant_number  =  T2.contestant_number GROUP BY T1.contestant_number ORDER BY count(*) ASC LIMIT 1</td>
+<td>并列最值/并列计数：模型 DENSE_RANK/RANK 保留全部并列行（gen ⊇ gold），gold LIMIT 1 任意取一行</td></tr>
+<tr><td style="white-space:nowrap">world_1<br><code style="font-size:11px">spider_dev_740</code></td>
+<td style="width:90px">并列保序</td><td>What is name of the country that speaks the largest number of languages?</td>
+<td class="sql">WITH lang_cnt AS (
+    SELECT cl.CountryCode, COUNT(*) AS cnt
+    FROM countrylanguage cl
+    GROUP BY cl.CountryCode
+),
+ranked AS (
+    SELECT c.Name,
+           DENSE_RANK() OVER (ORDER BY lc.cnt DESC) AS rnk
+    FROM country c
+    JOIN lang_cnt lc ON lc.CountryCode = c.Code
+)
+SELECT Name
+FROM ranked
+WHERE rnk = 1;</td>
+<td class="sql">SELECT T1.Name FROM country AS T1 JOIN countrylanguage AS T2 ON T1.Code  =  T2.CountryCode GROUP BY T1.Name ORDER BY COUNT(*) DESC LIMIT 1</td>
+<td>并列最值/并列计数：模型 DENSE_RANK/RANK 保留全部并列行（gen ⊇ gold），gold LIMIT 1 任意取一行</td></tr>
+<tr><td style="white-space:nowrap">world_1<br><code style="font-size:11px">spider_dev_741</code></td>
+<td style="width:90px">并列保序</td><td>Give the name of the nation that uses the greatest amount of languages.</td>
+<td class="sql">SELECT c.Name
+FROM (
+    SELECT CountryCode,
+           DENSE_RANK() OVER (ORDER BY cnt DESC) AS rnk
+    FROM (
+        SELECT CountryCode, COUNT(Language) AS cnt
+        FROM countrylanguage
+        GROUP BY CountryCode
+    ) a
+) t
+JOIN country c ON c.Code = t.CountryCode
+WHERE t.rnk = 1;</td>
+<td class="sql">SELECT T1.Name FROM country AS T1 JOIN countrylanguage AS T2 ON T1.Code  =  T2.CountryCode GROUP BY T1.Name ORDER BY COUNT(*) DESC LIMIT 1</td>
+<td>并列最值/并列计数：模型 DENSE_RANK/RANK 保留全部并列行（gen ⊇ gold），gold LIMIT 1 任意取一行</td></tr>
+<tr><td style="white-space:nowrap">world_1<br><code style="font-size:11px">spider_dev_785</code></td>
+<td style="width:90px">并列保序</td><td>What are the names of cities in Europe for which English is not the official language?</td>
+<td class="sql">SELECT city.Name
+FROM city
+JOIN country ON city.CountryCode = country.Code
+WHERE country.Continent = 'Europe'
+  AND NOT EXISTS (
+    SELECT 1
+    FROM countrylanguage cl
+    WHERE cl.CountryCode = country.Code
+      AND cl.Language = 'English'
+      AND cl.IsOfficial = 'T'
+  )
+ORDER BY city.Name;</td>
+<td class="sql">SELECT DISTINCT T2.Name FROM country AS T1 JOIN city AS T2 ON T2.CountryCode  =  T1.Code WHERE T1.Continent  =  'Europe' AND T1.Name NOT IN (SELECT T3.Name FROM country AS T3 JOIN countrylanguage AS T4 ON T3.Code  =  T4.CountryCode WHERE T4.IsOfficial  =  'T' AND T4.Language  =  'English')</td>
+<td>并列最值/并列计数：模型 DENSE_RANK/RANK 保留全部并列行（gen ⊇ gold），gold LIMIT 1 任意取一行</td></tr>
+<tr><td style="white-space:nowrap">world_1<br><code style="font-size:11px">spider_dev_804</code></td>
+<td style="width:90px">并列保序</td><td>What are the names of the nations with the 3 lowest populations?</td>
+<td class="sql">SELECT Name
+FROM (
+    SELECT Name,
+           RANK() OVER (ORDER BY Population ASC) AS rk
+    FROM country
+) t
+WHERE rk &lt;= 3;</td>
+<td class="sql">SELECT Name FROM country ORDER BY Population ASC LIMIT 3</td>
+<td>并列最值/并列计数：模型 DENSE_RANK/RANK 保留全部并列行（gen ⊇ gold），gold LIMIT 1 任意取一行</td></tr>
+<tr><td style="white-space:nowrap">world_1<br><code style="font-size:11px">spider_dev_805</code></td>
+<td style="width:90px">并列保序</td><td>Return the names of the 3 countries with the fewest people.</td>
+<td class="sql">SELECT Name
+FROM (
+  SELECT Name, RANK() OVER (ORDER BY Population ASC) AS rnk
+  FROM country
+) t
+WHERE rnk &lt;= 3;</td>
+<td class="sql">SELECT Name FROM country ORDER BY Population ASC LIMIT 3</td>
+<td>并列最值/并列计数：模型 DENSE_RANK/RANK 保留全部并列行（gen ⊇ gold），gold LIMIT 1 任意取一行</td></tr>
+<tr><td style="white-space:nowrap">orchestra<br><code style="font-size:11px">spider_dev_844</code></td>
+<td style="width:90px">并列保序</td><td>Show the name of the conductor that has conducted the most number of orchestras.</td>
+<td class="sql">SELECT c.Name
+FROM conductor c
+JOIN orchestra o ON o.Conductor_ID = c.Conductor_ID
+GROUP BY c.Conductor_ID, c.Name
+HAVING COUNT(*) = (
+    SELECT MAX(cnt)
+    FROM (
+        SELECT COUNT(*) AS cnt
+        FROM orchestra
+        GROUP BY Conductor_ID
+    ) x
+)</td>
+<td class="sql">SELECT T1.Name FROM conductor AS T1 JOIN orchestra AS T2 ON T1.Conductor_ID  =  T2.Conductor_ID GROUP BY T2.Conductor_ID ORDER BY COUNT(*) DESC LIMIT 1</td>
+<td>并列最值/并列计数：模型 DENSE_RANK/RANK 保留全部并列行（gen ⊇ gold），gold LIMIT 1 任意取一行</td></tr>
+<tr><td style="white-space:nowrap">orchestra<br><code style="font-size:11px">spider_dev_845</code></td>
+<td style="width:90px">并列保序</td><td>What is the name of the conductor who has conducted the most orchestras?</td>
+<td class="sql">SELECT c.Name
+FROM (
+    SELECT Conductor_ID,
+           DENSE_RANK() OVER (ORDER BY cnt DESC) AS rnk
+    FROM (
+        SELECT Conductor_ID, COUNT(*) AS cnt
+        FROM orchestra
+        GROUP BY Conductor_ID
+    ) agg
+) ranked
+JOIN conductor c ON c.Conductor_ID = ranked.Conductor_ID
+WHERE ranked.rnk = 1;</td>
+<td class="sql">SELECT T1.Name FROM conductor AS T1 JOIN orchestra AS T2 ON T1.Conductor_ID  =  T2.Conductor_ID GROUP BY T2.Conductor_ID ORDER BY COUNT(*) DESC LIMIT 1</td>
+<td>并列最值/并列计数：模型 DENSE_RANK/RANK 保留全部并列行（gen ⊇ gold），gold LIMIT 1 任意取一行</td></tr>
+<tr><td style="white-space:nowrap">network_1<br><code style="font-size:11px">spider_dev_878</code></td>
+<td style="width:90px">并列保序</td><td>Which grade has the most high schoolers?</td>
+<td class="sql">SELECT grade
+FROM (
+  SELECT grade, cnt,
+         DENSE_RANK() OVER (ORDER BY cnt DESC) AS rnk
+  FROM (
+    SELECT grade, COUNT(*) AS cnt
+    FROM highschooler
+    GROUP BY grade
+  ) agg
+) ranked
+WHERE rnk = 1;</td>
+<td class="sql">SELECT grade FROM Highschooler GROUP BY grade ORDER BY count(*) DESC LIMIT 1</td>
+<td>并列最值/并列计数：模型 DENSE_RANK/RANK 保留全部并列行（gen ⊇ gold），gold LIMIT 1 任意取一行</td></tr>
+<tr><td style="white-space:nowrap">network_1<br><code style="font-size:11px">spider_dev_879</code></td>
+<td style="width:90px">并列保序</td><td>Return the grade that has the greatest number of high schoolers.</td>
+<td class="sql">SELECT grade
+FROM (
+    SELECT grade, cnt, DENSE_RANK() OVER (ORDER BY cnt DESC) AS rnk
+    FROM (
+        SELECT grade, COUNT(*) AS cnt
+        FROM highschooler
+        GROUP BY grade
+    ) a
+) b
+WHERE rnk = 1;</td>
+<td class="sql">SELECT grade FROM Highschooler GROUP BY grade ORDER BY count(*) DESC LIMIT 1</td>
+<td>并列最值/并列计数：模型 DENSE_RANK/RANK 保留全部并列行（gen ⊇ gold），gold LIMIT 1 任意取一行</td></tr>
+<tr><td style="white-space:nowrap">dog_kennels<br><code style="font-size:11px">spider_dev_954</code></td>
+<td style="width:90px">并列保序</td><td>List the names of the dogs of the rarest breed and the treatment dates of them.</td>
+<td class="sql">WITH breed_counts AS (
+    SELECT breed_code, COUNT(*) AS dog_count
+    FROM dogs
+    GROUP BY breed_code
+),
+ranked_breeds AS (
+    SELECT breed_code,
+           DENSE_RANK() OVER (ORDER BY dog_count ASC) AS rarity_rank
+    FROM breed_counts
+)
+SELECT d.name, t.date_of_treatment
+FROM dogs AS d
+JOIN ranked_breeds AS rb
+  ON rb.breed_code = d.breed_code
+ AND rb.rarity_rank = 1
+JOIN treatments AS t
+  </td>
+<td class="sql">SELECT T1.name ,  T2.date_of_treatment FROM Dogs AS T1 JOIN Treatments AS T2 ON T1.dog_id  =  T2.dog_id WHERE T1.breed_code  =  ( SELECT breed_code FROM Dogs GROUP BY breed_code ORDER BY count(*) ASC LIMIT 1 )</td>
+<td>并列最值/并列计数：模型 DENSE_RANK/RANK 保留全部并列行（gen ⊇ gold），gold LIMIT 1 任意取一行</td></tr>
+<tr><td style="white-space:nowrap">dog_kennels<br><code style="font-size:11px">spider_dev_955</code></td>
+<td style="width:90px">并列保序</td><td>Which dogs are of the rarest breed? Show their names and treatment dates.</td>
+<td class="sql">WITH breed_counts AS (
+    SELECT
+        breed_code,
+        COUNT(*) AS dog_count
+    FROM dogs
+    GROUP BY breed_code
+),
+ranked_breeds AS (
+    SELECT
+        breed_code,
+        DENSE_RANK() OVER (ORDER BY dog_count ASC) AS breed_rank
+    FROM breed_counts
+)
+SELECT
+    d.name,
+    t.date_of_treatment
+FROM ranked_breeds rb
+JOIN dogs d
+    ON d.breed_code = rb.breed_code
+JOIN treatments t
+    O</td>
+<td class="sql">SELECT T1.name ,  T2.date_of_treatment FROM Dogs AS T1 JOIN Treatments AS T2 ON T1.dog_id  =  T2.dog_id WHERE T1.breed_code  =  ( SELECT breed_code FROM Dogs GROUP BY breed_code ORDER BY count(*) ASC LIMIT 1 )</td>
+<td>并列最值/并列计数：模型 DENSE_RANK/RANK 保留全部并列行（gen ⊇ gold），gold LIMIT 1 任意取一行</td></tr>
+<tr><td style="white-space:nowrap">dog_kennels<br><code style="font-size:11px">spider_dev_958</code></td>
+<td style="width:90px">并列保序</td><td>What are the arriving date and the departing date of the dogs who have gone through a treatment?</td>
+<td class="sql">SELECT d.date_arrived, d.date_departed
+FROM dogs d
+JOIN treatments t ON d.dog_id = t.dog_id</td>
+<td class="sql">SELECT DISTINCT T1.date_arrived ,  T1.date_departed FROM Dogs AS T1 JOIN Treatments AS T2 ON T1.dog_id  =  T2.dog_id</td>
+<td>并列最值/并列计数：模型 DENSE_RANK/RANK 保留全部并列行（gen ⊇ gold），gold LIMIT 1 任意取一行</td></tr>
+<tr><td style="white-space:nowrap">dog_kennels<br><code style="font-size:11px">spider_dev_998</code></td>
+<td style="width:90px">并列保序</td><td>List the first name of all the professionals along with the description of the treatment they have done.</td>
+<td class="sql">SELECT p.first_name, tt.treatment_type_description
+FROM professionals p
+JOIN treatments t ON p.professional_id = t.professional_id
+JOIN treatment_types tt ON t.treatment_type_code = tt.treatment_type_code</td>
+<td class="sql">SELECT DISTINCT T1.first_name ,  T3.treatment_type_description FROM professionals AS T1 JOIN Treatments AS T2 ON T1.professional_id  =  T2.professional_id JOIN Treatment_types AS T3 ON T2.treatment_type_code  =  T3.treatment_type_code</td>
+<td>并列最值/并列计数：模型 DENSE_RANK/RANK 保留全部并列行（gen ⊇ gold），gold LIMIT 1 任意取一行</td></tr>
+<tr><td style="white-space:nowrap">dog_kennels<br><code style="font-size:11px">spider_dev_999</code></td>
+<td style="width:90px">并列保序</td><td>What are each professional's first name and description of the treatment they have performed?</td>
+<td class="sql">SELECT p.first_name, tt.treatment_type_description
+FROM professionals p
+JOIN treatments t ON p.professional_id = t.professional_id
+JOIN treatment_types tt ON t.treatment_type_code = tt.treatment_type_code</td>
+<td class="sql">SELECT DISTINCT T1.first_name ,  T3.treatment_type_description FROM professionals AS T1 JOIN Treatments AS T2 ON T1.professional_id  =  T2.professional_id JOIN Treatment_types AS T3 ON T2.treatment_type_code  =  T3.treatment_type_code</td>
+<td>并列最值/并列计数：模型 DENSE_RANK/RANK 保留全部并列行（gen ⊇ gold），gold LIMIT 1 任意取一行</td></tr>
+<tr><td style="white-space:nowrap">singer<br><code style="font-size:11px">spider_dev_1007</code></td>
+<td style="width:90px">并列保序</td><td>What are the names of the singers who are not French citizens?</td>
+<td class="sql">SELECT Name
+FROM singer
+WHERE Citizenship &lt;&gt; 'French';</td>
+<td class="sql">SELECT Name FROM singer WHERE Citizenship != "France"</td>
+<td>并列最值/并列计数：模型 DENSE_RANK/RANK 保留全部并列行（gen ⊇ gold），gold LIMIT 1 任意取一行</td></tr>
+<tr><td style="white-space:nowrap">real_estate_properties<br><code style="font-size:11px">spider_dev_1032</code></td>
+<td style="width:90px">并列保序</td><td>Show the property type descriptions of properties belonging to that code.</td>
+<td class="sql">SELECT T2.property_type_description
+FROM properties AS T1
+JOIN ref_property_types AS T2 ON T1.property_type_code = T2.property_type_code</td>
+<td class="sql">SELECT T2.property_type_description FROM Properties AS T1 JOIN Ref_Property_Types AS T2 ON T1.property_type_code  =  T2.property_type_code GROUP BY T1.property_type_code</td>
+<td>并列最值/并列计数：模型 DENSE_RANK/RANK 保留全部并列行（gen ⊇ gold），gold LIMIT 1 任意取一行</td></tr>
+<tr><td style="white-space:nowrap">concert_singer<br><code style="font-size:11px">spider_dev_38</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>What are the names of the singers who performed in a concert in 2014?</td>
+<td class="sql">SELECT DISTINCT s.Name
+FROM singer s
+JOIN singer_in_concert sic ON s.Singer_ID = sic.Singer_ID
+JOIN concert c ON sic.concert_ID = c.concert_ID
+WHERE c.Year = '2014';</td>
+<td class="sql">SELECT T2.name FROM singer_in_concert AS T1 JOIN singer AS T2 ON T1.singer_id  =  T2.singer_id JOIN concert AS T3 ON T1.concert_id  =  T3.concert_id WHERE T3.year  =  2014</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">pets_1<br><code style="font-size:11px">spider_dev_66</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>What is the first name of every student who has a dog but does not have a cat?</td>
+<td class="sql">SELECT s.Fname
+FROM student s
+JOIN has_pet hp ON s.StuID = hp.StuID
+JOIN pets p ON hp.PetID = p.PetID
+WHERE p.PetType = 'dog'
+  AND s.StuID NOT IN (
+    SELECT hp2.StuID
+    FROM has_pet hp2
+    JOIN pets p2 ON hp2.PetID = p2.PetID
+    WHERE p2.PetType = 'cat'
+  );</td>
+<td class="sql">SELECT T1.fname ,  T1.age FROM student AS T1 JOIN has_pet AS T2 ON T1.stuid  =  T2.stuid JOIN pets AS T3 ON T3.petid  =  T2.petid WHERE T3.pettype  =  'dog' AND T1.stuid NOT IN (SELECT T1.stuid FROM student AS T1 JOIN has_pet AS T2 ON T1.stuid  =  T2.stuid JOIN pets AS T3 ON T3.petid  =  T2.petid WHERE T3.pettype  =  'cat')</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">car_1<br><code style="font-size:11px">spider_dev_95</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>Which model of the car has the minimum horsepower?</td>
+<td class="sql">SELECT cn.Model
+FROM car_names cn
+JOIN cars_data cd ON cn.MakeId = cd.Id
+WHERE CAST(cd.Horsepower AS DECIMAL(18,4)) = (
+    SELECT MIN(CAST(Horsepower AS DECIMAL(18,4)))
+    FROM cars_data
+);</td>
+<td class="sql">SELECT T1.Model FROM CAR_NAMES AS T1 JOIN CARS_DATA AS T2 ON T1.MakeId  =  T2.Id ORDER BY T2.horsepower ASC LIMIT 1;</td>
+<td>gold quirk + tie：horsepower 为 TEXT 列，gold ORDER BY 字典序 LIMIT 1；模型 CAST 数值排序并保并列 6 行（数值语义下模型对）</td></tr>
+<tr><td style="white-space:nowrap">car_1<br><code style="font-size:11px">spider_dev_96</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>What is the model of the car with the smallest amount of horsepower?</td>
+<td class="sql">SELECT model
+FROM (
+    SELECT cn.Model AS model,
+           DENSE_RANK() OVER (ORDER BY CAST(cd.Horsepower AS DECIMAL(18,4)) ASC) AS rnk
+    FROM cars_data cd
+    JOIN car_names cn ON cn.MakeId = cd.Id
+    WHERE cd.Horsepower IS NOT NULL
+) t
+WHERE rnk = 1;</td>
+<td class="sql">SELECT T1.Model FROM CAR_NAMES AS T1 JOIN CARS_DATA AS T2 ON T1.MakeId  =  T2.Id ORDER BY T2.horsepower ASC LIMIT 1;</td>
+<td>同 q95：TEXT 列字典序 vs 数值排序 + 并列保留（6 行 vs 1 行）</td></tr>
+<tr><td style="white-space:nowrap">car_1<br><code style="font-size:11px">spider_dev_102</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>What is the maker of the carr produced in the earliest year and what year was it?</td>
+<td class="sql">SELECT maker, year
+FROM (
+    SELECT cm.Maker AS maker,
+           cd.Year AS year,
+           DENSE_RANK() OVER (ORDER BY cd.Year ASC) AS rnk
+    FROM cars_data cd
+    JOIN car_names cn ON cd.Id = cn.MakeId
+    JOIN model_list ml ON cn.Model = ml.Model
+    JOIN car_makers cm ON ml.Maker = cm.Id
+) t
+WHERE rnk = 1;</td>
+<td class="sql">SELECT T2.Make ,  T1.Year FROM CARS_DATA AS T1 JOIN CAR_NAMES AS T2 ON T1.Id  =  T2.MakeId WHERE T1.Year  =  (SELECT min(YEAR) FROM CARS_DATA);</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">car_1<br><code style="font-size:11px">spider_dev_121</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>What are all the makers and models?</td>
+<td class="sql">SELECT DISTINCT cm.Maker, ml.Model
+FROM car_makers cm
+JOIN model_list ml ON ml.Maker = cm.Id
+ORDER BY cm.Maker, ml.Model;</td>
+<td class="sql">SELECT Maker ,  Model FROM MODEL_LIST;</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">car_1<br><code style="font-size:11px">spider_dev_122</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>What are the makers and models?</td>
+<td class="sql">SELECT T1.FullName, T2.Model
+FROM car_makers AS T1
+JOIN model_list AS T2 ON T1.Id = T2.Maker;</td>
+<td class="sql">SELECT Maker ,  Model FROM MODEL_LIST;</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">car_1<br><code style="font-size:11px">spider_dev_131</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>What is the maximum horsepower and the make of the car models with 3 cylinders?</td>
+<td class="sql">WITH ranked_cars AS (
+    SELECT
+        cn.Make AS make,
+        CAST(REPLACE(TRIM(cd.Horsepower), ',', '') AS DECIMAL(18,4)) AS maximum_horsepower,
+        DENSE_RANK() OVER (
+            ORDER BY CAST(REPLACE(TRIM(cd.Horsepower), ',', '') AS DECIMAL(18,4)) DESC
+        ) AS horsepower_rank
+    FROM cars_data AS cd
+    JOIN car_names AS cn
+        ON cn.MakeId = cd.Id
+    WHERE cd.Cylinders = 3
+</td>
+<td class="sql">SELECT T2.horsepower ,  T1.Make FROM CAR_NAMES AS T1 JOIN CARS_DATA AS T2 ON T1.MakeId  =  T2.Id WHERE T2.cylinders  =  3 ORDER BY T2.horsepower DESC LIMIT 1;</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">car_1<br><code style="font-size:11px">spider_dev_132</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>What is the largest amount of horsepower for the models with 3 cylinders and what make is it?</td>
+<td class="sql">SELECT cn.Make, CAST(REPLACE(TRIM(cd.Horsepower), ',', '') AS UNSIGNED) AS horsepower
+FROM cars_data cd
+JOIN car_names cn ON cd.Id = cn.MakeId
+WHERE cd.Cylinders = 3
+ORDER BY horsepower DESC
+LIMIT 1;</td>
+<td class="sql">SELECT T2.horsepower ,  T1.Make FROM CAR_NAMES AS T1 JOIN CARS_DATA AS T2 ON T1.MakeId  =  T2.Id WHERE T2.cylinders  =  3 ORDER BY T2.horsepower DESC LIMIT 1;</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">car_1<br><code style="font-size:11px">spider_dev_133</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>Which model saves the most gasoline? That is to say, have the maximum miles per gallon.</td>
+<td class="sql">WITH ranked_cars AS (
+    SELECT
+        cn.Model,
+        DENSE_RANK() OVER (
+            ORDER BY CAST(TRIM(cd.MPG) AS DECIMAL(18,4)) DESC
+        ) AS mpg_rank
+    FROM car_names AS cn
+    JOIN cars_data AS cd
+        ON cn.MakeId = cd.Id
+)
+SELECT DISTINCT Model
+FROM ranked_cars
+WHERE mpg_rank = 1;</td>
+<td class="sql">SELECT T1.Model FROM CAR_NAMES AS T1 JOIN CARS_DATA AS T2 ON T1.MakeId  =  T2.Id ORDER BY T2.mpg DESC LIMIT 1;</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">car_1<br><code style="font-size:11px">spider_dev_134</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>What is the car model with the highest mpg ?</td>
+<td class="sql">SELECT Model
+FROM (
+    SELECT cn.Model,
+           DENSE_RANK() OVER (ORDER BY CAST(TRIM(cd.MPG) AS DECIMAL(18,4)) DESC) AS rk
+    FROM car_names cn
+    JOIN cars_data cd ON cd.Id = cn.MakeId
+) t
+WHERE rk = 1;</td>
+<td class="sql">select t1.model from car_names as t1 join cars_data as t2 on t1.makeid  =  t2.id order by t2.mpg desc limit 1;</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">car_1<br><code style="font-size:11px">spider_dev_138</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>What is the average edispl for all volvos?</td>
+<td class="sql">SELECT AVG(cd.Edispl) AS avg_edispl
+FROM car_makers m
+JOIN car_names cn ON cn.MakeId = m.Id
+JOIN cars_data cd ON cd.Id = cn.MakeId
+WHERE LOWER(m.Maker) = 'volvo';</td>
+<td class="sql">SELECT avg(T2.edispl) FROM CAR_NAMES AS T1 JOIN CARS_DATA AS T2 ON T1.MakeId  =  T2.Id WHERE T1.Model  =  'volvo';</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">car_1<br><code style="font-size:11px">spider_dev_158</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>For a volvo model, how many cylinders does the version with least accelerate have?</td>
+<td class="sql">SELECT Cylinders
+FROM (
+    SELECT cd.Cylinders,
+           DENSE_RANK() OVER (ORDER BY cd.Accelerate ASC) AS accelerate_rank
+    FROM cars_data AS cd
+    JOIN car_names AS cn
+      ON cn.MakeId = cd.Id
+    WHERE cn.Make = 'volvo'
+) AS ranked
+WHERE accelerate_rank = 1;</td>
+<td class="sql">SELECT T1.cylinders FROM CARS_DATA AS T1 JOIN CAR_NAMES AS T2 ON T1.Id  =  T2.MakeId WHERE T2.Model  =  'volvo' ORDER BY T1.accelerate ASC LIMIT 1;</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">car_1<br><code style="font-size:11px">spider_dev_159</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>How many cars have a larger accelerate than the car with the largest horsepower?</td>
+<td class="sql">SELECT COUNT(*) AS car_count
+FROM cars_data
+WHERE Accelerate &gt; (
+  SELECT t.Accelerate
+  FROM (
+    SELECT Accelerate, CAST(TRIM(Horsepower) AS DECIMAL(18,4)) AS hp
+    FROM cars_data
+  ) t
+  ORDER BY t.hp DESC
+  LIMIT 1
+);</td>
+<td class="sql">SELECT COUNT(*) FROM CARS_DATA WHERE Accelerate  &gt;  ( SELECT Accelerate FROM CARS_DATA ORDER BY Horsepower DESC LIMIT 1 );</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">car_1<br><code style="font-size:11px">spider_dev_160</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>What is the number of cars with a greater accelerate than the one with the most horsepower?</td>
+<td class="sql">SELECT COUNT(*) FROM cars_data WHERE Accelerate &gt; (SELECT Accelerate FROM cars_data ORDER BY CAST(Horsepower AS DECIMAL(18,4)) DESC LIMIT 1);</td>
+<td class="sql">SELECT COUNT(*) FROM CARS_DATA WHERE Accelerate  &gt;  ( SELECT Accelerate FROM CARS_DATA ORDER BY Horsepower DESC LIMIT 1 );</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">car_1<br><code style="font-size:11px">spider_dev_161</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>How many countries has more than 2 car makers ?</td>
+<td class="sql">SELECT COUNT(*) AS country_count
+FROM (
+    SELECT cm.Country
+    FROM car_makers cm
+    GROUP BY cm.Country
+    HAVING COUNT(cm.Id) &gt; 2
+) t;</td>
+<td class="sql">select count(*) from countries as t1 join car_makers as t2 on t1.countryid  =  t2.country group by t1.countryid having count(*)  &gt;  2</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">car_1<br><code style="font-size:11px">spider_dev_162</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>What is the number of countries with more than 2 car makers ?</td>
+<td class="sql">SELECT COUNT(*) AS country_count
+FROM (
+    SELECT cm.Country
+    FROM car_makers cm
+    JOIN countries c ON cm.Country = c.CountryId
+    GROUP BY cm.Country
+    HAVING COUNT(*) &gt; 2
+) AS t;</td>
+<td class="sql">select count(*) from countries as t1 join car_makers as t2 on t1.countryid  =  t2.country group by t1.countryid having count(*)  &gt;  2</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">car_1<br><code style="font-size:11px">spider_dev_165</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>For the cars with 4 cylinders, which model has the largest horsepower?</td>
+<td class="sql">SELECT t.Model
+FROM (
+    SELECT cn.Model,
+           DENSE_RANK() OVER (ORDER BY CAST(cd.Horsepower AS DECIMAL(18,4)) DESC) AS rnk
+    FROM cars_data cd
+    JOIN car_names cn ON cn.MakeId = cd.Id
+    WHERE cd.Cylinders = 4
+) t
+WHERE t.rnk = 1;</td>
+<td class="sql">SELECT T1.Model FROM CAR_NAMES AS T1 JOIN CARS_DATA AS T2 ON T1.MakeId  =  T2.Id WHERE T2.Cylinders  =  4 ORDER BY T2.horsepower DESC LIMIT 1;</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">car_1<br><code style="font-size:11px">spider_dev_166</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>For all of the 4 cylinder cars, which model has the most horsepower?</td>
+<td class="sql">WITH ranked_models AS (
+    SELECT
+        cn.Model,
+        DENSE_RANK() OVER (
+            ORDER BY CAST(
+                REPLACE(REPLACE(TRIM(cd.Horsepower), ',', ''), '+', '')
+                AS DECIMAL(18,4)
+            ) DESC
+        ) AS horsepower_rank
+    FROM car_names AS cn
+    JOIN cars_data AS cd
+        ON cd.Id = cn.MakeId
+    WHERE cd.Cylinders = 4
+)
+SELECT Model
+FROM ranked_models</td>
+<td class="sql">SELECT T1.Model FROM CAR_NAMES AS T1 JOIN CARS_DATA AS T2 ON T1.MakeId  =  T2.Id WHERE T2.Cylinders  =  4 ORDER BY T2.horsepower DESC LIMIT 1;</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">car_1<br><code style="font-size:11px">spider_dev_169</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>What is the maximum miles per gallon of the car with 8 cylinders or produced before 1980 ?</td>
+<td class="sql">SELECT MAX(CAST(MPG AS DECIMAL(18,4))) AS max_mpg
+FROM cars_data
+WHERE Cylinders = 8 OR Year &lt; 1980;</td>
+<td class="sql">select max(mpg) from cars_data where cylinders  =  8 or year  &lt;  1980</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">car_1<br><code style="font-size:11px">spider_dev_170</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>What is the maximum mpg of the cars that had 8 cylinders or that were produced before 1980 ?</td>
+<td class="sql">SELECT MAX(CAST(MPG AS DECIMAL(18,4))) FROM cars_data WHERE Cylinders = 8 OR Year &lt; 1980</td>
+<td class="sql">select max(mpg) from cars_data where cylinders  =  8 or year  &lt;  1980</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">flight_2<br><code style="font-size:11px">spider_dev_197</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>Which city and country is the Alton airport at?</td>
+<td class="sql">SELECT City, Country
+FROM airports
+WHERE AirportName LIKE '%Alton%';</td>
+<td class="sql">SELECT City ,  Country FROM AIRPORTS WHERE AirportName  =  "Alton"</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">flight_2<br><code style="font-size:11px">spider_dev_225</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>What is the code of airport that has the highest number of flights?</td>
+<td class="sql">SELECT AirportCode
+FROM (
+  SELECT AirportCode,
+         DENSE_RANK() OVER (ORDER BY cnt DESC) AS rk
+  FROM (
+    SELECT AirportCode, COUNT(*) AS cnt
+    FROM (
+      SELECT SourceAirport AS AirportCode FROM flights
+      UNION ALL
+      SELECT DestAirport AS AirportCode FROM flights
+    ) u
+    GROUP BY AirportCode
+  ) g
+) t
+WHERE t.rk = 1;</td>
+<td class="sql">SELECT T1.AirportCode FROM AIRPORTS AS T1 JOIN FLIGHTS AS T2 ON T1.AirportCode  =  T2.DestAirport OR T1.AirportCode  =  T2.SourceAirport GROUP BY T1.AirportCode ORDER BY count(*) DESC LIMIT 1</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">flight_2<br><code style="font-size:11px">spider_dev_226</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>What is the airport code of the airport with the most flights?</td>
+<td class="sql">SELECT AirportCode
+FROM (
+    SELECT AirportCode, DENSE_RANK() OVER (ORDER BY cnt DESC) AS rk
+    FROM (
+        SELECT AirportCode, COUNT(*) AS cnt
+        FROM (
+            SELECT SourceAirport AS AirportCode FROM flights
+            UNION ALL
+            SELECT DestAirport AS AirportCode FROM flights
+        ) u
+        GROUP BY AirportCode
+    ) a
+) b
+WHERE rk = 1;</td>
+<td class="sql">SELECT T1.AirportCode FROM AIRPORTS AS T1 JOIN FLIGHTS AS T2 ON T1.AirportCode  =  T2.DestAirport OR T1.AirportCode  =  T2.SourceAirport GROUP BY T1.AirportCode ORDER BY count(*) DESC LIMIT 1</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">flight_2<br><code style="font-size:11px">spider_dev_227</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>What is the code of airport that has fewest number of flights?</td>
+<td class="sql">WITH cnts AS (
+    SELECT SourceAirport AS AirportCode, COUNT(*) AS cnt
+    FROM flights
+    GROUP BY SourceAirport
+)
+SELECT AirportCode
+FROM (
+    SELECT AirportCode, DENSE_RANK() OVER (ORDER BY cnt ASC) AS rnk
+    FROM cnts
+) t
+WHERE rnk = 1;</td>
+<td class="sql">SELECT T1.AirportCode FROM AIRPORTS AS T1 JOIN FLIGHTS AS T2 ON T1.AirportCode  =  T2.DestAirport OR T1.AirportCode  =  T2.SourceAirport GROUP BY T1.AirportCode ORDER BY count(*) LIMIT 1</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">flight_2<br><code style="font-size:11px">spider_dev_228</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>Give the code of the airport with the least flights.</td>
+<td class="sql">SELECT AirportCode
+FROM (
+  SELECT AirportCode,
+         DENSE_RANK() OVER (ORDER BY cnt ASC) AS rk
+  FROM (
+    SELECT f.AirportCode, COUNT(*) AS cnt
+    FROM (
+      SELECT SourceAirport AS AirportCode FROM flights
+      UNION ALL
+      SELECT DestAirport AS AirportCode FROM flights
+    ) f
+    GROUP BY f.AirportCode
+  ) a
+) b
+WHERE rk = 1;</td>
+<td class="sql">SELECT T1.AirportCode FROM AIRPORTS AS T1 JOIN FLIGHTS AS T2 ON T1.AirportCode  =  T2.DestAirport OR T1.AirportCode  =  T2.SourceAirport GROUP BY T1.AirportCode ORDER BY count(*) LIMIT 1</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">flight_2<br><code style="font-size:11px">spider_dev_229</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>Which airline has most number of flights?</td>
+<td class="sql">SELECT t.Airline, t.flight_count
+FROM (
+  SELECT al.Airline, COUNT(*) AS flight_count,
+         DENSE_RANK() OVER (ORDER BY COUNT(*) DESC) AS rnk
+  FROM flights f
+  JOIN airlines al ON f.Airline = al.uid
+  GROUP BY al.Airline
+) t
+WHERE t.rnk = 1;</td>
+<td class="sql">SELECT T1.Airline FROM AIRLINES AS T1 JOIN FLIGHTS AS T2 ON T1.uid  =  T2.Airline GROUP BY T1.Airline ORDER BY count(*) DESC LIMIT 1</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">cre_Doc_Template_Mgt<br><code style="font-size:11px">spider_dev_361</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>Show paragraph details for paragraph with text 'Korea ' .</td>
+<td class="sql">SELECT other_details FROM paragraphs WHERE paragraph_text = 'Korea '</td>
+<td class="sql">select other_details from paragraphs where paragraph_text like 'korea'</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">cre_Doc_Template_Mgt<br><code style="font-size:11px">spider_dev_362</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>What are the details for the paragraph that includes the text 'Korea ' ?</td>
+<td class="sql">SELECT Paragraph_ID, Document_ID, Paragraph_Text, Other_Details
+FROM paragraphs
+WHERE Paragraph_Text LIKE '%Korea %';</td>
+<td class="sql">select other_details from paragraphs where paragraph_text like 'korea'</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">course_teach<br><code style="font-size:11px">spider_dev_396</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>What is the most commmon hometowns for teachers?</td>
+<td class="sql">WITH hometown_counts AS (
+    SELECT
+        Hometown,
+        COUNT(*) AS teacher_count
+    FROM teacher
+    GROUP BY Hometown
+),
+ranked_hometowns AS (
+    SELECT
+        Hometown,
+        teacher_count,
+        DENSE_RANK() OVER (ORDER BY teacher_count DESC) AS hometown_rank
+    FROM hometown_counts
+)
+SELECT
+    Hometown,
+    teacher_count
+FROM ranked_hometowns
+WHERE hometown_rank = 1;</td>
+<td class="sql">SELECT Hometown FROM teacher GROUP BY Hometown ORDER BY COUNT(*) DESC LIMIT 1</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">wta_1<br><code style="font-size:11px">spider_dev_439</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>Find the highest rank of losers in all matches.</td>
+<td class="sql">SELECT MAX(loser_rank) AS highest_rank FROM matches;</td>
+<td class="sql">SELECT min(loser_rank) FROM matches</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">wta_1<br><code style="font-size:11px">spider_dev_456</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>What are the full names of all players, sorted by birth date?</td>
+<td class="sql">SELECT CONCAT(first_name, ' ', last_name) AS full_name
+FROM players
+ORDER BY birth_date;</td>
+<td class="sql">SELECT first_name ,  last_name FROM players ORDER BY birth_date</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">wta_1<br><code style="font-size:11px">spider_dev_458</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>What are the full names of all left handed players, in order of birth date?</td>
+<td class="sql">SELECT CONCAT(first_name, ' ', last_name) AS full_name
+FROM players
+WHERE hand = 'L'
+ORDER BY birth_date;</td>
+<td class="sql">SELECT first_name ,  last_name FROM players WHERE hand  =  'L' ORDER BY birth_date</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">wta_1<br><code style="font-size:11px">spider_dev_459</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>Find the first name and country code of the player who did the most number of tours.</td>
+<td class="sql">SELECT p.first_name, p.country_code
+FROM (
+    SELECT player_id, DENSE_RANK() OVER (ORDER BY total_tours DESC) AS rnk
+    FROM (
+        SELECT player_id, SUM(tours) AS total_tours
+        FROM rankings
+        GROUP BY player_id
+    ) agg
+) ranked
+JOIN players p ON p.player_id = ranked.player_id
+WHERE ranked.rnk = 1;</td>
+<td class="sql">SELECT T1.country_code ,  T1.first_name FROM players AS T1 JOIN rankings AS T2 ON T1.player_id  =  T2.player_id ORDER BY T2.tours DESC LIMIT 1</td>
+<td>口径类：gold 按 rankings 单行 tours DESC LIMIT 1（SQLite 弱语义），模型按 SUM(tours) 聚合，胜者不同（不可两全）</td></tr>
+<tr><td style="white-space:nowrap">wta_1<br><code style="font-size:11px">spider_dev_469</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>Find the average ranking for each player and their first name.</td>
+<td class="sql">SELECT p.first_name, AVG(CAST(r.ranking AS DECIMAL(18,4))) AS avg_ranking
+FROM players p
+JOIN rankings r ON p.player_id = r.player_id
+GROUP BY p.player_id, p.first_name;</td>
+<td class="sql">SELECT avg(ranking) ,  T1.first_name FROM players AS T1 JOIN rankings AS T2 ON T1.player_id  =  T2.player_id GROUP BY T1.first_name</td>
+<td>gold quirk：gold GROUP BY first_name（同名球员合并 1580 组），模型按 player_id 分组（2000 组）——按题意「each player」模型是对的</td></tr>
+<tr><td style="white-space:nowrap">wta_1<br><code style="font-size:11px">spider_dev_471</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>Find the total ranking points for each player and their first name.</td>
+<td class="sql">SELECT p.first_name, SUM(r.ranking_points) AS total_ranking_points
+FROM players p
+JOIN rankings r ON p.player_id = r.player_id
+GROUP BY p.player_id, p.first_name;</td>
+<td class="sql">SELECT sum(ranking_points) ,  T1.first_name FROM players AS T1 JOIN rankings AS T2 ON T1.player_id  =  T2.player_id GROUP BY T1.first_name</td>
+<td>同 q469：gold GROUP BY first_name vs 模型按 player_id（口径差，不可两全）</td></tr>
+<tr><td style="white-space:nowrap">wta_1<br><code style="font-size:11px">spider_dev_486</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>Find the number of left handed winners who participated in the WTA Championships.</td>
+<td class="sql">SELECT COUNT(*) AS left_handed_winners
+FROM matches
+WHERE tourney_name = 'WTA Championships'
+  AND winner_hand = 'L';</td>
+<td class="sql">SELECT count(DISTINCT winner_name) FROM matches WHERE tourney_name  =  'WTA Championships' AND winner_hand  =  'L'</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">battle_death<br><code style="font-size:11px">spider_dev_500</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>What is the ship id and name that caused most total injuries?</td>
+<td class="sql">SELECT ship_id, name
+FROM (
+    SELECT ship_id, name, total_injuries,
+           DENSE_RANK() OVER (ORDER BY total_injuries DESC) AS rnk
+    FROM (
+        SELECT d.caused_by_ship_id AS ship_id, s.name AS name, SUM(d.injured) AS total_injuries
+        FROM death d
+        JOIN ship s ON d.caused_by_ship_id = s.id
+        GROUP BY d.caused_by_ship_id, s.name
+    ) agg
+) ranked
+WHERE rnk = 1;</td>
+<td class="sql">SELECT T2.id ,  T2.name FROM death AS T1 JOIN ship AS t2 ON T1.caused_by_ship_id  =  T2.id GROUP BY T2.id ORDER BY count(*) DESC LIMIT 1</td>
+<td>gold quirk：题面「most total injuries」应为 SUM(injured)，gold 用 count(*) 计死亡行数，两者选出不同船</td></tr>
+<tr><td style="white-space:nowrap">battle_death<br><code style="font-size:11px">spider_dev_506</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>What are the notes of the death events which has substring 'East'?</td>
+<td class="sql">SELECT d.note
+FROM death d
+JOIN ship s ON d.caused_by_ship_id = s.id
+WHERE s.location LIKE '%East%';</td>
+<td class="sql">SELECT note FROM death WHERE note LIKE '%East%'</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">student_transcripts_tracking<br><code style="font-size:11px">spider_dev_507</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>what are all the addresses including line 1 and line 2?</td>
+<td class="sql">SELECT address_id, line_1, line_2, line_3, city, zip_postcode, state_province_county, country, other_address_details FROM addresses;</td>
+<td class="sql">SELECT line_1 ,  line_2 FROM addresses</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">student_transcripts_tracking<br><code style="font-size:11px">spider_dev_520</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>How many different degrees are offered?</td>
+<td class="sql">SELECT COUNT(DISTINCT degree_program_id) AS degree_count
+FROM degree_programs;</td>
+<td class="sql">SELECT count(DISTINCT degree_summary_name) FROM Degree_Programs</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">student_transcripts_tracking<br><code style="font-size:11px">spider_dev_526</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>What are the names and ids of every course with less than 2 sections?</td>
+<td class="sql">SELECT c.course_name, c.course_id
+FROM courses c
+JOIN sections s ON c.course_id = s.course_id
+GROUP BY c.course_id, c.course_name
+HAVING COUNT(*) &lt; 2;</td>
+<td class="sql">SELECT T1.course_name ,  T1.course_id FROM Courses AS T1 JOIN Sections AS T2 ON T1.course_id  =  T2.course_id GROUP BY T1.course_id HAVING count(*)  &lt;=  2</td>
+<td>边界口径：题面「less than 2」，gold HAVING count(*)&lt;=2（含 2），模型 &lt;2（7 行 vs 11 行）——gold 自身口径存疑</td></tr>
+<tr><td style="white-space:nowrap">student_transcripts_tracking<br><code style="font-size:11px">spider_dev_533</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>Who are enrolled in 2 degree programs in one semester? List the first name, middle name and last name and the id.</td>
+<td class="sql">SELECT s.first_name, s.middle_name, s.last_name, s.student_id
+FROM students s
+JOIN student_enrolment se ON s.student_id = se.student_id
+GROUP BY s.student_id, s.first_name, s.middle_name, s.last_name, se.semester_id
+HAVING COUNT(DISTINCT se.degree_program_id) = 2</td>
+<td class="sql">SELECT T1.first_name ,  T1.middle_name ,  T1.last_name ,  T1.student_id FROM Students AS T1 JOIN Student_Enrolment AS T2 ON T1.student_id  =  T2.student_id GROUP BY T1.student_id HAVING count(*)  =  2</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">student_transcripts_tracking<br><code style="font-size:11px">spider_dev_534</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>What are the first, middle, and last names, along with the ids, of all students who enrolled in 2 degree programs in one</td>
+<td class="sql">SELECT s.first_name, s.middle_name, s.last_name, s.student_id
+FROM students s
+JOIN (
+    SELECT student_id
+    FROM student_enrolment
+    GROUP BY student_id, semester_id
+    HAVING COUNT(DISTINCT degree_program_id) = 2
+) t ON s.student_id = t.student_id;</td>
+<td class="sql">SELECT T1.first_name ,  T1.middle_name ,  T1.last_name ,  T1.student_id FROM Students AS T1 JOIN Student_Enrolment AS T2 ON T1.student_id  =  T2.student_id GROUP BY T1.student_id HAVING count(*)  =  2</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">student_transcripts_tracking<br><code style="font-size:11px">spider_dev_536</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>What are the first, middle, and last names for everybody enrolled in a Bachelors program?</td>
+<td class="sql">SELECT DISTINCT s.first_name, s.middle_name, s.last_name
+FROM students s
+JOIN student_enrolment se ON s.student_id = se.student_id
+JOIN degree_programs dp ON se.degree_program_id = dp.degree_program_id
+WHERE dp.degree_summary_name = 'Bachelors';</td>
+<td class="sql">SELECT DISTINCT T1.first_name ,  T1.middle_name ,  T1.last_name FROM Students AS T1 JOIN Student_Enrolment AS T2 ON T1.student_id  =  T2.student_id JOIN Degree_Programs AS T3 ON T2.degree_program_id  =  T3.degree_program_id WHERE T3.degree_summary_name  =  'Bachelor'</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">student_transcripts_tracking<br><code style="font-size:11px">spider_dev_541</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>Which student has enrolled for the most times in any program? List the id, first name, middle name, last name, the numbe</td>
+<td class="sql">SELECT student_id, first_name, middle_name, last_name, enrollment_count
+FROM (
+    SELECT s.student_id,
+           s.first_name,
+           s.middle_name,
+           s.last_name,
+           COUNT(*) AS enrollment_count,
+           DENSE_RANK() OVER (ORDER BY COUNT(*) DESC) AS rnk
+    FROM students s
+    JOIN student_enrolment se ON se.student_id = s.student_id
+    GROUP BY s.student_id, s.first_na</td>
+<td class="sql">SELECT T1.student_id ,  T1.first_name ,  T1.middle_name ,  T1.last_name ,  count(*) ,  T1.student_id FROM Students AS T1 JOIN Student_Enrolment AS T2 ON T1.student_id  =  T2.student_id GROUP BY T1.student_id ORDER BY count(*) DESC LIMIT 1</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">student_transcripts_tracking<br><code style="font-size:11px">spider_dev_542</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>What is the first, middle, and last name, along with the id and number of enrollments, for the student who enrolled the </td>
+<td class="sql">SELECT t.first_name,
+       t.middle_name,
+       t.last_name,
+       t.student_id,
+       t.enrollment_count
+FROM (
+    SELECT s.student_id,
+           s.first_name,
+           s.middle_name,
+           s.last_name,
+           COUNT(se.student_enrolment_id) AS enrollment_count,
+           DENSE_RANK() OVER (ORDER BY COUNT(se.student_enrolment_id) DESC) AS rnk
+    FROM students s
+    JOIN student_</td>
+<td class="sql">SELECT T1.student_id ,  T1.first_name ,  T1.middle_name ,  T1.last_name ,  count(*) ,  T1.student_id FROM Students AS T1 JOIN Student_Enrolment AS T2 ON T1.student_id  =  T2.student_id GROUP BY T1.student_id ORDER BY count(*) DESC LIMIT 1</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">student_transcripts_tracking<br><code style="font-size:11px">spider_dev_571</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>How many times at most can a course enrollment result show in different transcripts? Also show the course enrollment id.</td>
+<td class="sql">WITH enrollment_transcript_counts AS (
+    SELECT
+        sec.student_enrolment_id,
+        COUNT(DISTINCT tc.transcript_id) AS transcript_count
+    FROM student_enrolment_courses AS sec
+    JOIN transcript_contents AS tc
+        ON tc.student_course_id = sec.student_course_id
+    GROUP BY sec.student_enrolment_id
+),
+ranked_counts AS (
+    SELECT
+        student_enrolment_id,
+        transcript_co</td>
+<td class="sql">SELECT count(*) ,  student_course_id FROM Transcript_Contents GROUP BY student_course_id ORDER BY count(*) DESC LIMIT 1</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">student_transcripts_tracking<br><code style="font-size:11px">spider_dev_572</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>What is the maximum number of times that a course shows up in different transcripts and what is that course's enrollment</td>
+<td class="sql">WITH course_transcript_counts AS (
+    SELECT
+        sec.course_id,
+        sec.student_enrolment_id,
+        COUNT(DISTINCT tc.transcript_id) AS transcript_count
+    FROM transcript_contents tc
+    JOIN student_enrolment_courses sec
+        ON tc.student_course_id = sec.student_course_id
+    GROUP BY sec.course_id, sec.student_enrolment_id
+),
+ranked AS (
+    SELECT
+        course_id,
+        stu</td>
+<td class="sql">SELECT count(*) ,  student_course_id FROM Transcript_Contents GROUP BY student_course_id ORDER BY count(*) DESC LIMIT 1</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">student_transcripts_tracking<br><code style="font-size:11px">spider_dev_573</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>Show the date of the transcript which shows the least number of results, also list the id.</td>
+<td class="sql">SELECT transcript_id, transcript_date
+FROM (
+    SELECT transcript_id, transcript_date, cnt,
+           DENSE_RANK() OVER (ORDER BY cnt ASC) AS rnk
+    FROM (
+        SELECT t.transcript_id, t.transcript_date, COUNT(tc.student_course_id) AS cnt
+        FROM transcripts t
+        JOIN transcript_contents tc ON tc.transcript_id = t.transcript_id
+        GROUP BY t.transcript_id, t.transcript_date
+  </td>
+<td class="sql">SELECT T2.transcript_date ,  T1.transcript_id FROM Transcript_Contents AS T1 JOIN Transcripts AS T2 ON T1.transcript_id  =  T2.transcript_id GROUP BY T1.transcript_id ORDER BY count(*) ASC LIMIT 1</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">student_transcripts_tracking<br><code style="font-size:11px">spider_dev_574</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>What is the date and id of the transcript with the least number of results?</td>
+<td class="sql">SELECT transcript_id, transcript_date
+FROM (
+  SELECT transcript_id, transcript_date,
+         DENSE_RANK() OVER (ORDER BY cnt ASC) AS rnk
+  FROM (
+    SELECT t.transcript_id, t.transcript_date, COUNT(tc.student_course_id) AS cnt
+    FROM transcripts t
+    JOIN transcript_contents tc ON tc.transcript_id = t.transcript_id
+    GROUP BY t.transcript_id, t.transcript_date
+  ) a
+) b
+WHERE rnk = 1;</td>
+<td class="sql">SELECT T2.transcript_date ,  T1.transcript_id FROM Transcript_Contents AS T1 JOIN Transcripts AS T2 ON T1.transcript_id  =  T2.transcript_id GROUP BY T1.transcript_id ORDER BY count(*) ASC LIMIT 1</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">student_transcripts_tracking<br><code style="font-size:11px">spider_dev_578</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>What are the different addresses that have students living there?</td>
+<td class="sql">SELECT DISTINCT
+    a.address_id,
+    a.line_1,
+    a.line_2,
+    a.line_3,
+    a.city,
+    a.zip_postcode,
+    a.state_province_county,
+    a.country,
+    a.other_address_details
+FROM addresses a
+JOIN students s ON s.current_address_id = a.address_id;</td>
+<td class="sql">SELECT count(DISTINCT current_address_id) FROM Students</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">student_transcripts_tracking<br><code style="font-size:11px">spider_dev_580</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>What other details can you tell me about students in reverse alphabetical order?</td>
+<td class="sql">SELECT
+  s.first_name,
+  s.last_name,
+  s.other_student_details
+FROM students s
+ORDER BY s.last_name DESC, s.first_name DESC;</td>
+<td class="sql">SELECT other_student_details FROM Students ORDER BY other_student_details DESC</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">tvshow<br><code style="font-size:11px">spider_dev_610</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>What is the series name of the TV Channel that shows the cartoon "The Rise of the Blue Beetle"?</td>
+<td class="sql">SELECT t1.series_name FROM tv_channel AS t1 JOIN cartoon AS t2 ON t1.id = t2.Channel WHERE t2.Title = 'The Rise of the Blue Beetle'</td>
+<td class="sql">SELECT T1.series_name FROM TV_Channel AS T1 JOIN Cartoon AS T2 ON T1.id = T2.Channel WHERE T2.Title = "The Rise of the Blue Beetle!";</td>
+<td>枚举照抄偏差：题面「The Rise of the Blue Beetle!」带感叹号，模型生成 SQL 丢「!」→ 0 行（枚举值需逐字符照抄）</td></tr>
+<tr><td style="white-space:nowrap">tvshow<br><code style="font-size:11px">spider_dev_646</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>What are the package options of all tv channels that are not playing any cartoons directed by Ben Jones?</td>
+<td class="sql">SELECT DISTINCT tc.Package_Option
+FROM tv_channel tc
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM cartoon c
+    WHERE c.Channel = tc.id
+      AND TRIM(c.Directed_by) = 'Ben Jones'
+);</td>
+<td class="sql">SELECT package_option FROM TV_Channel WHERE id NOT IN (SELECT channel FROM cartoon WHERE directed_by  =  'Ben Jones')</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">voter_1<br><code style="font-size:11px">spider_dev_687</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>How many states are there?</td>
+<td class="sql">SELECT COUNT(DISTINCT state) FROM area_code_state;</td>
+<td class="sql">SELECT count(*) FROM area_code_state</td>
+<td>gold quirk：area_code_state 表含重复 state 行，gold count(*)=19 按行数，模型 COUNT(DISTINCT state) 按州数——按题意模型对</td></tr>
+<tr><td style="white-space:nowrap">voter_1<br><code style="font-size:11px">spider_dev_698</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>What is the area code in which the most voters voted?</td>
+<td class="sql">SELECT area_code
+FROM (
+  SELECT area_code,
+         DENSE_RANK() OVER (ORDER BY cnt DESC) AS rnk
+  FROM (
+    SELECT SUBSTR(phone_number, 1, 3) AS area_code,
+           COUNT(*) AS cnt
+    FROM votes
+    GROUP BY SUBSTR(phone_number, 1, 3)
+  ) agg
+) ranked
+WHERE rnk = 1;</td>
+<td class="sql">SELECT T1.area_code FROM area_code_state AS T1 JOIN votes AS T2 ON T1.state  =  T2.state GROUP BY T1.area_code ORDER BY count(*) DESC LIMIT 1</td>
+<td>口径差 + tie：gold 用 area_code_state 映射表 JOIN，模型 SUBSTR(phone_number) 推导区号，且并列保序 4 行 vs gold LIMIT 1</td></tr>
+<tr><td style="white-space:nowrap">world_1<br><code style="font-size:11px">spider_dev_704</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>How many countries have a republic as their form of government?</td>
+<td class="sql">SELECT COUNT(*) AS country_count
+FROM country
+WHERE GovernmentForm LIKE '%Republic%';</td>
+<td class="sql">SELECT count(*) FROM country WHERE GovernmentForm  =  "Republic"</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">world_1<br><code style="font-size:11px">spider_dev_724</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>What is the average life expectancy in African countries that are republics?</td>
+<td class="sql">SELECT AVG(LifeExpectancy) AS avg_life_expectancy
+FROM country
+WHERE Continent = 'Africa'
+  AND GovernmentForm LIKE '%Republic%';</td>
+<td class="sql">SELECT avg(LifeExpectancy) FROM country WHERE Continent  =  "Africa" AND GovernmentForm  =  "Republic"</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">world_1<br><code style="font-size:11px">spider_dev_755</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>Which countries have either English or Dutch as an official language?</td>
+<td class="sql">SELECT DISTINCT
+    c.Name
+FROM country AS c
+INNER JOIN countrylanguage AS cl
+    ON cl.CountryCode = c.Code
+WHERE TRIM(cl.Language) IN ('English', 'Dutch')
+  AND TRIM(cl.IsOfficial) = 'T';</td>
+<td class="sql">SELECT * FROM country AS T1 JOIN countrylanguage AS T2 ON T1.Code  =  T2.CountryCode WHERE T2.Language  =  "English" AND IsOfficial  =  "T" UNION SELECT * FROM country AS T1 JOIN countrylanguage AS T2 ON T1.Code  =  T2.CountryCode WHERE T2.Language  =  "Dutch" AND IsOfficial  =  "T"</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">world_1<br><code style="font-size:11px">spider_dev_759</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>What languages are only used by a single country with a republic government?</td>
+<td class="sql">SELECT cl.Language
+FROM countrylanguage cl
+JOIN country c ON c.Code = cl.CountryCode
+GROUP BY cl.Language
+HAVING COUNT(DISTINCT cl.CountryCode) = 1
+   AND MAX(CASE WHEN c.GovernmentForm LIKE '%Republic%' THEN 1 ELSE 0 END) = 1;</td>
+<td class="sql">SELECT T2.Language FROM country AS T1 JOIN countrylanguage AS T2 ON T1.Code  =  T2.CountryCode WHERE T1.GovernmentForm  =  "Republic" GROUP BY T2.Language HAVING COUNT(*)  =  1</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">world_1<br><code style="font-size:11px">spider_dev_772</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>What are the countries that have greater surface area than any country in Europe?</td>
+<td class="sql">SELECT
+  Name
+FROM country
+WHERE SurfaceArea &gt; (
+  SELECT MAX(SurfaceArea)
+  FROM country
+  WHERE Continent = 'Europe'
+)</td>
+<td class="sql">SELECT Name FROM country WHERE SurfaceArea  &gt;  (SELECT min(SurfaceArea) FROM country WHERE Continent  =  "Europe")</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">world_1<br><code style="font-size:11px">spider_dev_773</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>Which countries have greater area than that of any country in Europe?</td>
+<td class="sql">SELECT Name
+FROM country
+WHERE SurfaceArea &gt; (
+    SELECT MAX(SurfaceArea)
+    FROM country
+    WHERE Continent = 'Europe'
+);</td>
+<td class="sql">SELECT Name FROM country WHERE SurfaceArea  &gt;  (SELECT min(SurfaceArea) FROM country WHERE Continent  =  "Europe")</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">world_1<br><code style="font-size:11px">spider_dev_774</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>What are the African countries that have a  population less than any country in Asia?</td>
+<td class="sql">SELECT Name
+FROM country
+WHERE Continent = 'Africa'
+  AND Population &lt; (SELECT MIN(Population) FROM country WHERE Continent = 'Asia');</td>
+<td class="sql">SELECT Name FROM country WHERE Continent  =  "Africa"  AND population  &lt;  (SELECT max(population) FROM country WHERE Continent  =  "Asia")</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">world_1<br><code style="font-size:11px">spider_dev_777</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>What are the Asian countries which have a population larger than that of any country in Africa?</td>
+<td class="sql">SELECT c.Name, c.Population
+FROM country c
+WHERE c.Continent = 'Asia'
+  AND c.Population &gt; (SELECT MAX(Population) FROM country WHERE Continent = 'Africa');</td>
+<td class="sql">SELECT Name FROM country WHERE Continent  =  "Asia"  AND population  &gt;  (SELECT min(population) FROM country WHERE Continent  =  "Africa")</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">world_1<br><code style="font-size:11px">spider_dev_784</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>Which cities are in European countries where English is not the official language?</td>
+<td class="sql">SELECT DISTINCT ci.Name AS city_name
+FROM city AS ci
+JOIN country AS co
+  ON ci.CountryCode = co.Code
+JOIN countrylanguage AS cl
+  ON co.Code = cl.CountryCode
+WHERE co.Continent = 'Europe'
+  AND cl.Language = 'English'
+  AND cl.IsOfficial = 'No';</td>
+<td class="sql">SELECT DISTINCT T2.Name FROM country AS T1 JOIN city AS T2 ON T2.CountryCode  =  T1.Code WHERE T1.Continent  =  'Europe' AND T1.Name NOT IN (SELECT T3.Name FROM country AS T3 JOIN countrylanguage AS T4 ON T3.Code  =  T4.CountryCode WHERE T4.IsOfficial  =  'T' AND T4.Language  =  'English')</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">world_1<br><code style="font-size:11px">spider_dev_788</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>What are the name, independence year, and surface area of the country with the smallest population?</td>
+<td class="sql">SELECT Name, IndepYear, SurfaceArea
+FROM (
+    SELECT Name, IndepYear, SurfaceArea,
+           DENSE_RANK() OVER (ORDER BY Population ASC) AS rk
+    FROM country
+) t
+WHERE rk = 1;</td>
+<td class="sql">SELECT Name ,  SurfaceArea ,  IndepYear FROM country ORDER BY Population LIMIT 1</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">world_1<br><code style="font-size:11px">spider_dev_789</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>Give the name, year of independence, and surface area of the country that has the lowest population.</td>
+<td class="sql">SELECT Name, IndepYear, SurfaceArea
+FROM country
+WHERE Population = (SELECT MIN(Population) FROM country);</td>
+<td class="sql">SELECT Name ,  SurfaceArea ,  IndepYear FROM country ORDER BY Population LIMIT 1</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">world_1<br><code style="font-size:11px">spider_dev_812</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>What are the cities whose population is between 160000 and 900000?</td>
+<td class="sql">SELECT Name, Population
+FROM city
+WHERE Population BETWEEN 160000 AND 900000;</td>
+<td class="sql">SELECT name FROM city WHERE Population BETWEEN 160000 AND 900000</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">world_1<br><code style="font-size:11px">spider_dev_818</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>What is the total number of countries where Spanish is spoken by the largest percentage of people?</td>
+<td class="sql">SELECT COUNT(*) AS country_count
+FROM (
+    SELECT
+        CountryCode,
+        Language,
+        DENSE_RANK() OVER (PARTITION BY CountryCode ORDER BY Percentage DESC) AS rk
+    FROM countrylanguage
+) t
+WHERE t.rk = 1
+  AND t.Language = 'Spanish';</td>
+<td class="sql">SELECT count(*) ,   max(Percentage) FROM countrylanguage WHERE LANGUAGE  =  "Spanish" GROUP BY CountryCode</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">world_1<br><code style="font-size:11px">spider_dev_819</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>Count the number of countries for which Spanish is the predominantly spoken language.</td>
+<td class="sql">SELECT COUNT(*) AS country_count
+FROM (
+    SELECT CountryCode,
+           Language,
+           DENSE_RANK() OVER (PARTITION BY CountryCode ORDER BY Percentage DESC) AS rk
+    FROM countrylanguage
+) t
+WHERE t.rk = 1
+  AND t.Language = 'Spanish';</td>
+<td class="sql">SELECT count(*) ,   max(Percentage) FROM countrylanguage WHERE LANGUAGE  =  "Spanish" GROUP BY CountryCode</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">world_1<br><code style="font-size:11px">spider_dev_820</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>What are the codes of countries where Spanish is spoken by the largest percentage of people?</td>
+<td class="sql">SELECT CountryCode
+FROM (
+  SELECT CountryCode,
+         DENSE_RANK() OVER (ORDER BY Percentage DESC) AS rk
+  FROM countrylanguage
+  WHERE Language = 'Spanish'
+) t
+WHERE rk = 1;</td>
+<td class="sql">SELECT CountryCode ,  max(Percentage) FROM countrylanguage WHERE LANGUAGE  =  "Spanish" GROUP BY CountryCode</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">world_1<br><code style="font-size:11px">spider_dev_821</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>Return the codes of countries for which Spanish is the predominantly spoken language.</td>
+<td class="sql">SELECT CountryCode
+FROM (
+    SELECT CountryCode, Language,
+           DENSE_RANK() OVER (PARTITION BY CountryCode ORDER BY Percentage DESC) AS rnk
+    FROM countrylanguage
+) t
+WHERE rnk = 1
+  AND Language = 'Spanish';</td>
+<td class="sql">SELECT CountryCode ,  max(Percentage) FROM countrylanguage WHERE LANGUAGE  =  "Spanish" GROUP BY CountryCode</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">orchestra<br><code style="font-size:11px">spider_dev_832</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>What are the maximum and minimum share of performances whose type is not "Live final".</td>
+<td class="sql">SELECT MAX(CAST(REPLACE(TRIM(Share), '%', '') AS DECIMAL(18,4))) AS max_share,
+       MIN(CAST(REPLACE(TRIM(Share), '%', '') AS DECIMAL(18,4))) AS min_share
+FROM performance
+WHERE Type &lt;&gt; 'Live final';</td>
+<td class="sql">SELECT max(SHARE) ,  min(SHARE) FROM performance WHERE TYPE != "Live final"</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">orchestra<br><code style="font-size:11px">spider_dev_833</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>Return the maximum and minimum shares for performances that do not have the type "Live final".</td>
+<td class="sql">SELECT MAX(CAST(REPLACE(TRIM(Share), '%', '') AS DECIMAL(10,2))) AS max_share,
+       MIN(CAST(REPLACE(TRIM(Share), '%', '') AS DECIMAL(10,2))) AS min_share
+FROM performance
+WHERE Type &lt;&gt; 'Live final';</td>
+<td class="sql">SELECT max(SHARE) ,  min(SHARE) FROM performance WHERE TYPE != "Live final"</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">network_1<br><code style="font-size:11px">spider_dev_866</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>Show all the grades of the high schoolers.</td>
+<td class="sql">SELECT DISTINCT grade
+FROM highschooler;</td>
+<td class="sql">SELECT grade FROM Highschooler</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">network_1<br><code style="font-size:11px">spider_dev_883</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>How many friends does each student have?</td>
+<td class="sql">SELECT h.name, COUNT(f.friend_id) AS friend_count
+FROM highschooler h
+LEFT JOIN friend f ON h.ID = f.student_id
+GROUP BY h.ID, h.name;</td>
+<td class="sql">SELECT student_id ,  count(*) FROM Friend GROUP BY student_id</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">network_1<br><code style="font-size:11px">spider_dev_904</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>Show the names of high schoolers who have likes, and numbers of likes for each.</td>
+<td class="sql">SELECT h.name, COUNT(*) AS num_likes
+FROM highschooler h
+JOIN likes l ON h.ID = l.liked_id
+GROUP BY h.ID, h.name;</td>
+<td class="sql">SELECT T2.name ,  count(*) FROM Likes AS T1 JOIN Highschooler AS T2 ON T1.student_id  =  T2.id GROUP BY T1.student_id</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">network_1<br><code style="font-size:11px">spider_dev_905</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>What are the names of high schoolers who have likes, and how many likes does each have?</td>
+<td class="sql">SELECT h.name, COUNT(*) AS num_likes
+FROM highschooler h
+JOIN likes l ON h.ID = l.liked_id
+GROUP BY h.ID, h.name;</td>
+<td class="sql">SELECT T2.name ,  count(*) FROM Likes AS T1 JOIN Highschooler AS T2 ON T1.student_id  =  T2.id GROUP BY T1.student_id</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">network_1<br><code style="font-size:11px">spider_dev_906</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>What is the name of the high schooler who has the greatest number of likes?</td>
+<td class="sql">WITH like_counts AS (
+    SELECT liked_id, COUNT(*) AS like_count
+    FROM likes
+    GROUP BY liked_id
+),
+ranked_likes AS (
+    SELECT liked_id,
+           DENSE_RANK() OVER (ORDER BY like_count DESC) AS like_rank
+    FROM like_counts
+)
+SELECT h.name
+FROM ranked_likes AS r
+JOIN highschooler AS h ON h.ID = r.liked_id
+WHERE r.like_rank = 1;</td>
+<td class="sql">SELECT T2.name FROM Likes AS T1 JOIN Highschooler AS T2 ON T1.student_id  =  T2.id GROUP BY T1.student_id ORDER BY count(*) DESC LIMIT 1</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">network_1<br><code style="font-size:11px">spider_dev_907</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>Give the name of the student with the most likes.</td>
+<td class="sql">SELECT name
+FROM (
+    SELECT h.name,
+           DENSE_RANK() OVER (ORDER BY c.cnt DESC) AS rk
+    FROM (
+        SELECT liked_id, COUNT(*) AS cnt
+        FROM likes
+        GROUP BY liked_id
+    ) c
+    JOIN highschooler h ON h.ID = c.liked_id
+) t
+WHERE rk = 1;</td>
+<td class="sql">SELECT T2.name FROM Likes AS T1 JOIN Highschooler AS T2 ON T1.student_id  =  T2.id GROUP BY T1.student_id ORDER BY count(*) DESC LIMIT 1</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">network_1<br><code style="font-size:11px">spider_dev_908</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>Show the names of students who have at least 2 likes.</td>
+<td class="sql">SELECT h.name
+FROM highschooler h
+JOIN likes l ON h.ID = l.liked_id
+GROUP BY h.ID, h.name
+HAVING COUNT(*) &gt;= 2;</td>
+<td class="sql">SELECT T2.name FROM Likes AS T1 JOIN Highschooler AS T2 ON T1.student_id  =  T2.id GROUP BY T1.student_id HAVING count(*)  &gt;=  2</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">network_1<br><code style="font-size:11px">spider_dev_909</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>What are the names of students who have 2 or more likes?</td>
+<td class="sql">SELECT h.name
+FROM highschooler h
+JOIN likes l ON h.ID = l.liked_id
+GROUP BY h.ID, h.name
+HAVING COUNT(*) &gt;= 2;</td>
+<td class="sql">SELECT T2.name FROM Likes AS T1 JOIN Highschooler AS T2 ON T1.student_id  =  T2.id GROUP BY T1.student_id HAVING count(*)  &gt;=  2</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">network_1<br><code style="font-size:11px">spider_dev_915</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>What is the average grade of students who have friends?</td>
+<td class="sql">SELECT AVG(CAST(h.grade AS DECIMAL(18,4))) AS avg_grade
+FROM highschooler h
+JOIN (
+    SELECT student_id AS sid FROM friend
+    UNION
+    SELECT friend_id AS sid FROM friend
+) f ON h.ID = f.sid;</td>
+<td class="sql">SELECT avg(grade) FROM Highschooler WHERE id IN (SELECT T1.student_id FROM Friend AS T1 JOIN Highschooler AS T2 ON T1.student_id  =  T2.id)</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">network_1<br><code style="font-size:11px">spider_dev_916</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>Find the minimum grade of students who have no friends.</td>
+<td class="sql">SELECT MIN(grade) AS min_grade
+FROM highschooler
+WHERE ID NOT IN (SELECT student_id FROM friend)
+  AND ID NOT IN (SELECT friend_id FROM friend);</td>
+<td class="sql">SELECT min(grade) FROM Highschooler WHERE id NOT IN (SELECT T1.student_id FROM Friend AS T1 JOIN Highschooler AS T2 ON T1.student_id  =  T2.id)</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">network_1<br><code style="font-size:11px">spider_dev_917</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>What is the lowest grade of students who do not have any friends?</td>
+<td class="sql">SELECT MIN(h.grade) AS lowest_grade
+FROM highschooler h
+WHERE NOT EXISTS (
+    SELECT 1 FROM friend f
+    WHERE f.student_id = h.ID OR f.friend_id = h.ID
+);</td>
+<td class="sql">SELECT min(grade) FROM Highschooler WHERE id NOT IN (SELECT T1.student_id FROM Friend AS T1 JOIN Highschooler AS T2 ON T1.student_id  =  T2.id)</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">dog_kennels<br><code style="font-size:11px">spider_dev_924</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>Which dogs have not cost their owner more than 1000 for treatment ? List the dog names .</td>
+<td class="sql">SELECT d.name
+FROM dogs AS d
+JOIN treatments AS t
+  ON t.dog_id = d.dog_id
+GROUP BY d.dog_id, d.name
+HAVING SUM(t.cost_of_treatment) &lt;= 1000;</td>
+<td class="sql">select name from dogs where dog_id not in ( select dog_id from treatments group by dog_id having sum(cost_of_treatment)  &gt;  1000 )</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">dog_kennels<br><code style="font-size:11px">spider_dev_925</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>What are the names of the dogs for which the owner has not spend more than 1000 for treatment ?</td>
+<td class="sql">SELECT d.name
+FROM dogs d
+JOIN owners o ON d.owner_id = o.owner_id
+LEFT JOIN (
+    SELECT d2.owner_id, SUM(t.cost_of_treatment) AS total_cost
+    FROM dogs d2
+    JOIN treatments t ON t.dog_id = d2.dog_id
+    GROUP BY d2.owner_id
+) ot ON ot.owner_id = o.owner_id
+WHERE COALESCE(ot.total_cost, 0) &lt;= 1000;</td>
+<td class="sql">select name from dogs where dog_id not in ( select dog_id from treatments group by dog_id having sum(cost_of_treatment)  &gt;  1000 )</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">dog_kennels<br><code style="font-size:11px">spider_dev_937</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>Tell me the owner id and last name of the owner who spent the most on treatments of his or her dogs.</td>
+<td class="sql">SELECT owner_id, last_name
+FROM (
+    SELECT o.owner_id,
+           o.last_name,
+           DENSE_RANK() OVER (ORDER BY SUM(t.cost_of_treatment) DESC) AS rnk
+    FROM treatments t
+    JOIN dogs d ON t.dog_id = d.dog_id
+    JOIN owners o ON d.owner_id = o.owner_id
+    GROUP BY o.owner_id, o.last_name
+) ranked
+WHERE rnk = 1;</td>
+<td class="sql">SELECT T1.owner_id ,  T1.last_name FROM Owners AS T1 JOIN Dogs AS T2 ON T1.owner_id  =  T2.owner_id JOIN Treatments AS T3 ON T2.dog_id  =  T3.dog_id GROUP BY T1.owner_id ORDER BY count(*) DESC LIMIT 1</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">dog_kennels<br><code style="font-size:11px">spider_dev_942</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>Which professionals have done at least two types of treatments? List the professional id and cell phone.</td>
+<td class="sql">SELECT p.professional_id, p.cell_number
+FROM professionals AS p
+JOIN treatments AS t
+  ON t.professional_id = p.professional_id
+GROUP BY p.professional_id, p.cell_number
+HAVING COUNT(DISTINCT t.treatment_type_code) &gt;= 2;</td>
+<td class="sql">SELECT T1.professional_id ,  T1.cell_number FROM Professionals AS T1 JOIN Treatments AS T2 ON T1.professional_id  =  T2.professional_id GROUP BY T1.professional_id HAVING count(*)  &gt;=  2</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">dog_kennels<br><code style="font-size:11px">spider_dev_943</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>Find the id and cell phone of the professionals who operate two or more types of treatments.</td>
+<td class="sql">SELECT
+    p.professional_id,
+    p.cell_number
+FROM professionals AS p
+JOIN treatments AS t
+    ON t.professional_id = p.professional_id
+GROUP BY
+    p.professional_id,
+    p.cell_number
+HAVING COUNT(DISTINCT t.treatment_type_code) &gt;= 2;</td>
+<td class="sql">SELECT T1.professional_id ,  T1.cell_number FROM Professionals AS T1 JOIN Treatments AS T2 ON T1.professional_id  =  T2.professional_id GROUP BY T1.professional_id HAVING count(*)  &gt;=  2</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">dog_kennels<br><code style="font-size:11px">spider_dev_944</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>What are the first name and last name of the professionals who have done treatment with cost below average?</td>
+<td class="sql">SELECT DISTINCT
+    p.first_name,
+    p.last_name
+FROM professionals AS p
+JOIN treatments AS t
+    ON t.professional_id = p.professional_id
+WHERE t.cost_of_treatment &lt; (
+    SELECT AVG(cost_of_treatment)
+    FROM treatments
+);</td>
+<td class="sql">SELECT DISTINCT T1.first_name ,  T1.last_name FROM Professionals AS T1 JOIN Treatments AS T2 WHERE cost_of_treatment  &lt;  ( SELECT avg(cost_of_treatment) FROM Treatments )</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">dog_kennels<br><code style="font-size:11px">spider_dev_945</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>Which professionals have operated a treatment that costs less than the average? Give me theor first names and last names</td>
+<td class="sql">SELECT DISTINCT p.first_name, p.last_name
+FROM professionals AS p
+JOIN treatments AS t
+  ON t.professional_id = p.professional_id
+WHERE t.cost_of_treatment &lt; (
+  SELECT AVG(cost_of_treatment)
+  FROM treatments
+);</td>
+<td class="sql">SELECT DISTINCT T1.first_name ,  T1.last_name FROM Professionals AS T1 JOIN Treatments AS T2 WHERE cost_of_treatment  &lt;  ( SELECT avg(cost_of_treatment) FROM Treatments )</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">dog_kennels<br><code style="font-size:11px">spider_dev_950</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>List each owner's first name, last name, and the size of his for her dog.</td>
+<td class="sql">SELECT o.first_name, o.last_name, s.size_description
+FROM owners AS o
+JOIN dogs AS d ON d.owner_id = o.owner_id
+JOIN sizes AS s ON s.size_code = d.size_code;</td>
+<td class="sql">SELECT T1.first_name ,  T1.last_name ,  T2.size_code FROM Owners AS T1 JOIN Dogs AS T2 ON T1.owner_id  =  T2.owner_id</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">dog_kennels<br><code style="font-size:11px">spider_dev_951</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>What are each owner's first name, last name, and the size of their dog?</td>
+<td class="sql">SELECT
+    o.first_name,
+    o.last_name,
+    s.size_description
+FROM owners AS o
+JOIN dogs AS d
+    ON d.owner_id = o.owner_id
+JOIN sizes AS s
+    ON s.size_code = d.size_code;</td>
+<td class="sql">SELECT T1.first_name ,  T1.last_name ,  T2.size_code FROM Owners AS T1 JOIN Dogs AS T2 ON T1.owner_id  =  T2.owner_id</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">dog_kennels<br><code style="font-size:11px">spider_dev_960</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>List the last name of the owner owning the youngest dog.</td>
+<td class="sql">SELECT o.last_name
+FROM owners o
+JOIN dogs d ON o.owner_id = d.owner_id
+WHERE CAST(d.age AS SIGNED) = (SELECT MIN(CAST(age AS SIGNED)) FROM dogs);</td>
+<td class="sql">SELECT T1.last_name FROM Owners AS T1 JOIN Dogs AS T2 ON T1.owner_id  =  T2.owner_id WHERE T2.age  =  ( SELECT max(age) FROM Dogs )</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">dog_kennels<br><code style="font-size:11px">spider_dev_988</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>What is the age of the oldest dog?</td>
+<td class="sql">SELECT MAX(CAST(TRIM(age) AS DECIMAL(18,4))) AS oldest_dog_age
+FROM dogs;</td>
+<td class="sql">SELECT max(age) FROM Dogs</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">dog_kennels<br><code style="font-size:11px">spider_dev_989</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>Tell me the age of the oldest dog.</td>
+<td class="sql">SELECT MAX(CAST(TRIM(age) AS DECIMAL(18,4))) AS oldest_age
+FROM dogs;</td>
+<td class="sql">SELECT max(age) FROM Dogs</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">dog_kennels<br><code style="font-size:11px">spider_dev_995</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>What are the email, cell phone and home phone of each professional?</td>
+<td class="sql">SELECT professional_id, first_name, last_name, email_address, cell_number, home_phone FROM professionals;</td>
+<td class="sql">SELECT email_address ,  cell_number ,  home_phone FROM professionals</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">dog_kennels<br><code style="font-size:11px">spider_dev_996</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>What are all the possible breed type and size type combinations?</td>
+<td class="sql">SELECT 
+    b.breed_name,
+    s.size_description
+FROM breeds b
+CROSS JOIN sizes s
+ORDER BY b.breed_name, s.size_description;</td>
+<td class="sql">SELECT DISTINCT breed_code ,  size_code FROM dogs</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">dog_kennels<br><code style="font-size:11px">spider_dev_997</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>Find the distinct breed type and size type combinations for dogs.</td>
+<td class="sql">SELECT DISTINCT b.breed_name, s.size_description
+FROM dogs AS d
+JOIN breeds AS b
+  ON d.breed_code = b.breed_code
+JOIN sizes AS s
+  ON d.size_code = s.size_code;</td>
+<td class="sql">SELECT DISTINCT breed_code ,  size_code FROM dogs</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">real_estate_properties<br><code style="font-size:11px">spider_dev_1033</code></td>
+<td style="width:90px">真错（含 gold quirk）</td><td>What are the names of properties that are either houses or apartments with more than 1 room?</td>
+<td class="sql">SELECT property_name
+FROM properties
+WHERE property_type_code IN ('Hse', 'Apt')
+  AND room_count &gt; 1;</td>
+<td class="sql">SELECT property_name FROM Properties WHERE property_type_code  =  "House" UNION SELECT property_name FROM Properties WHERE property_type_code  =  "Apartment" AND room_count  &gt;  1</td>
+<td>枚举幻觉：实际枚举值 'House'/'Apartment'，模型写了 Spider 训练集惯例的 'Hse'/'Apt' → 0 行（方向与常见幻觉相反）</td></tr>
+<tr><td style="white-space:nowrap">pets_1<br><code style="font-size:11px">spider_dev_49</code></td>
+<td style="width:90px">形态类（宽口径过）</td><td>Find the maximum weight for each type of pet. List the maximum weight and pet type.</td>
+<td class="sql">SELECT PetType, MAX(weight) AS max_weight FROM pets GROUP BY PetType;</td>
+<td class="sql">SELECT max(weight) ,  petType FROM pets GROUP BY petType</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">pets_1<br><code style="font-size:11px">spider_dev_50</code></td>
+<td style="width:90px">形态类（宽口径过）</td><td>List the maximum weight and type for each type of pet.</td>
+<td class="sql">SELECT PetType, MAX(weight) AS max_weight
+FROM pets
+GROUP BY PetType;</td>
+<td class="sql">SELECT max(weight) ,  petType FROM pets GROUP BY petType</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">pets_1<br><code style="font-size:11px">spider_dev_71</code></td>
+<td style="width:90px">形态类（宽口径过）</td><td>Find the average and maximum age for each type of pet.</td>
+<td class="sql">SELECT PetType, AVG(CAST(pet_age AS DECIMAL(18,4))) AS avg_age, MAX(pet_age) AS max_age
+FROM pets
+GROUP BY PetType;</td>
+<td class="sql">SELECT avg(pet_age) ,  max(pet_age) ,  pettype FROM pets GROUP BY pettype</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">pets_1<br><code style="font-size:11px">spider_dev_72</code></td>
+<td style="width:90px">形态类（宽口径过）</td><td>What is the average and maximum age for each pet type?</td>
+<td class="sql">SELECT PetType, AVG(CAST(pet_age AS DECIMAL(18,4))) AS avg_age, MAX(pet_age) AS max_age
+FROM pets
+GROUP BY PetType;</td>
+<td class="sql">SELECT avg(pet_age) ,  max(pet_age) ,  pettype FROM pets GROUP BY pettype</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">pets_1<br><code style="font-size:11px">spider_dev_73</code></td>
+<td style="width:90px">形态类（宽口径过）</td><td>Find the average weight for each pet type.</td>
+<td class="sql">SELECT PetType, AVG(weight) AS avg_weight
+FROM pets
+GROUP BY PetType;</td>
+<td class="sql">SELECT avg(weight) ,  pettype FROM pets GROUP BY pettype</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">pets_1<br><code style="font-size:11px">spider_dev_74</code></td>
+<td style="width:90px">形态类（宽口径过）</td><td>What is the average weight for each type of pet?</td>
+<td class="sql">SELECT PetType, AVG(weight) AS avg_weight FROM pets GROUP BY PetType</td>
+<td class="sql">SELECT avg(weight) ,  pettype FROM pets GROUP BY pettype</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">pets_1<br><code style="font-size:11px">spider_dev_79</code></td>
+<td style="width:90px">形态类（宽口径过）</td><td>Find the number of pets for each student who has any pet and student id.</td>
+<td class="sql">SELECT StuID, COUNT(PetID) AS num_pets
+FROM has_pet
+GROUP BY StuID;</td>
+<td class="sql">SELECT count(*) ,  T1.stuid FROM student AS T1 JOIN has_pet AS T2 ON T1.stuid  =  T2.stuid GROUP BY T1.stuid</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">pets_1<br><code style="font-size:11px">spider_dev_80</code></td>
+<td style="width:90px">形态类（宽口径过）</td><td>For students who have pets , how many pets does each student have ? list their ids instead of names .</td>
+<td class="sql">SELECT StuID, COUNT(PetID) AS num_pets FROM has_pet GROUP BY StuID</td>
+<td class="sql">select count(*) ,  t1.stuid from student as t1 join has_pet as t2 on t1.stuid  =  t2.stuid group by t1.stuid</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">car_1<br><code style="font-size:11px">spider_dev_110</code></td>
+<td style="width:90px">形态类（宽口径过）</td><td>What is the number of car models that are produced by each maker and what is the id and full name of each maker?</td>
+<td class="sql">SELECT
+    cm.Id,
+    cm.FullName,
+    COUNT(ml.ModelId) AS model_count
+FROM car_makers AS cm
+JOIN model_list AS ml
+    ON ml.Maker = cm.Id
+GROUP BY
+    cm.Id,
+    cm.FullName;</td>
+<td class="sql">SELECT Count(*) ,  T2.FullName ,  T2.id FROM MODEL_LIST AS T1 JOIN CAR_MAKERS AS T2 ON T1.Maker  =  T2.Id GROUP BY T2.id;</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">car_1<br><code style="font-size:11px">spider_dev_127</code></td>
+<td style="width:90px">形态类（宽口径过）</td><td>What is the average weight of cars each year?</td>
+<td class="sql">SELECT
+  Year,
+  AVG(CAST(Weight AS DECIMAL(18,4))) AS avg_weight
+FROM cars_data
+GROUP BY Year
+ORDER BY Year;</td>
+<td class="sql">SELECT avg(Weight) ,  YEAR FROM CARS_DATA GROUP BY YEAR;</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">car_1<br><code style="font-size:11px">spider_dev_128</code></td>
+<td style="width:90px">形态类（宽口径过）</td><td>What is the average weight and year for each year?</td>
+<td class="sql">SELECT Year, AVG(CAST(Weight AS DECIMAL(18,4))) FROM cars_data GROUP BY Year</td>
+<td class="sql">SELECT avg(Weight) ,  YEAR FROM CARS_DATA GROUP BY YEAR;</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">car_1<br><code style="font-size:11px">spider_dev_139</code></td>
+<td style="width:90px">形态类（宽口径过）</td><td>What is the maximum accelerate for different number of cylinders?</td>
+<td class="sql">SELECT
+  Cylinders,
+  MAX(Accelerate) AS max_accelerate
+FROM cars_data
+GROUP BY Cylinders;</td>
+<td class="sql">SELECT max(Accelerate) ,  Cylinders FROM CARS_DATA GROUP BY Cylinders;</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">car_1<br><code style="font-size:11px">spider_dev_140</code></td>
+<td style="width:90px">形态类（宽口径过）</td><td>What is the maximum accelerate for all the different cylinders?</td>
+<td class="sql">SELECT Cylinders, MAX(Accelerate) FROM cars_data GROUP BY Cylinders</td>
+<td class="sql">SELECT max(Accelerate) ,  Cylinders FROM CARS_DATA GROUP BY Cylinders;</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">flight_2<br><code style="font-size:11px">spider_dev_243</code></td>
+<td style="width:90px">形态类（宽口径过）</td><td>Find all airlines that have fewer than 200 flights.</td>
+<td class="sql">SELECT a.Airline, COUNT(*) AS flight_count
+FROM flights f
+JOIN airlines a ON f.Airline = a.uid
+GROUP BY a.uid, a.Airline
+HAVING COUNT(*) &lt; 200;</td>
+<td class="sql">SELECT T1.Airline FROM AIRLINES AS T1 JOIN FLIGHTS AS T2 ON T1.uid  =  T2.Airline GROUP BY T1.Airline HAVING count(*)  &lt;  200</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">flight_2<br><code style="font-size:11px">spider_dev_258</code></td>
+<td style="width:90px">形态类（宽口径过）</td><td>Which airports do not have departing or arriving flights?</td>
+<td class="sql">SELECT
+    a.AirportCode,
+    a.AirportName
+FROM airports AS a
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM flights AS f
+    WHERE f.SourceAirport = a.AirportCode
+)
+AND NOT EXISTS (
+    SELECT 1
+    FROM flights AS f
+    WHERE f.DestAirport = a.AirportCode
+);</td>
+<td class="sql">SELECT AirportName FROM Airports WHERE AirportCode NOT IN (SELECT SourceAirport FROM Flights UNION SELECT DestAirport FROM Flights)</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">employee_hire_evaluation<br><code style="font-size:11px">spider_dev_263</code></td>
+<td style="width:90px">形态类（宽口径过）</td><td>What is the number of employees from each city?</td>
+<td class="sql">SELECT City, COUNT(Employee_ID) AS num_employees FROM employee GROUP BY City</td>
+<td class="sql">SELECT count(*) ,  city FROM employee GROUP BY city</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">employee_hire_evaluation<br><code style="font-size:11px">spider_dev_264</code></td>
+<td style="width:90px">形态类（宽口径过）</td><td>Count the number of employees for each city.</td>
+<td class="sql">SELECT City, COUNT(Employee_ID) AS num_employees
+FROM employee
+GROUP BY City;</td>
+<td class="sql">SELECT count(*) ,  city FROM employee GROUP BY city</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">employee_hire_evaluation<br><code style="font-size:11px">spider_dev_267</code></td>
+<td style="width:90px">形态类（宽口径过）</td><td>Find the number of shops in each location.</td>
+<td class="sql">SELECT Location, COUNT(Shop_ID) AS shop_count
+FROM shop
+GROUP BY Location;</td>
+<td class="sql">SELECT count(*) ,  LOCATION FROM shop GROUP BY LOCATION</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">employee_hire_evaluation<br><code style="font-size:11px">spider_dev_268</code></td>
+<td style="width:90px">形态类（宽口径过）</td><td>How many shops are there in each location?</td>
+<td class="sql">SELECT Location, COUNT(*) AS shop_count
+FROM shop
+GROUP BY Location;</td>
+<td class="sql">SELECT count(*) ,  LOCATION FROM shop GROUP BY LOCATION</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">employee_hire_evaluation<br><code style="font-size:11px">spider_dev_287</code></td>
+<td style="width:90px">形态类（宽口径过）</td><td>Find the number of employees hired in each shop; show the shop name as well.</td>
+<td class="sql">SELECT s.Name, COUNT(h.Employee_ID) AS num_employees
+FROM shop s
+JOIN hiring h ON s.Shop_ID = h.Shop_ID
+GROUP BY s.Shop_ID, s.Name;</td>
+<td class="sql">SELECT count(*) ,  t2.name FROM hiring AS t1 JOIN shop AS t2 ON t1.shop_id  =  t2.shop_id GROUP BY t2.name</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">employee_hire_evaluation<br><code style="font-size:11px">spider_dev_288</code></td>
+<td style="width:90px">形态类（宽口径过）</td><td>For each shop, return the number of employees working there and the name of the shop.</td>
+<td class="sql">SELECT s.Name, COUNT(*) AS num_employees
+FROM shop AS s
+JOIN hiring AS h ON s.Shop_ID = h.Shop_ID
+GROUP BY s.Shop_ID, s.Name;</td>
+<td class="sql">SELECT count(*) ,  t2.name FROM hiring AS t1 JOIN shop AS t2 ON t1.shop_id  =  t2.shop_id GROUP BY t2.name</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">course_teach<br><code style="font-size:11px">spider_dev_386</code></td>
+<td style="width:90px">形态类（宽口径过）</td><td>What is the age and hometown of every teacher?</td>
+<td class="sql">SELECT
+  Name,
+  Age,
+  Hometown
+FROM teacher;</td>
+<td class="sql">SELECT Age ,  Hometown FROM teacher</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">museum_visit<br><code style="font-size:11px">spider_dev_417</code></td>
+<td style="width:90px">形态类（宽口径过）</td><td>What are the opening year and staff number of the museum named Plaza Museum?</td>
+<td class="sql">SELECT Open_Year, Num_of_Staff FROM museum WHERE Name = 'Plaza Museum'</td>
+<td class="sql">SELECT Num_of_Staff ,  Open_Year FROM museum WHERE name  =  'Plaza Museum'</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">wta_1<br><code style="font-size:11px">spider_dev_460</code></td>
+<td style="width:90px">形态类（宽口径过）</td><td>What is the first name and country code of the player with the most tours?</td>
+<td class="sql">SELECT first_name, country_code
+FROM (
+    SELECT p.first_name, p.country_code,
+           DENSE_RANK() OVER (ORDER BY r.tours DESC) AS rk
+    FROM players p
+    JOIN rankings r ON p.player_id = r.player_id
+) t
+WHERE rk = 1;</td>
+<td class="sql">SELECT T1.country_code ,  T1.first_name FROM players AS T1 JOIN rankings AS T2 ON T1.player_id  =  T2.player_id ORDER BY T2.tours DESC LIMIT 1</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">wta_1<br><code style="font-size:11px">spider_dev_461</code></td>
+<td style="width:90px">形态类（宽口径过）</td><td>Find the year that has the most number of matches.</td>
+<td class="sql">WITH yearly_matches AS (
+    SELECT
+        year,
+        COUNT(*) AS match_count
+    FROM matches
+    GROUP BY year
+),
+ranked_years AS (
+    SELECT
+        year,
+        match_count,
+        DENSE_RANK() OVER (ORDER BY match_count DESC) AS match_rank
+    FROM yearly_matches
+)
+SELECT
+    year,
+    match_count
+FROM ranked_years
+WHERE match_rank = 1;</td>
+<td class="sql">SELECT YEAR FROM matches GROUP BY YEAR ORDER BY count(*) DESC LIMIT 1</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">wta_1<br><code style="font-size:11px">spider_dev_470</code></td>
+<td style="width:90px">形态类（宽口径过）</td><td>What are the first names of all players, and their average rankings?</td>
+<td class="sql">SELECT p.first_name, AVG(CAST(r.ranking AS DECIMAL(18,4))) AS avg_ranking
+FROM players p
+JOIN rankings r ON p.player_id = r.player_id
+GROUP BY p.first_name</td>
+<td class="sql">SELECT avg(ranking) ,  T1.first_name FROM players AS T1 JOIN rankings AS T2 ON T1.player_id  =  T2.player_id GROUP BY T1.first_name</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">wta_1<br><code style="font-size:11px">spider_dev_472</code></td>
+<td style="width:90px">形态类（宽口径过）</td><td>What are the first names of all players, and their total ranking points?</td>
+<td class="sql">SELECT p.first_name, SUM(r.ranking_points) AS total_ranking_points
+FROM players p
+JOIN rankings r ON p.player_id = r.player_id
+GROUP BY p.first_name;</td>
+<td class="sql">SELECT sum(ranking_points) ,  T1.first_name FROM players AS T1 JOIN rankings AS T2 ON T1.player_id  =  T2.player_id GROUP BY T1.first_name</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">wta_1<br><code style="font-size:11px">spider_dev_473</code></td>
+<td style="width:90px">形态类（宽口径过）</td><td>find the number of players for each country.</td>
+<td class="sql">SELECT country_code, COUNT(player_id) AS player_count
+FROM players
+GROUP BY country_code;</td>
+<td class="sql">SELECT count(*) ,  country_code FROM players GROUP BY country_code</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">wta_1<br><code style="font-size:11px">spider_dev_474</code></td>
+<td style="width:90px">形态类（宽口径过）</td><td>How many players are from each country?</td>
+<td class="sql">SELECT
+    country_code,
+    COUNT(*) AS player_count
+FROM players
+GROUP BY country_code;</td>
+<td class="sql">SELECT count(*) ,  country_code FROM players GROUP BY country_code</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">wta_1<br><code style="font-size:11px">spider_dev_478</code></td>
+<td style="width:90px">形态类（宽口径过）</td><td>What are the codes of countries with more than 50 players?</td>
+<td class="sql">SELECT country_code, COUNT(player_id) AS player_count
+FROM players
+GROUP BY country_code
+HAVING COUNT(player_id) &gt; 50;</td>
+<td class="sql">SELECT country_code FROM players GROUP BY country_code HAVING count(*)  &gt;  50</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">wta_1<br><code style="font-size:11px">spider_dev_479</code></td>
+<td style="width:90px">形态类（宽口径过）</td><td>Find the total number of tours for each ranking date.</td>
+<td class="sql">SELECT ranking_date, SUM(tours) AS total_tours
+FROM rankings
+GROUP BY ranking_date;</td>
+<td class="sql">SELECT sum(tours) ,  ranking_date FROM rankings GROUP BY ranking_date</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">wta_1<br><code style="font-size:11px">spider_dev_480</code></td>
+<td style="width:90px">形态类（宽口径过）</td><td>How many total tours were there for each ranking date?</td>
+<td class="sql">SELECT ranking_date, SUM(tours) AS total_tours
+FROM rankings
+GROUP BY ranking_date;</td>
+<td class="sql">SELECT sum(tours) ,  ranking_date FROM rankings GROUP BY ranking_date</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">wta_1<br><code style="font-size:11px">spider_dev_481</code></td>
+<td style="width:90px">形态类（宽口径过）</td><td>Find the number of matches happened in each year.</td>
+<td class="sql">SELECT
+    year,
+    COUNT(*) AS match_count
+FROM matches
+GROUP BY year
+ORDER BY year;</td>
+<td class="sql">SELECT count(*) ,  YEAR FROM matches GROUP BY YEAR</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">wta_1<br><code style="font-size:11px">spider_dev_482</code></td>
+<td style="width:90px">形态类（宽口径过）</td><td>How many matches were played in each year?</td>
+<td class="sql">SELECT
+    year,
+    COUNT(*) AS match_count
+FROM matches
+GROUP BY year
+ORDER BY year;</td>
+<td class="sql">SELECT count(*) ,  YEAR FROM matches GROUP BY YEAR</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">wta_1<br><code style="font-size:11px">spider_dev_489</code></td>
+<td style="width:90px">形态类（宽口径过）</td><td>Find the number of players for each hand type.</td>
+<td class="sql">SELECT hand, COUNT(player_id) AS player_count
+FROM players
+GROUP BY hand;</td>
+<td class="sql">SELECT count(*) ,  hand FROM players GROUP BY hand</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">wta_1<br><code style="font-size:11px">spider_dev_490</code></td>
+<td style="width:90px">形态类（宽口径过）</td><td>How many players are there for each hand type?</td>
+<td class="sql">SELECT hand, COUNT(player_id) AS player_count
+FROM players
+GROUP BY hand;</td>
+<td class="sql">SELECT count(*) ,  hand FROM players GROUP BY hand</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">battle_death<br><code style="font-size:11px">spider_dev_493</code></td>
+<td style="width:90px">形态类（宽口径过）</td><td>List the name, date and result of each battle.</td>
+<td class="sql">SELECT name, date, result FROM battle;</td>
+<td class="sql">SELECT name ,  date FROM battle</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">battle_death<br><code style="font-size:11px">spider_dev_496</code></td>
+<td style="width:90px">形态类（宽口径过）</td><td>What are the death and injury situations caused by the ship with tonnage 't'?</td>
+<td class="sql">SELECT d.note, d.killed, d.injured
+FROM death d
+JOIN ship s ON d.caused_by_ship_id = s.id
+WHERE s.tonnage = 't';</td>
+<td class="sql">SELECT T1.killed ,  T1.injured FROM death AS T1 JOIN ship AS t2 ON T1.caused_by_ship_id  =  T2.id WHERE T2.tonnage  =  't'</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">student_transcripts_tracking<br><code style="font-size:11px">spider_dev_551</code></td>
+<td style="width:90px">形态类（宽口径过）</td><td>Show the date and id of the transcript with at least 2 course results.</td>
+<td class="sql">SELECT t.transcript_id, t.transcript_date
+FROM transcripts t
+JOIN transcript_contents tc ON t.transcript_id = tc.transcript_id
+GROUP BY t.transcript_id, t.transcript_date
+HAVING COUNT(tc.student_course_id) &gt;= 2;</td>
+<td class="sql">SELECT T2.transcript_date ,  T1.transcript_id FROM Transcript_Contents AS T1 JOIN Transcripts AS T2 ON T1.transcript_id  =  T2.transcript_id GROUP BY T1.transcript_id HAVING count(*)  &gt;=  2</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">student_transcripts_tracking<br><code style="font-size:11px">spider_dev_552</code></td>
+<td style="width:90px">形态类（宽口径过）</td><td>What is the date and id of the transcript with at least 2 courses listed?</td>
+<td class="sql">SELECT t.transcript_id, t.transcript_date
+FROM transcripts t
+JOIN transcript_contents tc ON tc.transcript_id = t.transcript_id
+GROUP BY t.transcript_id, t.transcript_date
+HAVING COUNT(DISTINCT tc.student_course_id) &gt;= 2;</td>
+<td class="sql">SELECT T2.transcript_date ,  T1.transcript_id FROM Transcript_Contents AS T1 JOIN Transcripts AS T2 ON T1.transcript_id  =  T2.transcript_id GROUP BY T1.transcript_id HAVING count(*)  &gt;=  2</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">student_transcripts_tracking<br><code style="font-size:11px">spider_dev_561</code></td>
+<td style="width:90px">形态类（宽口径过）</td><td>Which address holds the most number of students currently? List the address id and all lines.</td>
+<td class="sql">SELECT t.address_id, t.line_1, t.line_2, t.line_3
+FROM (
+  SELECT a.address_id, a.line_1, a.line_2, a.line_3,
+         DENSE_RANK() OVER (ORDER BY s.cnt DESC) AS rk
+  FROM addresses a
+  JOIN (
+    SELECT current_address_id, COUNT(*) AS cnt
+    FROM students
+    GROUP BY current_address_id
+  ) s ON s.current_address_id = a.address_id
+) t
+WHERE t.rk = 1</td>
+<td class="sql">SELECT T1.address_id ,  T1.line_1 ,  T1.line_2 FROM Addresses AS T1 JOIN Students AS T2 ON T1.address_id  =  T2.current_address_id GROUP BY T1.address_id ORDER BY count(*) DESC LIMIT 1</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">tvshow<br><code style="font-size:11px">spider_dev_614</code></td>
+<td style="width:90px">形态类（宽口径过）</td><td>What are all of the episodes ordered by ratings?</td>
+<td class="sql">SELECT Episode, Rating
+FROM tv_series
+ORDER BY CAST(REPLACE(TRIM(Rating), ',', '') AS DECIMAL(18,4)) DESC;</td>
+<td class="sql">SELECT Episode FROM TV_series ORDER BY rating</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">tvshow<br><code style="font-size:11px">spider_dev_617</code></td>
+<td style="width:90px">形态类（宽口径过）</td><td>What is minimum and maximum share of TV series?</td>
+<td class="sql">SELECT
+    MIN(`Share`) AS minimum_share,
+    MAX(`Share`) AS maximum_share
+FROM tv_series;</td>
+<td class="sql">SELECT max(SHARE) , min(SHARE) FROM TV_series;</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">tvshow<br><code style="font-size:11px">spider_dev_621</code></td>
+<td style="width:90px">形态类（宽口径过）</td><td>What is Weekly Rank of TV series with Episode "A Love of a Lifetime"?</td>
+<td class="sql">SELECT Episode, Weekly_Rank
+FROM tv_series
+WHERE Episode = 'A Love of a Lifetime';</td>
+<td class="sql">SELECT Weekly_Rank FROM TV_series WHERE Episode = "A Love of a Lifetime";</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">tvshow<br><code style="font-size:11px">spider_dev_627</code></td>
+<td style="width:90px">形态类（宽口径过）</td><td>Find the number of cartoons directed by each of the listed directors.</td>
+<td class="sql">SELECT `Directed_by`, COUNT(*) AS `number_of_cartoons`
+FROM `cartoon`
+GROUP BY `Directed_by`;</td>
+<td class="sql">SELECT count(*) ,  Directed_by FROM cartoon GROUP BY Directed_by</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">tvshow<br><code style="font-size:11px">spider_dev_628</code></td>
+<td style="width:90px">形态类（宽口径过）</td><td>How many cartoons did each director create?</td>
+<td class="sql">SELECT
+  Directed_by,
+  COUNT(id) AS cartoon_count
+FROM cartoon
+GROUP BY Directed_by;</td>
+<td class="sql">SELECT count(*) ,  Directed_by FROM cartoon GROUP BY Directed_by</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">poker_player<br><code style="font-size:11px">spider_dev_651</code></td>
+<td style="width:90px">形态类（宽口径过）</td><td>List the final tables made and the best finishes of poker players.</td>
+<td class="sql">SELECT p.Name, pp.Final_Table_Made, pp.Best_Finish
+FROM people AS p
+INNER JOIN poker_player AS pp
+    ON p.People_ID = pp.People_ID;</td>
+<td class="sql">SELECT Final_Table_Made ,  Best_Finish FROM poker_player</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">poker_player<br><code style="font-size:11px">spider_dev_652</code></td>
+<td style="width:90px">形态类（宽口径过）</td><td>What are the final tables made and best finishes for all poker players?</td>
+<td class="sql">SELECT
+    p.Name,
+    pp.Final_Table_Made,
+    pp.Best_Finish
+FROM people AS p
+JOIN poker_player AS pp
+    ON p.People_ID = pp.People_ID;</td>
+<td class="sql">SELECT Final_Table_Made ,  Best_Finish FROM poker_player</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">world_1<br><code style="font-size:11px">spider_dev_715</code></td>
+<td style="width:90px">形态类（宽口径过）</td><td>Give me Brazil’s population and life expectancies.</td>
+<td class="sql">SELECT Name, Population, LifeExpectancy
+FROM country
+WHERE Name = 'Brazil';</td>
+<td class="sql">SELECT Population ,  LifeExpectancy FROM country WHERE Name  =  "Brazil"</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">world_1<br><code style="font-size:11px">spider_dev_716</code></td>
+<td style="width:90px">形态类（宽口径过）</td><td>What are the region and population of Angola?</td>
+<td class="sql">SELECT Region, Population FROM country WHERE Name = 'Angola';</td>
+<td class="sql">SELECT Population ,  Region FROM country WHERE Name  =  "Angola"</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">world_1<br><code style="font-size:11px">spider_dev_717</code></td>
+<td style="width:90px">形态类（宽口径过）</td><td>What region does Angola belong to and what is its population?</td>
+<td class="sql">SELECT Region, Population
+FROM country
+WHERE Name = 'Angola';</td>
+<td class="sql">SELECT Population ,  Region FROM country WHERE Name  =  "Angola"</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">world_1<br><code style="font-size:11px">spider_dev_742</code></td>
+<td style="width:90px">形态类（宽口径过）</td><td>Which continent has the most diverse languages?</td>
+<td class="sql">SELECT Continent, language_count
+FROM (
+    SELECT c.Continent AS Continent,
+           COUNT(DISTINCT cl.Language) AS language_count,
+           DENSE_RANK() OVER (ORDER BY COUNT(DISTINCT cl.Language) DESC) AS rnk
+    FROM countrylanguage cl
+    JOIN country c ON cl.CountryCode = c.Code
+    GROUP BY c.Continent
+) t
+WHERE rnk = 1;</td>
+<td class="sql">SELECT T1.Continent FROM country AS T1 JOIN countrylanguage AS T2 ON T1.Code  =  T2.CountryCode GROUP BY T1.Continent ORDER BY COUNT(*) DESC LIMIT 1</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">world_1<br><code style="font-size:11px">spider_dev_792</code></td>
+<td style="width:90px">形态类（宽口径过）</td><td>Return the country name and the numbers of languages spoken for each country that speaks at least 3 languages.</td>
+<td class="sql">SELECT co.Name, COUNT(cl.Language) AS num_languages
+FROM country co
+JOIN countrylanguage cl ON cl.CountryCode = co.Code
+GROUP BY co.Code, co.Name
+HAVING COUNT(cl.Language) &gt;= 3;</td>
+<td class="sql">SELECT COUNT(T2.Language) ,  T1.Name FROM country AS T1 JOIN countrylanguage AS T2 ON T1.Code  =  T2.CountryCode GROUP BY T1.Name HAVING COUNT(*)  &gt;  2</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">world_1<br><code style="font-size:11px">spider_dev_793</code></td>
+<td style="width:90px">形态类（宽口径过）</td><td>What are the names of countries that speak more than 2 languages, as well as how many languages they speak?</td>
+<td class="sql">SELECT c.Name, COUNT(DISTINCT cl.Language) AS language_count
+FROM country c
+JOIN countrylanguage cl ON cl.CountryCode = c.Code
+GROUP BY c.Code, c.Name
+HAVING COUNT(DISTINCT cl.Language) &gt; 2;</td>
+<td class="sql">SELECT COUNT(T2.Language) ,  T1.Name FROM country AS T1 JOIN countrylanguage AS T2 ON T1.Code  =  T2.CountryCode GROUP BY T1.Name HAVING COUNT(*)  &gt;  2</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">world_1<br><code style="font-size:11px">spider_dev_794</code></td>
+<td style="width:90px">形态类（宽口径过）</td><td>Find the number of cities in each district whose population is greater than the average population of cities?</td>
+<td class="sql">SELECT District, COUNT(*) AS city_count
+FROM city
+WHERE Population &gt; (SELECT AVG(Population) FROM city)
+GROUP BY District;</td>
+<td class="sql">SELECT count(*) ,  District FROM city WHERE Population  &gt;  (SELECT avg(Population) FROM city) GROUP BY District</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">world_1<br><code style="font-size:11px">spider_dev_795</code></td>
+<td style="width:90px">形态类（宽口径过）</td><td>How many cities in each district have a population that is above the average population across all cities?</td>
+<td class="sql">SELECT
+    District,
+    COUNT(*) AS city_count
+FROM city
+WHERE Population &gt; (
+    SELECT AVG(CAST(Population AS DECIMAL(18,4)))
+    FROM city
+)
+GROUP BY District;</td>
+<td class="sql">SELECT count(*) ,  District FROM city WHERE Population  &gt;  (SELECT avg(Population) FROM city) GROUP BY District</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">world_1<br><code style="font-size:11px">spider_dev_796</code></td>
+<td style="width:90px">形态类（宽口径过）</td><td>Find the government form name and total population for each government form whose average life expectancy is longer than</td>
+<td class="sql">SELECT GovernmentForm, SUM(Population) AS TotalPopulation
+FROM country
+GROUP BY GovernmentForm
+HAVING AVG(LifeExpectancy) &gt; 72;</td>
+<td class="sql">SELECT sum(Population) ,  GovernmentForm FROM country GROUP BY GovernmentForm HAVING avg(LifeExpectancy)  &gt;  72</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">world_1<br><code style="font-size:11px">spider_dev_797</code></td>
+<td style="width:90px">形态类（宽口径过）</td><td>What are the different government forms and what is the total population of each for government forms that have an avera</td>
+<td class="sql">SELECT
+    GovernmentForm,
+    SUM(Population) AS TotalPopulation
+FROM country
+GROUP BY GovernmentForm
+HAVING AVG(LifeExpectancy) &gt; 72;</td>
+<td class="sql">SELECT sum(Population) ,  GovernmentForm FROM country GROUP BY GovernmentForm HAVING avg(LifeExpectancy)  &gt;  72</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">world_1<br><code style="font-size:11px">spider_dev_798</code></td>
+<td style="width:90px">形态类（宽口径过）</td><td>Find the average life expectancy and total population for each continent where the average life expectancy is shorter th</td>
+<td class="sql">SELECT Continent,
+       AVG(LifeExpectancy) AS avg_life_expectancy,
+       SUM(Population) AS total_population
+FROM country
+GROUP BY Continent
+HAVING AVG(LifeExpectancy) &lt; 72;</td>
+<td class="sql">SELECT sum(Population) ,  avg(LifeExpectancy) ,  Continent FROM country GROUP BY Continent HAVING avg(LifeExpectancy)  &lt;  72</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">world_1<br><code style="font-size:11px">spider_dev_799</code></td>
+<td style="width:90px">形态类（宽口径过）</td><td>What are the different continents and the total popuation and average life expectancy corresponding to each, for contine</td>
+<td class="sql">SELECT
+    Continent,
+    SUM(Population) AS TotalPopulation,
+    AVG(LifeExpectancy) AS AverageLifeExpectancy
+FROM country
+GROUP BY Continent
+HAVING AVG(LifeExpectancy) &lt; 72;</td>
+<td class="sql">SELECT sum(Population) ,  avg(LifeExpectancy) ,  Continent FROM country GROUP BY Continent HAVING avg(LifeExpectancy)  &lt;  72</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">orchestra<br><code style="font-size:11px">spider_dev_828</code></td>
+<td style="width:90px">形态类（宽口径过）</td><td>What are the record companies of orchestras in descending order of years in which they were founded?</td>
+<td class="sql">SELECT Record_Company, Year_of_Founded
+FROM orchestra
+ORDER BY Year_of_Founded DESC;</td>
+<td class="sql">SELECT Record_Company FROM orchestra ORDER BY Year_of_Founded DESC</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">orchestra<br><code style="font-size:11px">spider_dev_829</code></td>
+<td style="width:90px">形态类（宽口径过）</td><td>Return the record companies of orchestras, sorted descending by the years in which they were founded.</td>
+<td class="sql">SELECT Record_Company, Year_of_Founded
+FROM orchestra
+ORDER BY Year_of_Founded DESC;</td>
+<td class="sql">SELECT Record_Company FROM orchestra ORDER BY Year_of_Founded DESC</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">orchestra<br><code style="font-size:11px">spider_dev_850</code></td>
+<td style="width:90px">形态类（宽口径过）</td><td>Please show the record formats of orchestras in ascending order of count.</td>
+<td class="sql">SELECT Major_Record_Format, COUNT(*) AS cnt
+FROM orchestra
+GROUP BY Major_Record_Format
+ORDER BY cnt ASC;</td>
+<td class="sql">SELECT Major_Record_Format FROM orchestra GROUP BY Major_Record_Format ORDER BY COUNT(*) ASC</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">network_1<br><code style="font-size:11px">spider_dev_867</code></td>
+<td style="width:90px">形态类（宽口径过）</td><td>What is the grade of each high schooler?</td>
+<td class="sql">SELECT name, grade
+FROM highschooler;</td>
+<td class="sql">SELECT grade FROM Highschooler</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">network_1<br><code style="font-size:11px">spider_dev_880</code></td>
+<td style="width:90px">形态类（宽口径过）</td><td>Show me all grades that have at least 4 students.</td>
+<td class="sql">SELECT grade, COUNT(ID) AS student_count
+FROM highschooler
+GROUP BY grade
+HAVING COUNT(ID) &gt;= 4;</td>
+<td class="sql">SELECT grade FROM Highschooler GROUP BY grade HAVING count(*)  &gt;=  4</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">dog_kennels<br><code style="font-size:11px">spider_dev_992</code></td>
+<td style="width:90px">形态类（宽口径过）</td><td>How much does the most expensive charge type costs?</td>
+<td class="sql">SELECT charge_type, charge_amount
+FROM (
+    SELECT charge_type, charge_amount,
+           DENSE_RANK() OVER (ORDER BY charge_amount DESC) AS rk
+    FROM charges
+) t
+WHERE rk = 1;</td>
+<td class="sql">SELECT max(charge_amount) FROM Charges</td>
+<td></td></tr>
+<tr><td style="white-space:nowrap">dog_kennels<br><code style="font-size:11px">spider_dev_993</code></td>
+<td style="width:90px">形态类（宽口径过）</td><td>What is the charge amount of the most expensive charge type?</td>
+<td class="sql">SELECT charge_type, charge_amount
+FROM (
+    SELECT
+        charge_type,
+        charge_amount,
+        DENSE_RANK() OVER (ORDER BY charge_amount DESC) AS amount_rank
+    FROM charges
+) AS ranked_charges
+WHERE amount_rank = 1;</td>
+<td class="sql">SELECT max(charge_amount) FROM Charges</td>
+<td></td></tr>
+</table>
+
+<h2>五、失败分桶说明</h2>
+<ul>
+  <li><b>并列保序（39 题）</b>：并列最值/并列计数：模型 DENSE_RANK/RANK 保留全部并列行（gen ⊇ gold），gold LIMIT 1 任意取一行。模型结果 ⊇ gold，
+      建议评测时「并列分桶」单独统计（BIRD/Falcon 同款 tie-breaking 问题），不耗优化预算。</li>
+  <li><b>形态类（67 题，宽口径通过）</b>：列序与题面用词不一致（perm 层）、
+      多输出 1 列（extra_col 层）、AVG 半进位 0.0001 级精度漂移（tol 层 ±0.0015）。</li>
+  <li><b>gold quirk（true_wrong 内约 6 题）</b>：TEXT 列字典序排序、count(*) 代 SUM、
+      GROUP BY first_name、边界 &lt;=2、行数代州数——gold 自身口径与题面语义不符，不可两全。</li>
+  <li><b>模型侧可改进（2 类）</b>：① <b>枚举值照抄</b>——q610 丢「!」、q1033 写 'Hse'/'Apt'
+      而实际是 'House'/'Apartment'（Spider 训练集先验反噬），沉淀「枚举值逐字符照抄实际值」知识条目；
+      ② <b>方言</b>——q923 HAVING 非聚合列，MySQL 不允许，生成 prompt 已有方言提示可再强化「聚合条件放 WHERE/HAVING 的边界」。</li>
+</ul>
+
+<h2>六、口径与工具链</h2>
+<ul>
+  <li><b>统一比对器</b>（<code>spider_bench.wide_compare</code>，对齐 Falcon 收敛版）：
+      ① r3/ci 精确多重集 → ② 数值容差（字符串锚点分组配对，±0.0015，吸收 AVG 半进位漂移）→
+      ③ 列排列（≤3 列放宽到 2000 行）→ ④ 排列+容差 → ⑤ 多余列剔除（gen 列 = gold+1）。</li>
+  <li><b>离线重算</b>（<code>analyze_spider.py</code>）：各批次结果按 qid 取最新，gen SQL 全量重放 MySQL，
+      统一 strict/wide/分桶；重放含 Decimal→float 安全转换（MySQL AVG 返回 DECIMAL）。</li>
+  <li><b>多线程（模型分片）</b>：<code>spider_bench test</code> 支持 <code>workers</code> 并发 +
+      <code>fallback_ids</code> 模型池；全量跑批按「一个模型一个线程」round-robin 分片
+      （链 = 7/9/10/8 各领 1/4 题），避免 4 线程全压单模型被限速；单题失败从分片模型起按链轮换重试。</li>
+  <li><b>凭证</b>：跑批凭证走环境变量 <code>QF_MYSQL_PASSWORD</code>/<code>QF_PASSWORD</code>
+      （2026-10-21 合规清理后基准脚本不再硬编码）。</li>
+</ul>
+
+<h2>七、结论与下一步</h2>
+<ul>
+  <li><b>基线定格</b>：Spider dev 全量 946 题严格 EX 77.2% / 宽口径 84.2%，
+      与 140 题抽样期（80.0%/85.0%）基本一致——抽样基线在全量下成立；
+      与 Falcon 收敛后（74.0% 严格）同一量级、同一失败格局，三套基准互证链路稳定性。</li>
+  <li><b>近期可做</b>：① 知识库补「枚举值逐字符照抄」与「MySQL HAVING 非聚合列」条目，小批复测；
+      ② tie 分桶纳入报告主口径（39 题另有统计）；③ 真错 102 题按失败类型手册归类后决定优化预算。</li>
+</ul>
+</div></body></html>

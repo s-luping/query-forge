@@ -28,10 +28,11 @@ DB_DIR = os.path.join(SPIDER_DIR, "database")
 QUESTIONS_DIR = os.path.join(BASE_DIR, "..", "questions", "spider")
 RESULTS_DIR = os.path.join(BASE_DIR, "..", "results", "spider")
 
-MYSQL = dict(host="127.0.0.1", port=3306, user="root", password="REDACTED",
+MYSQL = dict(host="127.0.0.1", port=3306, user="root",
+             password=os.environ.get("QF_MYSQL_PASSWORD", ""),
              charset="utf8mb4", autocommit=True)
 BASE_URL = "http://localhost:8888"
-USER, PWD = "admin", "REDACTED"
+USER, PWD = "admin", os.environ.get("QF_PASSWORD", "")
 MAX_ROWS = 2000
 SESSION = requests.Session()  # 仅单线程路径使用；多线程走 _tls 线程本地会话
 _tls = threading.local()
@@ -454,7 +455,7 @@ def login():
         try:
             r = s.post(f"{BASE_URL}/login", json={"username": USER, "password": PWD},
                        timeout=30)
-        except requests.ConnectionError:
+        except requests.RequestException:  # 含 ReadTimeout（服务 reload 窗口）
             time.sleep(20)
             continue
         if r.status_code == 429:
@@ -478,7 +479,7 @@ def cmd_setup(questions_file):
             ds = unwrap(api("POST", "/api/sync/datasources", json={
                 "name": f"Spider-{db_id}", "db_type": "mysql", "host": "127.0.0.1",
                 "port": 3306, "database": mysql_db, "username": "root",
-                "password": "REDACTED"}))
+                "password": os.environ.get("QF_MYSQL_PASSWORD", "")}))
         ds_id = ds["id"]
         print(f"[{db_id}] datasource id={ds_id}", flush=True)
         print("  test:", api("POST", f"/api/sync/datasources/{ds_id}/test"), flush=True)
@@ -545,7 +546,8 @@ def _eval_one(q, llm_config_id):
 
 def cmd_test(questions_file, out_file, llm_config_id=7, workers=1, fallback_ids=None):
     """多线程批量评测。workers>1 时并发调 QF API；fallback_ids 为逗号分隔的
-    备用 llm_config_id 列表，单题失败（超时/5xx/限流/配额）时按序换配置重试。"""
+    模型池，多线程模式下按模型分片（一个模型一个线程，round-robin 均分题目），
+    单题失败（超时/5xx/限流/配额）时从分片模型起按链轮换重试。"""
     import threading
     from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -573,9 +575,10 @@ def cmd_test(questions_file, out_file, llm_config_id=7, workers=1, fallback_ids=
               f"match={rec.get('match')} wide={rec.get('match_wide')} "
               f"err={str(rec.get('error'))[:60]} elapsed={rec['elapsed_s']}s", flush=True)
 
-    def run_question(q):
+    def run_question(q, start=None):
+        order = ([start] + [c for c in chain if c != start]) if start else chain
         rec = None
-        for cfg in chain:
+        for cfg in order:
             rec = _eval_one(q, cfg)
             if not rec.get("error"):
                 break
@@ -587,10 +590,19 @@ def cmd_test(questions_file, out_file, llm_config_id=7, workers=1, fallback_ids=
         for q in todo:
             save(run_question(q))
     else:
-        with ThreadPoolExecutor(max_workers=workers) as pool:
-            futs = {pool.submit(run_question, q): q for q in todo}
-            for fut in as_completed(futs):
-                save(fut.result())
+        # 一个模型一个线程：按配置链把题 round-robin 分片，每个模型独占线程池
+        # （workers//模型数 个线程，默认恰好 1）；单题失败仍从分片模型起按链轮换重试
+        n_models = len(chain)
+        per = max(1, workers // n_models)
+        pools = {m: ThreadPoolExecutor(max_workers=per) for m in chain}
+        futs = {}
+        for idx, q in enumerate(todo):
+            futs[pools[chain[idx % n_models]].submit(run_question, q,
+                                                     chain[idx % n_models])] = q
+        for fut in as_completed(futs):
+            save(fut.result())
+        for p in pools.values():
+            p.shutdown()
     n_ok = sum(1 for r in results if r.get("match"))
     n_okw = sum(1 for r in results if r.get("match_wide"))
     print(f"\n总计(严格): {n_ok}/{len(results)}  (宽口径): {n_okw + n_ok}/{len(results)}",
