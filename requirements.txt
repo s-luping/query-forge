@@ -46,7 +46,7 @@ jieba>=0.42.0
 
 # --- 向量嵌入模型 ---
 # torch 2.12.0 在 Windows + Python 3.10 下存在 DLL 兼容性问题，排除此版本
-torch==2.6.0
+torch==2.13.0
 sentence-transformers>=3.0.0,<4.0.0
 # 模型下载脚本（download_model.py）
 modelscope>=1.15.0
