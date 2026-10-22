@@ -5,13 +5,13 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from app.auth import (
+from app.security import (
     _get_token_expire_minutes,
     authenticate_user,
     create_access_token,
     hash_password,
 )
-from app.config import COOKIE_SECURE
+from app.settings import COOKIE_SECURE
 from app.limiter import LIMIT_AUTH, limiter
 from app.logger import logger
 from app.timezone import now_beijing

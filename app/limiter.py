@@ -13,8 +13,8 @@ from slowapi.util import get_remote_address
 
 import os
 
-from app.auth import resolve_request_user
-from app.config import DEBUG
+from app.security import resolve_request_user
+from app.settings import DEBUG
 
 
 def _rate_limit_key(request):

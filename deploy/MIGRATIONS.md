@@ -77,7 +77,7 @@
 ## 三、外部数据库（MySQL / PostgreSQL）
 
 不经过 SQLite 轻量迁移：`init_database` 对非 SQLite 仅执行 `create_all`
-（建全量表，含全部索引）。切换到外部库只需修改 `app/config.py` 的 `DATABASE_URL`，
+（建全量表，含全部索引）。切换到外部库只需修改 `app/settings.py` 的 `DATABASE_URL`，
 基线 DDL 可作为审查参考（SQLite 方言，类型映射需按目标库调整）。
 
 ## 四、变更登记规范

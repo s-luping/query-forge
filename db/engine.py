@@ -12,7 +12,7 @@ from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import QueuePool
 
-import app.config as config
+import app.settings as config
 from app.logger import logger
 from app.response import get_request_id
 

@@ -13,7 +13,7 @@ from typing import List
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
-from app.auth import AdminUser
+from app.security import AdminUser
 from app.limiter import LIMIT_HEAVY, LIMIT_READ, limiter
 from app.logger import log_audit, logger
 from app.response import ErrorCode, fail, ok_msg

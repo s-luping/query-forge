@@ -27,7 +27,7 @@ SETTING_META = {
 
 def _seed_system_settings():
     """初始化系统配置表 — 从 config 初始值写入 system_settings"""
-    import app.config as config
+    import app.settings as config
     from db.engine import SessionLocal
     from models.system import SystemSetting
     db = SessionLocal()
@@ -83,7 +83,7 @@ def _seed_roles():
 
 def create_default_admin():
     """创建默认管理员用户（仅首次）"""
-    from app.auth import hash_password
+    from app.security import hash_password
     from db.engine import SessionLocal
     from models.user import User
     db = SessionLocal()

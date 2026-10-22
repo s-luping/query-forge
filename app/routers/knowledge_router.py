@@ -11,7 +11,7 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel, field_validator
 
-from app.auth import CurrentUser
+from app.security import CurrentUser
 from app.limiter import LIMIT_HEAVY, LIMIT_READ, LIMIT_WRITE, limiter
 from app.logger import log_audit, logger
 from app.permissions import get_visible_knowledge_ids, is_admin

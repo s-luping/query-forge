@@ -7,11 +7,11 @@
   db/seed.py          种子数据（所有数据库通用）
   db/database.py      本文件 — get_setting + init_database 编排
 
-切换数据库只需修改 app/config.py 中 DATABASE_URL 的值：
+切换数据库只需修改 app/settings.py 中 DATABASE_URL 的值：
   DATABASE_URL = 'mysql+pymysql://user:pass@host:3306/queryforge?charset=utf8mb4'
   DATABASE_URL = 'postgresql+psycopg2://user:pass@host:5432/queryforge'
 """
-import app.config as config
+import app.settings as config
 from app.logger import logger
 
 # 从 engine.py 引入引擎与会话工厂（统一导出点）

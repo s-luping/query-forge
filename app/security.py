@@ -4,7 +4,7 @@ from typing import Annotated, Any, Dict, Optional
 import jwt
 from fastapi import Depends, HTTPException, Request
 
-from app.config import ACCESS_TOKEN_EXPIRE_MINUTES, SECRET_KEY
+from app.settings import ACCESS_TOKEN_EXPIRE_MINUTES, SECRET_KEY
 from app.logger import logger
 from app.timezone import now_beijing_aware
 from crud.base import session_scope
@@ -54,7 +54,7 @@ def _get_secret_key() -> str:
     if key:
         return key
     raise RuntimeError(
-        'SECRET_KEY 未配置：请设置 app/config.py 的 SECRET_KEY，'
+        'SECRET_KEY 未配置：请设置 app/settings.py 的 SECRET_KEY，'
         '或删除数据库 system_settings 中的 SECRET_KEY 后重新初始化')
 
 

@@ -21,7 +21,7 @@ from apscheduler.triggers.cron import CronTrigger
 from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
-from app.auth import AdminUser
+from app.security import AdminUser
 from app.limiter import LIMIT_READ, LIMIT_WRITE, limiter
 from app.logger import log_audit
 from app.timezone import BEIJING_TZ, now_beijing

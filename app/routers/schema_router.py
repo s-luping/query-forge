@@ -12,7 +12,7 @@ from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict
 
-from app.auth import AdminUser, CurrentUser
+from app.security import AdminUser, CurrentUser
 from app.limiter import LIMIT_HEAVY, LIMIT_READ, LIMIT_WRITE, limiter
 from app.logger import log_audit, logger
 from app.permissions import get_table_grants_by_schema, get_visible_schema_ids, is_schema_visible

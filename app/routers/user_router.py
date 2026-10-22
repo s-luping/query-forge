@@ -11,7 +11,7 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
-from app.auth import AdminUser, CurrentUser, hash_password, verify_password
+from app.security import AdminUser, CurrentUser, hash_password, verify_password
 from app.limiter import LIMIT_READ, LIMIT_WRITE, limiter
 from app.logger import log_audit, logger
 from app.routers.auth_router import _validate_password_strength

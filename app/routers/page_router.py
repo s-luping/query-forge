@@ -2,7 +2,7 @@
 from fastapi import APIRouter
 from fastapi.responses import FileResponse
 
-from app.config import COOKIE_SECURE
+from app.settings import COOKIE_SECURE
 
 router = APIRouter()
 

@@ -17,13 +17,13 @@ def _get_fernet():
     if _fernet_instance is None:
         from cryptography.fernet import Fernet
 
-        from app.config import FERNET_KEY
+        from app.settings import FERNET_KEY
         if FERNET_KEY:
             # 独立 Fernet 密钥（推荐），与 JWT 签名密钥分离
             _fernet_instance = Fernet(FERNET_KEY.encode('utf-8'))
         else:
             # 兼容旧部署：从 SECRET_KEY 派生
-            from app.auth import _get_secret_key
+            from app.security import _get_secret_key
             digest = hashlib.sha256(_get_secret_key().encode('utf-8')).digest()
             _fernet_instance = Fernet(base64.urlsafe_b64encode(digest))
     return _fernet_instance

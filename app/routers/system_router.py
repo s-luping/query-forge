@@ -12,7 +12,7 @@ from typing import List, Optional
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
-from app.auth import AdminUser, CurrentUser
+from app.security import AdminUser, CurrentUser
 from app.limiter import LIMIT_HEAVY, LIMIT_READ, LIMIT_WRITE, limiter
 from app.logger import logger
 from app.response import ErrorCode, fail, ok_msg

@@ -54,11 +54,11 @@ QueryForge/
 ├── app/                    # 应用核心
 │   ├── routers/            # API 路由（auth/user/schema/knowledge/llm/conversation/
 │   │                       #   system/permission/security/sync/driver/scheduler/docs/page）
-│   ├── auth.py             # JWT 认证 + CurrentUser/AdminUser 依赖
+│   ├── security.py         # JWT 认证 + CurrentUser/AdminUser 依赖
 │   ├── permissions.py      # 四层权限校验（数据源→库→表→字段，含 TTL 缓存）
 │   ├── middleware.py       # 安全响应头 / 访问日志 / 页面访问守卫 / CORS
 │   ├── logger.py           # 日志系统（app/llm/audit/server 分离，自动轮转）
-│   ├── config.py           # 全部配置唯一初始值来源
+│   ├── settings.py         # 全部配置唯一初始值来源
 │   ├── crypto.py           # Fernet 加解密
 │   ├── limiter.py          # 限流配置
 │   └── timezone.py
@@ -95,7 +95,7 @@ QueryForge/
 │   ├── css/ js/ img/ vendor/ webfonts/
 │   └── template/           # login/home/index/chatSQL/knowledge/schema/llm/system 页面
 ├── scripts/                # 运维脚本（ci_guard 资产自检 / gen_schema_sql DDL 再生成 /
-│                           #   reset_admin_password / sample_enum_values 枚举实采 / seed_knowledge 知识批量）
+│                           #   admin_account_reset / sample_enum_values 枚举实采 / seed_knowledge 知识批量）
 ├── tests/                  # pytest 回归（含模块红线 AST 检查 test_module_boundaries）
 ├── benchmark/              # NL2SQL 基准评测工具链（Falcon/BIRD/Spider；脚本/题目/结果/数据，
 │                           #   报告产出 docs/测试报告/；详见 docs/README.md）
@@ -183,18 +183,18 @@ start_server.bat
 .venv\Scripts\python.exe main.py
 ```
 
-服务启动后访问 http://localhost:8888（端口在 `app/config.py` 的 `PORT` 修改）
+服务启动后访问 http://localhost:8888（端口在 `app/settings.py` 的 `PORT` 修改）
 
 ### 5. 默认管理员账号
 
 - 用户名：`admin`
-- 密码：`REDACTED`（首次登录后请立即修改；遗忘可用 `scripts/reset_admin_password.py` 重置）
+- 密码：`REDACTED`（首次登录后请立即修改；遗忘可用 `scripts/admin_account_reset.py` 重置）
 
 ---
 
 ## 数据库说明
 
-项目使用 **SQLite 双库**（WAL 模式）存储，也可通过修改 `app/config.py` 的 `DATABASE_URL` 切换 MySQL/PostgreSQL：
+项目使用 **SQLite 双库**（WAL 模式）存储，也可通过修改 `app/settings.py` 的 `DATABASE_URL` 切换 MySQL/PostgreSQL：
 
 | 数据库 | 说明 |
 |--------|------|

@@ -4,7 +4,7 @@ from typing import List, Optional
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
-from app.auth import AdminUser
+from app.security import AdminUser
 from app.limiter import LIMIT_READ, LIMIT_WRITE, limiter
 from app.logger import log_audit
 from app.response import ok

@@ -5,8 +5,8 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from app.auth import resolve_request_user
-from app.config import CORS_ORIGINS, FRAME_ANCESTORS, SLOW_REQUEST_MS
+from app.security import resolve_request_user
+from app.settings import CORS_ORIGINS, FRAME_ANCESTORS, SLOW_REQUEST_MS
 from app.logger import logger
 from app.response import get_request_id, new_request_id, set_request_id
 

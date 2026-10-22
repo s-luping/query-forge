@@ -5,7 +5,7 @@ from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel
 from sqlalchemy import func, or_
 
-from app.auth import AdminUser
+from app.security import AdminUser
 from app.limiter import LIMIT_READ, LIMIT_WRITE, limiter
 from app.logger import logger
 from app.response import ok

@@ -2,9 +2,9 @@
 """重置管理员密码 — 直接改数据库，用于遗忘密码时恢复访问。
 
 用法：
-    python scripts/reset_admin_password.py                     # 交互式输入新密码
-    python scripts/reset_admin_password.py --password 新密码   # 命令行指定
-    python scripts/reset_admin_password.py --username admin --password 新密码
+    python scripts/admin_account_reset.py                     # 交互式输入新密码
+    python scripts/admin_account_reset.py --password 新密码   # 命令行指定
+    python scripts/admin_account_reset.py --username admin --password 新密码
 
 说明：
     - 默认重置用户名为 admin 的账号，可用 --username 指定其他用户；
@@ -46,7 +46,7 @@ def main():
             print('两次输入的密码不一致')
             return 1
 
-    from app.auth import hash_password
+    from app.security import hash_password
     from crud.base import session_scope
     from models.user import User
 

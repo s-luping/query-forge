@@ -9,8 +9,8 @@ from fastapi.staticfiles import StaticFiles
 from slowapi.errors import RateLimitExceeded
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from app.auth import _get_secret_key
-from app.config import DEBUG
+from app.security import _get_secret_key
+from app.settings import DEBUG
 from app.limiter import limiter
 from app.logger import logger, setup_server_logging
 from app.middleware import register_middlewares
@@ -176,7 +176,7 @@ app.include_router(scheduler_router,
 
 
 if __name__ == "__main__":
-    from app.config import HOST, PORT
+    from app.settings import HOST, PORT
     uvicorn.run(
         "main:app",
         host=HOST,

@@ -18,7 +18,7 @@ bcrypt>=4.0.0
 # --- 数据库 ---
 sqlalchemy>=2.0.0
 # 外部数据库驱动（系统库切换 + 元数据同步：MySQL / PostgreSQL）
-# 修改 app/config.py 中 DATABASE_URL 的值即可从 SQLite 切换到外部数据库
+# 修改 app/settings.py 中 DATABASE_URL 的值即可从 SQLite 切换到外部数据库
 pymysql>=1.1.0
 psycopg2-binary>=2.9.0
 

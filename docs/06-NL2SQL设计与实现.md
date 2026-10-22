@@ -412,7 +412,7 @@ SQL 执行成功但 0 行时，assistant 消息的 `permission_note` 会追加�
 | 低 | sql_gateway `process` | 同一 SQL 重复 parse 两次 | 复用首次解析 |
 | 低 | app/cache `_hashable` | set 迭代序不稳定导致缓存键抖动 | 排序后转 tuple |
 | 低 | app/utils.py | 指向不存在旧库的死代码，全项目无调用 | 删除 |
-| 性能 | app/auth + middleware + limiter | 同一请求 token 解析（JWT+2 次 DB 查询）重复 3~4 次 | `resolve_request_user` 结果缓存到 request.state，全请求仅解析 1 次 |
+| 性能 | app/security + middleware + limiter | 同一请求 token 解析（JWT+2 次 DB 查询）重复 3~4 次 | `resolve_request_user` 结果缓存到 request.state，全请求仅解析 1 次 |
 
 ### 10.1 已识别、待后续处理（按优先级）
 
