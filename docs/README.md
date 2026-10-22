@@ -21,17 +21,18 @@
 | [08-NL2SQL基准测试方案.md](08-NL2SQL基准测试方案.md) | 基准选型（Falcon/BIRD/Spider/DuSQL）、指标、对接流程、基线记录 |
 | [09-NL2SQL评测失败类型手册.md](09-NL2SQL评测失败类型手册.md) | 跑批失败归因标准：宽口径五层比对、错误类型 A/B/C 三类、优化预算分配原则 |
 
-## 测试报告（docs/测试报告/，10 份）
+## 测试报告（docs/测试报告/，11 份）
 
 | 报告 | 覆盖 |
 |---|---|
+| NL2SQL三基准评测总报告_20261021 | Falcon/BIRD/Spider 三基准汇总：总览、跨基准失败类型分布、优化轨迹、链路健康度 |
 | NL2SQL验证测试报告.pdf / NL2SQL经典场景测试报告.pdf | 第一轮（milk_tea_sales 7 场景）/ 第二轮（northwind+sakila 10 题）手工验证 |
 | BIRD基准NL2SQL测试报告.html | BIRD dev 24 题多轮合并（turbo/glm53/双模型/小库直通优化），去重后终版 |
 | Falcon抽样5题 / 抽样30题报告（_20261017） | Falcon 前两轮抽样，逐题归因 |
 | Falcon小批优化对比_20261018 / _第5轮 | 比对器修复 + KB 迭代的小批验证 |
 | Falcon知识库优化对比_20261017 | KB A/B 评测（35 题，+1.4pp）与枚举照抄结论 |
 | Falcon全量迭代收敛报告_20261019 | Falcon 全量 309 题三轮收敛终版（35.8%→74.0%），含残余失败分类 |
-| Spider累计140题报告_glm53_20261020 | Spider dev 140 题三轮累计（严格 80.0% / 宽口径 85.0%），20 库全覆盖 |
+| Spider全量946题报告_glm53_20261021 | Spider dev 全量 946 题（严格 77.2% / 宽口径 84.2%），20 库全覆盖，模型分片跑批 |
 
 ## 基准评测（benchmark/，与《08-NL2SQL基准测试方案》配套）
 
@@ -44,11 +45,12 @@ benchmark/
 ├── bird/        # BIRD：qf_bench_run.py（评测）/ bird_to_mysql.py / bird_select_and_ground.py
 │                #   make_bird_report.py / recompute_match.py
 ├── questions/   # 题目主档：falcon/questions_falcon.jsonl(309) / bird/bird_selected_questions.json /
-│                #   spider/spider_selected.json(140，唯一主档)
+│                #   spider/spider_full_dev.json(946 全量主档，spider_selected.json 为 140 题抽样档)
 ├── results/     # 原始评测数据，按数据集分子目录（falcon/ bird/ spider/）；
 │                #   报告一律产出 docs/测试报告/，不放本目录
 │                #   Falcon 终版：falcon.c7.final.enriched.jsonl + full309(.r2)/kb35 enriched；
-│                #   BIRD：bird_eval_*.json 7 份（合并报告输入）；Spider：extra30/extra100 + cumulative analysis
+│                #   BIRD：bird_eval_*.json 7 份（合并报告输入）；
+│                #   Spider：extra30/extra100/fulldiv + fulldiv_946 analysis
 └── data/        # 数据集原始包（gitignore：falcon / bird / spider）
 ```
 
