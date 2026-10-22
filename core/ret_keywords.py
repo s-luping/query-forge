@@ -86,7 +86,8 @@ class KeywordExtractor:
         if not word or len(word) < 2:
             return False
 
-        if word in self.stop_words:
+        # 停用词匹配忽略大小写（英文问句 "Show/the" 与词表小写条目对齐）
+        if word.lower() in self.stop_words:
             return False
 
         if word.isdigit():

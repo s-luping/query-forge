@@ -105,8 +105,15 @@ class _FakeRetriever:
                                              'column_name': 'c1'}}}
 
     def recall_knowledge(self, query, scope_schema_id=None, keywords=None,
-                         exclude_contents=None, scope=None):
+                         exclude_contents=None, scope=None,
+                         preferred_schema_ids=None):
         return {'items': [], 'prompt_text': '', 'related_tables': []}
+
+    def recall_tables_by_name(self, keywords, schema_name=None, scope=None):
+        return []
+
+    def schema_ids_by_names(self, names):
+        return []
 
     def resolve_scope_schema_id(self, schema_name):
         return None

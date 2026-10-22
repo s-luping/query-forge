@@ -95,6 +95,21 @@ class SchemaRetriever:
     def field_count(self, schema_name: Optional[str] = None) -> int:
         return schema_service.field_count(schema_name)
 
+    def schema_ids_by_names(self, names) -> List[int]:
+        """库名集合 → schema id 列表（用于知识分层的相关性比对；失败返回空）"""
+        names = [n for n in set(names or []) if n]
+        if not names:
+            return []
+        try:
+            from crud.base import session_scope
+            from models.schema import DbSchema
+            with session_scope() as db:
+                rows = db.query(DbSchema.id).filter(DbSchema.name.in_(names)).all()
+            return [r[0] for r in rows]
+        except Exception as e:
+            logger.warning(f"[SchemaRetriever] 库名解析 id 失败: {e}")
+            return []
+
     def resolve_scope_schema_id(self, schema_name: Optional[str]) -> Optional[int]:
         """库名 → schema id（用于知识作用域过滤；未知库返回 None）"""
         if not schema_name:
@@ -460,11 +475,15 @@ class SchemaRetriever:
     def recall_knowledge(self, query: str, scope_schema_id: Optional[int] = None,
                          keywords: Optional[List[str]] = None,
                          exclude_contents: Optional[set] = None,
-                         scope: Optional[RecallScope] = None) -> Dict:
+                         scope: Optional[RecallScope] = None,
+                         preferred_schema_ids: Optional[List[int]] = None) -> Dict:
         """按 query 关键词召回 typed 知识条目，返回注入提示词的文本块与关联表（用于动态扩表）。
 
         exclude_contents: 已注入 prompt 的知识内容集合（如用户勾选知识库的 content），
         命中条目按 content 精确去重，避免同一知识在【领域知识】中出现两次。
+
+        preferred_schema_ids: 本次召回涉及的库 id——知识按「涉及库绑定 > 全局 >
+        其他可见库」分层取用（防其他业务域口径知识污染判断步），最多注入 6 条。
 
         Returns:
             {
@@ -482,6 +501,7 @@ class SchemaRetriever:
 
         # 可见性：global 条目人人可召回；personal 仅属主/被授权者
         # （快照的 visible_knowledge_ids 对管理员/通配授权为 None = 不限制）
+        # 多取一倍候选：后续按库相关性分层裁到 KNOWLEDGE_RECALL_LIMIT
         owner_user_id = self.user_id
         s = self._scope(scope)
         items = knowledge_crud.search_matched_items(
@@ -490,10 +510,36 @@ class SchemaRetriever:
         if exclude_contents:
             items = [d for d in items
                      if (d.get('content') or '').strip() not in exclude_contents]
+        # 知识绑库权限交集（全库模式：SQL 层 scope 过滤不生效，这里按用户可见库过滤）。
+        # 条目绑定的库不在用户可见范围内 → 不注入（防无权限域的知识进入上下文）。
+        # relation 类型豁免：其产出是表名清单，扩表时仍有库/表/字段级权限过滤兜底。
+        if scope_schema_id is None and s.visible_schema_ids is not None:
+            allowed = set(s.visible_schema_ids)
+            preferred = set(preferred_schema_ids or [])
+            inv = {sid for sid in preferred if sid in allowed} or preferred
+
+            def _tier(d: Dict) -> int:
+                if d.get('knowledge_type') == 'relation':
+                    return 0   # relation 用于动态扩表，优先保留
+                sid = d.get('scope_schema_id')
+                if sid is None:
+                    return 1   # 全局条目（输出规范等）
+                if sid in inv:
+                    return 0   # 绑定库与本次涉及库相关
+                return 2 if sid in allowed else 9   # 9 = 绑定库不可见 → 剔除
+
+            items = [d for d in items if _tier(d) < 9]
+            pre_sort = list(items)          # 原 score 序（related_tables 收集顺序保持不变）
+            items.sort(key=_tier)           # 稳定排序：同层保持原 score 降序
+        else:
+            pre_sort = list(items)
+        items = items[:6]
+        # related_tables 按原始 score 顺序收集（与旧行为一致，仅集合随分层裁剪变化）
+        _selected_ids = {d.get('id') for d in items}
+        related_source = [d for d in pre_sort if d.get('id') in _selected_ids]
         serialized: List[Dict] = []
         related_tables: List[str] = []
-        for d in items:
-            serialized.append(d)
+        for d in related_source:
             pl = d.get('payload') or {}
             # relation 类型：收集两侧表名用于动态扩表（实现跨库作用域发现）
             if d['knowledge_type'] == 'relation':
@@ -508,12 +554,55 @@ class SchemaRetriever:
             for t in (pl.get('related_tables') or []):
                 if t and t not in related_tables:
                     related_tables.append(t)
+        for d in items:
+            serialized.append(d)
 
         return {
             'items': serialized,
             'prompt_text': _format_knowledge_prompt(serialized),
             'related_tables': related_tables,
         }
+
+    def recall_tables_by_name(self, keywords: List[str],
+                              schema_name: Optional[str] = None,
+                              scope: Optional[RecallScope] = None) -> List[str]:
+        """表名兜底召回：问题关键词与用户可见库的表名双向包含匹配（len>=3）
+
+        背景：向量召回按列名/描述语义排序，问题核心实体是表名（stadium/concert）
+        而列名是通用词时召回 miss（spider 库判断步误拦截事故）；DB 关键词兜底
+        匹配列元数据，同样可能漏"列名与表名无交集"的表。此兜底直接匹配表名，
+        仅返回用户可见（库级+表级权限）的表，供编排层并入聚合结果。
+        """
+        kws = [k.lower() for k in keywords if len(k) >= 3]
+        if not kws:
+            return []
+        from crud.base import session_scope
+        from models.schema import DbSchema, DbTable
+
+        s = self._scope(scope)
+        visible_ids = s.visible_schema_ids
+        table_grants = s.table_grants
+        if visible_ids is not None and not visible_ids:
+            return []
+        with session_scope() as db:
+            q = (db.query(DbSchema.id, DbSchema.name, DbTable.id, DbTable.name)
+                 .join(DbTable, DbTable.schema_id == DbSchema.id))
+            if schema_name:
+                q = q.filter(DbSchema.name == schema_name)
+            elif visible_ids is not None:
+                q = q.filter(DbSchema.id.in_(visible_ids))
+            rows = q.all()
+        hits: List[str] = []
+        for sid, sname, tid, tname in rows:
+            tl = (tname or '').lower()
+            if not any(kw in tl or tl in kw for kw in kws):
+                continue
+            # 表级白名单：该库配置了表级约束时须在名单内
+            if sid in table_grants and tid not in (table_grants.get(sid) or []):
+                continue
+            if tname not in hits:
+                hits.append(tname)
+        return hits
 
     def extend_aggregation_with_tables(self, aggregation: Dict, table_names: List[str],
                                        schema_name: Optional[str] = None,

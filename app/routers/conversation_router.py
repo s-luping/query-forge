@@ -93,6 +93,10 @@ def _permission_note(result: dict, query_result: Optional[dict] = None) -> Optio
     """
     gw = result.get('gateway')
     parts = []
+    # 权限裁剪提示（哪些字段/表被裁减）：权限明细步生成，无论生成与否都透出
+    trimmed = (result.get('trimmed_notice') or '').strip()
+    if trimmed:
+        parts.append(trimmed)
     if gw:
         if gw.get('was_modified'):
             tables = []

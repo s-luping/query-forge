@@ -68,8 +68,8 @@ flowchart TD
 
 模型/知识库加载作为 `LLM_CONFIG_LOAD / KNOWLEDGE_LOAD` 写入链路日志头部（PIPELINE_START 之后）；
 **库级可见性校验（AUTH_SCHEMA_CHECK）不在入口执行**——前台只带问题/模型/知识库，
-先召回聚合确定本次涉及的库/表，再做库级硬闸门（`is_schema_visible`，失败 403，
-见 §3.4a）。
+先召回聚合确定本次涉及的库/表，再在「鉴权与权限明细」步做库级硬闸门
+（`is_schema_visible`，失败 403，见 §3.5）。
 
 ### 3.2 ② 关键词提取（jieba）
 
@@ -79,11 +79,15 @@ flowchart TD
 
 - `dict.txt`：启动时 `jieba.set_dictionary()` 设为主词典，避免 pip 包缺 dict.txt；
 - `custom_words.txt`：自定义词库，每行一个词、`#` 为注释，启动时 `jieba.add_word` 加入词典（`_load_custom_words`）；
-- `stop_words.txt`：停用词唯一来源，每行一个词、`#` 为注释，由 `_load_stop_words` 加载；文件缺失时停用词过滤不生效（仅告警不阻断）。
+- `stop_words.txt`：停用词唯一来源，每行一个词、`#` 为注释，由 `_load_stop_words` 加载；文件缺失时停用词过滤不生效（仅告警不阻断）。含英文问句虚词/疑问词（the/of/what/show…），停用词匹配忽略大小写——否则英文问题的 "the" 等 LIKE 匹配会同时污染字段召回与知识召回。
 
 设计要点：**追问轮若无实质业务词**（如"不对，条件改一下"），提取结果为空——此时跳过向量召回直接复用首轮表集合（全库向量召回必然跑偏，召回过百无关字段反而污染上下文）。
 
 ### 3.3 ③ 字段召回（向量 + DB 并集）
+
+**表名兜底召回（Step 2.5）**：`recall_tables_by_name(keywords)`——问题关键词与用户可见库的**表名**双向包含匹配（len≥3，按库级+表级权限过滤）。向量按列名/描述语义排序、DB 兜底匹配列元数据，都会漏"问题实体是表名、列名与表名无交集"的表（stadium/concert 事故）；兜底命中的表经 `extend_aggregation_with_tables` 并入聚合结果，链路记 `STEP_RECALL_TABLE_FALLBACK`。
+
+判断步拦截时按同一匹配做**权限归因**（`_recall_gap_hint`）：缺失实体在可见库中有匹配表 → "召回未覆盖，请换问法/指定库"；无匹配 → "您可见的数据库中未找到相关表（可能无该库权限，或库未收录）"——不再让"召回结果里没有"被误读为无权限或数据不存在。
 
 `SchemaRetriever.recall_fields(keywords, schema_name, query)`：
 
@@ -115,23 +119,32 @@ flowchart TD
 
 产出 `schema_csv`（表名,字段名,字段类型,字段描述,主键,外键）——**跨库模式表名带库前缀**（`库名.表名`），供 LLM 生成可路由执行的 SQL。
 
-### 3.4a ④+ 数据库鉴权（库级可见性，表聚合之后）
+### 3.5 ⑤ 鉴权与权限明细（本轮涉及库/表/字段）
 
-`is_schema_visible(user, schema_name)` 硬闸门：表聚合后本次涉及的库/表已明确，再校验
-请求库对用户是否可见（防绕过前端直接请求无权限库），失败 403、链路留痕
-`AUTH_SCHEMA_CHECK`（status=intercept）。此前该校验在链路最前——但前台只带
-问题/模型/知识库，未召回前无法确定涉及哪些库，故后移至此。
-召回本身已按权限快照（RecallScope.visible_schema_ids）过滤，无权限库召回为空，无泄露。
+**鉴权（库级硬闸门）与权限明细在同一留痕步（STEP_PERMISSION）完成**——不再设独立的
+"数据库鉴权"步（此前全库模式下该步只产出 `schema_name: null, passed: true`，无信息量）。
 
-### 3.5 ⑤ 权限裁剪统计
+`is_schema_visible(user, schema_name)`：指定了请求库时校验用户可见性（防绕过前端直接
+请求无权限库），不可见 → 步骤 status=intercept、抛 `SchemaAuthError`（路由层转 403）；
+全库模式（schema_name=None）不针对特定库，无需校验。召回本身已按权限快照
+（RecallScope.visible_schema_ids）过滤，无权限库召回为空，无泄露。
 
-`_log_permission_stats`：记录库级可见性、表级白名单覆盖、字段 SELECT/FILTER/NONE 分布，并按敏感级别列出敏感/机密字段名单——供审计核对"该拦的有没有被拦"。
+权限明细记录**本轮实际涉及资源**的权限，而非"可见多少"的范围计数——
+
+- 库级：涉及的库 + 对用户是否可见（`involved_schemas`）；
+- 表级：涉及的表 + 是否在表级白名单内 + 逐表 SELECT/FILTER/NONE 计数（`involved_tables`）；
+- 字段级：FILTER（可作条件不可取值）/ NONE（已裁剪）字段名单（`fields_by_access`），并按敏感级别列出敏感/机密字段——供审计核对"该拦的有没有被拦"。
+
+**裁剪提示透出**：明细步同时生成用户可见的裁剪提示（哪些字段/表被裁减了），
+无论本轮最终生成与否都随结果透出（路由层并入 `permission_note`，消息气泡展示）。
+
+知识条目的实际注入清单（id/标题/类型）在「知识召回」步记录，召回时已按知识可见性过滤。
 
 ### 3.6 ⑥ 知识召回与动态扩表
 
 `recall_knowledge(query, scope_schema_id, exclude_contents)`：
 
-- **typed 知识**（八种类型：note/terminology/calculation/relation/value_domain/convention/entity_map/sample_qa）按关键词匹配（SQL LIKE 粗筛 + 内存打分，limit 12），渲染为 `【领域知识】` 文本块注入 prompt；
+- **typed 知识**（八种类型：note/terminology/calculation/relation/value_domain/convention/entity_map/sample_qa）按关键词匹配（SQL LIKE 粗筛 + 内存打分），**按「绑定库≈本次涉及库 > 全局 > 其他可见库」分层取 6 条**（绑定的库不在用户可见范围内 → 剔除；relation 豁免，其扩表下游仍有权限过滤），渲染为 `【领域知识】` 文本块注入 prompt；
 - **relation 知识**：payload 中 left/right 两侧表名自动收集为 `related_tables`，经 `extend_aggregation_with_tables` **跨库扩表**（不过滤 schema_name，仅按权限裁剪）——实现"知识描述的表关系把分散在多个库的表自动纳入上下文"；
 - 与用户勾选知识按 content 精确去重，防同一知识两次注入；
 - 作用域 `scope_schema_id`：知识可绑定库或全局。
@@ -308,7 +321,7 @@ assistant 消息通过 `llm_call_id` 关联调用明细，首轮 schema 上下�
 
 ```
 PIPELINE_START → LLM_CONFIG_LOAD → KNOWLEDGE_LOAD
-→ STEP1_KEYWORDS → STEP2_RECALL → STEP3_AGGREGATE → AUTH_SCHEMA_CHECK → STEP_PERMISSION
+→ STEP1_KEYWORDS → STEP2_RECALL → STEP3_AGGREGATE → STEP_PERMISSION（含鉴权硬闸门）
 → STEP_RECALL_KNOWLEDGE → STEP_EXTEND_TABLES → STEP4_CONTEXT
 → STEP_JUDGE_PROMPT → STEP_JUDGE_RESULT → STEP5_RESULT
 → STEP6_VALIDATE → STEP7_GATEWAY → SQL_EXECUTE → MESSAGE_PERSIST

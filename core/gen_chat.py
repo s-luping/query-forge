@@ -202,13 +202,14 @@ class ChatSession:
         import json
         start_time = now_beijing()
         self._tracker = StepTracker()   # 每条消息重置计时（前置步骤耗时由路由层自己的 tracker 计）
+        self._trimmed_notice = ''       # 权限裁剪提示（权限明细步生成，随结果透出）
         # 权限快照：编排层一次性构建（P2 召回/权限解耦，docs §3.2），召回模块只消费数据
         self._scope = build_recall_scope(self.user)
-        # 流程开始登记在最前（前台只带问题/模型/知识库，鉴权在召回确定涉及库表后再做）
+        # 流程开始登记在最前（前台只带问题/模型/知识库，不携带 schema——
+        # 请求库在鉴权步记录、本轮实际涉及库在权限明细步记录）
         pipeline_log = []
         self._log_step(pipeline_log, "PIPELINE_START", {
             "user_id": self.user_id, "query": query,
-            "schema_name": schema_name or "全部",
         }, summary="首轮全链路")
         if pre_log:
             pipeline_log.extend(pre_log)
@@ -242,36 +243,53 @@ class ChatSession:
             summary=(f"{len(aggregation.get('tables', []))} 表 / "
                      f"{len(aggregation.get('all_fields', {}))} 字段"))
 
-        # Step 3.5: 数据库鉴权（库级可见性校验）
-        # 顺序：表聚合后本次涉及的库/表已明确，再做库级硬闸门（防绕过前端请求无权限库）。
-        # 召回本身已按权限快照过滤（无权限库召回为空，无泄露），此处校验负责拦截 + 留痕。
-        from app.permissions import is_schema_visible
-        schema_visible = is_schema_visible(self.user, schema_name)
-        self._log_step(pipeline_log, "AUTH_SCHEMA_CHECK", {
-            "schema_name": schema_name, "role": self.user.get('role', ''),
-            "passed": schema_visible},
-            status='ok' if schema_visible else 'intercept',
-            error=None if schema_visible else "库级可见性校验未通过",
-            summary="库级可见性校验")
-        if not schema_visible:
-            self._audit_auth_intercept(query, pipeline_log, start_time)
-            raise SchemaAuthError("无权访问该数据库")
+        # Step 2.5: 表名兜底召回 — 问题关键词直接命中可见库表名（向量/DB 召回漏表名时补齐）
+        # 背景：向量按列名/描述语义排序，"stadium/concert" 这类表名实体召回 miss，
+        # 判断步会误判"无相关表"；兜底仅匹配用户可见（库级+表级权限）的表名。
+        try:
+            _existing = set(aggregation.get('tables', []))
+            _fb_tables = [t for t in self.retriever.recall_tables_by_name(
+                keywords, schema_name, scope=self._scope) if t not in _existing]
+            if _fb_tables:
+                aggregation = self.retriever.extend_aggregation_with_tables(
+                    aggregation, _fb_tables, schema_name, scope=self._scope)
+                self._log_step(pipeline_log, "STEP_RECALL_TABLE_FALLBACK", {
+                    "added_tables": _fb_tables,
+                    "tables": aggregation.get('tables', [])},
+                    summary=f"表名兜底召回 +{len(_fb_tables)} 表")
+            else:
+                self._log_step(pipeline_log, "STEP_RECALL_TABLE_FALLBACK", {
+                    "added_tables": []},
+                    status='skip', summary="表名兜底无新增")
+        except Exception as e:
+            self._log_step(pipeline_log, "STEP_RECALL_TABLE_FALLBACK", {"error": str(e)},
+                           status='error', error=str(e), summary="表名兜底召回异常（不影响主流程）")
 
-        # Step 3.6: 权限裁剪统计（库级 / 表级 / 字段级）
-        self._log_permission_stats(pipeline_log, aggregation, schema_name)
+        # Step 3.5: 鉴权 + 权限明细（同一留痕：库级硬闸门并入涉及资源权限记录，
+        # 请求库不可见时在权限明细步拦截并抛 SchemaAuthError）
+        self._log_permission_stats(pipeline_log, aggregation, schema_name,
+                                   query_text=query, start_time=start_time)
 
         # 概念级召回：typed 知识单独召回 + relation 动态扩表（自动执行，与用户勾选知识库无关）
-        # 排除已勾选知识库内容（content 精确去重），避免同一知识在【领域知识】中出现两次
+        # 排除已勾选知识库内容（content 精确去重），避免同一知识在【领域知识】中出现两次；
+        # 涉及库 id 传入做分层：绑定库与本次涉及库相关的知识优先，其他业务域口径靠后
         scope_id = scope_schema_id if scope_schema_id is not None else self.retriever.resolve_scope_schema_id(schema_name)
         kb_base = knowledge_content or ''
         kb_parts = {p.strip() for p in kb_base.split('\n\n') if p.strip()}
+        _involved_names = {f.get('schema_name')
+                           for f in (aggregation.get('all_fields') or {}).values()
+                           if f.get('schema_name')}
+        _sid_fn = getattr(self.retriever, 'schema_ids_by_names', None)
         recall = self.retriever.recall_knowledge(
             query, scope_schema_id=scope_id, exclude_contents=kb_parts or None,
-            scope=self._scope)
+            scope=self._scope,
+            preferred_schema_ids=(_sid_fn(_involved_names) if _sid_fn else None))
         self._log_step(pipeline_log, "STEP_RECALL_KNOWLEDGE", {
             "source": "auto_concept_recall",
-            "note": "自动概念召回（对全部知识条目关键词匹配，无需勾选知识库）",
+            "note": "自动概念召回：关键词匹配，按「绑定库≈涉及库 > 全局 > 其他可见库」分层取 6 条；已按知识可见性与绑库权限过滤",
             "matched_count": len(recall['items']),
+            "items": [{"id": it.get('id'), "title": it.get('title'),
+                       "type": it.get('knowledge_type')} for it in recall['items']],
             "related_tables": recall['related_tables']},
             summary=f"自动概念召回 {len(recall['items'])} 条")
         if recall['related_tables']:
@@ -336,6 +354,10 @@ class ChatSession:
             error=((judge or {}).get('reason', '') or None) if _judge_intercept else None,
             summary='拦截：信息不足' if _judge_intercept else '判断可生成')
         if judge and not judge.get('can_generate', True):
+            # 拦截归因：缺失实体与用户可见库表名比对——召回未覆盖 ≠ 无权限/数据不存在
+            _gap = self._recall_gap_hint(keywords, aggregation, schema_name)
+            if _gap:
+                judge['suggestion'] = ((judge.get('suggestion') or '') + f'（{_gap}）').strip()
             return self._need_more_info_result(
                 judge, query, messages, pipeline_log, start_time, aggregation,
                 schema_csv=schema_csv, tables=aggregation.get('tables', []),
@@ -399,6 +421,7 @@ class ChatSession:
             "duration_ms": duration_ms,
             "raw_response": llm_result.get("raw_response", ""),
             "gateway": gateway_info,
+            "trimmed_notice": self._trimmed_notice,
             "pipeline_log": pipeline_log,
             "audit_log_id": audit_log_id,
             "tokens": {
@@ -438,13 +461,14 @@ class ChatSession:
         import json
         start_time = now_beijing()
         self._tracker = StepTracker()   # 每条消息重置计时（前置步骤耗时由路由层自己的 tracker 计）
+        self._trimmed_notice = ''       # 权限裁剪提示（权限明细步生成，随结果透出）
         # 权限快照：编排层一次性构建（P2 召回/权限解耦），追问轮同样按当次权限
         self._scope = build_recall_scope(self.user)
-        # 流程开始登记在最前，前置步骤（模型/知识库）随后（与首轮链路顺序对齐）
+        # 流程开始登记在最前，前置步骤（模型/知识库）随后（与首轮链路顺序对齐）；
+        # 不携带 schema_name——对话关联库在鉴权步、本轮实际涉及库在权限明细步记录
         pipeline_log = []
         self._log_step(pipeline_log, "PIPELINE_START", {
-            "user_id": self.user_id, "query": new_user_content,
-            "schema_name": schema_name or "复用上一轮", "mode": "followup",
+            "user_id": self.user_id, "query": new_user_content, "mode": "followup",
         }, summary="追问轮全链路")
         if pre_log:
             pipeline_log.extend(pre_log)
@@ -504,20 +528,6 @@ class ChatSession:
                     status='skip', summary="复用上一轮 CSV")
                 aggregation = None
 
-        # Step 3.5: 数据库鉴权（库级可见性校验）— 与首轮对齐：召回确定涉及库表后再校验
-        # （对话关联库权限被管理员变更的场景在此拦截，不再进入知识召回与生成）
-        from app.permissions import is_schema_visible
-        schema_visible = is_schema_visible(self.user, schema_name)
-        self._log_step(pipeline_log, "AUTH_SCHEMA_CHECK", {
-            "schema_name": schema_name, "role": self.user.get('role', ''),
-            "passed": schema_visible},
-            status='ok' if schema_visible else 'intercept',
-            error=None if schema_visible else "库级可见性校验未通过",
-            summary="库级可见性校验")
-        if not schema_visible:
-            self._audit_auth_intercept(new_user_content, pipeline_log, start_time)
-            raise SchemaAuthError("无权访问该数据库（对话关联库权限已变更）")
-
         # 累积召回：首轮表集合(first_tables) ∪ 追问重召回表 ∪ 知识扩表
         # 仅当首轮表集合已知时重建（带权限裁剪），否则沿用 router 全量 schema_csv（向后兼容旧对话）
         # 知识扩表（entity_map 等 payload.related_tables 声明的事实表）并入 keep_first：
@@ -532,8 +542,10 @@ class ChatSession:
             scope=self._scope)
         self._log_step(pipeline_log, "STEP_RECALL_KNOWLEDGE", {
             "source": "auto_concept_recall",
-            "note": "自动概念召回（对全部知识条目关键词匹配，无需勾选知识库）",
+            "note": "自动概念召回：关键词匹配，按「绑定库≈涉及库 > 全局 > 其他可见库」分层取 6 条；已按知识可见性与绑库权限过滤",
             "matched_count": len(followup_recall['items']),
+            "items": [{"id": it.get('id'), "title": it.get('title'),
+                       "type": it.get('knowledge_type')} for it in followup_recall['items']],
             "related_tables": followup_recall['related_tables']},
             summary=f"自动概念召回 {len(followup_recall['items'])} 条")
 
@@ -633,8 +645,12 @@ class ChatSession:
                             f"(历史SQL {len(used_tables)} / 召回 "
                             f"{len(aggregation.get('tables', [])) if aggregation else 0} / "
                             f"知识 {len(followup_recall['related_tables'])})")
-                # Step 3.5: 权限裁剪统计（累积后）
-                self._log_permission_stats(pipeline_log, merged_aggregation, schema_name)
+                # 鉴权 + 权限明细（累积后；库级硬闸门不可见时在此抛 SchemaAuthError）
+                self._log_permission_stats(pipeline_log, merged_aggregation, schema_name,
+                                           query_text=new_user_content,
+                                           start_time=start_time)
+            except SchemaAuthError:
+                raise   # 鉴权拦截不落入累积聚合的降级回退
             except Exception as e:
                 logger.warning(f"[ChatSession] 累积聚合失败，回退全量 schema_csv: {e}")
                 self._log_step(pipeline_log, "STEP_CUMULATIVE_AGGREGATE", {
@@ -646,6 +662,10 @@ class ChatSession:
         else:
             schema_csv_used = schema_csv
             relation_tables = _parse_tables_from_csv(schema_csv)
+            # 复用上一轮 CSV 路径：同样做鉴权 + 权限明细（基于复用表集合）
+            self._log_permission_stats(pipeline_log, {'tables': relation_tables},
+                                       schema_name, query_text=new_user_content,
+                                       start_time=start_time)
 
         messages = self._build_messages_from_history(
             conversation_messages, schema_csv_used, db_type, knowledge_content
@@ -725,6 +745,11 @@ class ChatSession:
             error=((judge or {}).get('reason', '') or None) if _judge_intercept else None,
             summary='拦截：信息不足' if _judge_intercept else '判断可生成')
         if judge and not judge.get('can_generate', True):
+            # 拦截归因：与首轮一致，按可见库表名比对（无关键词时跳过归因）
+            _gap = (self._recall_gap_hint(keywords, aggregation, schema_name)
+                    if keywords else '')
+            if _gap:
+                judge['suggestion'] = ((judge.get('suggestion') or '') + f'（{_gap}）').strip()
             return self._need_more_info_result(
                 judge, new_user_content, messages, pipeline_log, start_time,
                 aggregation)
@@ -787,6 +812,7 @@ class ChatSession:
             "duration_ms": duration_ms,
             "raw_response": llm_result.get("raw_response", ""),
             "gateway": gateway_info,
+            "trimmed_notice": self._trimmed_notice,
             "pipeline_log": pipeline_log,
             "audit_log_id": audit_log_id,
             "tokens": {
@@ -845,6 +871,7 @@ class ChatSession:
             "messages": messages, "duration_ms": duration_ms,
             "raw_response": '', "gateway": None, "pipeline_log": pipeline_log,
             "need_more_info": True,
+            "trimmed_notice": getattr(self, '_trimmed_notice', ''),
             "missing_info": judge.get('missing_info', []),
             "suggestion": judge.get('suggestion', ''),
             "judge_reason": judge.get('reason', ''),
@@ -863,6 +890,25 @@ class ChatSession:
         if keywords is not None:
             result["keywords"] = keywords
         return result
+
+    def _recall_gap_hint(self, keywords: List[str], aggregation: Optional[dict],
+                         schema_name: Optional[str]) -> str:
+        """判断拦截时的权限归因：缺失实体在用户可见库中是否有匹配表
+
+        拦截消息此前只描述"召回结果里没有"，用户会误读为无权限/数据不存在。
+        以可见库表名兜底匹配结果归因：有匹配 → 召回未覆盖（引导换问法/指定库）；
+        无匹配 → 可见库中不存在相关表（可能无该库权限或库未收录）。
+        """
+        try:
+            existing = set((aggregation or {}).get('tables', []))
+            hits = [t for t in self.retriever.recall_tables_by_name(
+                keywords, schema_name, scope=self._scope) if t not in existing]
+            if hits:
+                return (f"您有权限的库中存在可能相关的表：{'、'.join(hits[:5])}，"
+                        f"但本次召回未覆盖，请换一种问法重试或指定包含该表的数据库")
+            return '您可见的数据库中未找到相关表（可能无该库权限，或库未收录）'
+        except Exception:
+            return ''
 
     def _audit_auth_intercept(self, query_text: str, pipeline_log: list,
                               start_time) -> None:
@@ -921,47 +967,154 @@ class ChatSession:
         return ''
 
     def _log_permission_stats(self, pipeline_log: list, aggregation: dict,
-                              schema_name: Optional[str]):
-        """记录权限裁剪统计：库级可见性 / 表级白名单 / 字段级访问分布"""
+                              schema_name: Optional[str],
+                              query_text: Optional[str] = None,
+                              start_time=None):
+        """鉴权 + 权限明细（同一留痕步）— 记录本轮实际涉及资源（库/表/字段）的权限
+
+        库级硬闸门：请求库对用户不可见 → 拦截留痕并抛 SchemaAuthError（全库模式
+        不针对特定库，无需校验）。明细部分记录涉及资源而非"可见多少"的范围计数：
+        库级（涉及库+是否可见）、表级（涉及表+白名单+逐表权限分布）、
+        字段级（FILTER/NONE 字段名单）。
+
+        同时生成用户可见的裁剪提示 self._trimmed_notice（哪些被裁减了），
+        无论本轮最终生成与否都随结果透出（路由层并入 permission_note）。
+        """
         from collections import Counter
 
         from app.permissions import (
             get_column_access_map,
             get_table_grants_by_schema,
             get_visible_schema_ids,
+            is_schema_visible,
         )
+        from crud.base import session_scope as _session_scope
+        from models.schema import DbSchema, DbTable
+        from services import schema_service as _schema_service
+
         try:
-            visible = get_visible_schema_ids(self.user)
+            # ── 库级硬闸门（防绕过前端请求无权限库） ──
+            request_visible = (is_schema_visible(self.user, schema_name)
+                               if schema_name else None)   # None=全库模式，不校验
+            if request_visible is False:
+                self._log_step(pipeline_log, "STEP_PERMISSION", {
+                    "request_schema": schema_name, "request_schema_visible": False,
+                    "involved_schemas": [], "involved_tables": []},
+                    status='intercept', error="库级可见性校验未通过",
+                    summary="拦截：库级可见性未通过")
+                if query_text is not None and start_time is not None:
+                    self._audit_auth_intercept(query_text, pipeline_log, start_time)
+                raise SchemaAuthError("无权访问该数据库")
+
+            # 跨库模式表名可能带库前缀（db.table），统计按裸表名匹配
+            tables = [t.split('.')[-1] for t in (aggregation.get('tables') or [])]
+            if not tables:
+                self._trimmed_notice = ''
+                self._log_step(pipeline_log, "STEP_PERMISSION", {"tables": []},
+                               status='skip', summary="本轮无涉及表，跳过权限统计")
+                return
+            visible_ids = get_visible_schema_ids(self.user)   # None=全部可见
             table_grants = get_table_grants_by_schema(self.user)
-            tables = aggregation.get('tables', [])
-            col_map = (get_column_access_map(self.user, schema_name=schema_name,
-                                             table_names=tables or None)
-                       if tables else {})
-            dist = Counter(col_map.values())
-            # 按敏感级别列出字段名，便于审计核对敏感/机密字段是否被正确处理
-            by_level: Dict[str, List[str]] = {'sensitive': [], 'confidential': [],
-                                              'internal': [], 'public': []}
-            for _key, f in (aggregation.get('all_fields') or {}).items():
-                lv = f.get('sensitive_level') or 'public'
-                if lv in by_level:
-                    by_level[lv].append(f"{f.get('table_name')}.{f.get('column_name')}")
-            self._log_step(pipeline_log, "STEP_PERMISSION", {
-                "schema_visible": ("全部" if visible is None
-                                   else (f"{len(visible)} 个" if visible else "无")),
-                "table_grant_schemas": len(table_grants),
-                "fields_in_context": len(aggregation.get('all_fields', {})),
-                "field_access": {
+            col_map = get_column_access_map(self.user, schema_name=schema_name,
+                                            table_names=tables)
+            # 涉及表的全量字段行（不做库/表级预裁剪，逐字段标注实际访问级别）
+            rows = _schema_service.iter_field_rows(
+                schema_name=schema_name, table_names=tables,
+                visible_schema_ids=None, table_grants_by_schema=None)
+
+            # 库/表 id 映射（可见性判断用）
+            involved_schema_names = sorted({r.schema_name for r in rows if r.schema_name})
+            with _session_scope() as db:
+                sid_by_name = dict(db.query(DbSchema.name, DbSchema.id).filter(
+                    DbSchema.name.in_(involved_schema_names)).all()) if involved_schema_names else {}
+                trows = (db.query(DbSchema.name, DbTable.name, DbTable.id)
+                         .join(DbTable, DbTable.schema_id == DbSchema.id)
+                         .filter(DbSchema.name.in_(involved_schema_names),
+                                 DbTable.name.in_(tables)).all()
+                         ) if involved_schema_names else []
+            tid_by_key = {(n, t): i for n, t, i in trows}
+
+            def _access(r):
+                return col_map.get(r.column_id, 'SELECT')
+
+            schemas_detail = [{
+                "schema": n, "schema_id": sid_by_name.get(n),
+                "visible": (True if visible_ids is None
+                            else sid_by_name.get(n) in (visible_ids or [])),
+            } for n in involved_schema_names]
+
+            tables_detail = []
+            for sname, tname in sorted({(r.schema_name, r.table_name) for r in rows}):
+                t_rows = [r for r in rows
+                          if r.schema_name == sname and r.table_name == tname]
+                dist = Counter(_access(r) for r in t_rows)
+                sid = sid_by_name.get(sname)
+                tid = tid_by_key.get((sname, tname))
+                tables_detail.append({
+                    "schema": sname, "table": tname, "table_id": tid,
+                    # sid 未配置表级约束 → 全表可见；否则须在白名单内
+                    "visible": (True if sid is None or sid not in table_grants
+                                else tid in (table_grants.get(sid) or [])),
+                    "field_count": len(t_rows),
                     "SELECT": dist.get('SELECT', 0),
                     "FILTER": dist.get('FILTER', 0),
                     "NONE": dist.get('NONE', 0),
-                },
+                })
+
+            def _names(level):
+                return [f"{r.schema_name}.{r.table_name}.{r.column_name}"
+                        for r in rows if _access(r) == level]
+
+            by_level: Dict[str, List[str]] = {'sensitive': [], 'confidential': [],
+                                              'internal': [], 'public': []}
+            for r in rows:
+                lv = r.sensitive_level or 'public'
+                if lv in by_level:
+                    by_level[lv].append(f"{r.schema_name}.{r.table_name}.{r.column_name}")
+
+            total = len(rows)
+            filter_names, none_names = _names('FILTER'), _names('NONE')
+            n_sel = total - len(filter_names) - len(none_names)
+            detail = {
+                "involved_schemas": schemas_detail,
+                "involved_tables": tables_detail,
+                "fields": {"total": total, "SELECT": n_sel,
+                           "FILTER": len(filter_names), "NONE": len(none_names)},
+                # FILTER=可作查询条件不可取值；NONE=已从上下文裁剪
+                "fields_by_access": {"FILTER": filter_names, "NONE": none_names},
                 "sensitive_fields": by_level['sensitive'],
                 "confidential_fields": by_level['confidential'],
-            },
-                summary=(f"可见库 {'全部' if visible is None else len(visible) or '无'} · "
-                         f"字段 SELECT {dist.get('SELECT', 0)} / FILTER {dist.get('FILTER', 0)}"
-                         f" / NONE {dist.get('NONE', 0)}"))
+            }
+            if schema_name:
+                detail["request_schema"] = schema_name
+                detail["request_schema_visible"] = True
+            else:
+                detail["scope"] = "全库模式（未指定请求库，涉及库见 involved_schemas）"
+            self._log_step(pipeline_log, "STEP_PERMISSION", detail,
+                summary=(f"涉及 {len(schemas_detail)} 库 / {len(tables_detail)} 表 / "
+                         f"{total} 字段 · SELECT {n_sel} / FILTER {len(filter_names)}"
+                         f" / NONE {len(none_names)}"))
+
+            # ── 用户可见的裁剪提示（无论本轮生成与否都随结果透出） ──
+            def _short(names):
+                return '、'.join(names[:5]) + ('等' if len(names) > 5 else '')
+
+            trimmed_parts = []
+            if none_names:
+                trimmed_parts.append(
+                    f"{len(none_names)} 个受限字段未纳入本次分析（{_short(none_names)}）")
+            if filter_names:
+                trimmed_parts.append(
+                    f"{len(filter_names)} 个敏感字段仅可作查询条件（{_short(filter_names)}）")
+            invis_tables = [f"{t['schema']}.{t['table']}"
+                            for t in tables_detail if not t['visible']]
+            if invis_tables:
+                trimmed_parts.append(f"无权访问的表已排除：{_short(invis_tables)}")
+            self._trimmed_notice = '；'.join(trimmed_parts)
+        except SchemaAuthError:
+            raise
         except Exception as e:
+            self._trimmed_notice = ''
             self._log_step(pipeline_log, "STEP_PERMISSION_ERROR", {"error": str(e)},
                            status='error', error=str(e), summary="权限统计异常（不影响裁剪本身）")
 

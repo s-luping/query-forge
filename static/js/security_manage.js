@@ -60,23 +60,24 @@ async function showPipeline(logId) {
         'STEP2_VECTOR_RECALL': '5. 字段召回（向量）', 'STEP2_DB_RECALL': '5. 字段召回（数据库）',
         'STEP2_RECALL': '5. 字段召回',
         'STEP3_AGGREGATE': '6. 表聚合', 'STEP_CUMULATIVE_AGGREGATE': '6. 累积表聚合',
-        // 鉴权在表聚合之后：本次涉及的库/表已明确，再做库级硬闸门
-        'AUTH_SCHEMA_CHECK': '7. 数据库鉴权',
-        'STEP_PERMISSION': '8. 权限裁剪统计（库/表/字段级）',
-        'STEP_PERMISSION_ERROR': '8. 权限裁剪统计（异常）',
+        'STEP_RECALL_TABLE_FALLBACK': '5.5 表名兜底召回',
+        // 鉴权并入权限明细（STEP_PERMISSION）：库级硬闸门 + 涉及库/表/字段权限一次留痕
+        'STEP_PERMISSION': '7. 鉴权与权限明细（涉及库/表/字段）',
+        'STEP_PERMISSION_ERROR': '7. 鉴权与权限明细（异常）',
+        'AUTH_SCHEMA_CHECK': '数据库鉴权（旧版独立步，已并入权限明细）',
         // 知识与上下文
-        'STEP_RECALL_KNOWLEDGE': '9. 知识召回', 'STEP_EXTEND_TABLES': '10. 知识扩表',
-        'STEP4_CONTEXT': '11. 上下文构建',
+        'STEP_RECALL_KNOWLEDGE': '8. 知识召回', 'STEP_EXTEND_TABLES': '9. 知识扩表',
+        'STEP4_CONTEXT': '10. 上下文构建',
         // 判断与生成
-        'STEP_JUDGE_PROMPT': '12. 可否生成判断', 'STEP_JUDGE_RESULT': '12. 可否生成判断',
-        'STEP_JUDGE_ERROR': '12. 可否生成判断（异常）',
-        'STEP5_PROMPT': '12. 提示词构建', 'STEP5_RESULT': '13. LLM 生成',
+        'STEP_JUDGE_PROMPT': '11. 可否生成判断', 'STEP_JUDGE_RESULT': '11. 可否生成判断',
+        'STEP_JUDGE_ERROR': '11. 可否生成判断（异常）',
+        'STEP5_PROMPT': '11. 提示词构建', 'STEP5_RESULT': '12. LLM 生成',
         // 校验与网关
-        'STEP6_VALIDATE': '14. SQL 校验', 'STEP7_GATEWAY': '15. 权限网关',
-        'STEP7_GATEWAY_ERROR': '15. 权限网关（异常）',
+        'STEP6_VALIDATE': '13. SQL 校验', 'STEP7_GATEWAY': '14. 权限网关',
+        'STEP7_GATEWAY_ERROR': '14. 权限网关（异常）',
         // 后置步骤（路由层）
-        'PREFIX_REPAIR': '库前缀修复（全库模式）', 'SQL_EXECUTE': '16. SQL 执行',
-        'MESSAGE_PERSIST': '17. 消息持久化',
+        'PREFIX_REPAIR': '库前缀修复（全库模式）', 'SQL_EXECUTE': '15. SQL 执行',
+        'MESSAGE_PERSIST': '16. 消息持久化',
         'STEP_RESPONSE': '响应返回',
     };
     // StepTrace 统一结构（docs/ChatSQL模块化与全链路留痕设计.md §5.2）：
@@ -98,6 +99,17 @@ async function showPipeline(logId) {
             ? `<div class="text-muted mb-1" style="font-size:12px;"><strong>${esc(s.summary)}</strong></div>` : '';
         const errHtml = s.error
             ? `<div class="alert ${s.status === 'error' ? 'alert-danger' : 'alert-warning'} py-1 px-2 my-1" style="font-size:12px;">${esc(s.error)}</div>` : '';
+        // 长内容折叠：detail JSON 超 400 字符默认收起，点击"展开详情"查看
+        const COLLAPSE_LEN = 400;
+        const detailText = (detail === undefined || detail === null)
+            ? '' : esc(JSON.stringify(detail, null, 2));
+        const preStyle = 'white-space:pre-wrap;word-break:break-all;background:#f8f9fa;padding:8px;border-radius:4px;';
+        let detailHtml = '';
+        if (detailText) {
+            detailHtml = detailText.length > COLLAPSE_LEN
+                ? `<details class="mt-1"><summary style="cursor:pointer;font-size:12px;color:#0d6efd;user-select:none;">▸ 展开详情（${detailText.length} 字符）</summary><pre class="mb-0 mt-1" style="${preStyle}">${detailText}</pre></details>`
+                : `<pre class="mb-0 mt-1" style="${preStyle}">${detailText}</pre>`;
+        }
         return `
         <div class="card mb-2${meta && meta.cls === 'danger' ? ' border-danger' : ''}">
             <div class="card-header py-1 d-flex justify-content-between" style="font-size:13px;">
@@ -105,8 +117,7 @@ async function showPipeline(logId) {
                 <span class="text-muted">${esc(ts)}</span>
             </div>
             <div class="card-body py-2" style="font-size:12px;">
-                ${sumHtml}${errHtml}
-                <pre class="mb-0" style="white-space:pre-wrap;word-break:break-all;background:#f8f9fa;padding:8px;border-radius:4px;">${esc(JSON.stringify(detail, null, 2))}</pre>
+                ${sumHtml}${errHtml}${detailHtml}
             </div>
         </div>`;
     }).join('') : '<div class="text-muted">链路数据为空</div>';
